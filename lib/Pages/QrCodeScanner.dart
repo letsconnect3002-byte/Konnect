@@ -125,7 +125,7 @@ class _QRScannerPageState extends State<QRScannerPage> {
       this.controller = controller;
     });
 
-    controller.scannedDataStream.listen((scanData) {
+    controller.scannedDataStream.listen((scanData) async {
       print("Scanned QR Code: ${scanData.code}");
 
       setState(() {
@@ -137,34 +137,92 @@ class _QRScannerPageState extends State<QRScannerPage> {
           // Ensure raw input is used for decoding
           String rawData = scanData.code ?? "";
 
-          // Convert to valid JSON format
-          String jsonFormatted = convertToJsonFormat(rawData);
+          Map<String, dynamic> decodedData;
+          final trimmed = rawData.trim();
+          if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+            decodedData = jsonDecode(trimmed) as Map<String, dynamic>;
+          } else {
+            // Convert to valid JSON format
+            String jsonFormatted = convertToJsonFormat(rawData);
+            print("Converted to Data Map: $jsonFormatted");
+            // Decode the JSON
+            decodedData = jsonDecode(jsonFormatted) as Map<String, dynamic>;
+          }
 
-          print("Converted to Data Map: $jsonFormatted");
-
-          // Decode the JSON
-          Map<String, dynamic> decodedData = jsonDecode(jsonFormatted);
-
-          // // Parse the JSON string
-          // Map<String, String> dataMap = jsonDecode(decodedData);
           print("Decoded Data Map: $decodedData");
 
           // Pause the camera to prevent additional scans
           controller.pauseCamera();
 
-          // Navigate to the ProfileCard page with the parsed data
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => ProfileCard(profileData: decodedData),
-            ),
-          );
+          if (decodedData.containsKey('userId')) {
+            final userIdVal = decodedData['userId'];
+            final int idToFetch = userIdVal is int ? userIdVal : int.parse(userIdVal.toString());
+
+            // Show a progress dialog while fetching profile
+            if (mounted) {
+              showDialog(
+                context: context,
+                barrierDismissible: false,
+                builder: (context) => const Center(
+                  child: CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF00F2FE)),
+                  ),
+                ),
+              );
+            }
+
+            if (!mounted) return;
+            final profileProvider = Provider.of<ProfileProvider2>(context, listen: false);
+            final fetchedData = await profileProvider.fetchProfileDataOnly(idToFetch);
+            if (fetchedData.isNotEmpty) {
+              fetchedData['sharedCard'] = decodedData['sharedCard'] ?? 'both';
+            }
+
+            if (mounted) {
+              Navigator.pop(context); // Dismiss progress dialog
+            }
+
+            if (fetchedData.isNotEmpty && fetchedData['name'].toString().isNotEmpty) {
+              if (mounted) {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => ProfileCard(profileData: fetchedData),
+                  ),
+                ).then((_) {
+                  controller.resumeCamera();
+                });
+              }
+            } else {
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text("Profile data not found")),
+                );
+                controller.resumeCamera();
+              }
+            }
+          } else {
+            decodedData['sharedCard'] = decodedData['sharedCard'] ?? 'both';
+            if (mounted) {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => ProfileCard(profileData: decodedData),
+                ),
+              ).then((_) {
+                controller.resumeCamera();
+              });
+            }
+          }
         } catch (e) {
           // Handle any parsing errors gracefully
           print("Error decoding QR data: $e");
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text("Invalid QR Code")),
-          );
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text("Invalid QR Code")),
+            );
+          }
+          controller.resumeCamera();
         }
       }
     });
@@ -207,12 +265,36 @@ class _ProfileCardState extends State<ProfileCard> {
   }
 
   void saveProfile() async {
-    provider.saveOtherProfileData(false, widget.profileData).then((v) async {
+    if (provider.userId == -1) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Saved")),
+        const SnackBar(content: Text("Please set up your profile first")),
       );
-      // List data = await provider.getOtherProfiles();
-      // print(data);
+      return;
+    }
+    final otherUserIdVal = widget.profileData['id'];
+    if (otherUserIdVal == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Invalid scanned profile data")),
+      );
+      return;
+    }
+    final int scannedUserId = otherUserIdVal is int ? otherUserIdVal : int.parse(otherUserIdVal.toString());
+
+    final String presenterSharedCard = widget.profileData['sharedCard'] ?? 'both';
+
+    provider.connectUsers(
+      provider.userId, 
+      scannedUserId, 
+      sharedCardByPresenter: presenterSharedCard,
+    ).then((v) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Connected successfully!")),
+      );
+      Navigator.pop(context); // Pop back to previous screen
+    }).catchError((e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Error saving connection: $e")),
+      );
     });
   }
 

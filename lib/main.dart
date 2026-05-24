@@ -1,32 +1,29 @@
+import 'dart:ui';
+
+import 'package:connect/Config/supabase_config.dart';
 import 'package:connect/Pages/OtherProfilesPage.dart';
 import 'package:connect/Pages/ProfilePage.dart';
+import 'package:connect/Pages/yet_to_be_built_profile_page.dart';
 import 'package:connect/Providers/ProfileProvider.dart';
 import 'package:connect/Providers/ProviderSQL.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+import 'package:connect/Pages/AuthScreen.dart';
 
 void main() async {
-  // WidgetsFlutterBinding.ensureInitialized();
-  // await Firebase.initializeApp();
-  runApp(MyApp());
+  WidgetsFlutterBinding.ensureInitialized();
+  await Supabase.initialize(
+    url: SupabaseConfig.url,
+    anonKey: SupabaseConfig.serviceRoleKey,
+  );
+  runApp(const MyApp());
 }
 
-class MyApp extends StatefulWidget {
-  @override
-  State<MyApp> createState() => _MyAppState();
-}
-
-class _MyAppState extends State<MyApp> {
-  final screens = [ProfilePage(), const OtherProfilesPage()];
-  int i = 0;
-  // @override
-  // void initState() {
-  //   // TODO: implement initState
-  //   super.initState();
-  //   setState(() {
-  //     i = 0;
-  //   });
-  // }
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -35,64 +32,209 @@ class _MyAppState extends State<MyApp> {
         ChangeNotifierProvider(create: (_) => ProfileProvider()),
         ChangeNotifierProvider(create: (_) => ProfileProvider2()),
       ],
-      child: MaterialApp(
-        home: Scaffold(
-          body: screens[i],
-          bottomNavigationBar: BottomNavigationBar(
-            onTap: (value) {
-              setState(() {
-                i = value;
-              });
-            },
-            backgroundColor: Colors.black,
-            selectedItemColor: Colors.white,
-            unselectedItemColor: Colors.grey,
-            selectedLabelStyle: const TextStyle(color: Colors.white),
-            unselectedLabelStyle: const TextStyle(color: Colors.grey),
-            items: <BottomNavigationBarItem>[
-              BottomNavigationBarItem(
-                icon: Icon(
-                  Icons.person_2_rounded,
-                  color: Colors.white,
-                  size: 30,
-                ),
-                label: 'Profile',
-              ),
-              // BottomNavigationBarItem(
-              //   icon: Icon(Icons.connect_without_contact_rounded,
-              //       size: 30, color: Colors.white),
-              //   label: 'Connections',
-              // ),
-              BottomNavigationBarItem(
-                icon: Image.asset(
-                  'assets/icons/Connect Icon3.png',
-                  width: 40, // Adjust width as needed
-                  height: 40, // Adjust height if necessary
-                  fit: BoxFit
-                      .contain, // You can adjust the fit to control how the image is scaled
-                ),
-                label: 'Connections',
-              )
-
-              // BottomNavigationBarItem(
-              //   icon: Icon(Icons.chat, color: Colors.white),
-              //   label: 'Chats',
-              // ),
-            ],
-          ),
-        ),
-        // home: QrDisplayPage(data: "${profileData}"),
-        // home: QRScannerPage(),
+      child: const MaterialApp(
+        debugShowCheckedModeBanner: false,
+        home: AuthGate(),
       ),
     );
+  }
+}
 
-    // ChangeNotifierProvider(
-    //   create: (_) => ProfileProvider(),
-    //   child: MaterialApp(
-    //     home: ProfilePage(),
-    //     // home: QrDisplayPage(data: "${profileData}"),
-    //     // home: QRScannerPage(),
-    //   ),
-    // );
+class AuthGate extends StatelessWidget {
+  const AuthGate({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<AuthState>(
+      stream: Supabase.instance.client.auth.onAuthStateChange,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Scaffold(
+            backgroundColor: Color(0xFF090A0F),
+            body: Center(
+              child: CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF00F2FE)),
+              ),
+            ),
+          );
+        }
+
+        final session = snapshot.data?.session;
+        if (session != null) {
+          return const AppShellGate();
+        }
+
+        return const AuthScreen();
+      },
+    );
+  }
+}
+
+class AppShellGate extends StatefulWidget {
+  const AppShellGate({super.key});
+
+  @override
+  State<AppShellGate> createState() => _AppShellGateState();
+}
+
+class _AppShellGateState extends State<AppShellGate> {
+  bool _initialized = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _initUser();
+  }
+
+  Future<void> _initUser() async {
+    final provider = Provider.of<ProfileProvider2>(context, listen: false);
+    try {
+      await provider.ensureProfileExists();
+      final userId = await provider.fetchAndSetUserId2(true);
+      if (userId != -1) {
+        final userData = await provider.loadProfile(userId);
+        provider.setUserData(userData);
+      }
+    } catch (e) {
+      print("Error in AppShellGate initialization: $e");
+    } finally {
+      if (mounted) {
+        setState(() {
+          _initialized = true;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_initialized) {
+      return const Scaffold(
+        backgroundColor: Color(0xFF090A0F),
+        body: Center(
+          child: CircularProgressIndicator(
+            valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF00F2FE)),
+          ),
+        ),
+      );
+    }
+    return const _AppShell();
+  }
+}
+
+class _AppShell extends StatefulWidget {
+  const _AppShell();
+
+  @override
+  State<_AppShell> createState() => _AppShellState();
+}
+
+class _AppShellState extends State<_AppShell> {
+  int _currentIndex = 0;
+  late final List<Widget> _screens;
+
+  @override
+  void initState() {
+    super.initState();
+    _screens = [
+      ProfilePage(
+        onSetUpProfile: () {
+          setState(() {
+            _currentIndex = 2;
+          });
+        },
+      ),
+      const OtherProfilesPage(),
+      const YetToBeBuiltProfilePage(),
+    ];
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFF090A0F),
+      body: IndexedStack(
+        index: _currentIndex,
+        children: _screens,
+      ),
+      bottomNavigationBar: _buildFloatingNavBar(),
+    );
+  }
+
+  Widget _buildFloatingNavBar() {
+    return ClipRRect(
+      borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 6, sigmaY: 6),
+        child: Container(
+          decoration: BoxDecoration(
+            color: const Color(0xFF0F101A).withValues(alpha: 0.94),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+            border: Border(
+              top: BorderSide(color: Colors.white.withValues(alpha: 0.03)),
+            ),
+          ),
+          child: SafeArea(
+            top: false,
+            child: SizedBox(
+              height: 64,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  _buildNavItem(index: 0, icon: Icons.home_rounded),
+                  _buildNavItem(index: 1, icon: Icons.chat_bubble_rounded),
+                  _buildNavItem(index: 2, icon: Icons.person_rounded),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNavItem({
+    required int index,
+    required IconData icon,
+  }) {
+    final bool isActive = _currentIndex == index;
+
+    return GestureDetector(
+      onTap: () {
+        HapticFeedback.lightImpact();
+        setState(() => _currentIndex = index);
+      },
+      behavior: HitTestBehavior.opaque,
+      child: SizedBox(
+        width: 72,
+        height: 64,
+        child: Center(
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 250),
+            curve: Curves.easeOutCubic,
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: isActive ? const Color(0xFF1A1B2E) : Colors.transparent,
+              boxShadow: isActive
+                  ? [
+                      BoxShadow(
+                        color: const Color(0xFF8B5CF6).withValues(alpha: 0.12),
+                        blurRadius: 8,
+                        spreadRadius: 0,
+                      ),
+                    ]
+                  : null,
+            ),
+            child: Icon(
+              icon,
+              size: 26,
+              color: isActive ? Colors.white : const Color(0xFF5C5E78),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
