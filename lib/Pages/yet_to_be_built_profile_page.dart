@@ -5,6 +5,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:image/image.dart' as img;
+import 'package:connect/Pages/crop_image_page.dart';
 
 class YetToBeBuiltProfilePage extends StatefulWidget {
   const YetToBeBuiltProfilePage({super.key});
@@ -22,17 +25,9 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
   bool _isSaving = false;
   ProfileCardType _previewCard = ProfileCardType.casual;
   bool _showFront = true;
-  String _avatarUrl =
+  static const String _defaultAvatarUrl =
       'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=300&q=80';
-
-  // Preset Premium Avatars matching sleek digital business card aesthetics
-  final List<String> _presetAvatars = [
-    'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=300&q=80', // Jordan Miller style (Warm light, male)
-    'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80', // Premium Female portrait (Pinkish lighting)
-    'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=300&q=80', // Cool lighting (Male)
-    'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=300&q=80', // Professional female portrait (Warm sun)
-    'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&w=300&q=80', // Expressive curly-haired male portrait
-  ];
+  String _avatarUrl = _defaultAvatarUrl;
 
   late TextEditingController _nameController;
   late TextEditingController _professionController;
@@ -152,7 +147,7 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
           _showProfileToConnections = provider.showProfileToConnections;
           _avatarUrl = provider.avatarUrl.isNotEmpty
               ? provider.avatarUrl
-              : _presetAvatars[0];
+              : _defaultAvatarUrl;
         }
       } else {
         // Use default placeholders
@@ -166,7 +161,7 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
         _showProfileToConnections = provider.showProfileToConnections;
         _avatarUrl = provider.avatarUrl.isNotEmpty
             ? provider.avatarUrl
-            : _presetAvatars[0];
+            : _defaultAvatarUrl;
         await provider.loadFieldAssignments();
       }
     } catch (e) {
@@ -231,118 +226,263 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
     }
   }
 
+  Future<Uint8List> _compressImageTo10Kb(Uint8List originalBytes) async {
+    if (originalBytes.length <= 10 * 1024) {
+      return originalBytes;
+    }
+
+    final image = img.decodeImage(originalBytes);
+    if (image == null) return originalBytes;
+
+    int width = 150;
+    int height = (image.height * (width / image.width)).round();
+    img.Image resized = img.copyResize(image, width: width, height: height);
+
+    int quality = 80;
+    Uint8List compressedBytes;
+    do {
+      compressedBytes = Uint8List.fromList(img.encodeJpg(resized, quality: quality));
+      if (compressedBytes.length <= 10 * 1024 || quality <= 10) {
+        break;
+      }
+      quality -= 15;
+      if (quality < 10) quality = 10;
+    } while (compressedBytes.length > 10 * 1024);
+
+    if (compressedBytes.length > 10 * 1024) {
+      resized = img.copyResize(image, width: 80, height: 80);
+      compressedBytes = Uint8List.fromList(img.encodeJpg(resized, quality: 15));
+    }
+
+    return compressedBytes;
+  }
+
+  Future<void> _pickAndUploadImage({
+    required StateSetter setModalState,
+    required Function(String) onUploadSuccess,
+    required Function(String) onUploadError,
+  }) async {
+    final provider = Provider.of<ProfileProvider2>(context, listen: false);
+    final picker = ImagePicker();
+    try {
+      final XFile? imageFile = await picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 1024,
+        maxHeight: 1024,
+      );
+
+      if (imageFile == null) {
+        onUploadError("No image picked");
+        return;
+      }
+
+      setModalState(() {});
+
+      final bytes = await imageFile.readAsBytes();
+
+      if (!mounted) return;
+
+      // Navigate to the beautiful custom crop screen
+      final Uint8List? croppedBytes = await Navigator.push<Uint8List>(
+        context,
+        MaterialPageRoute(
+          builder: (context) => CropImagePage(imageBytes: bytes),
+        ),
+      );
+
+      if (croppedBytes == null) {
+        onUploadError("No image cropped");
+        return;
+      }
+
+      // Re-trigger loading state in bottom sheet UI
+      setModalState(() {});
+
+      final compressedBytes = await _compressImageTo10Kb(croppedBytes);
+
+      try {
+        await Supabase.instance.client.storage.createBucket('avatars', const BucketOptions(public: true));
+      } catch (_) {
+        // Safe to ignore if bucket already exists
+      }
+
+      final String timestamp = DateTime.now().millisecondsSinceEpoch.toString();
+      final String folderName = provider.userId != -1 ? '${provider.userId}' : 'temp_user';
+      final String fileName = '$folderName/avatar_$timestamp.jpg';
+
+      await Supabase.instance.client.storage
+          .from('avatars')
+          .uploadBinary(
+            fileName,
+            compressedBytes,
+            fileOptions: const FileOptions(
+              contentType: 'image/jpeg',
+              upsert: true,
+            ),
+          );
+
+      final String publicUrl = Supabase.instance.client.storage
+          .from('avatars')
+          .getPublicUrl(fileName);
+
+      onUploadSuccess(publicUrl);
+    } catch (e) {
+      print("Error picking/uploading image: $e");
+      onUploadError(e.toString());
+    }
+  }
+
   void _showPhotoPicker() {
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       backgroundColor: const Color(0xFF13141F),
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (context) {
-        String tempUrl = _avatarUrl;
+        bool isUploading = false;
+        String? uploadError;
+
         return StatefulBuilder(
           builder: (context, setModalState) {
-            return Padding(
-              padding: const EdgeInsets.all(24.0),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  const Text(
-                    "Choose Profile Photo",
-                    style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 16),
-                  // Horizontal Presets Grid
-                  SizedBox(
-                    height: 80,
-                    child: ListView.builder(
-                      scrollDirection: Axis.horizontal,
-                      itemCount: _presetAvatars.length,
-                      itemBuilder: (context, index) {
-                        final avatar = _presetAvatars[index];
-                        final isSelected = tempUrl == avatar;
-                        return GestureDetector(
-                          onTap: () {
-                            setModalState(() => tempUrl = avatar);
-                          },
-                          child: Container(
-                            margin: const EdgeInsets.only(right: 12),
-                            padding: const EdgeInsets.all(2.0),
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              gradient: isSelected
-                                  ? const LinearGradient(
-                                      colors: [
-                                        Color(0xFF00F2FE),
-                                        Color(0xFF8B5CF6)
-                                      ],
-                                    )
-                                  : null,
-                              border: !isSelected
-                                  ? Border.all(color: Colors.white24)
-                                  : null,
-                            ),
-                            child: CircleAvatar(
-                              radius: 34,
-                              backgroundImage: NetworkImage(avatar),
-                              backgroundColor: const Color(0xFF1B1C2A),
-                            ),
+            return SingleChildScrollView(
+              physics: const BouncingScrollPhysics(),
+              child: Padding(
+                padding: EdgeInsets.only(
+                  left: 24.0,
+                  right: 24.0,
+                  top: 24.0,
+                  bottom: 24.0 + MediaQuery.of(context).viewInsets.bottom,
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const Text(
+                      "Profile Photo",
+                      style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          fontFamily: 'Inter'),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 24),
+                    
+                    Center(
+                      child: Container(
+                        width: 120,
+                        height: 120,
+                        decoration: const BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: LinearGradient(
+                            colors: [Color(0xFF00F2FE), Color(0xFF8B5CF6)],
                           ),
-                        );
-                      },
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  // Custom URL option
-                  TextField(
-                    style: const TextStyle(color: Colors.white, fontSize: 14),
-                    cursorColor: const Color(0xFF8B5CF6),
-                    decoration: InputDecoration(
-                      hintText: "Or enter custom image URL...",
-                      hintStyle:
-                          TextStyle(color: Colors.white.withValues(alpha: 0.3)),
-                      prefixIcon:
-                          const Icon(Icons.link_rounded, color: Colors.white38),
-                      filled: true,
-                      fillColor: const Color(0xFF1B1D30),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(16),
-                        borderSide: BorderSide.none,
+                        ),
+                        padding: const EdgeInsets.all(3),
+                        child: CircleAvatar(
+                          radius: 57,
+                          backgroundImage: NetworkImage(_avatarUrl),
+                          backgroundColor: const Color(0xFF1B1C2A),
+                        ),
                       ),
-                      contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 12),
                     ),
-                    onChanged: (val) {
-                      if (val.trim().isNotEmpty) {
-                        setModalState(() => tempUrl = val.trim());
-                      }
-                    },
-                  ),
-                  const SizedBox(height: 24),
-                  ElevatedButton(
-                    onPressed: () {
-                      setState(() {
-                        _avatarUrl = tempUrl;
-                      });
-                      Navigator.pop(context);
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF8B5CF6),
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
+                    const SizedBox(height: 24),
+                    
+                    if (isUploading) ...[
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 20),
+                        child: Center(
+                          child: CircularProgressIndicator(
+                            valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF00F2FE)),
+                          ),
+                        ),
                       ),
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                    ),
-                    child: const Text("Apply Photo",
+                    ] else ...[
+                      ElevatedButton.icon(
+                        onPressed: () {
+                          setModalState(() {
+                            isUploading = true;
+                            uploadError = null;
+                          });
+                          _pickAndUploadImage(
+                            setModalState: setModalState,
+                            onUploadSuccess: (publicUrl) {
+                              if (mounted) {
+                                setState(() {
+                                  _avatarUrl = publicUrl;
+                                });
+                              }
+                              Navigator.pop(context); // Auto-dismiss sheet on success
+                              
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: const Text(
+                                    "Profile photo updated and saved to storage!",
+                                    style: TextStyle(fontFamily: 'Inter', fontWeight: FontWeight.bold),
+                                  ),
+                                  backgroundColor: const Color(0xFF8B5CF6),
+                                  behavior: SnackBarBehavior.floating,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                ),
+                              );
+                            },
+                            onUploadError: (err) {
+                              setModalState(() {
+                                isUploading = false;
+                                uploadError = err;
+                              });
+                            },
+                          );
+                        },
+                        icon: const Icon(Icons.photo_library_rounded, color: Colors.white, size: 18),
+                        label: const Text(
+                          "Upload from Gallery",
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                            fontFamily: 'Inter',
+                          ),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF1C1D30),
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                            side: const BorderSide(color: Color(0xFF26273C)),
+                          ),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                        ),
+                      ),
+                    ],
+                    
+                    if (uploadError != null && uploadError != "No image picked") ...[
+                      const SizedBox(height: 16),
+                      Text(
+                        "Upload Error: $uploadError\nMake sure storage bucket 'avatars' is created and RLS is public in Supabase.",
+                        style: const TextStyle(color: Colors.redAccent, fontSize: 11, fontFamily: 'Inter'),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                    
+                    const SizedBox(height: 16),
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text(
+                        "Cancel",
                         style: TextStyle(
-                            fontWeight: FontWeight.bold, fontSize: 16)),
-                  ),
-                ],
+                          color: Color(0xFF5C5E78),
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          fontFamily: 'Inter',
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             );
           },
