@@ -15,16 +15,19 @@ class _AuthScreenState extends State<AuthScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
+  final _otpController = TextEditingController();
 
   bool _isSignIn = true;
   bool _isLoading = false;
   bool _obscurePassword = true;
+  bool _isOtpMode = false;
 
   @override
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
+    _otpController.dispose();
     super.dispose();
   }
 
@@ -57,15 +60,79 @@ class _AuthScreenState extends State<AuthScreen> {
         );
 
         if (mounted) {
+          setState(() {
+            _isOtpMode = true;
+          });
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text(
-                  "Account created! Please check your email for confirmation."),
+                  "Account created! Please check your email for the 6-digit verification code."),
               backgroundColor: Color(0xFF8B5CF6),
               behavior: SnackBarBehavior.floating,
             ),
           );
         }
+      }
+    } on AuthException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.message),
+            backgroundColor: Colors.redAccent,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.toString().replaceAll("Exception: ", "")),
+            backgroundColor: Colors.redAccent,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  Future<void> _verifyOtp() async {
+    final email = _emailController.text.trim();
+    final token = _otpController.text.trim();
+
+    if (token.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Please enter the verification code"),
+          backgroundColor: Colors.orangeAccent,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isLoading = true);
+    HapticFeedback.mediumImpact();
+
+    try {
+      await Supabase.instance.client.auth.verifyOTP(
+        type: OtpType.signup,
+        token: token,
+        email: email,
+      );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Verification successful! Logging you in..."),
+            backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
       }
     } on AuthException catch (e) {
       if (mounted) {
@@ -262,134 +329,193 @@ class _AuthScreenState extends State<AuthScreen> {
                         ),
                       ),
                       const SizedBox(height: 6),
-                      Text(
-                        _isSignIn
-                            ? "Sign in to access your digital business cards"
-                            : "Create an account to build your cards & sync contacts",
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          color: Color(0xFF8B8C9E),
-                          fontSize: 14,
+                      if (!_isOtpMode)
+                        Text(
+                          _isSignIn
+                              ? "Sign in to access your digital business cards"
+                              : "Create an account to build your cards & sync contacts",
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            color: Color(0xFF8B8C9E),
+                            fontSize: 14,
+                          ),
                         ),
-                      ),
                       const SizedBox(height: 40),
 
-                      // Sliding Tab Switcher
-                      _buildAuthToggle(),
-                      const SizedBox(height: 28),
-
-                      // Email Field
-                      _buildInputField(
-                        controller: _emailController,
-                        hint: "Email Address",
-                        icon: Icons.email_rounded,
-                        keyboardType: TextInputType.emailAddress,
-                        validator: (value) {
-                          if (value == null || value.trim().isEmpty) {
-                            return "Email is required";
-                          }
-                          final emailRegExp = RegExp(
-                            r'^[a-zA-Z0-9.]+@[a-zA-Z0-9]+\.[a-zA-Z]+',
-                          );
-                          if (!emailRegExp.hasMatch(value.trim())) {
-                            return "Please enter a valid email address";
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 18),
-
-                      // Password Field
-                      _buildInputField(
-                        controller: _passwordController,
-                        hint: "Password",
-                        icon: Icons.lock_rounded,
-                        obscureText: _obscurePassword,
-                        suffixIcon: IconButton(
-                          icon: Icon(
-                            _obscurePassword
-                                ? Icons.visibility_off_rounded
-                                : Icons.visibility_rounded,
-                            color: const Color(0xFF5C5E78),
-                            size: 20,
+                      if (_isOtpMode) ...[
+                        const Text(
+                          "Verify Your Email",
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 22,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 0.5,
                           ),
-                          onPressed: () {
-                            setState(
-                                () => _obscurePassword = !_obscurePassword);
-                          },
                         ),
-                        validator: (value) {
-                          if (value == null || value.trim().isEmpty) {
-                            return "Password is required";
-                          }
-                          if (value.trim().length < 6) {
-                            return "Password must be at least 6 characters";
-                          }
-                          return null;
-                        },
-                      ),
-
-                      if (!_isSignIn) ...[
-                        const SizedBox(height: 18),
-                        // Confirm Password Field
+                        const SizedBox(height: 12),
+                        Text(
+                          "We've sent a 6-digit confirmation code to\n${_emailController.text.trim()}",
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            color: Color(0xFF8B8C9E),
+                            fontSize: 14,
+                            height: 1.4,
+                          ),
+                        ),
+                        const SizedBox(height: 32),
                         _buildInputField(
-                          controller: _confirmPasswordController,
-                          hint: "Confirm Password",
-                          icon: Icons.lock_outline_rounded,
-                          obscureText: _obscurePassword,
+                          controller: _otpController,
+                          hint: "6-Digit Verification Code",
+                          icon: Icons.pin_rounded,
+                          keyboardType: TextInputType.number,
                           validator: (value) {
                             if (value == null || value.trim().isEmpty) {
-                              return "Please confirm your password";
+                              return "Verification code is required";
                             }
-                            if (value.trim() !=
-                                _passwordController.text.trim()) {
-                              return "Passwords do not match";
+                            if (value.trim().length != 6) {
+                              return "Code must be 6 digits";
                             }
                             return null;
                           },
                         ),
-                      ],
-
-                      const SizedBox(height: 32),
-
-                      // Submit Button
-                      _buildSubmitButton(),
-                      const SizedBox(height: 24),
-
-                      // Divider "OR"
-                      Row(
-                        children: [
-                          const Expanded(
-                            child: Divider(
-                              color: Color(0xFF1F2030),
-                              thickness: 1.5,
+                        const SizedBox(height: 32),
+                        _buildOtpSubmitButton(),
+                        const SizedBox(height: 18),
+                        TextButton(
+                          onPressed: () {
+                            setState(() {
+                              _isOtpMode = false;
+                              _otpController.clear();
+                            });
+                          },
+                          child: const Text(
+                            "Back to Sign Up",
+                            style: TextStyle(
+                              color: Color(0xFF8B5CF6),
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
                             ),
                           ),
-                          Padding(
-                            padding:
-                                const EdgeInsets.symmetric(horizontal: 16.0),
-                            child: Text(
-                              "OR CONTINUE WITH",
-                              style: TextStyle(
-                                color: const Color(0xFF5C5E78),
-                                fontSize: 11,
-                                fontWeight: FontWeight.bold,
-                                letterSpacing: 1.0,
-                              ),
+                        ),
+                      ] else ...[
+                        // Sliding Tab Switcher
+                        _buildAuthToggle(),
+                        const SizedBox(height: 28),
+
+                        // Email Field
+                        _buildInputField(
+                          controller: _emailController,
+                          hint: "Email Address",
+                          icon: Icons.email_rounded,
+                          keyboardType: TextInputType.emailAddress,
+                          validator: (value) {
+                            if (value == null || value.trim().isEmpty) {
+                              return "Email is required";
+                            }
+                            final emailRegExp = RegExp(
+                              r'^[a-zA-Z0-9.]+@[a-zA-Z0-9]+\.[a-zA-Z]+',
+                            );
+                            if (!emailRegExp.hasMatch(value.trim())) {
+                              return "Please enter a valid email address";
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 18),
+
+                        // Password Field
+                        _buildInputField(
+                          controller: _passwordController,
+                          hint: "Password",
+                          icon: Icons.lock_rounded,
+                          obscureText: _obscurePassword,
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              _obscurePassword
+                                  ? Icons.visibility_off_rounded
+                                  : Icons.visibility_rounded,
+                              color: const Color(0xFF5C5E78),
+                              size: 20,
                             ),
+                            onPressed: () {
+                              setState(
+                                  () => _obscurePassword = !_obscurePassword);
+                            },
                           ),
-                          const Expanded(
-                            child: Divider(
-                              color: Color(0xFF1F2030),
-                              thickness: 1.5,
-                            ),
+                          validator: (value) {
+                            if (value == null || value.trim().isEmpty) {
+                              return "Password is required";
+                            }
+                            if (value.trim().length < 6) {
+                              return "Password must be at least 6 characters";
+                            }
+                            return null;
+                          },
+                        ),
+
+                        if (!_isSignIn) ...[
+                          const SizedBox(height: 18),
+                          // Confirm Password Field
+                          _buildInputField(
+                            controller: _confirmPasswordController,
+                            hint: "Confirm Password",
+                            icon: Icons.lock_outline_rounded,
+                            obscureText: _obscurePassword,
+                            validator: (value) {
+                              if (value == null || value.trim().isEmpty) {
+                                            return "Please confirm your password";
+                              }
+                              if (value.trim() !=
+                                  _passwordController.text.trim()) {
+                                return "Passwords do not match";
+                              }
+                              return null;
+                            },
                           ),
                         ],
-                      ),
-                      const SizedBox(height: 24),
 
-                      // Google Sign In Button
-                      _buildGoogleButton(),
+                        const SizedBox(height: 32),
+
+                        // Submit Button
+                        _buildSubmitButton(),
+                        const SizedBox(height: 24),
+
+                        // Divider "OR"
+                        Row(
+                          children: [
+                            const Expanded(
+                              child: Divider(
+                                color: Color(0xFF1F2030),
+                                thickness: 1.5,
+                              ),
+                            ),
+                            Padding(
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 16.0),
+                              child: Text(
+                                "OR CONTINUE WITH",
+                                style: TextStyle(
+                                  color: const Color(0xFF5C5E78),
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: 1.0,
+                                ),
+                              ),
+                            ),
+                            const Expanded(
+                              child: Divider(
+                                color: Color(0xFF1F2030),
+                                thickness: 1.5,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 24),
+
+                        // Google Sign In Button
+                        _buildGoogleButton(),
+                      ],
                     ],
                   ),
                 ),
@@ -620,6 +746,53 @@ class _AuthScreenState extends State<AuthScreen> {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildOtpSubmitButton() {
+    return Container(
+      height: 52,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        gradient: const LinearGradient(
+          colors: [
+            Color(0xFF00F2FE),
+            Color(0xFF8B5CF6),
+          ],
+          begin: Alignment.centerLeft,
+          end: Alignment.centerRight,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF8B5CF6).withValues(alpha: 0.3),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: ElevatedButton(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.transparent,
+          shadowColor: Colors.transparent,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+        ),
+        onPressed: () {
+          if (_formKey.currentState!.validate()) {
+            _verifyOtp();
+          }
+        },
+        child: const Text(
+          "Verify Code",
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 0.5,
+          ),
         ),
       ),
     );

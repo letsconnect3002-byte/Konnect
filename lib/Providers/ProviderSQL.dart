@@ -22,6 +22,9 @@ class ProfileProvider2 with ChangeNotifier {
   bool showProfileToConnections = true;
   int userId = -1;
 
+  List<Map<String, dynamic>> connections = [];
+  RealtimeChannel? _connectionsSubscription;
+
   Map<String, dynamic> UserData = {};
   String? _ownerId;
 
@@ -306,6 +309,9 @@ class ProfileProvider2 with ChangeNotifier {
   Future<void> fetchAndSetUserId(bool isMyProfile) async {
     userId = await fetchAndSetUserId2(isMyProfile);
     print("userId set to: $userId");
+    if (userId != -1) {
+      subscribeToConnections();
+    }
     notifyListeners();
   }
 
@@ -321,6 +327,7 @@ class ProfileProvider2 with ChangeNotifier {
 
       if (response != null) {
         userId = response['id'] as int;
+        subscribeToConnections();
         return userId;
       }
     } catch (e) {
@@ -351,11 +358,18 @@ class ProfileProvider2 with ChangeNotifier {
       // Query the view to find connected user IDs
       final response = await Supabase.instance.client
           .from('network_graph')
-          .select('connected_user_id')
+          .select('connected_user_id, shared_card')
           .eq('primary_user_id', userId);
 
       if ((response as List).isEmpty) {
         return [];
+      }
+
+      // Build a lookup: connectedUserId -> sharedCard
+      final Map<int, String> sharedCardLookup = {};
+      for (final row in response as List) {
+        sharedCardLookup[row['connected_user_id'] as int] =
+            (row['shared_card'] ?? 'both').toString();
       }
 
       final connectedIds = (response as List).map<int>((row) => row['connected_user_id'] as int).toList();
@@ -387,12 +401,56 @@ class ProfileProvider2 with ChangeNotifier {
               ? List<String>.from(row['card_types'] as List)
               : <String>[],
           'connection_profile_id': row['id'],
+          'shared_card': sharedCardLookup[row['id'] as int] ?? 'both',
+          'field_assignments': row['field_assignments'], // pass raw jsonb through
         };
       }).toList();
     } catch (e) {
       print("Error fetching other profiles: $e");
       return [];
     }
+  }
+
+  Future<List<Map<String, dynamic>>> fetchConnections() async {
+    final list = await getOtherProfiles();
+    connections = list;
+    notifyListeners();
+    return list;
+  }
+
+  void subscribeToConnections() {
+    if (userId == -1) return;
+    unsubscribeFromConnections();
+
+    _connectionsSubscription = Supabase.instance.client
+        .channel('public:user_connections_changes')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'user_connections',
+          callback: (payload) async {
+            print("Realtime connection change detected: ${payload.toString()}");
+            await fetchConnections();
+          },
+        );
+
+    _connectionsSubscription?.subscribe();
+
+    // Initial fetch to load the data
+    fetchConnections();
+  }
+
+  void unsubscribeFromConnections() {
+    if (_connectionsSubscription != null) {
+      Supabase.instance.client.removeChannel(_connectionsSubscription!);
+      _connectionsSubscription = null;
+    }
+  }
+
+  @override
+  void dispose() {
+    unsubscribeFromConnections();
+    super.dispose();
   }
 
   // Method to fetch and set userId by email
@@ -775,6 +833,7 @@ class ProfileProvider2 with ChangeNotifier {
               ? List<String>.from(response['card_types'] as List)
               : <String>[],
           'connection_profile_id': response['id'],
+          'field_assignments': response['field_assignments'],
         };
       }
     } catch (e) {

@@ -42,10 +42,8 @@ class _ProfilePageState extends State<ProfilePage> {
         if (userData.isNotEmpty) {
           profileProvider.setUserData(userData);
         }
+        profileProvider.subscribeToConnections();
       }
-
-      // Fetch connections (other profiles)
-      _connections = await profileProvider.getOtherProfiles();
     } catch (e) {
       print("Error initializing data: $e");
     } finally {
@@ -185,6 +183,7 @@ class _ProfilePageState extends State<ProfilePage> {
   @override
   Widget build(BuildContext context) {
     final profileProvider = Provider.of<ProfileProvider2>(context);
+    _connections = profileProvider.connections;
 
     final hasBasicDetails = profileProvider.name.trim().isNotEmpty &&
         profileProvider.profession.trim().isNotEmpty &&

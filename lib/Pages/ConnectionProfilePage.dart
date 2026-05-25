@@ -32,6 +32,13 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
   late String _instagram;
   late String _linkedin;
   late String _twitter;
+  Map<String, String> _casualFields = {};
+  Map<String, String> _professionalFields = {};
+
+  Map<String, String> get _activeFields {
+    if (_previewCard == ProfileCardType.casual) return _casualFields;
+    return _professionalFields;
+  }
 
   late final ProfileProvider2 provider;
   String _sharedCardPermission = 'both'; // what they share with me
@@ -52,7 +59,7 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
     if (assignmentMap == null) return true;
     
     final bool isCasual = assignmentMap['c'] == true;
-    final bool isProfessional = assignmentMap['p'] == true || assignmentMap['p'] != false;
+    final bool isProfessional = assignmentMap['p'] == true;
     
     if (_sharedCardPermission == 'casual') {
       return isCasual;
@@ -75,6 +82,27 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
     _instagram = data['instagram'] ?? '';
     _linkedin = data['linkedin'] ?? '';
     _twitter = data['twitter'] ?? '';
+
+    _casualFields = {
+      'profession': _profession,
+      'company': _company,
+      'email': _email,
+      'phoneNumber': _phoneNumber,
+      'instagram': _instagram,
+      'linkedin': _linkedin,
+      'twitter': _twitter,
+      'bio': _bio,
+    };
+    _professionalFields = {
+      'profession': _profession,
+      'company': _company,
+      'email': _email,
+      'phoneNumber': _phoneNumber,
+      'instagram': _instagram,
+      'linkedin': _linkedin,
+      'twitter': _twitter,
+      'bio': _bio,
+    };
 
     final connectionProfileId = data['connection_profile_id'];
     if (connectionProfileId != null) {
@@ -142,6 +170,49 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
             _linkedin = _isFieldVisible('linkedin', fieldAssignments) ? (response['linkedin'] ?? '') : '';
             _twitter = _isFieldVisible('twitter', fieldAssignments) ? (response['twitter'] ?? '') : '';
             _bio = _isFieldVisible('bio', fieldAssignments) ? (response['bio'] ?? '') : '';
+          });
+
+          // Build per-card filtered field sets
+          final Map<String, dynamic>? fa = fieldAssignments;
+
+          String _filterField(String field, String rawValue) {
+            // name and avatarUrl are always visible
+            if (field == 'name' || field == 'avatarUrl') return rawValue;
+            if (fa == null) return rawValue;
+            final assignmentMap = fa[field];
+            if (assignmentMap == null) return rawValue;
+            return assignmentMap['c'] == true ? rawValue : '';
+          }
+
+          String _filterFieldPro(String field, String rawValue) {
+            if (field == 'name' || field == 'avatarUrl') return rawValue;
+            if (fa == null) return rawValue;
+            final assignmentMap = fa[field];
+            if (assignmentMap == null) return rawValue;
+            return assignmentMap['p'] == true ? rawValue : '';
+          }
+
+          setState(() {
+            _casualFields = {
+              'profession': _filterField('profession', response['profession'] ?? ''),
+              'company': _filterField('company', response['company'] ?? ''),
+              'email': _filterField('email', response['email'] ?? ''),
+              'phoneNumber': _filterField('phoneNumber', response['phone_number'] ?? ''),
+              'instagram': _filterField('instagram', response['instagram'] ?? ''),
+              'linkedin': _filterField('linkedin', response['linkedin'] ?? ''),
+              'twitter': _filterField('twitter', response['twitter'] ?? ''),
+              'bio': _filterField('bio', response['bio'] ?? ''),
+            };
+            _professionalFields = {
+              'profession': _filterFieldPro('profession', response['profession'] ?? ''),
+              'company': _filterFieldPro('company', response['company'] ?? ''),
+              'email': _filterFieldPro('email', response['email'] ?? ''),
+              'phoneNumber': _filterFieldPro('phoneNumber', response['phone_number'] ?? ''),
+              'instagram': _filterFieldPro('instagram', response['instagram'] ?? ''),
+              'linkedin': _filterFieldPro('linkedin', response['linkedin'] ?? ''),
+              'twitter': _filterFieldPro('twitter', response['twitter'] ?? ''),
+              'bio': _filterFieldPro('bio', response['bio'] ?? ''),
+            };
           });
         }
       } catch (e) {
@@ -555,7 +626,7 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
   Widget _buildUnifiedFrontCard(double cardWidth) {
     final isCasual = _previewCard == ProfileCardType.casual;
     final W = cardWidth;
-    final comp = _getCompany(_name, _company);
+    final comp = _getCompany(_name, _activeFields['company'] ?? '');
     final avatar = _getAvatarUrl(_name, _avatarUrl);
 
     return Stack(
@@ -676,7 +747,7 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
                   ),
                 ),
               ),
-              if (_profession.isNotEmpty) ...[
+              if ((_activeFields['profession'] ?? '').isNotEmpty) ...[
                 const SizedBox(height: 4),
                 AnimatedAlign(
                   duration: _cardAnimDuration,
@@ -692,7 +763,7 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
                       fontFamily: 'Inter',
                     ),
                     child: Text(
-                      _profession,
+                      _activeFields['profession'] ?? '',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -810,7 +881,7 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
     final W = cardWidth;
     final H = isCasual ? cardWidth / 0.82 : cardWidth / 1.58;
     final avatar = _getAvatarUrl(_name, _avatarUrl);
-    final bio = _getBio(_name, _bio);
+    final bio = _getBio(_name, _activeFields['bio'] ?? '');
 
     return Stack(
       children: [
@@ -876,7 +947,7 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
                         ),
                       ),
                     ),
-                    if (_profession.isNotEmpty) ...[
+                    if ((_activeFields['profession'] ?? '').isNotEmpty) ...[
                       const SizedBox(height: 2),
                       FittedBox(
                         fit: BoxFit.scaleDown,
@@ -891,7 +962,7 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
                             fontFamily: 'Inter',
                           ),
                           child: Text(
-                            _profession.toUpperCase(),
+                            (_activeFields['profession'] ?? '').toUpperCase(),
                             maxLines: 1,
                           ),
                         ),
@@ -940,7 +1011,7 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
                 ),
               ),
               const SizedBox(height: 8),
-              if (_email.isNotEmpty)
+              if ((_activeFields['email'] ?? '').isNotEmpty)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 4.0),
                   child: Row(
@@ -949,7 +1020,7 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
                           color: Color(0xFF8B5CF6), size: 12),
                       const SizedBox(width: 8),
                       Text(
-                        _email,
+                        _activeFields['email'] ?? '',
                         style: const TextStyle(
                           color: Color(0xFFC0C1D0),
                           fontSize: 10,
@@ -959,14 +1030,14 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
                     ],
                   ),
                 ),
-              if (_phoneNumber.isNotEmpty)
+              if ((_activeFields['phoneNumber'] ?? '').isNotEmpty)
                 Row(
                   children: [
                     const Icon(Icons.phone_rounded,
                         color: Color(0xFF8B5CF6), size: 12),
                     const SizedBox(width: 8),
                     Text(
-                      _phoneNumber,
+                      _activeFields['phoneNumber'] ?? '',
                       style: const TextStyle(
                         color: Color(0xFFC0C1D0),
                         fontSize: 10,

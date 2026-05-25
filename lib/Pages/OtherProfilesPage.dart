@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:connect/Pages/ConnectionProfilePage.dart';
 import 'package:connect/Pages/QrCodeScanner.dart';
 import 'package:connect/Providers/ProviderSQL.dart';
@@ -86,6 +87,43 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
     } catch (e) {
       print("Error deleting profile locally: $e");
     }
+  }
+
+  String _getVisibleField(
+    Map<String, dynamic> profileData,
+    String fieldKey,
+    String rawValue,
+  ) {
+    // name and avatar are always visible
+    if (fieldKey == 'name' || fieldKey == 'avatarUrl') return rawValue;
+
+    // Determine what card type this viewer has access to
+    final String sharedCard = (profileData['sharedCard'] ?? profileData['shared_card'] ?? 'both').toString();
+
+    // If no field_assignments data present, show everything
+    final dynamic faRaw = profileData['field_assignments'];
+    if (faRaw == null) return rawValue;
+
+    Map<String, dynamic> fa;
+    try {
+      fa = faRaw is String
+          ? jsonDecode(faRaw) as Map<String, dynamic>
+          : faRaw as Map<String, dynamic>;
+    } catch (_) {
+      return rawValue;
+    }
+
+    final dynamic assignmentRaw = fa[fieldKey];
+    if (assignmentRaw == null) return rawValue;
+
+    final Map<String, dynamic> assignment = assignmentRaw as Map<String, dynamic>;
+    final bool isCasual = assignment['c'] == true;
+    final bool isProfessional = assignment['p'] == true;
+
+    if (sharedCard == 'casual') return isCasual ? rawValue : '';
+    if (sharedCard == 'professional') return isProfessional ? rawValue : '';
+    // 'both': show if on either card
+    return (isCasual || isProfessional) ? rawValue : '';
   }
 
   // Deterministic fallbacks to guarantee high-fidelity presentation
@@ -848,8 +886,12 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
       Map<String, dynamic> profileData, ProfileProvider2 provider) {
     final name = profileData["name"] ?? "Unknown";
     final profession = profileData["profession"] ?? "";
-    final company = _getCompany(name, profileData["company"]);
-    final email = profileData["email"] ?? "";
+    final String email = _getVisibleField(profileData, 'email', profileData["email"] ?? '');
+    final String company = _getVisibleField(
+      profileData,
+      'company',
+      _getCompany(name, profileData["company"]),
+    );
     final avatarUrl = _getAvatarUrl(name, profileData["avatarUrl"]);
     final profileIdStr = (profileData['id'] ?? '').toString();
     final isFavorite = _favoritedIds.contains(profileIdStr);
@@ -1134,7 +1176,11 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
       Map<String, dynamic> profileData, ProfileProvider2 provider) {
     final name = profileData["name"] ?? "Unknown";
     final profession = profileData["profession"] ?? "";
-    final company = _getCompany(name, profileData["company"]);
+    final String company = _getVisibleField(
+      profileData,
+      'company',
+      _getCompany(name, profileData["company"]),
+    );
     final avatarUrl = _getAvatarUrl(name, profileData["avatarUrl"]);
     final profileIdStr = (profileData['id'] ?? '').toString();
     final isFavorite = _favoritedIds.contains(profileIdStr);
@@ -1276,126 +1322,105 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<ProfileProvider2>();
+    final allProfiles = provider.connections;
+    final count = allProfiles.length;
 
     return Scaffold(
       backgroundColor: const Color(0xFF090A0F),
       body: SafeArea(
-        child: FutureBuilder<List<Map<String, dynamic>>>(
-          future: provider.getOtherProfiles(),
-          builder: (context, snapshot) {
-            final allProfiles = snapshot.data ?? [];
-            final count = allProfiles.length;
-
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                // Premium Header
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(24, 24, 24, 8),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Premium Header
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 24, 24, 8),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            "Konnections",
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 32,
-                              fontWeight: FontWeight.bold,
-                              fontFamily: 'Inter',
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            "$count ${count == 1 ? 'connection' : 'connections'}",
-                            style: const TextStyle(
-                              color: Color(0xFF8B8C9E),
-                              fontSize: 14,
-                              fontFamily: 'Inter',
-                            ),
-                          ),
-                        ],
+                      const Text(
+                        "Konnections",
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 32,
+                          fontWeight: FontWeight.bold,
+                          fontFamily: 'Inter',
+                        ),
                       ),
-                      Row(
-                        children: [
-                          _buildCircularActionButton(
-                            icon: Icons.qr_code_scanner_rounded,
-                            onPressed: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => const QRScannerPage(),
-                                ),
-                              );
-                            },
-                          ),
-                        ],
+                      const SizedBox(height: 4),
+                      Text(
+                        "$count ${count == 1 ? 'connection' : 'connections'}",
+                        style: const TextStyle(
+                          color: Color(0xFF8B8C9E),
+                          fontSize: 14,
+                          fontFamily: 'Inter',
+                        ),
                       ),
                     ],
                   ),
-                ),
-                // Toggle Switch Row
-                _buildToggleRow(),
-                // Connection Content list or loading
-                Expanded(
-                  child: AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 300),
-                    child: snapshot.connectionState == ConnectionState.waiting
-                        ? const Center(
-                            child: CircularProgressIndicator(
-                              valueColor: AlwaysStoppedAnimation<Color>(
-                                  Color(0xFF8B5CF6)),
+                  Row(
+                    children: [
+                      _buildCircularActionButton(
+                        icon: Icons.qr_code_scanner_rounded,
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const QRScannerPage(),
                             ),
-                          )
-                        : snapshot.hasError
-                            ? Center(
-                                child: Text(
-                                  'Error: ${snapshot.error}',
-                                  style: const TextStyle(color: Colors.white),
-                                ),
-                              )
-                            : allProfiles.isEmpty
-                                ? const Center(
-                                    child: Column(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.center,
-                                      children: [
-                                        Icon(
-                                          Icons.people_outline_rounded,
-                                          color: Color(0xFF5C5E78),
-                                          size: 48,
-                                        ),
-                                        SizedBox(height: 16),
-                                        Text(
-                                          "No profiles available.",
-                                          style: TextStyle(
-                                            color: Color(0xFF8B8C9E),
-                                            fontSize: 15,
-                                            fontFamily: 'Inter',
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  )
-                                : ListView.builder(
-                                    key: ValueKey<bool>(_isGridView),
-                                    itemCount: allProfiles.length,
-                                    physics: const BouncingScrollPhysics(),
-                                    padding: const EdgeInsets.only(bottom: 24),
-                                    itemBuilder: (context, index) {
-                                      final item = allProfiles[index];
-                                      return _isGridView
-                                          ? _buildCardItem(item, provider)
-                                          : _buildListItem(item, provider);
-                                    },
-                                  ),
+                          );
+                        },
+                      ),
+                    ],
                   ),
-                ),
-              ],
-            );
-          },
+                ],
+              ),
+            ),
+            // Toggle Switch Row
+            _buildToggleRow(),
+            // Connection Content list or loading
+            Expanded(
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 300),
+                child: allProfiles.isEmpty
+                    ? const Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.people_outline_rounded,
+                              color: Color(0xFF5C5E78),
+                              size: 48,
+                            ),
+                            SizedBox(height: 16),
+                            Text(
+                              "No profiles available.",
+                              style: TextStyle(
+                                color: Color(0xFF8B8C9E),
+                                fontSize: 15,
+                                fontFamily: 'Inter',
+                              ),
+                            ),
+                          ],
+                        ),
+                      )
+                    : ListView.builder(
+                        key: ValueKey<bool>(_isGridView),
+                        itemCount: allProfiles.length,
+                        physics: const BouncingScrollPhysics(),
+                        padding: const EdgeInsets.only(bottom: 24),
+                        itemBuilder: (context, index) {
+                          final item = allProfiles[index];
+                          return _isGridView
+                              ? _buildCardItem(item, provider)
+                              : _buildListItem(item, provider);
+                        },
+                      ),
+              ),
+            ),
+          ],
         ),
       ),
     );
