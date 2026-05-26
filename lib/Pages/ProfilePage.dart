@@ -187,7 +187,8 @@ class _ProfilePageState extends State<ProfilePage> {
 
     final hasBasicDetails = profileProvider.name.trim().isNotEmpty &&
         profileProvider.profession.trim().isNotEmpty &&
-        profileProvider.phoneNumber.trim().isNotEmpty;
+        (profileProvider.phoneNumber.trim().isNotEmpty ||
+            profileProvider.professionalPhoneNumber.trim().isNotEmpty);
 
     debugPrint(
         "ProfilePage Build: userId=${profileProvider.userId}, UserData=${profileProvider.UserData}, hasBasicDetails=$hasBasicDetails, name='${profileProvider.name}', profession='${profileProvider.profession}', phoneNumber='${profileProvider.phoneNumber}'");
@@ -1012,11 +1013,13 @@ class _ProfilePageState extends State<ProfilePage> {
             ? profession
             : (email.isNotEmpty ? email : "Connected via Connect");
         final relativeTime = _getRelativeTime(connection['created_at']);
+        final avatarUrl =
+            connection['avatarUrl'] ?? connection['avatar_url'] ?? '';
 
         // Show status dot for some active profiles (e.g. index 0 or even index)
-        final showPresenceDot = index % 2 == 0;
+        final showPresenceDot = false;
         // Show purple notification dot for the first connection
-        final showPurpleIndicator = index == 0;
+        final showPurpleIndicator = false;
 
         return GestureDetector(
           onLongPress: () =>
@@ -1033,7 +1036,7 @@ class _ProfilePageState extends State<ProfilePage> {
           },
           child: Container(
             margin: const EdgeInsets.only(bottom: 12),
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
               color: const Color(0xFF13141F),
               borderRadius: BorderRadius.circular(24),
@@ -1045,8 +1048,8 @@ class _ProfilePageState extends State<ProfilePage> {
                 Stack(
                   children: [
                     Container(
-                      width: 56,
-                      height: 56,
+                      width: 45,
+                      height: 45,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         gradient: LinearGradient(
@@ -1059,16 +1062,40 @@ class _ProfilePageState extends State<ProfilePage> {
                         ),
                       ),
                       alignment: Alignment.center,
-                      child: Text(
-                        name.isNotEmpty
-                            ? name.substring(0, 1).toUpperCase()
-                            : "?",
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
+                      child: avatarUrl.isNotEmpty
+                          ? ClipRRect(
+                              borderRadius: BorderRadius.circular(28),
+                              child: Image.network(
+                                avatarUrl,
+                                width: 45,
+                                height: 45,
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) {
+                                  return Center(
+                                    child: Text(
+                                      name.isNotEmpty
+                                          ? name.substring(0, 1).toUpperCase()
+                                          : "?",
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 20,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                            )
+                          : Text(
+                              name.isNotEmpty
+                                  ? name.substring(0, 1).toUpperCase()
+                                  : "?",
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                     ),
                     if (showPresenceDot)
                       Positioned(
@@ -1104,7 +1131,7 @@ class _ProfilePageState extends State<ProfilePage> {
                               name,
                               style: const TextStyle(
                                 color: Colors.white,
-                                fontSize: 16,
+                                fontSize: 14,
                                 fontWeight: FontWeight.bold,
                               ),
                               maxLines: 1,
@@ -1115,12 +1142,12 @@ class _ProfilePageState extends State<ProfilePage> {
                           _buildCardTypeIndicators(connection),
                         ],
                       ),
-                      const SizedBox(height: 4),
+                      const SizedBox(height: 1),
                       Text(
                         displaySubtitle,
                         style: TextStyle(
                           color: Colors.white.withOpacity(0.4),
-                          fontSize: 13,
+                          fontSize: 11,
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -1130,30 +1157,33 @@ class _ProfilePageState extends State<ProfilePage> {
                 ),
 
                 // Relative time and purple notification dot
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      relativeTime,
-                      style: const TextStyle(
-                        color: Color(0xFF8B5CF6), // Purple color
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    if (showPurpleIndicator) ...[
-                      const SizedBox(width: 6),
-                      Container(
-                        width: 8,
-                        height: 8,
-                        decoration: const BoxDecoration(
-                          color: Color(0xFF8B5CF6),
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
+                // Row(
+                //   mainAxisSize: MainAxisSize.min,
+                //   children: [
+                //     Padding(
+                //       padding: const EdgeInsets.only(right: 10),
+                //       child: Text(
+                //         relativeTime,
+                //         style: const TextStyle(
+                //           color: Color(0xFF8B5CF6), // Purple color
+                //           fontSize: 12,
+                //           fontWeight: FontWeight.w600,
+                //         ),
+                //       ),
+                //     ),
+                //     if (showPurpleIndicator) ...[
+                //       const SizedBox(width: 6),
+                //       Container(
+                //         width: 8,
+                //         height: 8,
+                //         decoration: const BoxDecoration(
+                //           color: Color(0xFF8B5CF6),
+                //           shape: BoxShape.circle,
+                //         ),
+                //       ),
+                //     ],
+                //   ],
+                // ),
               ],
             ),
           ),

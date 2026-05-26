@@ -26,7 +26,9 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
   late String _profession;
   late String _company;
   late String _email;
+  late String _professionalEmail;
   late String _phoneNumber;
+  late String _professionalPhoneNumber;
   late String _bio;
   late String _avatarUrl;
   late String _instagram;
@@ -76,7 +78,9 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
     _profession = data['profession'] ?? '';
     _company = data['company'] ?? '';
     _email = data['email'] ?? '';
+    _professionalEmail = data['professionalEmail'] ?? data['professional_email'] ?? '';
     _phoneNumber = data['phoneNumber'] ?? data['phone_number'] ?? '';
+    _professionalPhoneNumber = data['professionalPhoneNumber'] ?? data['professional_phone_number'] ?? '';
     _bio = data['bio'] ?? '';
     _avatarUrl = data['avatarUrl'] ?? data['avatar_url'] ?? '';
     _instagram = data['instagram'] ?? '';
@@ -96,8 +100,8 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
     _professionalFields = {
       'profession': _profession,
       'company': _company,
-      'email': _email,
-      'phoneNumber': _phoneNumber,
+      'email': _professionalEmail,
+      'phoneNumber': _professionalPhoneNumber,
       'instagram': _instagram,
       'linkedin': _linkedin,
       'twitter': _twitter,
@@ -206,8 +210,8 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
             _professionalFields = {
               'profession': _filterFieldPro('profession', response['profession'] ?? ''),
               'company': _filterFieldPro('company', response['company'] ?? ''),
-              'email': _filterFieldPro('email', response['email'] ?? ''),
-              'phoneNumber': _filterFieldPro('phoneNumber', response['phone_number'] ?? ''),
+              'email': _filterFieldPro('email', response['professional_email'] ?? ''),
+              'phoneNumber': _filterFieldPro('phoneNumber', response['professional_phone_number'] ?? ''),
               'instagram': _filterFieldPro('instagram', response['instagram'] ?? ''),
               'linkedin': _filterFieldPro('linkedin', response['linkedin'] ?? ''),
               'twitter': _filterFieldPro('twitter', response['twitter'] ?? ''),
@@ -367,103 +371,95 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
   }
 
   Widget _buildCardTypeTabs() {
-    final isCasual = _previewCard == ProfileCardType.casual;
     final bool casualLocked = _sharedCardPermission == 'professional';
     final bool professionalLocked = _sharedCardPermission == 'casual';
 
     return Container(
-      height: 48,
+      height: 40,
+      padding: const EdgeInsets.all(3),
       decoration: BoxDecoration(
         color: const Color(0xFF13141F),
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(color: const Color(0xFF1F2030)),
       ),
-      padding: const EdgeInsets.all(4),
       child: Row(
         children: [
           Expanded(
-            child: GestureDetector(
+            child: _buildCardTab(
+              label: 'Casual',
+              icon: Icons.person_outline_rounded,
+              isActive: _previewCard == ProfileCardType.casual,
+              isLocked: casualLocked,
               onTap: casualLocked
                   ? () {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text("Access to Casual card restricted by user")),
+                        const SnackBar(
+                            content: Text("Access to Casual card restricted by user")),
                       );
                     }
                   : () => setState(() => _previewCard = ProfileCardType.casual),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                decoration: BoxDecoration(
-                  color: isCasual && !casualLocked
-                      ? const Color(0xFF8B5CF6)
-                      : Colors.transparent,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                alignment: Alignment.center,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      'CASUAL CARD',
-                      style: TextStyle(
-                        color: casualLocked
-                            ? const Color(0xFF5C5E78).withOpacity(0.3)
-                            : (isCasual ? Colors.white : const Color(0xFF5C5E78)),
-                        fontWeight: FontWeight.bold,
-                        fontSize: 12,
-                        fontFamily: 'Inter',
-                      ),
-                    ),
-                    if (casualLocked) ...[
-                      const SizedBox(width: 4),
-                      Icon(Icons.lock_rounded, size: 12, color: const Color(0xFF5C5E78).withOpacity(0.5)),
-                    ],
-                  ],
-                ),
-              ),
             ),
           ),
           Expanded(
-            child: GestureDetector(
+            child: _buildCardTab(
+              label: 'Professional',
+              icon: Icons.work_outline_rounded,
+              isActive: _previewCard == ProfileCardType.professional,
+              isLocked: professionalLocked,
               onTap: professionalLocked
                   ? () {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text("Access to Professional card restricted by user")),
+                        const SnackBar(
+                            content: Text("Access to Professional card restricted by user")),
                       );
                     }
                   : () => setState(() => _previewCard = ProfileCardType.professional),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                decoration: BoxDecoration(
-                  color: !isCasual && !professionalLocked
-                      ? const Color(0xFF8B5CF6)
-                      : Colors.transparent,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                alignment: Alignment.center,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      'PROFESSIONAL CARD',
-                      style: TextStyle(
-                        color: professionalLocked
-                            ? const Color(0xFF5C5E78).withOpacity(0.3)
-                            : (!isCasual ? Colors.white : const Color(0xFF5C5E78)),
-                        fontWeight: FontWeight.bold,
-                        fontSize: 12,
-                        fontFamily: 'Inter',
-                      ),
-                    ),
-                    if (professionalLocked) ...[
-                      const SizedBox(width: 4),
-                      Icon(Icons.lock_rounded, size: 12, color: const Color(0xFF5C5E78).withOpacity(0.5)),
-                    ],
-                  ],
-                ),
-              ),
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildCardTab({
+    required String label,
+    required IconData icon,
+    required bool isActive,
+    required bool isLocked,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: isActive && !isLocked ? const Color(0xFF8B5CF6) : Colors.transparent,
+          borderRadius: BorderRadius.circular(17),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              isLocked ? Icons.lock_rounded : icon,
+              size: 16,
+              color: isLocked
+                  ? const Color(0xFF5C5E78).withOpacity(0.5)
+                  : (isActive ? Colors.white : const Color(0xFF8B8C9E)),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(
+                color: isLocked
+                    ? const Color(0xFF5C5E78).withOpacity(0.5)
+                    : (isActive ? Colors.white : const Color(0xFF8B8C9E)),
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -562,7 +558,7 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
                 color: (isCasual
                         ? const Color(0xFF8B5CF6)
                         : const Color(0xFF00F2FE))
-                    .withOpacity(0.1),
+                    .withValues(alpha: 0.1),
                 blurRadius: 14,
                 spreadRadius: 0,
               ),
@@ -592,7 +588,7 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
                         color: (isCasual
                                 ? const Color(0xFF8B5CF6)
                                 : const Color(0xFF00F2FE))
-                            .withOpacity(0.06),
+                            .withValues(alpha: 0.06),
                       ),
                     ),
                   ),
@@ -610,9 +606,7 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
                         ),
                       );
                     },
-                    child: _showFront
-                        ? _buildUnifiedFrontCard(cardWidth)
-                        : _buildUnifiedBackCard(cardWidth),
+                    child: _buildActiveCardFace(cardWidth),
                   ),
                 ],
               ),
@@ -620,6 +614,47 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
           ),
         );
       },
+    );
+  }
+
+  Widget _buildActiveCardFace(double cardWidth) {
+    final isFront = _showFront;
+    if (isFront) {
+      return _wrapCardFace(
+        _buildUnifiedFrontCard(cardWidth),
+        _previewCard == ProfileCardType.casual ? 0.82 : 1.58,
+        cardWidth,
+        const ValueKey('FrontCard'),
+      );
+    } else {
+      return _wrapCardFace(
+        _buildUnifiedBackCard(cardWidth),
+        _previewCard == ProfileCardType.casual ? 0.82 : 1.58,
+        cardWidth,
+        const ValueKey('BackCard'),
+      );
+    }
+  }
+
+  Widget _wrapCardFace(
+      Widget child, double targetAspectRatio, double cardWidth, Key key) {
+    final targetHeight = cardWidth / targetAspectRatio;
+    return ClipRect(
+      key: key,
+      child: OverflowBox(
+        minWidth: cardWidth,
+        maxWidth: cardWidth,
+        minHeight: cardWidth / 1.58,
+        maxHeight: cardWidth / 0.82,
+        alignment: Alignment.topCenter,
+        child: AnimatedContainer(
+          duration: _cardAnimDuration,
+          curve: _cardAnimCurve,
+          width: cardWidth,
+          height: targetHeight,
+          child: child,
+        ),
+      ),
     );
   }
 
@@ -1293,16 +1328,30 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
                 value: comp,
                 icon: Icons.apartment_rounded,
               ),
-              _buildReadOnlyField(
-                label: 'Email Address',
-                value: _email,
-                icon: Icons.email_outlined,
-              ),
-              _buildReadOnlyField(
-                label: 'Phone Number',
-                value: _phoneNumber,
-                icon: Icons.phone_android_outlined,
-              ),
+              if (_isFieldVisible('email', widget.profileData['field_assignments']))
+                _buildReadOnlyField(
+                  label: 'Casual Email Address',
+                  value: _email,
+                  icon: Icons.email_outlined,
+                ),
+              if (_isFieldVisible('professionalEmail', widget.profileData['field_assignments']))
+                _buildReadOnlyField(
+                  label: 'Professional Email Address',
+                  value: _professionalEmail,
+                  icon: Icons.email_outlined,
+                ),
+              if (_isFieldVisible('phoneNumber', widget.profileData['field_assignments']))
+                _buildReadOnlyField(
+                  label: 'Casual Phone Number',
+                  value: _phoneNumber,
+                  icon: Icons.phone_android_outlined,
+                ),
+              if (_isFieldVisible('professionalPhoneNumber', widget.profileData['field_assignments']))
+                _buildReadOnlyField(
+                  label: 'Professional Phone Number',
+                  value: _professionalPhoneNumber,
+                  icon: Icons.phone_android_outlined,
+                ),
               _buildReadOnlyField(
                 label: 'Bio',
                 value: bio,

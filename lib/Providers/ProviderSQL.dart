@@ -11,7 +11,9 @@ class ProfileProvider2 with ChangeNotifier {
   String name = '';
   String profession = '';
   String email = '';
+  String professionalEmail = '';
   String phoneNumber = '';
+  String professionalPhoneNumber = '';
   String instagram = '';
   String linkedin = '';
   String twitter = '';
@@ -36,7 +38,9 @@ class ProfileProvider2 with ChangeNotifier {
     'name': false,
     'profession': false,
     'email': false,
+    'professionalEmail': false,
     'phoneNumber': false,
+    'professionalPhoneNumber': false,
     'instagram': false,
     'linkedin': false,
     'twitter': false,
@@ -52,7 +56,15 @@ class ProfileProvider2 with ChangeNotifier {
     for (final field in assignableProfileFields) {
       fieldAssignments.putIfAbsent(
         field,
-        () => FieldCardAssignment(casual: false, professional: true),
+        () {
+          if (field == 'email' || field == 'phoneNumber' || field == 'bio') {
+            return FieldCardAssignment(casual: true, professional: true);
+          }
+          if (field == 'name' || field == 'avatarUrl') {
+            return FieldCardAssignment(casual: true, professional: true);
+          }
+          return FieldCardAssignment(casual: false, professional: true);
+        },
       );
     }
   }
@@ -162,8 +174,12 @@ class ProfileProvider2 with ChangeNotifier {
         return company;
       case 'email':
         return email;
+      case 'professionalEmail':
+        return professionalEmail;
       case 'phoneNumber':
         return phoneNumber;
+      case 'professionalPhoneNumber':
+        return professionalPhoneNumber;
       case 'bio':
         return bio;
       case 'professionalBio':
@@ -232,7 +248,9 @@ class ProfileProvider2 with ChangeNotifier {
     name = data['name'] ?? '';
     profession = data['profession'] ?? '';
     email = data['email'] ?? '';
+    professionalEmail = data['professionalEmail'] ?? data['professional_email'] ?? '';
     phoneNumber = data['phoneNumber'] ?? data['phone_number'] ?? '';
+    professionalPhoneNumber = data['professionalPhoneNumber'] ?? data['professional_phone_number'] ?? '';
     instagram = data['instagram'] ?? '';
     linkedin = data['linkedin'] ?? '';
     twitter = data['twitter'] ?? '';
@@ -263,8 +281,14 @@ class ProfileProvider2 with ChangeNotifier {
       case 'email':
         email = value;
         break;
+      case 'professionalEmail':
+        professionalEmail = value;
+        break;
       case 'phoneNumber':
         phoneNumber = value;
+        break;
+      case 'professionalPhoneNumber':
+        professionalPhoneNumber = value;
         break;
       case 'instagram':
         instagram = value;
@@ -386,7 +410,9 @@ class ProfileProvider2 with ChangeNotifier {
           'name': row['name'] ?? '',
           'profession': row['profession'] ?? '',
           'email': row['email'] ?? '',
+          'professionalEmail': row['professional_email'] ?? '',
           'phoneNumber': row['phone_number'] ?? '',
+          'professionalPhoneNumber': row['professional_phone_number'] ?? '',
           'instagram': row['instagram'] ?? '',
           'linkedin': row['linkedin'] ?? '',
           'twitter': row['twitter'] ?? '',
@@ -478,7 +504,9 @@ class ProfileProvider2 with ChangeNotifier {
       "name": "",
       "profession": "",
       "email": "",
+      "professionalEmail": "",
       "phoneNumber": "",
+      "professionalPhoneNumber": "",
       "instagram": "",
       "linkedin": "",
       "twitter": "",
@@ -499,7 +527,9 @@ class ProfileProvider2 with ChangeNotifier {
         name = response['name'] ?? '';
         profession = response['profession'] ?? '';
         email = response['email'] ?? '';
+        professionalEmail = response['professional_email'] ?? '';
         phoneNumber = response['phone_number'] ?? '';
+        professionalPhoneNumber = response['professional_phone_number'] ?? '';
         instagram = response['instagram'] ?? '';
         linkedin = response['linkedin'] ?? '';
         twitter = response['twitter'] ?? '';
@@ -512,7 +542,9 @@ class ProfileProvider2 with ChangeNotifier {
         profileData["name"] = name;
         profileData["profession"] = profession;
         profileData["email"] = email;
+        profileData["professionalEmail"] = professionalEmail;
         profileData["phoneNumber"] = phoneNumber;
+        profileData["professionalPhoneNumber"] = professionalPhoneNumber;
         profileData["instagram"] = instagram;
         profileData["linkedin"] = linkedin;
         profileData["twitter"] = twitter;
@@ -573,7 +605,9 @@ class ProfileProvider2 with ChangeNotifier {
               'name': name,
               'profession': profession,
               'email': email,
+              'professional_email': professionalEmail,
               'phone_number': phoneNumber,
+              'professional_phone_number': professionalPhoneNumber,
               'instagram': instagram,
               'linkedin': linkedin,
               'twitter': twitter,
@@ -596,7 +630,9 @@ class ProfileProvider2 with ChangeNotifier {
           'name': name,
           'profession': profession,
           'email': email,
+          'professionalEmail': professionalEmail,
           'phoneNumber': phoneNumber,
+          'professionalPhoneNumber': professionalPhoneNumber,
           'instagram': instagram,
           'linkedin': linkedin,
           'twitter': twitter,
@@ -623,7 +659,9 @@ class ProfileProvider2 with ChangeNotifier {
         'name': profileData['name'] ?? '',
         'profession': profileData['profession'] ?? '',
         'email': profileData['email'] ?? '',
+        'professional_email': profileData['professionalEmail'] ?? '',
         'phone_number': profileData['phoneNumber'] ?? '',
+        'professional_phone_number': profileData['professionalPhoneNumber'] ?? '',
         'instagram': profileData['instagram'] ?? '',
         'linkedin': profileData['linkedin'] ?? '',
         'twitter': profileData['twitter'] ?? '',
@@ -656,8 +694,14 @@ class ProfileProvider2 with ChangeNotifier {
       case 'email':
         email = value;
         break;
+      case 'professionalEmail':
+        professionalEmail = value;
+        break;
       case 'phoneNumber':
         phoneNumber = value;
+        break;
+      case 'professionalPhoneNumber':
+        professionalPhoneNumber = value;
         break;
       case 'instagram':
         instagram = value;
@@ -685,6 +729,10 @@ class ProfileProvider2 with ChangeNotifier {
     String dbField = field;
     if (field == 'phoneNumber') {
       dbField = 'phone_number';
+    } else if (field == 'professionalEmail') {
+      dbField = 'professional_email';
+    } else if (field == 'professionalPhoneNumber') {
+      dbField = 'professional_phone_number';
     } else if (field == 'professionalBio') {
       dbField = 'professional_bio';
     } else if (field == 'avatarUrl') {
@@ -866,7 +914,9 @@ class ProfileProvider2 with ChangeNotifier {
       'name': name,
       'profession': profession,
       'email': email,
+      'professional_email': professionalEmail,
       'phone_number': phoneNumber,
+      'professional_phone_number': professionalPhoneNumber,
       'instagram': instagram,
       'linkedin': linkedin,
       'twitter': twitter,
@@ -891,7 +941,9 @@ class ProfileProvider2 with ChangeNotifier {
           'name': name,
           'profession': profession,
           'email': email,
+          'professionalEmail': professionalEmail,
           'phoneNumber': phoneNumber,
+          'professionalPhoneNumber': professionalPhoneNumber,
           'instagram': instagram,
           'linkedin': linkedin,
           'twitter': twitter,
@@ -923,7 +975,9 @@ class ProfileProvider2 with ChangeNotifier {
           'name': name,
           'profession': profession,
           'email': email,
+          'professionalEmail': professionalEmail,
           'phoneNumber': phoneNumber,
+          'professionalPhoneNumber': professionalPhoneNumber,
           'instagram': instagram,
           'linkedin': linkedin,
           'twitter': twitter,
@@ -949,7 +1003,9 @@ class ProfileProvider2 with ChangeNotifier {
     name = '';
     profession = '';
     email = '';
+    professionalEmail = '';
     phoneNumber = '';
+    professionalPhoneNumber = '';
     instagram = '';
     linkedin = '';
     twitter = '';

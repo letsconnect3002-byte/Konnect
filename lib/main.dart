@@ -7,6 +7,7 @@ import 'package:connect/Pages/yet_to_be_built_profile_page.dart';
 import 'package:connect/Providers/ProfileProvider.dart';
 import 'package:connect/Providers/ProviderSQL.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -32,9 +33,25 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => ProfileProvider()),
         ChangeNotifierProvider(create: (_) => ProfileProvider2()),
       ],
-      child: const MaterialApp(
+      child: MaterialApp(
         debugShowCheckedModeBanner: false,
-        home: AuthGate(),
+        theme: ThemeData(
+          brightness: Brightness.dark,
+          scaffoldBackgroundColor: const Color(0xFF090A0F),
+          canvasColor: const Color(0xFF090A0F),
+          colorScheme: const ColorScheme.dark(
+            primary: Color(0xFF8B5CF6),
+            surface: Color(0xFF13141F),
+            error: Colors.redAccent,
+          ),
+          pageTransitionsTheme: const PageTransitionsTheme(
+            builders: {
+              TargetPlatform.android: ZoomPageTransitionsBuilder(),
+              TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
+            },
+          ),
+        ),
+        home: const AuthGate(),
       ),
     );
   }
@@ -177,13 +194,18 @@ class _AppShellState extends State<_AppShell> {
           child: SafeArea(
             top: false,
             child: SizedBox(
-              height: 64,
+              height: 55,
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
-                  _buildNavItem(index: 0, icon: Icons.home_rounded),
-                  _buildNavItem(index: 1, icon: Icons.chat_bubble_rounded),
-                  _buildNavItem(index: 2, icon: Icons.person_rounded),
+                  _buildNavItem(
+                      index: 0, icon: Icons.home_rounded, isImageIcon: false),
+                  _buildNavItem(
+                      index: 1,
+                      icon: Icons.chat_bubble_rounded,
+                      isImageIcon: true),
+                  _buildNavItem(
+                      index: 2, icon: Icons.person_rounded, isImageIcon: false),
                 ],
               ),
             ),
@@ -196,6 +218,7 @@ class _AppShellState extends State<_AppShell> {
   Widget _buildNavItem({
     required int index,
     required IconData icon,
+    required bool isImageIcon,
   }) {
     final bool isActive = _currentIndex == index;
 
@@ -212,8 +235,9 @@ class _AppShellState extends State<_AppShell> {
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 250),
             curve: Curves.easeOutCubic,
-            width: 48,
-            height: 48,
+            width: 40,
+            height: 40,
+            alignment: Alignment.center,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               color: isActive ? const Color(0xFF1A1B2E) : Colors.transparent,
@@ -227,11 +251,17 @@ class _AppShellState extends State<_AppShell> {
                     ]
                   : null,
             ),
-            child: Icon(
-              icon,
-              size: 26,
-              color: isActive ? Colors.white : const Color(0xFF5C5E78),
-            ),
+            child: isImageIcon
+                ? ImageIcon(
+                    AssetImage("assets/icons/Connect Icon2.png"),
+                    size: 28,
+                    color: isActive ? Colors.white : const Color(0xFF5C5E78),
+                  )
+                : Icon(
+                    icon,
+                    size: 28,
+                    color: isActive ? Colors.white : const Color(0xFF5C5E78),
+                  ),
           ),
         ),
       ),

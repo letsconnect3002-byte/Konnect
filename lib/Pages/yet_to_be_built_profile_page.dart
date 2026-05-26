@@ -33,12 +33,20 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
   late TextEditingController _professionController;
   late TextEditingController _companyController;
   late TextEditingController _emailController;
+  late TextEditingController _professionalEmailController;
   late TextEditingController _phoneController;
+  late TextEditingController _professionalPhoneController;
   late TextEditingController _bioController;
   late TextEditingController _professionalBioController;
   late FocusNode _bioFocusNode;
   late FocusNode _professionalBioFocusNode;
+  late FocusNode _emailFocusNode;
+  late FocusNode _professionalEmailFocusNode;
+  late FocusNode _phoneFocusNode;
+  late FocusNode _professionalPhoneFocusNode;
   bool _showProfileToConnections = true;
+  String _casualCountryCode = '+91';
+  String _professionalCountryCode = '+91';
 
   @override
   void initState() {
@@ -47,18 +55,26 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
     _professionController = TextEditingController();
     _companyController = TextEditingController();
     _emailController = TextEditingController();
+    _professionalEmailController = TextEditingController();
     _phoneController = TextEditingController();
+    _professionalPhoneController = TextEditingController();
     _bioController = TextEditingController();
     _professionalBioController = TextEditingController();
     _bioFocusNode = FocusNode();
     _professionalBioFocusNode = FocusNode();
+    _emailFocusNode = FocusNode();
+    _professionalEmailFocusNode = FocusNode();
+    _phoneFocusNode = FocusNode();
+    _professionalPhoneFocusNode = FocusNode();
 
     // Setup real-time card preview listeners
     _nameController.addListener(_onFieldChanged);
     _professionController.addListener(_onFieldChanged);
     _companyController.addListener(_onFieldChanged);
     _emailController.addListener(_onFieldChanged);
+    _professionalEmailController.addListener(_onFieldChanged);
     _phoneController.addListener(_onFieldChanged);
+    _professionalPhoneController.addListener(_onFieldChanged);
     _bioController.addListener(_onFieldChanged);
     _professionalBioController.addListener(_onFieldChanged);
 
@@ -80,6 +96,42 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
       }
     });
 
+    _emailFocusNode.addListener(() {
+      if (!_emailFocusNode.hasFocus) {
+        final provider = Provider.of<ProfileProvider2>(context, listen: false);
+        if (provider.editMode['email'] == true) {
+          provider.setEditMode('email', false);
+        }
+      }
+    });
+
+    _professionalEmailFocusNode.addListener(() {
+      if (!_professionalEmailFocusNode.hasFocus) {
+        final provider = Provider.of<ProfileProvider2>(context, listen: false);
+        if (provider.editMode['professionalEmail'] == true) {
+          provider.setEditMode('professionalEmail', false);
+        }
+      }
+    });
+
+    _phoneFocusNode.addListener(() {
+      if (!_phoneFocusNode.hasFocus) {
+        final provider = Provider.of<ProfileProvider2>(context, listen: false);
+        if (provider.editMode['phoneNumber'] == true) {
+          provider.setEditMode('phoneNumber', false);
+        }
+      }
+    });
+
+    _professionalPhoneFocusNode.addListener(() {
+      if (!_professionalPhoneFocusNode.hasFocus) {
+        final provider = Provider.of<ProfileProvider2>(context, listen: false);
+        if (provider.editMode['professionalPhoneNumber'] == true) {
+          provider.setEditMode('professionalPhoneNumber', false);
+        }
+      }
+    });
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadInitialData();
     });
@@ -91,7 +143,9 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
     _professionController.removeListener(_onFieldChanged);
     _companyController.removeListener(_onFieldChanged);
     _emailController.removeListener(_onFieldChanged);
+    _professionalEmailController.removeListener(_onFieldChanged);
     _phoneController.removeListener(_onFieldChanged);
+    _professionalPhoneController.removeListener(_onFieldChanged);
     _bioController.removeListener(_onFieldChanged);
     _professionalBioController.removeListener(_onFieldChanged);
 
@@ -99,12 +153,32 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
     _professionController.dispose();
     _companyController.dispose();
     _emailController.dispose();
+    _professionalEmailController.dispose();
     _phoneController.dispose();
+    _professionalPhoneController.dispose();
     _bioController.dispose();
     _professionalBioController.dispose();
     _bioFocusNode.dispose();
     _professionalBioFocusNode.dispose();
+    _emailFocusNode.dispose();
+    _professionalEmailFocusNode.dispose();
+    _phoneFocusNode.dispose();
+    _professionalPhoneFocusNode.dispose();
     super.dispose();
+  }
+
+  Map<String, String> _parsePhone(String rawPhone) {
+    final codes = ['+1', '+91', '+44', '+61', '+81', '+49', '+33', '+65', '+971', '+966', '+27', '+55', '+86', '+7', '+52', '+39', '+34', '+31', '+82'];
+    codes.sort((a, b) => b.length.compareTo(a.length));
+    
+    String cleaned = rawPhone.trim();
+    for (final code in codes) {
+      if (cleaned.startsWith(code)) {
+        String rest = cleaned.substring(code.length).trim();
+        return {'code': code, 'number': rest};
+      }
+    }
+    return {'code': '+91', 'number': cleaned};
   }
 
   void _onFieldChanged() {
@@ -116,11 +190,24 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
   bool _isDataChanged() {
     if (!mounted) return false;
     final provider = Provider.of<ProfileProvider2>(context, listen: false);
+    
+    final String casualPhoneText = _phoneController.text.trim();
+    final String casualPhoneToCompare = casualPhoneText.isNotEmpty 
+        ? '$_casualCountryCode $casualPhoneText' 
+        : '';
+        
+    final String profPhoneText = _professionalPhoneController.text.trim();
+    final String profPhoneToCompare = profPhoneText.isNotEmpty 
+        ? '$_professionalCountryCode $profPhoneText' 
+        : '';
+
     return _nameController.text.trim() != provider.name ||
         _professionController.text.trim() != provider.profession ||
         _companyController.text.trim() != provider.company ||
         _emailController.text.trim() != provider.email ||
-        _phoneController.text.trim() != provider.phoneNumber ||
+        _professionalEmailController.text.trim() != provider.professionalEmail ||
+        casualPhoneToCompare != provider.phoneNumber ||
+        profPhoneToCompare != provider.professionalPhoneNumber ||
         _bioController.text.trim() != provider.bio ||
         _professionalBioController.text.trim() != provider.professionalBio ||
         _avatarUrl != provider.avatarUrl;
@@ -141,7 +228,16 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
           _professionController.text = provider.profession;
           _companyController.text = provider.company;
           _emailController.text = provider.email;
-          _phoneController.text = provider.phoneNumber;
+          _professionalEmailController.text = provider.professionalEmail;
+
+          final casualPhoneParsed = _parsePhone(provider.phoneNumber);
+          _casualCountryCode = casualPhoneParsed['code']!;
+          _phoneController.text = casualPhoneParsed['number']!;
+          
+          final profPhoneParsed = _parsePhone(provider.professionalPhoneNumber);
+          _professionalCountryCode = profPhoneParsed['code']!;
+          _professionalPhoneController.text = profPhoneParsed['number']!;
+
           _bioController.text = provider.bio;
           _professionalBioController.text = provider.professionalBio;
           _showProfileToConnections = provider.showProfileToConnections;
@@ -155,7 +251,16 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
         _professionController.text = provider.profession;
         _companyController.text = provider.company;
         _emailController.text = provider.email;
-        _phoneController.text = provider.phoneNumber;
+        _professionalEmailController.text = provider.professionalEmail;
+
+        final casualPhoneParsed = _parsePhone(provider.phoneNumber);
+        _casualCountryCode = casualPhoneParsed['code']!;
+        _phoneController.text = casualPhoneParsed['number']!;
+        
+        final profPhoneParsed = _parsePhone(provider.professionalPhoneNumber);
+        _professionalCountryCode = profPhoneParsed['code']!;
+        _professionalPhoneController.text = profPhoneParsed['number']!;
+
         _bioController.text = provider.bio;
         _professionalBioController.text = provider.professionalBio;
         _showProfileToConnections = provider.showProfileToConnections;
@@ -183,7 +288,20 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
       provider.setValue('profession', _professionController.text.trim());
       provider.setValue('company', _companyController.text.trim());
       provider.setValue('email', _emailController.text.trim());
-      provider.setValue('phoneNumber', _phoneController.text.trim());
+      provider.setValue('professionalEmail', _professionalEmailController.text.trim());
+
+      final String casualPhoneText = _phoneController.text.trim();
+      final String casualPhoneToSave = casualPhoneText.isNotEmpty 
+          ? '$_casualCountryCode $casualPhoneText' 
+          : '';
+      provider.setValue('phoneNumber', casualPhoneToSave);
+      
+      final String profPhoneText = _professionalPhoneController.text.trim();
+      final String profPhoneToSave = profPhoneText.isNotEmpty 
+          ? '$_professionalCountryCode $profPhoneText' 
+          : '';
+      provider.setValue('professionalPhoneNumber', profPhoneToSave);
+
       provider.setValue('bio', _bioController.text.trim());
       provider.setValue(
           'professionalBio', _professionalBioController.text.trim());
@@ -241,7 +359,8 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
     int quality = 80;
     Uint8List compressedBytes;
     do {
-      compressedBytes = Uint8List.fromList(img.encodeJpg(resized, quality: quality));
+      compressedBytes =
+          Uint8List.fromList(img.encodeJpg(resized, quality: quality));
       if (compressedBytes.length <= 10 * 1024 || quality <= 10) {
         break;
       }
@@ -301,18 +420,18 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
       final compressedBytes = await _compressImageTo10Kb(croppedBytes);
 
       try {
-        await Supabase.instance.client.storage.createBucket('avatars', const BucketOptions(public: true));
+        await Supabase.instance.client.storage
+            .createBucket('avatars', const BucketOptions(public: true));
       } catch (_) {
         // Safe to ignore if bucket already exists
       }
 
       final String timestamp = DateTime.now().millisecondsSinceEpoch.toString();
-      final String folderName = provider.userId != -1 ? '${provider.userId}' : 'temp_user';
+      final String folderName =
+          provider.userId != -1 ? '${provider.userId}' : 'temp_user';
       final String fileName = '$folderName/avatar_$timestamp.jpg';
 
-      await Supabase.instance.client.storage
-          .from('avatars')
-          .uploadBinary(
+      await Supabase.instance.client.storage.from('avatars').uploadBinary(
             fileName,
             compressedBytes,
             fileOptions: const FileOptions(
@@ -369,7 +488,6 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                       textAlign: TextAlign.center,
                     ),
                     const SizedBox(height: 24),
-                    
                     Center(
                       child: Container(
                         width: 120,
@@ -389,13 +507,13 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                       ),
                     ),
                     const SizedBox(height: 24),
-                    
                     if (isUploading) ...[
                       const Padding(
                         padding: EdgeInsets.symmetric(vertical: 20),
                         child: Center(
                           child: CircularProgressIndicator(
-                            valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF00F2FE)),
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                                Color(0xFF00F2FE)),
                           ),
                         ),
                       ),
@@ -414,13 +532,16 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                                   _avatarUrl = publicUrl;
                                 });
                               }
-                              Navigator.pop(context); // Auto-dismiss sheet on success
-                              
+                              Navigator.pop(
+                                  context); // Auto-dismiss sheet on success
+
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
                                   content: const Text(
                                     "Profile photo updated and saved to storage!",
-                                    style: TextStyle(fontFamily: 'Inter', fontWeight: FontWeight.bold),
+                                    style: TextStyle(
+                                        fontFamily: 'Inter',
+                                        fontWeight: FontWeight.bold),
                                   ),
                                   backgroundColor: const Color(0xFF8B5CF6),
                                   behavior: SnackBarBehavior.floating,
@@ -438,7 +559,8 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                             },
                           );
                         },
-                        icon: const Icon(Icons.photo_library_rounded, color: Colors.white, size: 18),
+                        icon: const Icon(Icons.photo_library_rounded,
+                            color: Colors.white, size: 18),
                         label: const Text(
                           "Upload from Gallery",
                           style: TextStyle(
@@ -458,16 +580,18 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                         ),
                       ),
                     ],
-                    
-                    if (uploadError != null && uploadError != "No image picked") ...[
+                    if (uploadError != null &&
+                        uploadError != "No image picked") ...[
                       const SizedBox(height: 16),
                       Text(
                         "Upload Error: $uploadError\nMake sure storage bucket 'avatars' is created and RLS is public in Supabase.",
-                        style: const TextStyle(color: Colors.redAccent, fontSize: 11, fontFamily: 'Inter'),
+                        style: const TextStyle(
+                            color: Colors.redAccent,
+                            fontSize: 11,
+                            fontFamily: 'Inter'),
                         textAlign: TextAlign.center,
                       ),
                     ],
-                    
                     const SizedBox(height: 16),
                     TextButton(
                       onPressed: () => Navigator.pop(context),
@@ -1221,17 +1345,22 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
               }
             },
             child: Container(
-              padding: const EdgeInsets.all(8),
-              decoration: const BoxDecoration(
-                color: Color(0xFF1C1D2A),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.arrow_back_ios_new_rounded,
-                color: Colors.white,
-                size: 16,
-              ),
-            ),
+                padding: const EdgeInsets.all(8),
+                decoration: const BoxDecoration(
+                  // color: Color(0xFF1C1D2A),
+                  shape: BoxShape.circle,
+                ),
+                child: SizedBox(
+                  width: 16,
+                  height: 16,
+                )
+
+                // const Icon(
+                //   Icons.arrow_back_ios_new_rounded,
+                //   color: Colors.white,
+                //   size: 16,
+                // ),
+                ),
           ),
           // Titles
           Column(
@@ -1300,7 +1429,8 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
               PopupMenuItem<String>(
                 value: 'sign_out',
                 child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
+                  padding:
+                      const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -1862,28 +1992,53 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                   height: isCasual ? 12 : 5,
                 ),
               ],
-              if (_fieldVisible('email')) ...[
-                _buildUnifiedCardRow(
-                  Icons.email_outlined,
-                  _emailController.text.trim().isEmpty
-                      ? 'jordan@designstudio.com'
-                      : _emailController.text.trim(),
-                  isCasual,
-                ),
-                AnimatedContainer(
-                  duration: _cardAnimDuration,
-                  curve: _cardAnimCurve,
-                  height: isCasual ? 12 : 5,
-                ),
+              if (isCasual) ...[
+                if (_fieldVisible('email')) ...[
+                  _buildUnifiedCardRow(
+                    Icons.email_outlined,
+                    _emailController.text.trim().isEmpty
+                        ? 'jordan@designstudio.com'
+                        : _emailController.text.trim(),
+                    isCasual,
+                  ),
+                  AnimatedContainer(
+                    duration: _cardAnimDuration,
+                    curve: _cardAnimCurve,
+                    height: 12,
+                  ),
+                ],
+                if (_fieldVisible('phoneNumber'))
+                  _buildUnifiedCardRow(
+                    Icons.phone_rounded,
+                    _phoneController.text.trim().isEmpty
+                        ? '+1 (555) 123-4567'
+                        : '$_casualCountryCode ${_phoneController.text.trim()}',
+                    isCasual,
+                  ),
+              ] else ...[
+                if (_fieldVisible('email')) ...[
+                  _buildUnifiedCardRow(
+                    Icons.email_outlined,
+                    _professionalEmailController.text.trim().isEmpty
+                        ? 'jordan@designstudio.com'
+                        : _professionalEmailController.text.trim(),
+                    isCasual,
+                  ),
+                  AnimatedContainer(
+                    duration: _cardAnimDuration,
+                    curve: _cardAnimCurve,
+                    height: 5,
+                  ),
+                ],
+                if (_fieldVisible('phoneNumber'))
+                  _buildUnifiedCardRow(
+                    Icons.phone_rounded,
+                    _professionalPhoneController.text.trim().isEmpty
+                        ? '+1 (555) 123-4567'
+                        : '$_professionalCountryCode ${_professionalPhoneController.text.trim()}',
+                    isCasual,
+                  ),
               ],
-              if (_fieldVisible('phoneNumber'))
-                _buildUnifiedCardRow(
-                  Icons.phone_rounded,
-                  _phoneController.text.trim().isEmpty
-                      ? '+1 (555) 123-4567'
-                      : _phoneController.text.trim(),
-                  isCasual,
-                ),
             ],
           ),
         ),
@@ -2168,24 +2323,604 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
           icon: Icons.apartment_rounded,
           controller: _companyController,
         ),
-        CardFieldInput(
-          fieldKey: 'email',
-          label: 'Email Address',
-          hint: 'jordan@designstudio.com',
-          icon: Icons.email_outlined,
-          controller: _emailController,
-          keyboardType: TextInputType.emailAddress,
-        ),
-        CardFieldInput(
-          fieldKey: 'phoneNumber',
-          label: 'Phone Number',
-          hint: '+1 (555) 123-4567',
-          icon: Icons.phone_android_outlined,
-          controller: _phoneController,
-          keyboardType: TextInputType.phone,
-        ),
+        _buildEmailSection(),
+        _buildPhoneSection(),
         _buildBioSection(),
       ],
+    );
+  }
+
+  String _getFlagForCode(String code) {
+    switch (code) {
+      case '+971': return '🇦🇪';
+      case '+1': return '🇺🇸';
+      case '+55': return '🇧🇷';
+      case '+52': return '🇲🇽';
+      case '+44': return '🇬🇧';
+      case '+49': return '🇩🇪';
+      case '+33': return '🇫🇷';
+      case '+39': return '🇮🇹';
+      case '+34': return '🇪🇸';
+      case '+31': return '🇳🇱';
+      case '+91': return '🇮🇳';
+      case '+86': return '🇨🇳';
+      case '+65': return '🇸🇬';
+      case '+81': return '🇯🇵';
+      case '+82': return '🇰🇷';
+      case '+966': return '🇸🇦';
+      default: return '🏳️';
+    }
+  }
+
+  void _showCountryPicker(BuildContext context, ValueChanged<String?> onCountryCodeChanged) {
+    showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: const Color(0xFF13141F),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (context) {
+        return const _CountryCodePickerSheet();
+      },
+    ).then((selectedCode) {
+      if (selectedCode != null) {
+        onCountryCodeChanged(selectedCode);
+      }
+    });
+  }
+
+  Widget _buildEmailSection() {
+    final provider = context.watch<ProfileProvider2>();
+    final assignment = provider.fieldAssignments['email'] ??
+        FieldCardAssignment(casual: true, professional: true);
+
+    final isCasualEditing = provider.editMode['email'] ?? false;
+    final isCasualFilled = _emailController.text.isNotEmpty;
+    final casualReadOnly = isCasualFilled && !isCasualEditing;
+
+    final isProfEditing = provider.editMode['professionalEmail'] ?? false;
+    final isProfFilled = _professionalEmailController.text.isNotEmpty;
+    final profReadOnly = isProfFilled && !isProfEditing;
+
+    // Autofocus when edit mode is toggled on
+    if (isCasualEditing && !_emailFocusNode.hasFocus) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && !_emailFocusNode.hasFocus) {
+          _emailFocusNode.requestFocus();
+        }
+      });
+    }
+    if (isProfEditing && !_professionalEmailFocusNode.hasFocus) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && !_professionalEmailFocusNode.hasFocus) {
+          _professionalEmailFocusNode.requestFocus();
+        }
+      });
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF13141F),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFF1F2030)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Header Row with Card Toggles
+          Row(
+            children: [
+              const Icon(Icons.email_outlined, color: Color(0xFF8B5CF6), size: 18),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Text(
+                  'Email Address',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              _buildLocalCardToggle(
+                icon: Icons.person_outline_rounded,
+                isActive: assignment.casual,
+                onTap: () => provider.toggleFieldOnCard('email', ProfileCardType.casual),
+              ),
+              const SizedBox(width: 8),
+              _buildLocalCardToggle(
+                icon: Icons.work_outline_rounded,
+                isActive: assignment.professional,
+                onTap: () => provider.toggleFieldOnCard('email', ProfileCardType.professional),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          // Casual Email Section Header
+          Row(
+            children: const [
+              Icon(Icons.person_outline_rounded, color: Color(0xFF8B5CF6), size: 16),
+              SizedBox(width: 6),
+              Text(
+                'Casual Email',
+                style: TextStyle(
+                  color: Color(0xFF8B8C9E),
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          TextFormField(
+            controller: _emailController,
+            focusNode: _emailFocusNode,
+            readOnly: casualReadOnly,
+            keyboardType: TextInputType.emailAddress,
+            style: const TextStyle(color: Colors.white, fontSize: 14),
+            cursorColor: const Color(0xFF8B5CF6),
+            decoration: InputDecoration(
+              hintText: 'jordan@designstudio.com',
+              hintStyle: TextStyle(
+                color: Colors.white.withValues(alpha: 0.25),
+                fontSize: 14,
+              ),
+              suffixIcon: isCasualFilled
+                  ? GestureDetector(
+                      onTap: () {
+                        if (isCasualEditing) {
+                          provider.setEditMode('email', false);
+                          _emailFocusNode.unfocus();
+                        } else {
+                          provider.setEditMode('email', true);
+                        }
+                      },
+                      child: Icon(
+                        isCasualEditing
+                            ? Icons.check_circle_outline_rounded
+                            : Icons.edit_rounded,
+                        color: isCasualEditing
+                            ? const Color(0xFF10B981)
+                            : Colors.white24,
+                        size: 18,
+                      ),
+                    )
+                  : const Icon(
+                      Icons.edit_rounded,
+                      color: Colors.white24,
+                      size: 16,
+                    ),
+              filled: true,
+              fillColor: const Color(0xFF191A2A),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: BorderSide.none,
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: BorderSide(
+                  color: Colors.white.withValues(alpha: 0.04),
+                ),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: const BorderSide(
+                  color: Color(0xFF8B5CF6),
+                  width: 1,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // Professional Email Section Header
+          Row(
+            children: const [
+              Icon(Icons.work_outline_rounded, color: Color(0xFF8B5CF6), size: 16),
+              SizedBox(width: 6),
+              Text(
+                'Professional Email',
+                style: TextStyle(
+                  color: Color(0xFF8B8C9E),
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          TextFormField(
+            controller: _professionalEmailController,
+            focusNode: _professionalEmailFocusNode,
+            readOnly: profReadOnly,
+            keyboardType: TextInputType.emailAddress,
+            style: const TextStyle(color: Colors.white, fontSize: 14),
+            cursorColor: const Color(0xFF8B5CF6),
+            decoration: InputDecoration(
+              hintText: 'jordan@company.com',
+              hintStyle: TextStyle(
+                color: Colors.white.withValues(alpha: 0.25),
+                fontSize: 14,
+              ),
+              suffixIcon: isProfFilled
+                  ? GestureDetector(
+                      onTap: () {
+                        if (isProfEditing) {
+                          provider.setEditMode('professionalEmail', false);
+                          _professionalEmailFocusNode.unfocus();
+                        } else {
+                          provider.setEditMode('professionalEmail', true);
+                        }
+                      },
+                      child: Icon(
+                        isProfEditing
+                            ? Icons.check_circle_outline_rounded
+                            : Icons.edit_rounded,
+                        color: isProfEditing
+                            ? const Color(0xFF10B981)
+                            : Colors.white24,
+                        size: 18,
+                      ),
+                    )
+                  : const Icon(
+                      Icons.edit_rounded,
+                      color: Colors.white24,
+                      size: 16,
+                    ),
+              filled: true,
+              fillColor: const Color(0xFF191A2A),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: BorderSide.none,
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: BorderSide(
+                  color: Colors.white.withValues(alpha: 0.04),
+                ),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: const BorderSide(
+                  color: Color(0xFF8B5CF6),
+                  width: 1,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPhoneSection() {
+    final provider = context.watch<ProfileProvider2>();
+    final assignment = provider.fieldAssignments['phoneNumber'] ??
+        FieldCardAssignment(casual: true, professional: true);
+
+    final isCasualEditing = provider.editMode['phoneNumber'] ?? false;
+    final isCasualFilled = _phoneController.text.isNotEmpty;
+    final casualReadOnly = isCasualFilled && !isCasualEditing;
+
+    final isProfEditing = provider.editMode['professionalPhoneNumber'] ?? false;
+    final isProfFilled = _professionalPhoneController.text.isNotEmpty;
+    final profReadOnly = isProfFilled && !isProfEditing;
+
+    // Autofocus when edit mode is toggled on
+    if (isCasualEditing && !_phoneFocusNode.hasFocus) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && !_phoneFocusNode.hasFocus) {
+          _phoneFocusNode.requestFocus();
+        }
+      });
+    }
+    if (isProfEditing && !_professionalPhoneFocusNode.hasFocus) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && !_professionalPhoneFocusNode.hasFocus) {
+          _professionalPhoneFocusNode.requestFocus();
+        }
+      });
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF13141F),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFF1F2030)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Header Row with Card Toggles
+          Row(
+            children: [
+              const Icon(Icons.phone_android_outlined, color: Color(0xFF8B5CF6), size: 18),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Text(
+                  'Phone Number',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              _buildLocalCardToggle(
+                icon: Icons.person_outline_rounded,
+                isActive: assignment.casual,
+                onTap: () => provider.toggleFieldOnCard('phoneNumber', ProfileCardType.casual),
+              ),
+              const SizedBox(width: 8),
+              _buildLocalCardToggle(
+                icon: Icons.work_outline_rounded,
+                isActive: assignment.professional,
+                onTap: () => provider.toggleFieldOnCard('phoneNumber', ProfileCardType.professional),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          // Casual Phone Number Section Header
+          Row(
+            children: const [
+              Icon(Icons.person_outline_rounded, color: Color(0xFF8B5CF6), size: 16),
+              SizedBox(width: 6),
+              Text(
+                'Casual Phone Number',
+                style: TextStyle(
+                  color: Color(0xFF8B8C9E),
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              // Selector calling code button
+              GestureDetector(
+                onTap: casualReadOnly
+                    ? null
+                    : () => _showCountryPicker(context, (val) {
+                          if (val != null) {
+                            setState(() => _casualCountryCode = val);
+                          }
+                        }),
+                child: Container(
+                  height: 48,
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF191A2A),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.04),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        '${_getFlagForCode(_casualCountryCode)} $_casualCountryCode',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      const Icon(
+                        Icons.keyboard_arrow_down_rounded,
+                        color: Colors.white70,
+                        size: 18,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: TextFormField(
+                  controller: _phoneController,
+                  focusNode: _phoneFocusNode,
+                  readOnly: casualReadOnly,
+                  keyboardType: TextInputType.phone,
+                  style: const TextStyle(color: Colors.white, fontSize: 14),
+                  cursorColor: const Color(0xFF8B5CF6),
+                  decoration: InputDecoration(
+                    hintText: '(555) 123-4567',
+                    hintStyle: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.25),
+                      fontSize: 14,
+                    ),
+                    suffixIcon: isCasualFilled
+                        ? GestureDetector(
+                            onTap: () {
+                              if (isCasualEditing) {
+                                provider.setEditMode('phoneNumber', false);
+                                _phoneFocusNode.unfocus();
+                              } else {
+                                provider.setEditMode('phoneNumber', true);
+                              }
+                            },
+                            child: Icon(
+                              isCasualEditing
+                                  ? Icons.check_circle_outline_rounded
+                                  : Icons.edit_rounded,
+                              color: isCasualEditing
+                                  ? const Color(0xFF10B981)
+                                  : Colors.white24,
+                              size: 18,
+                            ),
+                          )
+                        : const Icon(
+                            Icons.edit_rounded,
+                            color: Colors.white24,
+                            size: 16,
+                          ),
+                    filled: true,
+                    fillColor: const Color(0xFF191A2A),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: BorderSide.none,
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: BorderSide(
+                        color: Colors.white.withValues(alpha: 0.04),
+                      ),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: const BorderSide(
+                        color: Color(0xFF8B5CF6),
+                        width: 1,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          // Professional Phone Number Section Header
+          Row(
+            children: const [
+              Icon(Icons.work_outline_rounded, color: Color(0xFF8B5CF6), size: 16),
+              SizedBox(width: 6),
+              Text(
+                'Professional Phone Number',
+                style: TextStyle(
+                  color: Color(0xFF8B8C9E),
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              // Selector calling code button
+              GestureDetector(
+                onTap: profReadOnly
+                    ? null
+                    : () => _showCountryPicker(context, (val) {
+                          if (val != null) {
+                            setState(() => _professionalCountryCode = val);
+                          }
+                        }),
+                child: Container(
+                  height: 48,
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF191A2A),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.04),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        '${_getFlagForCode(_professionalCountryCode)} $_professionalCountryCode',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      const Icon(
+                        Icons.keyboard_arrow_down_rounded,
+                        color: Colors.white70,
+                        size: 18,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: TextFormField(
+                  controller: _professionalPhoneController,
+                  focusNode: _professionalPhoneFocusNode,
+                  readOnly: profReadOnly,
+                  keyboardType: TextInputType.phone,
+                  style: const TextStyle(color: Colors.white, fontSize: 14),
+                  cursorColor: const Color(0xFF8B5CF6),
+                  decoration: InputDecoration(
+                    hintText: '(555) 987-6543',
+                    hintStyle: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.25),
+                      fontSize: 14,
+                    ),
+                    suffixIcon: isProfFilled
+                        ? GestureDetector(
+                            onTap: () {
+                              if (isProfEditing) {
+                                provider.setEditMode('professionalPhoneNumber', false);
+                                _professionalPhoneFocusNode.unfocus();
+                              } else {
+                                provider.setEditMode('professionalPhoneNumber', true);
+                              }
+                            },
+                            child: Icon(
+                              isProfEditing
+                                  ? Icons.check_circle_outline_rounded
+                                  : Icons.edit_rounded,
+                              color: isProfEditing
+                                  ? const Color(0xFF10B981)
+                                  : Colors.white24,
+                              size: 18,
+                            ),
+                          )
+                        : const Icon(
+                            Icons.edit_rounded,
+                            color: Colors.white24,
+                            size: 16,
+                          ),
+                    filled: true,
+                    fillColor: const Color(0xFF191A2A),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: BorderSide.none,
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: BorderSide(
+                        color: Colors.white.withValues(alpha: 0.04),
+                      ),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: const BorderSide(
+                        color: Color(0xFF8B5CF6),
+                        width: 1,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 
@@ -2303,8 +3038,12 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                         }
                       },
                       child: Icon(
-                        isBioEditing ? Icons.check_circle_outline_rounded : Icons.edit_rounded,
-                        color: isBioEditing ? const Color(0xFF10B981) : Colors.white24,
+                        isBioEditing
+                            ? Icons.check_circle_outline_rounded
+                            : Icons.edit_rounded,
+                        color: isBioEditing
+                            ? const Color(0xFF10B981)
+                            : Colors.white24,
                         size: 18,
                       ),
                     )
@@ -2379,8 +3118,12 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                         }
                       },
                       child: Icon(
-                        isProfBioEditing ? Icons.check_circle_outline_rounded : Icons.edit_rounded,
-                        color: isProfBioEditing ? const Color(0xFF10B981) : Colors.white24,
+                        isProfBioEditing
+                            ? Icons.check_circle_outline_rounded
+                            : Icons.edit_rounded,
+                        color: isProfBioEditing
+                            ? const Color(0xFF10B981)
+                            : Colors.white24,
                         size: 18,
                       ),
                     )
@@ -2413,6 +3156,275 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class CountryInfo {
+  final String name;
+  final String code;
+  final String flag;
+  final String region;
+
+  const CountryInfo({
+    required this.name,
+    required this.code,
+    required this.flag,
+    required this.region,
+  });
+}
+
+class _CountryCodePickerSheet extends StatefulWidget {
+  const _CountryCodePickerSheet();
+
+  @override
+  State<_CountryCodePickerSheet> createState() => _CountryCodePickerSheetState();
+}
+
+class _CountryCodePickerSheetState extends State<_CountryCodePickerSheet> {
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
+
+  static const List<CountryInfo> _allCountries = [
+    // Dubai
+    CountryInfo(name: 'United Arab Emirates', code: '+971', flag: '🇦🇪', region: 'Dubai'),
+    // America
+    CountryInfo(name: 'United States', code: '+1', flag: '🇺🇸', region: 'America'),
+    CountryInfo(name: 'Canada', code: '+1', flag: '🇨🇦', region: 'America'),
+    CountryInfo(name: 'Brazil', code: '+55', flag: '🇧🇷', region: 'America'),
+    CountryInfo(name: 'Mexico', code: '+52', flag: '🇲🇽', region: 'America'),
+    // Europe
+    CountryInfo(name: 'United Kingdom', code: '+44', flag: '🇬🇧', region: 'Europe'),
+    CountryInfo(name: 'Germany', code: '+49', flag: '🇩🇪', region: 'Europe'),
+    CountryInfo(name: 'France', code: '+33', flag: '🇫🇷', region: 'Europe'),
+    CountryInfo(name: 'Italy', code: '+39', flag: '🇮🇹', region: 'Europe'),
+    CountryInfo(name: 'Spain', code: '+34', flag: '🇪🇸', region: 'Europe'),
+    CountryInfo(name: 'Netherlands', code: '+31', flag: '🇳🇱', region: 'Europe'),
+    // Asia
+    CountryInfo(name: 'India', code: '+91', flag: '🇮🇳', region: 'Asia'),
+    CountryInfo(name: 'China', code: '+86', flag: '🇨🇳', region: 'Asia'),
+    CountryInfo(name: 'Singapore', code: '+65', flag: '🇸🇬', region: 'Asia'),
+    CountryInfo(name: 'Japan', code: '+81', flag: '🇯🇵', region: 'Asia'),
+    CountryInfo(name: 'South Korea', code: '+82', flag: '🇰🇷', region: 'Asia'),
+    CountryInfo(name: 'Saudi Arabia', code: '+966', flag: '🇸🇦', region: 'Asia'),
+  ];
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Filter countries based on query
+    final query = _searchQuery.toLowerCase().trim();
+    final filtered = _allCountries.where((country) {
+      return country.name.toLowerCase().contains(query) ||
+          country.code.contains(query) ||
+          country.region.toLowerCase().contains(query);
+    }).toList();
+
+    // Group filtered countries by region
+    final Map<String, List<CountryInfo>> grouped = {};
+    for (var c in filtered) {
+      if (!grouped.containsKey(c.region)) {
+        grouped[c.region] = [];
+      }
+      grouped[c.region]!.add(c);
+    }
+
+    // Keep regional ordering: Dubai, America, Europe, Asia
+    final orderedRegions = ['Dubai', 'America', 'Europe', 'Asia'].where((r) => grouped.containsKey(r)).toList();
+    // Add any dynamic regions if somehow created
+    for (var r in grouped.keys) {
+      if (!orderedRegions.contains(r)) {
+        orderedRegions.add(r);
+      }
+    }
+
+    final double bottomPadding = MediaQuery.of(context).viewInsets.bottom;
+
+    return Material(
+      color: const Color(0xFF13141F),
+      borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+      clipBehavior: Clip.antiAlias,
+      child: SizedBox(
+        height: MediaQuery.of(context).size.height * 0.75,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Drag handle
+            const SizedBox(height: 12),
+            Center(
+              child: Container(
+                width: 48,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            // Header
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 24),
+              child: Text(
+                'Select Country',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  fontFamily: 'Inter',
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            // Search Input
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: TextField(
+                controller: _searchController,
+                onChanged: (val) {
+                  setState(() {
+                    _searchQuery = val;
+                  });
+                },
+                style: const TextStyle(color: Colors.white, fontSize: 15),
+                cursorColor: const Color(0xFF8B5CF6),
+                decoration: InputDecoration(
+                  hintText: 'Search country or code...',
+                  hintStyle: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.3),
+                    fontSize: 15,
+                  ),
+                  prefixIcon: Icon(
+                    Icons.search_rounded,
+                    color: Colors.white.withValues(alpha: 0.4),
+                    size: 20,
+                  ),
+                  suffixIcon: _searchQuery.isNotEmpty
+                      ? IconButton(
+                          icon: Icon(
+                            Icons.close_rounded,
+                            color: Colors.white.withValues(alpha: 0.4),
+                            size: 20,
+                          ),
+                          onPressed: () {
+                            _searchController.clear();
+                            setState(() {
+                              _searchQuery = '';
+                            });
+                          },
+                        )
+                      : null,
+                  filled: true,
+                  fillColor: const Color(0xFF191A2A),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide.none,
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide(
+                      color: Colors.white.withValues(alpha: 0.04),
+                    ),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: const BorderSide(
+                      color: Color(0xFF8B5CF6),
+                      width: 1,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            // Countries List
+            Expanded(
+              child: filtered.isEmpty
+                  ? const Center(
+                      child: Text(
+                        'No countries found',
+                        style: TextStyle(
+                          color: Colors.white54,
+                          fontSize: 14,
+                          fontFamily: 'Inter',
+                        ),
+                      ),
+                    )
+                  : ListView.builder(
+                      padding: EdgeInsets.fromLTRB(16, 0, 16, 24 + bottomPadding),
+                      itemCount: orderedRegions.length,
+                      itemBuilder: (context, regionIndex) {
+                        final regionName = orderedRegions[regionIndex];
+                        final countries = grouped[regionName]!;
+
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.only(left: 8, top: 16, bottom: 8),
+                              child: Text(
+                                regionName.toUpperCase(),
+                                style: const TextStyle(
+                                  color: Color(0xFF8B5CF6),
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 12,
+                                  letterSpacing: 1.2,
+                                ),
+                              ),
+                            ),
+                            ...countries.map((country) {
+                              return Theme(
+                                data: Theme.of(context).copyWith(
+                                  splashColor: const Color(0xFF8B5CF6).withValues(alpha: 0.1),
+                                  highlightColor: const Color(0xFF8B5CF6).withValues(alpha: 0.05),
+                                ),
+                                child: ListTile(
+                                  contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  leading: Text(
+                                    country.flag,
+                                    style: const TextStyle(fontSize: 22),
+                                  ),
+                                  title: Text(
+                                    country.name,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 15,
+                                      fontFamily: 'Inter',
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                  trailing: Text(
+                                    country.code,
+                                    style: const TextStyle(
+                                      color: Colors.white54,
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600,
+                                      fontFamily: 'Inter',
+                                    ),
+                                  ),
+                                  onTap: () {
+                                    Navigator.pop(context, country.code);
+                                  },
+                                ),
+                              );
+                            }),
+                          ],
+                        );
+                      },
+                    ),
+            ),
+          ],
+        ),
       ),
     );
   }
