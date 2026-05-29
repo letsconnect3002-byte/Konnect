@@ -38,6 +38,9 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
 
   Map<String, String> get _activeFields {
     if (_sharedCardPermission == 'casual') return _casualFields;
+    if (_sharedCardPermission == 'professional') return _professionalFields;
+
+    // If 'both', show professional fields (no fallback merging)
     return _professionalFields;
   }
 
@@ -90,6 +93,9 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
     _linkedin = data['linkedin'] ?? '';
     _twitter = data['twitter'] ?? '';
 
+    final String initialProfEmail = _professionalEmail;
+    final String initialProfPhone = _professionalPhoneNumber;
+
     _casualFields = {
       'profession': _profession,
       'company': _company,
@@ -103,8 +109,8 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
     _professionalFields = {
       'profession': _profession,
       'company': _company,
-      'email': _professionalEmail,
-      'phoneNumber': _professionalPhoneNumber,
+      'email': initialProfEmail,
+      'phoneNumber': initialProfPhone,
       'instagram': _instagram,
       'linkedin': _linkedin,
       'twitter': _twitter,
@@ -176,9 +182,17 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
             _email = _isFieldVisible('email', fieldAssignments)
                 ? (response['email'] ?? '')
                 : '';
+            _professionalEmail =
+                _isFieldVisible('professionalEmail', fieldAssignments)
+                    ? (response['professional_email'] ?? '')
+                    : '';
             _phoneNumber = _isFieldVisible('phoneNumber', fieldAssignments)
                 ? (response['phone_number'] ?? '')
                 : '';
+            _professionalPhoneNumber =
+                _isFieldVisible('professionalPhoneNumber', fieldAssignments)
+                    ? (response['professional_phone_number'] ?? '')
+                    : '';
             _instagram = _isFieldVisible('instagram', fieldAssignments)
                 ? (response['instagram'] ?? '')
                 : '';
@@ -214,13 +228,28 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
           }
 
           setState(() {
+            final String rawEmail = response['email'] ?? '';
+            final String rawPhone = response['phone_number'] ?? '';
+            final String rawProfEmail = response['professional_email'] ?? '';
+            final String rawProfPhone =
+                response['professional_phone_number'] ?? '';
+
+            final String filterCasualEmail = _filterField('email', rawEmail);
+            final String filterCasualPhone =
+                _filterField('phoneNumber', rawPhone);
+
+            final String filterProfEmail =
+                _filterFieldPro('professionalEmail', rawProfEmail);
+
+            final String filterProfPhone =
+                _filterFieldPro('professionalPhoneNumber', rawProfPhone);
+
             _casualFields = {
               'profession':
                   _filterField('profession', response['profession'] ?? ''),
               'company': _filterField('company', response['company'] ?? ''),
-              'email': _filterField('email', response['email'] ?? ''),
-              'phoneNumber':
-                  _filterField('phoneNumber', response['phone_number'] ?? ''),
+              'email': filterCasualEmail,
+              'phoneNumber': filterCasualPhone,
               'instagram':
                   _filterField('instagram', response['instagram'] ?? ''),
               'linkedin': _filterField('linkedin', response['linkedin'] ?? ''),
@@ -231,10 +260,8 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
               'profession':
                   _filterFieldPro('profession', response['profession'] ?? ''),
               'company': _filterFieldPro('company', response['company'] ?? ''),
-              'email': _filterFieldPro(
-                  'email', response['professional_email'] ?? ''),
-              'phoneNumber': _filterFieldPro(
-                  'phoneNumber', response['professional_phone_number'] ?? ''),
+              'email': filterProfEmail,
+              'phoneNumber': filterProfPhone,
               'instagram':
                   _filterFieldPro('instagram', response['instagram'] ?? ''),
               'linkedin':
@@ -254,32 +281,12 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
     }
   }
 
-  // Deterministic fallbacks to match the card view list
+  // Return the actual avatar URL from the database, or empty if none
   String _getAvatarUrl(String name, String url) {
-    if (url.isNotEmpty && url.startsWith('http')) {
+    if (url.isNotEmpty) {
       return url;
     }
-    final cleanName = name.toLowerCase().trim();
-    if (cleanName.contains('sarah') || cleanName.contains('chen')) {
-      return 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=300&q=80';
-    } else if (cleanName.contains('marcus') || cleanName.contains('lee')) {
-      return 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=300&q=80';
-    } else if (cleanName.contains('asha')) {
-      return 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80';
-    } else if (cleanName.contains('alex') || cleanName.contains('vance')) {
-      return 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=300&q=80';
-    } else if (cleanName.contains('santosh')) {
-      return 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&w=300&q=80';
-    }
-    final hash = name.codeUnits.fold<int>(0, (prev, element) => prev + element);
-    final avatars = [
-      'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=300&q=80',
-      'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=300&q=80',
-      'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80',
-      'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=300&q=80',
-      'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&w=300&q=80',
-    ];
-    return avatars[hash % avatars.length];
+    return '';
   }
 
   String _getCompany(String name, String comp) {
@@ -375,7 +382,7 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
               ),
               SizedBox(height: 2),
               Text(
-                'Digital Business Card',
+                'Digital Card',
                 style: TextStyle(
                   color: Color(0xFF8B8C9E),
                   fontSize: 11.0,
@@ -405,6 +412,7 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
       ),
       padding: const EdgeInsets.all(2),
       child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
           GestureDetector(
             onTap: () => setState(() => _showFront = true),
@@ -456,12 +464,12 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
   }
 
   Widget _buildDigitalCard() {
-    final isCasual = _sharedCardPermission == 'casual';
+    final isCasual = false;
 
     return LayoutBuilder(
       builder: (context, constraints) {
         final cardWidth = constraints.maxWidth;
-        final cardHeight = isCasual ? cardWidth / 0.82 : cardWidth / 1.58;
+        final cardHeight = cardWidth / 1.58;
 
         return GestureDetector(
           onDoubleTap: () {
@@ -478,26 +486,18 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
             height: cardHeight,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(24.0),
-              gradient: LinearGradient(
-                colors: isCasual
-                    ? const [
-                        Color(0xFF8B5CF6),
-                        Color(0xFF00F2FE),
-                      ]
-                    : const [
-                        Color(0xFF00F2FE),
-                        Color(0xFF8B5CF6),
-                        Color(0xFFEC4899),
-                      ],
+              gradient: const LinearGradient(
+                colors: [
+                  Color(0xFF00F2FE),
+                  Color(0xFF8B5CF6),
+                  Color(0xFFEC4899),
+                ],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
               boxShadow: [
                 BoxShadow(
-                  color: (isCasual
-                          ? const Color(0xFF8B5CF6)
-                          : const Color(0xFF00F2FE))
-                      .withValues(alpha: 0.1),
+                  color: const Color(0xFF00F2FE).withValues(alpha: 0.1),
                   blurRadius: 14,
                   spreadRadius: 0,
                 ),
@@ -510,12 +510,10 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
                 duration: _cardAnimDuration,
                 curve: _cardAnimCurve,
                 decoration: BoxDecoration(
-                  gradient: LinearGradient(
+                  gradient: const LinearGradient(
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
-                    colors: isCasual
-                        ? const [Color(0xFF16182A), Color(0xFF0E1018)]
-                        : const [Color(0xFF111222), Color(0xFF0A0B10)],
+                    colors: [Color(0xFF111222), Color(0xFF0A0B10)],
                   ),
                   borderRadius: BorderRadius.circular(22.5),
                 ),
@@ -524,10 +522,8 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
                     Positioned.fill(
                       child: CustomPaint(
                         painter: CardPatternPainter(
-                          color: (isCasual
-                                  ? const Color(0xFF8B5CF6)
-                                  : const Color(0xFF00F2FE))
-                              .withValues(alpha: 0.06),
+                          color:
+                              const Color(0xFF00F2FE).withValues(alpha: 0.06),
                         ),
                       ),
                     ),
@@ -562,14 +558,14 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
     if (isFront) {
       return _wrapCardFace(
         _buildUnifiedFrontCard(cardWidth),
-        _sharedCardPermission == 'casual' ? 0.82 : 1.58,
+        1.58,
         cardWidth,
         const ValueKey('FrontCard'),
       );
     } else {
       return _wrapCardFace(
         _buildUnifiedBackCard(cardWidth),
-        _sharedCardPermission == 'casual' ? 0.82 : 1.58,
+        1.58,
         cardWidth,
         const ValueKey('BackCard'),
       );
@@ -599,46 +595,43 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
   }
 
   Widget _buildUnifiedFrontCard(double cardWidth) {
-    final isCasual = _sharedCardPermission == 'casual';
+    final isCasual = false;
     final W = cardWidth;
     final comp = _getCompany(_name, _activeFields['company'] ?? '');
-    final avatar = _getAvatarUrl(_name, _avatarUrl);
+    final nameText = _name.isEmpty ? 'Jordan Miller' : _name;
+    final professionText = _activeFields['profession'] ?? '';
 
     return Stack(
       children: [
+        // 1. Top Section: Logo, Company Name, Card Type
         AnimatedPositioned(
           duration: _cardAnimDuration,
           curve: _cardAnimCurve,
           left: 0,
           right: 0,
-          top: isCasual ? 34 : 20,
+          top: 20,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               AnimatedContainer(
                 duration: _cardAnimDuration,
                 curve: _cardAnimCurve,
-                width: isCasual ? 56 : 44,
-                height: isCasual ? 56 : 44,
+                width: 44,
+                height: 44,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: isCasual
-                      ? const Color(0xFF171825)
-                      : const Color(0xFF151628),
+                  color: const Color(0xFF151628),
                   border: Border.all(
-                    color: const Color(0xFF8B5CF6)
-                        .withOpacity(isCasual ? 0.35 : 0.3),
+                    color: const Color(0xFF8B5CF6).withValues(alpha: 0.3),
                     width: 1.5,
                   ),
                 ),
                 child: Center(
                   child: Image.asset(
                     'assets/icons/Connect Icon2.png',
-                    width: isCasual ? 28 : 22,
-                    height: isCasual ? 28 : 22,
-                    color: isCasual
-                        ? const Color(0xFF8B5CF6)
-                        : const Color(0xFF00F2FE),
+                    width: 22,
+                    height: 22,
+                    color: const Color(0xFF00F2FE),
                   ),
                 ),
               ),
@@ -646,11 +639,11 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
               AnimatedDefaultTextStyle(
                 duration: _cardAnimDuration,
                 curve: _cardAnimCurve,
-                style: TextStyle(
+                style: const TextStyle(
                   color: Colors.white,
-                  fontSize: isCasual ? 14 : 12,
+                  fontSize: 12,
                   fontWeight: FontWeight.bold,
-                  letterSpacing: isCasual ? 3.0 : 2.5,
+                  letterSpacing: 2.5,
                   fontFamily: 'Inter',
                 ),
                 child: Text(
@@ -660,145 +653,66 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
                 ),
               ),
               const SizedBox(height: 4),
-              AnimatedCrossFade(
-                duration: _cardAnimDuration,
-                firstCurve: _cardAnimCurve,
-                secondCurve: _cardAnimCurve,
-                crossFadeState: isCasual
-                    ? CrossFadeState.showFirst
-                    : CrossFadeState.showSecond,
-                firstChild: Text(
-                  'CASUAL CARD',
-                  style: TextStyle(
-                    color: const Color(0xFF8B5CF6).withOpacity(0.8),
-                    fontSize: 9,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 1.5,
-                    fontFamily: 'Inter',
-                  ),
-                ),
-                secondChild: Text(
-                  'DIGITAL IDENTITY',
-                  style: TextStyle(
-                    color: const Color(0xFF00F2FE).withOpacity(0.8),
-                    fontSize: 8,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 1.0,
-                    fontFamily: 'Inter',
-                  ),
+              Text(
+                'DIGITAL IDENTITY',
+                style: TextStyle(
+                  color: const Color(0xFF00F2FE).withValues(alpha: 0.8),
+                  fontSize: 8,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 1.0,
+                  fontFamily: 'Inter',
                 ),
               ),
             ],
           ),
         ),
 
+        // 2. Name
         AnimatedPositioned(
           duration: _cardAnimDuration,
           curve: _cardAnimCurve,
-          left: isCasual ? 20 : 18,
-          right: isCasual ? 20 : W * 0.4,
-          bottom: isCasual ? 76 : 14,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              AnimatedAlign(
-                duration: _cardAnimDuration,
-                curve: _cardAnimCurve,
-                alignment: isCasual ? Alignment.center : Alignment.centerLeft,
-                child: AnimatedDefaultTextStyle(
-                  duration: _cardAnimDuration,
-                  curve: _cardAnimCurve,
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: isCasual ? 16 : 14,
-                    fontWeight: FontWeight.bold,
-                    fontFamily: 'Inter',
-                  ),
-                  child: Text(
-                    _name.isEmpty ? 'Unknown' : _name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
+          left: 18,
+          right: W * 0.4,
+          bottom: 14,
+          child: AnimatedAlign(
+            duration: _cardAnimDuration,
+            curve: _cardAnimCurve,
+            alignment: Alignment.centerLeft,
+            child: AnimatedDefaultTextStyle(
+              duration: _cardAnimDuration,
+              curve: _cardAnimCurve,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+                fontFamily: 'Inter',
               ),
-              if ((_activeFields['profession'] ?? '').isNotEmpty) ...[
-                const SizedBox(height: 4),
-                AnimatedAlign(
-                  duration: _cardAnimDuration,
-                  curve: _cardAnimCurve,
-                  alignment: isCasual ? Alignment.center : Alignment.centerLeft,
-                  child: AnimatedDefaultTextStyle(
-                    duration: _cardAnimDuration,
-                    curve: _cardAnimCurve,
-                    style: TextStyle(
-                      color: const Color(0xFF8B5CF6),
-                      fontSize: isCasual ? 12 : 10,
-                      fontWeight: FontWeight.w600,
-                      fontFamily: 'Inter',
-                    ),
-                    child: Text(
-                      _activeFields['profession'] ?? '',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ),
-              ],
-            ],
-          ),
-        ),
-
-        // Central profile icon / visual in Casual card
-        if (isCasual)
-          Positioned(
-            left: 20,
-            right: 20,
-            top: 148,
-            bottom: 128,
-            child: Center(
-              child: Container(
-                width: 90,
-                height: 90,
-                decoration: const BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: LinearGradient(
-                    colors: [Color(0xFF8B5CF6), Color(0xFF00F2FE)],
-                  ),
-                ),
-                padding: const EdgeInsets.all(2.5),
-                child: ClipOval(
-                  child: Image.network(
-                    avatar,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => const Icon(
-                      Icons.person,
-                      color: Colors.white60,
-                      size: 40,
-                    ),
-                  ),
-                ),
+              child: Text(
+                nameText,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
             ),
           ),
+        ),
 
+        // 3. Scan Badge
         AnimatedPositioned(
           duration: _cardAnimDuration,
           curve: _cardAnimCurve,
-          left: isCasual ? (W - 160) / 2 : W - 98,
-          bottom: isCasual ? 24 : 14,
-          width: isCasual ? 160 : 80,
+          left: W - 98,
+          bottom: 14,
+          width: 80,
           child: Container(
-            padding: EdgeInsets.symmetric(
-              horizontal: isCasual ? 12 : 8,
-              vertical: isCasual ? 6 : 4,
+            padding: const EdgeInsets.symmetric(
+              horizontal: 8,
+              vertical: 4,
             ),
             decoration: BoxDecoration(
-              color:
-                  isCasual ? const Color(0xFF171825) : const Color(0xFF1E1F32),
-              borderRadius: BorderRadius.circular(isCasual ? 8 : 6),
+              color: const Color(0xFF1E1F32),
+              borderRadius: BorderRadius.circular(6),
               border: Border.all(
-                color: Colors.white.withOpacity(0.08),
+                color: Colors.white.withValues(alpha: 0.08),
               ),
             ),
             child: Center(
@@ -806,19 +720,17 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(
+                  const Icon(
                     Icons.qr_code_2_rounded,
-                    color: const Color(0xFF00F2FE),
-                    size: isCasual ? 14 : 11,
+                    color: Color(0xFF00F2FE),
+                    size: 11,
                   ),
                   const SizedBox(width: 4),
                   AnimatedCrossFade(
                     duration: _cardAnimDuration,
                     firstCurve: _cardAnimCurve,
                     secondCurve: _cardAnimCurve,
-                    crossFadeState: isCasual
-                        ? CrossFadeState.showFirst
-                        : CrossFadeState.showSecond,
+                    crossFadeState: CrossFadeState.showSecond,
                     firstChild: const Text(
                       'SCAN TO CONNECT',
                       style: TextStyle(
@@ -852,28 +764,33 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
   }
 
   Widget _buildUnifiedBackCard(double cardWidth) {
-    final isCasual = _sharedCardPermission == 'casual';
+    final isCasual = false;
     final W = cardWidth;
-    final H = isCasual ? cardWidth / 0.82 : cardWidth / 1.58;
+    final H = cardWidth / 1.58;
     final avatar = _getAvatarUrl(_name, _avatarUrl);
-    final bio = _getBio(_name, _activeFields['bio'] ?? '');
+    final comp = _getCompany(_name, _activeFields['company'] ?? '');
+    final bioVal = _getBio(_name, _activeFields['bio'] ?? '');
+    final emailVal = _activeFields['email'] ?? '';
+    final phoneVal = _activeFields['phoneNumber'] ?? '';
+    final professionText = _activeFields['profession'] ?? '';
 
     return Stack(
       children: [
+        // 1. Row 1: Avatar, Name, Profession, Link Button
         AnimatedPositioned(
           duration: _cardAnimDuration,
           curve: _cardAnimCurve,
-          left: isCasual ? 20 : 16,
-          right: isCasual ? 20 : 16,
-          top: isCasual ? 16 : 12,
-          height: isCasual ? 60 : 40,
+          left: 16,
+          right: 16,
+          top: 12,
+          height: 40,
           child: Row(
             children: [
               AnimatedContainer(
                 duration: _cardAnimDuration,
                 curve: _cardAnimCurve,
-                width: isCasual ? 56 : 36,
-                height: isCasual ? 56 : 36,
+                width: 36,
+                height: 36,
                 padding: const EdgeInsets.all(1.0),
                 decoration: const BoxDecoration(
                   shape: BoxShape.circle,
@@ -882,146 +799,231 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
                   ),
                 ),
                 child: ClipOval(
-                  child: Image.network(
-                    avatar,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Icon(
-                      Icons.person_rounded,
-                      color: Colors.white60,
-                      size: isCasual ? 28 : 18,
-                    ),
-                  ),
+                  child: (avatar.isNotEmpty &&
+                          avatar.contains(
+                              'supabase.co/storage/v1/object/public/avatars/'))
+                      ? Image.network(
+                          avatar,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => Container(
+                            color: const Color(0xFF1E1F32),
+                            alignment: Alignment.center,
+                            child: Text(
+                              _name.isNotEmpty
+                                  ? _name.substring(0, 1).toUpperCase()
+                                  : "?",
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        )
+                      : Container(
+                          color: const Color(0xFF1E1F32),
+                          alignment: Alignment.center,
+                          child: Text(
+                            _name.isNotEmpty
+                                ? _name.substring(0, 1).toUpperCase()
+                                : "?",
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
                 ),
               ),
               AnimatedContainer(
                 duration: _cardAnimDuration,
                 curve: _cardAnimCurve,
-                width: isCasual ? 14 : 10,
+                width: 10,
               ),
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    FittedBox(
-                      fit: BoxFit.scaleDown,
-                      alignment: Alignment.centerLeft,
-                      child: AnimatedDefaultTextStyle(
-                        duration: _cardAnimDuration,
-                        curve: _cardAnimCurve,
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: isCasual ? 18 : 14,
-                          fontWeight: FontWeight.bold,
-                          fontFamily: 'Inter',
-                        ),
-                        child: Text(
-                          _name.isEmpty ? 'Unknown' : _name,
-                          maxLines: 1,
-                        ),
-                      ),
+                child: AnimatedAlign(
+                  duration: _cardAnimDuration,
+                  curve: _cardAnimCurve,
+                  alignment: Alignment.centerLeft,
+                  child: AnimatedDefaultTextStyle(
+                    duration: _cardAnimDuration,
+                    curve: _cardAnimCurve,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      fontFamily: 'Inter',
                     ),
-                    if ((_activeFields['profession'] ?? '').isNotEmpty) ...[
-                      const SizedBox(height: 2),
-                      FittedBox(
-                        fit: BoxFit.scaleDown,
-                        alignment: Alignment.centerLeft,
-                        child: AnimatedDefaultTextStyle(
-                          duration: _cardAnimDuration,
-                          curve: _cardAnimCurve,
-                          style: const TextStyle(
-                            color: Color(0xFF00F2FE),
-                            fontSize: 10,
-                            fontWeight: FontWeight.w600,
-                            fontFamily: 'Inter',
-                          ),
-                          child: Text(
-                            (_activeFields['profession'] ?? '').toUpperCase(),
-                            maxLines: 1,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ],
+                    child: Text(
+                      _name.isEmpty ? 'Unknown' : _name,
+                      maxLines: 1,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1E1F32),
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.06),
+                  ),
+                ),
+                child: const Icon(
+                  Icons.link_rounded,
+                  color: Color(0xFF00F2FE),
+                  size: 14,
                 ),
               ),
             ],
           ),
         ),
 
-        // Accent divider line
+        // 2. Divider Line
         AnimatedPositioned(
           duration: _cardAnimDuration,
           curve: _cardAnimCurve,
-          left: isCasual ? 20 : 16,
-          right: isCasual ? 20 : 16,
-          top: isCasual ? H - 19 : 140,
+          left: 16,
+          right: 16,
+          top: 60,
           height: 1,
           child: Container(
-            color: const Color(0xFF8B5CF6).withOpacity(0.25),
+            color: Colors.white.withValues(alpha: 0.08),
           ),
         ),
 
-        // Business/casual content fields
-        Positioned(
-          left: isCasual ? 20 : 16,
-          right: isCasual ? 20 : 16,
-          top: isCasual ? 90 : 60,
-          bottom: isCasual ? 30 : 16,
+        // 3. Contact Details Group (Company, Email, Phone)
+        AnimatedPositioned(
+          duration: _cardAnimDuration,
+          curve: _cardAnimCurve,
+          left: (W * 0.5) + 6,
+          right: 16,
+          top: 74,
+          height: 80,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.start,
             children: [
-              // Bio content block
-              Expanded(
-                child: Text(
-                  bio.isEmpty ? 'No bio provided for this card.' : bio,
-                  style: const TextStyle(
-                    color: Color(0xFF8B8C9E),
-                    fontSize: 11,
+              _buildUnifiedCardRow(
+                Icons.apartment_rounded,
+                comp.isNotEmpty ? comp : 'Data Unavailable',
+                false,
+                isUnavailable: comp.isEmpty,
+              ),
+              const SizedBox(height: 5),
+              _buildUnifiedCardRow(
+                Icons.email_outlined,
+                emailVal.isNotEmpty ? emailVal : 'Data Unavailable',
+                false,
+                isUnavailable: emailVal.isEmpty,
+              ),
+              const SizedBox(height: 5),
+              _buildUnifiedCardRow(
+                Icons.phone_rounded,
+                phoneVal.isNotEmpty ? phoneVal : 'Data Unavailable',
+                false,
+                isUnavailable: phoneVal.isEmpty,
+              ),
+            ],
+          ),
+        ),
+
+        // 4. Bio Section
+        AnimatedPositioned(
+          duration: _cardAnimDuration,
+          curve: _cardAnimCurve,
+          left: 16,
+          right: (W * 0.5) + 6,
+          top: 74,
+          height: 60,
+          child: bioVal.isNotEmpty
+              ? Text(
+                  bioVal,
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.55),
+                    fontSize: 9,
+                    height: 1.25,
                     fontFamily: 'Inter',
                   ),
-                  maxLines: isCasual ? 7 : 2,
+                  maxLines: 3,
                   overflow: TextOverflow.ellipsis,
-                ),
+                )
+              : const SizedBox.shrink(),
+        ),
+
+        // 5. Bottom Accent Line
+        AnimatedPositioned(
+          duration: _cardAnimDuration,
+          curve: _cardAnimCurve,
+          left: 16,
+          right: W - 76,
+          top: 140,
+          height: 2,
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(1.5),
+              gradient: const LinearGradient(
+                colors: [Color(0xFF8B5CF6), Color(0xFF00F2FE)],
               ),
-              const SizedBox(height: 8),
-              if ((_activeFields['email'] ?? '').isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 4.0),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.alternate_email_rounded,
-                          color: Color(0xFF8B5CF6), size: 12),
-                      const SizedBox(width: 8),
-                      Text(
-                        _activeFields['email'] ?? '',
-                        style: const TextStyle(
-                          color: Color(0xFFC0C1D0),
-                          fontSize: 10,
-                          fontFamily: 'Inter',
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              if ((_activeFields['phoneNumber'] ?? '').isNotEmpty)
-                Row(
-                  children: [
-                    const Icon(Icons.phone_rounded,
-                        color: Color(0xFF8B5CF6), size: 12),
-                    const SizedBox(width: 8),
-                    Text(
-                      _activeFields['phoneNumber'] ?? '',
-                      style: const TextStyle(
-                        color: Color(0xFFC0C1D0),
-                        fontSize: 10,
-                        fontFamily: 'Inter',
-                      ),
-                    ),
-                  ],
-                ),
-            ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildUnifiedCardRow(IconData icon, String text, bool isCasual,
+      {bool isUnavailable = false}) {
+    return Row(
+      children: [
+        AnimatedContainer(
+          duration: _cardAnimDuration,
+          curve: _cardAnimCurve,
+          width: isCasual ? 32 : 18,
+          height: isCasual ? 32 : 18,
+          decoration: const BoxDecoration(
+            color: Color(0xFF171825),
+            shape: BoxShape.circle,
+          ),
+          child: Center(
+            child: Icon(
+              icon,
+              color: isUnavailable
+                  ? const Color(0xFF3A3B50)
+                  : (isCasual ? const Color(0xFF8B8C9E) : Colors.white54),
+              size: isCasual ? 14 : 10,
+            ),
+          ),
+        ),
+        AnimatedContainer(
+          duration: _cardAnimDuration,
+          curve: _cardAnimCurve,
+          width: isCasual ? 12 : 6,
+        ),
+        Expanded(
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: AnimatedDefaultTextStyle(
+              duration: _cardAnimDuration,
+              curve: _cardAnimCurve,
+              style: TextStyle(
+                color: isUnavailable
+                    ? const Color(0xFF3A3B50)
+                    : (isCasual ? const Color(0xFF8B8C9E) : Colors.white70),
+                fontSize: isCasual ? 13 : 9,
+                fontWeight: FontWeight.w500,
+                fontStyle: isUnavailable ? FontStyle.italic : FontStyle.normal,
+                fontFamily: 'Inter',
+              ),
+              child: Text(
+                text,
+                maxLines: 1,
+              ),
+            ),
           ),
         ),
       ],
@@ -1033,7 +1035,8 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
     required String value,
     required IconData icon,
   }) {
-    if (value.trim().isEmpty) return const SizedBox.shrink();
+    final bool isUnavailable = value.trim().isEmpty;
+    final String displayValue = isUnavailable ? 'Data Unavailable' : value;
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -1060,11 +1063,15 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  value,
-                  style: const TextStyle(
-                    color: Colors.white,
+                  displayValue,
+                  style: TextStyle(
+                    color:
+                        isUnavailable ? const Color(0xFF3A3B50) : Colors.white,
                     fontSize: 14,
-                    fontWeight: FontWeight.bold,
+                    fontWeight:
+                        isUnavailable ? FontWeight.w500 : FontWeight.bold,
+                    fontStyle:
+                        isUnavailable ? FontStyle.italic : FontStyle.normal,
                     fontFamily: 'Inter',
                   ),
                 ),
@@ -1099,7 +1106,8 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
     required String handle,
     required Widget logo,
   }) {
-    if (handle.trim().isEmpty) return const SizedBox.shrink();
+    final bool isUnavailable = handle.trim().isEmpty;
+    final String displayHandle = isUnavailable ? 'Data Unavailable' : handle;
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -1126,11 +1134,15 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
                 ),
                 const SizedBox(height: 3),
                 Text(
-                  handle,
-                  style: const TextStyle(
-                    color: Colors.white,
+                  displayHandle,
+                  style: TextStyle(
+                    color:
+                        isUnavailable ? const Color(0xFF3A3B50) : Colors.white,
                     fontSize: 14,
-                    fontWeight: FontWeight.bold,
+                    fontWeight:
+                        isUnavailable ? FontWeight.w500 : FontWeight.bold,
+                    fontStyle:
+                        isUnavailable ? FontStyle.italic : FontStyle.normal,
                     fontFamily: 'Inter',
                   ),
                 ),
@@ -1215,7 +1227,7 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
                     _buildHeader(context),
                     const SizedBox(height: 16),
                     Align(
-                      alignment: Alignment.topRight,
+                      alignment: Alignment.centerRight,
                       child: _buildFrontBackToggle(),
                     ),
                     const SizedBox(height: 16),
@@ -1238,7 +1250,7 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
                     ),
                     const SizedBox(height: 16),
 
-                    // Read-only Details
+                    // Read-only Details (filtered by shared card permission)
                     _buildReadOnlyField(
                       label: 'Full Name',
                       value: _name,
@@ -1246,71 +1258,57 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
                     ),
                     _buildReadOnlyField(
                       label: 'Profession',
-                      value: _profession,
+                      value: _activeFields['profession'] ?? '',
                       icon: Icons.work_outline_rounded,
                     ),
                     _buildReadOnlyField(
                       label: 'Company',
-                      value: comp,
+                      value: _activeFields['company'] ?? '',
                       icon: Icons.apartment_rounded,
                     ),
                     _buildReadOnlyField(
-                      label: 'Casual Email Address',
-                      value: _email,
+                      label: 'Email Address',
+                      value: _activeFields['email'] ?? '',
                       icon: Icons.email_outlined,
                     ),
                     _buildReadOnlyField(
-                      label: 'Professional Email Address',
-                      value: _professionalEmail,
-                      icon: Icons.email_outlined,
-                    ),
-                    _buildReadOnlyField(
-                      label: 'Casual Phone Number',
-                      value: _phoneNumber,
-                      icon: Icons.phone_android_outlined,
-                    ),
-                    _buildReadOnlyField(
-                      label: 'Professional Phone Number',
-                      value: _professionalPhoneNumber,
+                      label: 'Phone Number',
+                      value: _activeFields['phoneNumber'] ?? '',
                       icon: Icons.phone_android_outlined,
                     ),
                     _buildReadOnlyField(
                       label: 'Bio',
-                      value: bio,
+                      value: _activeFields['bio'] ?? '',
                       icon: Icons.description_outlined,
                     ),
 
-                    // Social media block
-                    if (_linkedin.isNotEmpty ||
-                        _twitter.isNotEmpty ||
-                        _instagram.isNotEmpty) ...[
-                      const SizedBox(height: 16),
-                      const Text(
-                        'SOCIAL HANDLES',
-                        style: TextStyle(
-                          color: Color(0xFF8B8C9E),
-                          fontSize: 14.0,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 1.5,
-                        ),
+                    // Social media block (filtered by shared card permission)
+                    const SizedBox(height: 16),
+                    const Text(
+                      'SOCIAL HANDLES',
+                      style: TextStyle(
+                        color: Color(0xFF8B8C9E),
+                        fontSize: 14.0,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 1.5,
                       ),
-                      const SizedBox(height: 16),
-                      _buildSocialCard(
-                        title: 'LinkedIn',
-                        handle: _linkedin,
-                        logo: linkedinLogo,
-                      ),
-                      _buildSocialCard(
-                        title: 'Twitter',
-                        handle: _twitter,
-                        logo: twitterLogo,
-                      ),
-                      _buildSocialCard(
-                        title: 'Instagram',
-                        handle: _instagram,
-                        logo: instagramLogo,
-                      ),
-                    ],
+                    ),
+                    const SizedBox(height: 16),
+                    _buildSocialCard(
+                      title: 'LinkedIn',
+                      handle: _activeFields['linkedin'] ?? '',
+                      logo: linkedinLogo,
+                    ),
+                    _buildSocialCard(
+                      title: 'Twitter',
+                      handle: _activeFields['twitter'] ?? '',
+                      logo: twitterLogo,
+                    ),
+                    _buildSocialCard(
+                      title: 'Instagram',
+                      handle: _activeFields['instagram'] ?? '',
+                      logo: instagramLogo,
+                    ),
                   ],
                 ),
               ),

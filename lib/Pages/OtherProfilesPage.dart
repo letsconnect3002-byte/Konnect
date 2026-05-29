@@ -19,8 +19,6 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
   Set<String> _deletedProfileIds = {};
   late ProfileProvider2 profileProvider;
 
-
-
   @override
   void initState() {
     super.initState();
@@ -98,7 +96,9 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
     if (fieldKey == 'name' || fieldKey == 'avatarUrl') return rawValue;
 
     // Determine what card type this viewer has access to
-    final String sharedCard = (profileData['sharedCard'] ?? profileData['shared_card'] ?? 'both').toString();
+    final String sharedCard =
+        (profileData['sharedCard'] ?? profileData['shared_card'] ?? 'both')
+            .toString();
 
     // If no field_assignments data present, show everything
     final dynamic faRaw = profileData['field_assignments'];
@@ -116,7 +116,8 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
     final dynamic assignmentRaw = fa[fieldKey];
     if (assignmentRaw == null) return rawValue;
 
-    final Map<String, dynamic> assignment = assignmentRaw as Map<String, dynamic>;
+    final Map<String, dynamic> assignment =
+        assignmentRaw as Map<String, dynamic>;
     final bool isCasual = assignment['c'] == true;
     final bool isProfessional = assignment['p'] == true;
 
@@ -208,34 +209,37 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
     if (profile.containsKey('cardTypes')) {
       return List<String>.from(profile['cardTypes']);
     }
-    
+
     final allTypes = <String>[];
-    
+
     final hasInstagram = (profile['instagram'] ?? '').toString().isNotEmpty;
     final hasTwitter = (profile['twitter'] ?? '').toString().isNotEmpty;
     final hasCasualBio = (profile['bio'] ?? '').toString().isNotEmpty;
-    
+
     final hasLinkedin = (profile['linkedin'] ?? '').toString().isNotEmpty;
     final hasCompany = (profile['company'] ?? '').toString().isNotEmpty;
     final hasEmail = (profile['email'] ?? '').toString().isNotEmpty;
-    
-    if (hasInstagram || hasTwitter || hasCasualBio || (!hasLinkedin && !hasCompany)) {
+
+    if (hasInstagram ||
+        hasTwitter ||
+        hasCasualBio ||
+        (!hasLinkedin && !hasCompany)) {
       allTypes.add('casual');
     }
     if (hasLinkedin || hasCompany || hasEmail) {
       allTypes.add('professional');
     }
-    
+
     if (allTypes.isEmpty) {
       allTypes.addAll(['casual', 'professional']);
     }
-    
+
     return allTypes;
   }
 
   Widget _buildCardTypeBadges(Map<String, dynamic> profile) {
     final types = _getCardTypesForProfile(profile);
-    
+
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -617,12 +621,42 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
                     ),
                     padding: const EdgeInsets.all(1.5),
                     child: ClipOval(
-                      child: Image.network(
-                        avatar,
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) =>
-                            const Icon(Icons.person, color: Colors.white),
-                      ),
+                      child: (avatar.isNotEmpty &&
+                              avatar.contains(
+                                  'supabase.co/storage/v1/object/public/avatars/'))
+                          ? Image.network(
+                              avatar,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) =>
+                                  Container(
+                                color: const Color(0xFF1B1C2A),
+                                alignment: Alignment.center,
+                                child: Text(
+                                  name.isNotEmpty
+                                      ? name.substring(0, 1).toUpperCase()
+                                      : "?",
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 22,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            )
+                          : Container(
+                              color: const Color(0xFF1B1C2A),
+                              alignment: Alignment.center,
+                              child: Text(
+                                name.isNotEmpty
+                                    ? name.substring(0, 1).toUpperCase()
+                                    : "?",
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -886,7 +920,8 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
       Map<String, dynamic> profileData, ProfileProvider2 provider) {
     final name = profileData["name"] ?? "Unknown";
     final profession = profileData["profession"] ?? "";
-    final String email = _getVisibleField(profileData, 'email', profileData["email"] ?? '');
+    final String email =
+        _getVisibleField(profileData, 'email', profileData["email"] ?? '');
     final String company = _getVisibleField(
       profileData,
       'company',
@@ -958,13 +993,42 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
                     ),
                     padding: const EdgeInsets.all(2),
                     child: ClipOval(
-                      child: Image.network(
-                        avatarUrl,
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) {
-                          return const Icon(Icons.person, color: Colors.white);
-                        },
-                      ),
+                      child: (avatarUrl.isNotEmpty &&
+                              avatarUrl.contains(
+                                  'supabase.co/storage/v1/object/public/avatars/'))
+                          ? Image.network(
+                              avatarUrl,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) =>
+                                  Container(
+                                color: const Color(0xFF1B1C2A),
+                                alignment: Alignment.center,
+                                child: Text(
+                                  name.isNotEmpty
+                                      ? name.substring(0, 1).toUpperCase()
+                                      : "?",
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 22,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            )
+                          : Container(
+                              color: const Color(0xFF1B1C2A),
+                              alignment: Alignment.center,
+                              child: Text(
+                                name.isNotEmpty
+                                    ? name.substring(0, 1).toUpperCase()
+                                    : "?",
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
                     ),
                   ),
                 ),
@@ -1188,12 +1252,42 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
                 ),
                 padding: const EdgeInsets.all(1.5),
                 child: ClipOval(
-                  child: Image.network(
-                    avatarUrl,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) =>
-                        const Icon(Icons.person, color: Colors.white),
-                  ),
+                  child: (avatarUrl.isNotEmpty &&
+                          avatarUrl.contains(
+                              'supabase.co/storage/v1/object/public/avatars/'))
+                      ? Image.network(
+                          avatarUrl,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) =>
+                              Container(
+                            color: const Color(0xFF1B1C2A),
+                            alignment: Alignment.center,
+                            child: Text(
+                              name.isNotEmpty
+                                  ? name.substring(0, 1).toUpperCase()
+                                  : "?",
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        )
+                      : Container(
+                          color: const Color(0xFF1B1C2A),
+                          alignment: Alignment.center,
+                          child: Text(
+                            name.isNotEmpty
+                                ? name.substring(0, 1).toUpperCase()
+                                : "?",
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
                 ),
               ),
             ),

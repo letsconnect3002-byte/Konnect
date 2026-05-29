@@ -25,8 +25,7 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
   bool _isSaving = false;
   ProfileCardType _previewCard = ProfileCardType.casual;
   bool _showFront = true;
-  static const String _defaultAvatarUrl =
-      'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=300&q=80';
+  static const String _defaultAvatarUrl = '';
   String _avatarUrl = _defaultAvatarUrl;
 
   late TextEditingController _nameController;
@@ -168,9 +167,29 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
   }
 
   Map<String, String> _parsePhone(String rawPhone) {
-    final codes = ['+1', '+91', '+44', '+61', '+81', '+49', '+33', '+65', '+971', '+966', '+27', '+55', '+86', '+7', '+52', '+39', '+34', '+31', '+82'];
+    final codes = [
+      '+1',
+      '+91',
+      '+44',
+      '+61',
+      '+81',
+      '+49',
+      '+33',
+      '+65',
+      '+971',
+      '+966',
+      '+27',
+      '+55',
+      '+86',
+      '+7',
+      '+52',
+      '+39',
+      '+34',
+      '+31',
+      '+82'
+    ];
     codes.sort((a, b) => b.length.compareTo(a.length));
-    
+
     String cleaned = rawPhone.trim();
     for (final code in codes) {
       if (cleaned.startsWith(code)) {
@@ -190,22 +209,23 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
   bool _isDataChanged() {
     if (!mounted) return false;
     final provider = Provider.of<ProfileProvider2>(context, listen: false);
-    
+
     final String casualPhoneText = _phoneController.text.trim();
-    final String casualPhoneToCompare = casualPhoneText.isNotEmpty 
-        ? '$_casualCountryCode $casualPhoneText' 
+    final String casualPhoneToCompare = casualPhoneText.isNotEmpty
+        ? '$_casualCountryCode $casualPhoneText'
         : '';
-        
+
     final String profPhoneText = _professionalPhoneController.text.trim();
-    final String profPhoneToCompare = profPhoneText.isNotEmpty 
-        ? '$_professionalCountryCode $profPhoneText' 
+    final String profPhoneToCompare = profPhoneText.isNotEmpty
+        ? '$_professionalCountryCode $profPhoneText'
         : '';
 
     return _nameController.text.trim() != provider.name ||
         _professionController.text.trim() != provider.profession ||
         _companyController.text.trim() != provider.company ||
         _emailController.text.trim() != provider.email ||
-        _professionalEmailController.text.trim() != provider.professionalEmail ||
+        _professionalEmailController.text.trim() !=
+            provider.professionalEmail ||
         casualPhoneToCompare != provider.phoneNumber ||
         profPhoneToCompare != provider.professionalPhoneNumber ||
         _bioController.text.trim() != provider.bio ||
@@ -233,7 +253,7 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
           final casualPhoneParsed = _parsePhone(provider.phoneNumber);
           _casualCountryCode = casualPhoneParsed['code']!;
           _phoneController.text = casualPhoneParsed['number']!;
-          
+
           final profPhoneParsed = _parsePhone(provider.professionalPhoneNumber);
           _professionalCountryCode = profPhoneParsed['code']!;
           _professionalPhoneController.text = profPhoneParsed['number']!;
@@ -256,7 +276,7 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
         final casualPhoneParsed = _parsePhone(provider.phoneNumber);
         _casualCountryCode = casualPhoneParsed['code']!;
         _phoneController.text = casualPhoneParsed['number']!;
-        
+
         final profPhoneParsed = _parsePhone(provider.professionalPhoneNumber);
         _professionalCountryCode = profPhoneParsed['code']!;
         _professionalPhoneController.text = profPhoneParsed['number']!;
@@ -288,17 +308,18 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
       provider.setValue('profession', _professionController.text.trim());
       provider.setValue('company', _companyController.text.trim());
       provider.setValue('email', _emailController.text.trim());
-      provider.setValue('professionalEmail', _professionalEmailController.text.trim());
+      provider.setValue(
+          'professionalEmail', _professionalEmailController.text.trim());
 
       final String casualPhoneText = _phoneController.text.trim();
-      final String casualPhoneToSave = casualPhoneText.isNotEmpty 
-          ? '$_casualCountryCode $casualPhoneText' 
+      final String casualPhoneToSave = casualPhoneText.isNotEmpty
+          ? '$_casualCountryCode $casualPhoneText'
           : '';
       provider.setValue('phoneNumber', casualPhoneToSave);
-      
+
       final String profPhoneText = _professionalPhoneController.text.trim();
-      final String profPhoneToSave = profPhoneText.isNotEmpty 
-          ? '$_professionalCountryCode $profPhoneText' 
+      final String profPhoneToSave = profPhoneText.isNotEmpty
+          ? '$_professionalCountryCode $profPhoneText'
           : '';
       provider.setValue('professionalPhoneNumber', profPhoneToSave);
 
@@ -501,8 +522,28 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                         padding: const EdgeInsets.all(3),
                         child: CircleAvatar(
                           radius: 57,
-                          backgroundImage: NetworkImage(_avatarUrl),
+                          backgroundImage: (_avatarUrl.isNotEmpty &&
+                                  _avatarUrl.contains(
+                                      'supabase.co/storage/v1/object/public/avatars/'))
+                              ? NetworkImage(_avatarUrl)
+                              : null,
                           backgroundColor: const Color(0xFF1B1C2A),
+                          child: (_avatarUrl.isNotEmpty &&
+                                  _avatarUrl.contains(
+                                      'supabase.co/storage/v1/object/public/avatars/'))
+                              ? null
+                              : Text(
+                                  _nameController.text.isNotEmpty
+                                      ? _nameController.text
+                                          .substring(0, 1)
+                                          .toUpperCase()
+                                      : "?",
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 38,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
                         ),
                       ),
                     ),
@@ -531,6 +572,17 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                                 setState(() {
                                   _avatarUrl = publicUrl;
                                 });
+                                // Immediately persist to provider + database
+                                final provider = Provider.of<ProfileProvider2>(
+                                    context,
+                                    listen: false);
+                                provider.setValue('avatarUrl', publicUrl);
+                                if (provider.userId != -1) {
+                                  provider.updateProfileField(
+                                      'avatarUrl', publicUrl, provider.userId);
+                                } else {
+                                  provider.saveOrUpdateProfile();
+                                }
                               }
                               Navigator.pop(
                                   context); // Auto-dismiss sheet on success
@@ -538,7 +590,7 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
                                   content: const Text(
-                                    "Profile photo updated and saved to storage!",
+                                    "Profile photo updated and saved!",
                                     style: TextStyle(
                                         fontFamily: 'Inter',
                                         fontWeight: FontWeight.bold),
@@ -677,25 +729,14 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                     // EDIT DETAILS Header
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
+                      children: const [
+                        Text(
                           'EDIT DETAILS',
                           style: TextStyle(
                             color: Color(0xFF8B8C9E),
                             fontSize: 14.0,
                             fontWeight: FontWeight.w900,
                             letterSpacing: 1.5,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          _previewCard == ProfileCardType.casual
-                              ? 'Casual Card'
-                              : 'Professional Card',
-                          style: const TextStyle(
-                            color: Color(0xFF8B5CF6),
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
                           ),
                         ),
                       ],
@@ -710,10 +751,10 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                     const SizedBox(height: 32),
 
                     _buildSaveButton(),
-                    const SizedBox(height: 32),
+                    // const SizedBox(height: 32),
 
-                    _buildPrivacySection(),
-                    const SizedBox(height: 24),
+                    // _buildPrivacySection(),
+                    // const SizedBox(height: 24),
                   ],
                 ),
               ),
@@ -1376,7 +1417,7 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
               ),
               SizedBox(height: 2),
               Text(
-                'Digital Business Card',
+                'Digital Card',
                 style: TextStyle(
                   color: Color(0xFF8B8C9E),
                   fontSize: 11.0,
@@ -1468,12 +1509,10 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
   }
 
   Widget _buildDigitalCard() {
-    final isCasual = _previewCard == ProfileCardType.casual;
-
     return LayoutBuilder(
       builder: (context, constraints) {
         final cardWidth = constraints.maxWidth;
-        final cardHeight = isCasual ? cardWidth / 0.82 : cardWidth / 1.58;
+        final cardHeight = cardWidth / 1.58;
 
         return AnimatedContainer(
           duration: _cardAnimDuration,
@@ -1482,26 +1521,18 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
           height: cardHeight,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(24.0),
-            gradient: LinearGradient(
-              colors: isCasual
-                  ? const [
-                      Color(0xFF8B5CF6),
-                      Color(0xFF00F2FE),
-                    ]
-                  : const [
-                      Color(0xFF00F2FE),
-                      Color(0xFF8B5CF6),
-                      Color(0xFFEC4899),
-                    ],
+            gradient: const LinearGradient(
+              colors: [
+                Color(0xFF00F2FE),
+                Color(0xFF8B5CF6),
+                Color(0xFFEC4899),
+              ],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
             boxShadow: [
               BoxShadow(
-                color: (isCasual
-                        ? const Color(0xFF8B5CF6)
-                        : const Color(0xFF00F2FE))
-                    .withValues(alpha: 0.1),
+                color: const Color(0xFF00F2FE).withValues(alpha: 0.1),
                 blurRadius: 14,
                 spreadRadius: 0,
               ),
@@ -1514,12 +1545,10 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
               duration: _cardAnimDuration,
               curve: _cardAnimCurve,
               decoration: BoxDecoration(
-                gradient: LinearGradient(
+                gradient: const LinearGradient(
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
-                  colors: isCasual
-                      ? const [Color(0xFF16182A), Color(0xFF0E1018)]
-                      : const [Color(0xFF111222), Color(0xFF0A0B10)],
+                  colors: [Color(0xFF111222), Color(0xFF0A0B10)],
                 ),
                 borderRadius: BorderRadius.circular(22.5),
               ),
@@ -1528,10 +1557,7 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                   Positioned.fill(
                     child: CustomPaint(
                       painter: CardPatternPainter(
-                        color: (isCasual
-                                ? const Color(0xFF8B5CF6)
-                                : const Color(0xFF00F2FE))
-                            .withValues(alpha: 0.06),
+                        color: const Color(0xFF00F2FE).withValues(alpha: 0.06),
                       ),
                     ),
                   ),
@@ -1587,14 +1613,14 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
     if (isFront) {
       return _wrapCardFace(
         _buildUnifiedFrontCard(cardWidth),
-        _previewCard == ProfileCardType.casual ? 0.82 : 1.58,
+        1.58,
         cardWidth,
         const ValueKey('FrontCard'),
       );
     } else {
       return _wrapCardFace(
         _buildUnifiedBackCard(cardWidth),
-        _previewCard == ProfileCardType.casual ? 0.82 : 1.58,
+        1.58,
         cardWidth,
         const ValueKey('BackCard'),
       );
@@ -1602,7 +1628,6 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
   }
 
   Widget _buildUnifiedFrontCard(double cardWidth) {
-    final isCasual = _previewCard == ProfileCardType.casual;
     final W = cardWidth;
 
     return Stack(
@@ -1613,34 +1638,29 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
           curve: _cardAnimCurve,
           left: 0,
           right: 0,
-          top: isCasual ? 34 : 20,
+          top: 20,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               AnimatedContainer(
                 duration: _cardAnimDuration,
                 curve: _cardAnimCurve,
-                width: isCasual ? 56 : 44,
-                height: isCasual ? 56 : 44,
+                width: 44,
+                height: 44,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: isCasual
-                      ? const Color(0xFF171825)
-                      : const Color(0xFF151628),
+                  color: const Color(0xFF151628),
                   border: Border.all(
-                    color: const Color(0xFF8B5CF6)
-                        .withValues(alpha: isCasual ? 0.35 : 0.3),
+                    color: const Color(0xFF8B5CF6).withValues(alpha: 0.3),
                     width: 1.5,
                   ),
                 ),
                 child: Center(
                   child: Image.asset(
                     'assets/icons/Connect Icon2.png',
-                    width: isCasual ? 28 : 22,
-                    height: isCasual ? 28 : 22,
-                    color: isCasual
-                        ? const Color(0xFF8B5CF6)
-                        : const Color(0xFF00F2FE),
+                    width: 22,
+                    height: 22,
+                    color: const Color(0xFF00F2FE),
                   ),
                 ),
               ),
@@ -1648,11 +1668,11 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
               AnimatedDefaultTextStyle(
                 duration: _cardAnimDuration,
                 curve: _cardAnimCurve,
-                style: TextStyle(
+                style: const TextStyle(
                   color: Colors.white,
-                  fontSize: isCasual ? 14 : 12,
+                  fontSize: 12,
                   fontWeight: FontWeight.bold,
-                  letterSpacing: isCasual ? 3.0 : 2.5,
+                  letterSpacing: 2.5,
                   fontFamily: 'Inter',
                 ),
                 child: Text(
@@ -1664,32 +1684,14 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                 ),
               ),
               const SizedBox(height: 4),
-              AnimatedCrossFade(
-                duration: _cardAnimDuration,
-                firstCurve: _cardAnimCurve,
-                secondCurve: _cardAnimCurve,
-                crossFadeState: isCasual
-                    ? CrossFadeState.showFirst
-                    : CrossFadeState.showSecond,
-                firstChild: Text(
-                  'CASUAL CARD',
-                  style: TextStyle(
-                    color: const Color(0xFF8B5CF6).withValues(alpha: 0.8),
-                    fontSize: 9,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 1.5,
-                    fontFamily: 'Inter',
-                  ),
-                ),
-                secondChild: Text(
-                  'DIGITAL IDENTITY',
-                  style: TextStyle(
-                    color: const Color(0xFF00F2FE).withValues(alpha: 0.8),
-                    fontSize: 8,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 1.0,
-                    fontFamily: 'Inter',
-                  ),
+              Text(
+                'DIGITAL IDENTITY',
+                style: TextStyle(
+                  color: const Color(0xFF00F2FE).withValues(alpha: 0.8),
+                  fontSize: 8,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 1.0,
+                  fontFamily: 'Inter',
                 ),
               ),
             ],
@@ -1700,9 +1702,9 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
         AnimatedPositioned(
           duration: _cardAnimDuration,
           curve: _cardAnimCurve,
-          left: isCasual ? 20 : 18,
-          right: isCasual ? 20 : W * 0.4,
-          bottom: isCasual ? 76 : 14,
+          left: 18,
+          right: W * 0.4,
+          bottom: 14,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             mainAxisSize: MainAxisSize.min,
@@ -1711,13 +1713,13 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                 AnimatedAlign(
                   duration: _cardAnimDuration,
                   curve: _cardAnimCurve,
-                  alignment: isCasual ? Alignment.center : Alignment.centerLeft,
+                  alignment: Alignment.centerLeft,
                   child: AnimatedDefaultTextStyle(
                     duration: _cardAnimDuration,
                     curve: _cardAnimCurve,
-                    style: TextStyle(
+                    style: const TextStyle(
                       color: Colors.white,
-                      fontSize: isCasual ? 16 : 14,
+                      fontSize: 14,
                       fontWeight: FontWeight.bold,
                       fontFamily: 'Inter',
                     ),
@@ -1735,20 +1737,20 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                 AnimatedAlign(
                   duration: _cardAnimDuration,
                   curve: _cardAnimCurve,
-                  alignment: isCasual ? Alignment.center : Alignment.centerLeft,
+                  alignment: Alignment.centerLeft,
                   child: AnimatedDefaultTextStyle(
                     duration: _cardAnimDuration,
                     curve: _cardAnimCurve,
-                    style: TextStyle(
-                      color: const Color(0xFF8B5CF6),
-                      fontSize: isCasual ? 12 : 10,
+                    style: const TextStyle(
+                      color: Color(0xFF8B5CF6),
+                      fontSize: 10,
                       fontWeight: FontWeight.w600,
                       fontFamily: 'Inter',
                     ),
                     child: Text(
-                      _professionController.text.trim().isEmpty
-                          ? 'Product Designer'
-                          : _professionController.text.trim(),
+                      _previewCard == ProfileCardType.casual
+                          ? 'Casual'
+                          : 'Professional',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -1763,62 +1765,42 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
         AnimatedPositioned(
           duration: _cardAnimDuration,
           curve: _cardAnimCurve,
-          left: isCasual ? (W - 160) / 2 : W - 98,
-          bottom: isCasual ? 24 : 14,
-          width: isCasual ? 160 : 80,
+          left: W - 98,
+          bottom: 14,
+          width: 80,
           child: Container(
-            padding: EdgeInsets.symmetric(
-              horizontal: isCasual ? 12 : 8,
-              vertical: isCasual ? 6 : 4,
+            padding: const EdgeInsets.symmetric(
+              horizontal: 8,
+              vertical: 4,
             ),
             decoration: BoxDecoration(
-              color:
-                  isCasual ? const Color(0xFF171825) : const Color(0xFF1E1F32),
-              borderRadius: BorderRadius.circular(isCasual ? 8 : 6),
+              color: const Color(0xFF1E1F32),
+              borderRadius: BorderRadius.circular(6),
               border: Border.all(
                 color: Colors.white.withValues(alpha: 0.08),
               ),
             ),
-            child: Center(
+            child: const Center(
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(
                     Icons.qr_code_2_rounded,
-                    color: const Color(0xFF00F2FE),
-                    size: isCasual ? 14 : 11,
+                    color: Color(0xFF00F2FE),
+                    size: 11,
                   ),
-                  const SizedBox(width: 4),
-                  AnimatedCrossFade(
-                    duration: _cardAnimDuration,
-                    firstCurve: _cardAnimCurve,
-                    secondCurve: _cardAnimCurve,
-                    crossFadeState: isCasual
-                        ? CrossFadeState.showFirst
-                        : CrossFadeState.showSecond,
-                    firstChild: const Text(
-                      'SCAN TO CONNECT',
-                      style: TextStyle(
-                        color: Colors.white70,
-                        fontSize: 8,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 0.5,
-                        fontFamily: 'Inter',
-                      ),
-                      maxLines: 1,
+                  SizedBox(width: 4),
+                  Text(
+                    'SCAN',
+                    style: TextStyle(
+                      color: Colors.white70,
+                      fontSize: 8,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 0.5,
+                      fontFamily: 'Inter',
                     ),
-                    secondChild: const Text(
-                      'SCAN',
-                      style: TextStyle(
-                        color: Colors.white70,
-                        fontSize: 8,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 0.5,
-                        fontFamily: 'Inter',
-                      ),
-                      maxLines: 1,
-                    ),
+                    maxLines: 1,
                   ),
                 ],
               ),
@@ -1830,9 +1812,8 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
   }
 
   Widget _buildUnifiedBackCard(double cardWidth) {
-    final isCasual = _previewCard == ProfileCardType.casual;
+    final isCasualData = _previewCard == ProfileCardType.casual;
     final W = cardWidth;
-    final H = isCasual ? cardWidth / 0.82 : cardWidth / 1.58;
 
     return Stack(
       children: [
@@ -1840,18 +1821,18 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
         AnimatedPositioned(
           duration: _cardAnimDuration,
           curve: _cardAnimCurve,
-          left: isCasual ? 20 : 16,
-          right: isCasual ? 20 : 16,
-          top: isCasual ? 16 : 12,
-          height: isCasual ? 60 : 40,
+          left: 16,
+          right: 16,
+          top: 12,
+          height: 40,
           child: Row(
             children: [
               if (_fieldVisible('avatarUrl'))
                 AnimatedContainer(
                   duration: _cardAnimDuration,
                   curve: _cardAnimCurve,
-                  width: isCasual ? 56 : 36,
-                  height: isCasual ? 56 : 36,
+                  width: 36,
+                  height: 36,
                   padding: const EdgeInsets.all(1.0),
                   decoration: const BoxDecoration(
                     shape: BoxShape.circle,
@@ -1860,22 +1841,52 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                     ),
                   ),
                   child: ClipOval(
-                    child: Image.network(
-                      _avatarUrl,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => Icon(
-                        Icons.person_rounded,
-                        color: Colors.white60,
-                        size: isCasual ? 28 : 18,
-                      ),
-                    ),
+                    child: (_avatarUrl.isNotEmpty &&
+                            _avatarUrl.contains(
+                                'supabase.co/storage/v1/object/public/avatars/'))
+                        ? Image.network(
+                            _avatarUrl,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => Container(
+                              color: const Color(0xFF1B1C2A),
+                              alignment: Alignment.center,
+                              child: Text(
+                                _nameController.text.isNotEmpty
+                                    ? _nameController.text
+                                        .substring(0, 1)
+                                        .toUpperCase()
+                                    : "?",
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          )
+                        : Container(
+                            color: const Color(0xFF1B1C2A),
+                            alignment: Alignment.center,
+                            child: Text(
+                              _nameController.text.isNotEmpty
+                                  ? _nameController.text
+                                      .substring(0, 1)
+                                      .toUpperCase()
+                                  : "?",
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
                   ),
                 ),
               if (_fieldVisible('avatarUrl'))
                 AnimatedContainer(
                   duration: _cardAnimDuration,
                   curve: _cardAnimCurve,
-                  width: isCasual ? 14 : 10,
+                  width: 10,
                 ),
               Expanded(
                 child: Column(
@@ -1890,9 +1901,9 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                         child: AnimatedDefaultTextStyle(
                           duration: _cardAnimDuration,
                           curve: _cardAnimCurve,
-                          style: TextStyle(
+                          style: const TextStyle(
                             color: Colors.white,
-                            fontSize: isCasual ? 18 : 14,
+                            fontSize: 14,
                             fontWeight: FontWeight.bold,
                             fontFamily: 'Inter',
                           ),
@@ -1912,16 +1923,16 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                         child: AnimatedDefaultTextStyle(
                           duration: _cardAnimDuration,
                           curve: _cardAnimCurve,
-                          style: TextStyle(
-                            color: const Color(0xFF8B5CF6),
-                            fontSize: isCasual ? 13 : 10,
+                          style: const TextStyle(
+                            color: Color(0xFF8B5CF6),
+                            fontSize: 10,
                             fontWeight: FontWeight.w600,
                             fontFamily: 'Inter',
                           ),
                           child: Text(
-                            _professionController.text.trim().isEmpty
-                                ? 'Product Designer'
-                                : _professionController.text.trim(),
+                            _previewCard == ProfileCardType.casual
+                                ? 'Casual'
+                                : 'Professional',
                             maxLines: 1,
                           ),
                         ),
@@ -1932,20 +1943,18 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
               ),
               const SizedBox(width: 8),
               Container(
-                padding: EdgeInsets.all(isCasual ? 8 : 6),
+                padding: const EdgeInsets.all(6),
                 decoration: BoxDecoration(
-                  color: isCasual
-                      ? const Color(0xFF171825)
-                      : const Color(0xFF1E1F32),
+                  color: const Color(0xFF1E1F32),
                   shape: BoxShape.circle,
                   border: Border.all(
                     color: Colors.white.withValues(alpha: 0.06),
                   ),
                 ),
-                child: Icon(
+                child: const Icon(
                   Icons.link_rounded,
-                  color: const Color(0xFF00F2FE),
-                  size: isCasual ? 16 : 14,
+                  color: Color(0xFF00F2FE),
+                  size: 14,
                 ),
               ),
             ],
@@ -1956,9 +1965,9 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
         AnimatedPositioned(
           duration: _cardAnimDuration,
           curve: _cardAnimCurve,
-          left: isCasual ? 20 : 16,
-          right: isCasual ? 20 : 16,
-          top: isCasual ? 206 : 60,
+          left: 16,
+          right: 16,
+          top: 60,
           height: 1,
           child: Container(
             color: Colors.white.withValues(alpha: 0.08),
@@ -1969,14 +1978,13 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
         AnimatedPositioned(
           duration: _cardAnimDuration,
           curve: _cardAnimCurve,
-          left: isCasual ? 20 : (W * 0.5) + 6,
-          right: isCasual ? 20 : 16,
-          top: isCasual ? 86 : 74,
-          height: isCasual ? 120 : 80,
+          left: (W * 0.5) + 6,
+          right: 16,
+          top: 74,
+          height: 80,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment:
-                isCasual ? MainAxisAlignment.start : MainAxisAlignment.center,
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
               if (_fieldVisible('company')) ...[
                 _buildUnifiedCardRow(
@@ -1984,28 +1992,20 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                   _companyController.text.trim().isEmpty
                       ? 'Design Studio Inc.'
                       : _companyController.text.trim(),
-                  isCasual,
+                  false,
                 ),
-                AnimatedContainer(
-                  duration: _cardAnimDuration,
-                  curve: _cardAnimCurve,
-                  height: isCasual ? 12 : 5,
-                ),
+                const SizedBox(height: 5),
               ],
-              if (isCasual) ...[
+              if (isCasualData) ...[
                 if (_fieldVisible('email')) ...[
                   _buildUnifiedCardRow(
                     Icons.email_outlined,
                     _emailController.text.trim().isEmpty
                         ? 'jordan@designstudio.com'
                         : _emailController.text.trim(),
-                    isCasual,
+                    false,
                   ),
-                  AnimatedContainer(
-                    duration: _cardAnimDuration,
-                    curve: _cardAnimCurve,
-                    height: 12,
-                  ),
+                  const SizedBox(height: 5),
                 ],
                 if (_fieldVisible('phoneNumber'))
                   _buildUnifiedCardRow(
@@ -2013,7 +2013,7 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                     _phoneController.text.trim().isEmpty
                         ? '+1 (555) 123-4567'
                         : '$_casualCountryCode ${_phoneController.text.trim()}',
-                    isCasual,
+                    false,
                   ),
               ] else ...[
                 if (_fieldVisible('email')) ...[
@@ -2022,13 +2022,9 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                     _professionalEmailController.text.trim().isEmpty
                         ? 'jordan@designstudio.com'
                         : _professionalEmailController.text.trim(),
-                    isCasual,
+                    false,
                   ),
-                  AnimatedContainer(
-                    duration: _cardAnimDuration,
-                    curve: _cardAnimCurve,
-                    height: 5,
-                  ),
+                  const SizedBox(height: 5),
                 ],
                 if (_fieldVisible('phoneNumber'))
                   _buildUnifiedCardRow(
@@ -2036,7 +2032,7 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                     _professionalPhoneController.text.trim().isEmpty
                         ? '+1 (555) 123-4567'
                         : '$_professionalCountryCode ${_professionalPhoneController.text.trim()}',
-                    isCasual,
+                    false,
                   ),
               ],
             ],
@@ -2047,44 +2043,27 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
         AnimatedPositioned(
           duration: _cardAnimDuration,
           curve: _cardAnimCurve,
-          left: isCasual ? 20 : 16,
-          right: isCasual ? 20 : (W * 0.5) + 6,
-          top: isCasual ? 220 : 74,
-          height: isCasual ? 70 : 60,
+          left: 16,
+          right: (W * 0.5) + 6,
+          top: 74,
+          height: 60,
           child: _fieldVisible('bio')
-              ? AnimatedCrossFade(
-                  duration: _cardAnimDuration,
-                  firstCurve: _cardAnimCurve,
-                  secondCurve: _cardAnimCurve,
-                  crossFadeState: isCasual
-                      ? CrossFadeState.showFirst
-                      : CrossFadeState.showSecond,
-                  firstChild: Text(
-                    _bioController.text.trim().isEmpty
-                        ? 'Creating delightful user experiences through thoughtful design and innovation.'
-                        : _bioController.text.trim(),
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.55),
-                      fontSize: isCasual ? 12 : 9,
-                      height: isCasual ? 1.4 : 1.25,
-                      fontFamily: 'Inter',
-                    ),
-                    maxLines: 3,
-                    overflow: TextOverflow.ellipsis,
+              ? Text(
+                  isCasualData
+                      ? (_bioController.text.trim().isEmpty
+                          ? 'Creating delightful user experiences through thoughtful design and innovation.'
+                          : _bioController.text.trim())
+                      : (_professionalBioController.text.trim().isEmpty
+                          ? 'Senior Product Designer with 8+ years of experience crafting intuitive digital solutions.'
+                          : _professionalBioController.text.trim()),
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.55),
+                    fontSize: 9,
+                    height: 1.25,
+                    fontFamily: 'Inter',
                   ),
-                  secondChild: Text(
-                    _professionalBioController.text.trim().isEmpty
-                        ? 'Senior Product Designer with 8+ years of experience crafting intuitive digital solutions.'
-                        : _professionalBioController.text.trim(),
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.55),
-                      fontSize: 9,
-                      height: 1.25,
-                      fontFamily: 'Inter',
-                    ),
-                    maxLines: 3,
-                    overflow: TextOverflow.ellipsis,
-                  ),
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
                 )
               : const SizedBox.shrink(),
         ),
@@ -2093,10 +2072,10 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
         AnimatedPositioned(
           duration: _cardAnimDuration,
           curve: _cardAnimCurve,
-          left: isCasual ? 20 : 16,
-          right: isCasual ? 20 : W - 76,
-          top: isCasual ? H - 19 : 140,
-          height: isCasual ? 3 : 2,
+          left: 16,
+          right: W - 76,
+          top: 140,
+          height: 2,
           child: Container(
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(1.5),
@@ -2219,22 +2198,51 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                   ),
                 ),
                 child: ClipOval(
-                  child: Image.network(
-                    _avatarUrl,
-                    width: 72,
-                    height: 72,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Container(
-                      width: 72,
-                      height: 72,
-                      color: const Color(0xFF1B1C2A),
-                      child: const Icon(
-                        Icons.person_outline_rounded,
-                        color: Colors.white60,
-                        size: 36,
-                      ),
-                    ),
-                  ),
+                  child: (_avatarUrl.isNotEmpty &&
+                          _avatarUrl.contains(
+                              'supabase.co/storage/v1/object/public/avatars/'))
+                      ? Image.network(
+                          _avatarUrl,
+                          width: 72,
+                          height: 72,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => Container(
+                            width: 72,
+                            height: 72,
+                            color: const Color(0xFF1B1C2A),
+                            alignment: Alignment.center,
+                            child: Text(
+                              _nameController.text.isNotEmpty
+                                  ? _nameController.text
+                                      .substring(0, 1)
+                                      .toUpperCase()
+                                  : "?",
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 24,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        )
+                      : Container(
+                          width: 72,
+                          height: 72,
+                          color: const Color(0xFF1B1C2A),
+                          alignment: Alignment.center,
+                          child: Text(
+                            _nameController.text.isNotEmpty
+                                ? _nameController.text
+                                    .substring(0, 1)
+                                    .toUpperCase()
+                                : "?",
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
                 ),
               ),
               const SizedBox(width: 16),
@@ -2332,27 +2340,45 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
 
   String _getFlagForCode(String code) {
     switch (code) {
-      case '+971': return '🇦🇪';
-      case '+1': return '🇺🇸';
-      case '+55': return '🇧🇷';
-      case '+52': return '🇲🇽';
-      case '+44': return '🇬🇧';
-      case '+49': return '🇩🇪';
-      case '+33': return '🇫🇷';
-      case '+39': return '🇮🇹';
-      case '+34': return '🇪🇸';
-      case '+31': return '🇳🇱';
-      case '+91': return '🇮🇳';
-      case '+86': return '🇨🇳';
-      case '+65': return '🇸🇬';
-      case '+81': return '🇯🇵';
-      case '+82': return '🇰🇷';
-      case '+966': return '🇸🇦';
-      default: return '🏳️';
+      case '+971':
+        return '🇦🇪';
+      case '+1':
+        return '🇺🇸';
+      case '+55':
+        return '🇧🇷';
+      case '+52':
+        return '🇲🇽';
+      case '+44':
+        return '🇬🇧';
+      case '+49':
+        return '🇩🇪';
+      case '+33':
+        return '🇫🇷';
+      case '+39':
+        return '🇮🇹';
+      case '+34':
+        return '🇪🇸';
+      case '+31':
+        return '🇳🇱';
+      case '+91':
+        return '🇮🇳';
+      case '+86':
+        return '🇨🇳';
+      case '+65':
+        return '🇸🇬';
+      case '+81':
+        return '🇯🇵';
+      case '+82':
+        return '🇰🇷';
+      case '+966':
+        return '🇸🇦';
+      default:
+        return '🏳️';
     }
   }
 
-  void _showCountryPicker(BuildContext context, ValueChanged<String?> onCountryCodeChanged) {
+  void _showCountryPicker(
+      BuildContext context, ValueChanged<String?> onCountryCodeChanged) {
     showModalBottomSheet<String>(
       context: context,
       isScrollControlled: true,
@@ -2413,7 +2439,8 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
           // Header Row with Card Toggles
           Row(
             children: [
-              const Icon(Icons.email_outlined, color: Color(0xFF8B5CF6), size: 18),
+              const Icon(Icons.email_outlined,
+                  color: Color(0xFF8B5CF6), size: 18),
               const SizedBox(width: 8),
               const Expanded(
                 child: Text(
@@ -2428,13 +2455,15 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
               _buildLocalCardToggle(
                 icon: Icons.person_outline_rounded,
                 isActive: assignment.casual,
-                onTap: () => provider.toggleFieldOnCard('email', ProfileCardType.casual),
+                onTap: () =>
+                    provider.toggleFieldOnCard('email', ProfileCardType.casual),
               ),
               const SizedBox(width: 8),
               _buildLocalCardToggle(
                 icon: Icons.work_outline_rounded,
                 isActive: assignment.professional,
-                onTap: () => provider.toggleFieldOnCard('email', ProfileCardType.professional),
+                onTap: () => provider.toggleFieldOnCard(
+                    'email', ProfileCardType.professional),
               ),
             ],
           ),
@@ -2443,7 +2472,8 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
           // Casual Email Section Header
           Row(
             children: const [
-              Icon(Icons.person_outline_rounded, color: Color(0xFF8B5CF6), size: 16),
+              Icon(Icons.person_outline_rounded,
+                  color: Color(0xFF8B5CF6), size: 16),
               SizedBox(width: 6),
               Text(
                 'Casual Email',
@@ -2496,7 +2526,8 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                     ),
               filled: true,
               fillColor: const Color(0xFF191A2A),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(14),
                 borderSide: BorderSide.none,
@@ -2521,7 +2552,8 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
           // Professional Email Section Header
           Row(
             children: const [
-              Icon(Icons.work_outline_rounded, color: Color(0xFF8B5CF6), size: 16),
+              Icon(Icons.work_outline_rounded,
+                  color: Color(0xFF8B5CF6), size: 16),
               SizedBox(width: 6),
               Text(
                 'Professional Email',
@@ -2574,7 +2606,8 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                     ),
               filled: true,
               fillColor: const Color(0xFF191A2A),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(14),
                 borderSide: BorderSide.none,
@@ -2642,7 +2675,8 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
           // Header Row with Card Toggles
           Row(
             children: [
-              const Icon(Icons.phone_android_outlined, color: Color(0xFF8B5CF6), size: 18),
+              const Icon(Icons.phone_android_outlined,
+                  color: Color(0xFF8B5CF6), size: 18),
               const SizedBox(width: 8),
               const Expanded(
                 child: Text(
@@ -2657,13 +2691,15 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
               _buildLocalCardToggle(
                 icon: Icons.person_outline_rounded,
                 isActive: assignment.casual,
-                onTap: () => provider.toggleFieldOnCard('phoneNumber', ProfileCardType.casual),
+                onTap: () => provider.toggleFieldOnCard(
+                    'phoneNumber', ProfileCardType.casual),
               ),
               const SizedBox(width: 8),
               _buildLocalCardToggle(
                 icon: Icons.work_outline_rounded,
                 isActive: assignment.professional,
-                onTap: () => provider.toggleFieldOnCard('phoneNumber', ProfileCardType.professional),
+                onTap: () => provider.toggleFieldOnCard(
+                    'phoneNumber', ProfileCardType.professional),
               ),
             ],
           ),
@@ -2672,7 +2708,8 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
           // Casual Phone Number Section Header
           Row(
             children: const [
-              Icon(Icons.person_outline_rounded, color: Color(0xFF8B5CF6), size: 16),
+              Icon(Icons.person_outline_rounded,
+                  color: Color(0xFF8B5CF6), size: 16),
               SizedBox(width: 6),
               Text(
                 'Casual Phone Number',
@@ -2770,7 +2807,8 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                           ),
                     filled: true,
                     fillColor: const Color(0xFF191A2A),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 12),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(14),
                       borderSide: BorderSide.none,
@@ -2798,7 +2836,8 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
           // Professional Phone Number Section Header
           Row(
             children: const [
-              Icon(Icons.work_outline_rounded, color: Color(0xFF8B5CF6), size: 16),
+              Icon(Icons.work_outline_rounded,
+                  color: Color(0xFF8B5CF6), size: 16),
               SizedBox(width: 6),
               Text(
                 'Professional Phone Number',
@@ -2873,10 +2912,12 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                         ? GestureDetector(
                             onTap: () {
                               if (isProfEditing) {
-                                provider.setEditMode('professionalPhoneNumber', false);
+                                provider.setEditMode(
+                                    'professionalPhoneNumber', false);
                                 _professionalPhoneFocusNode.unfocus();
                               } else {
-                                provider.setEditMode('professionalPhoneNumber', true);
+                                provider.setEditMode(
+                                    'professionalPhoneNumber', true);
                               }
                             },
                             child: Icon(
@@ -2896,7 +2937,8 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                           ),
                     filled: true,
                     fillColor: const Color(0xFF191A2A),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 12),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(14),
                       borderSide: BorderSide.none,
@@ -3179,7 +3221,8 @@ class _CountryCodePickerSheet extends StatefulWidget {
   const _CountryCodePickerSheet();
 
   @override
-  State<_CountryCodePickerSheet> createState() => _CountryCodePickerSheetState();
+  State<_CountryCodePickerSheet> createState() =>
+      _CountryCodePickerSheetState();
 }
 
 class _CountryCodePickerSheetState extends State<_CountryCodePickerSheet> {
@@ -3188,26 +3231,34 @@ class _CountryCodePickerSheetState extends State<_CountryCodePickerSheet> {
 
   static const List<CountryInfo> _allCountries = [
     // Dubai
-    CountryInfo(name: 'United Arab Emirates', code: '+971', flag: '🇦🇪', region: 'Dubai'),
+    CountryInfo(
+        name: 'United Arab Emirates',
+        code: '+971',
+        flag: '🇦🇪',
+        region: 'Dubai'),
     // America
-    CountryInfo(name: 'United States', code: '+1', flag: '🇺🇸', region: 'America'),
+    CountryInfo(
+        name: 'United States', code: '+1', flag: '🇺🇸', region: 'America'),
     CountryInfo(name: 'Canada', code: '+1', flag: '🇨🇦', region: 'America'),
     CountryInfo(name: 'Brazil', code: '+55', flag: '🇧🇷', region: 'America'),
     CountryInfo(name: 'Mexico', code: '+52', flag: '🇲🇽', region: 'America'),
     // Europe
-    CountryInfo(name: 'United Kingdom', code: '+44', flag: '🇬🇧', region: 'Europe'),
+    CountryInfo(
+        name: 'United Kingdom', code: '+44', flag: '🇬🇧', region: 'Europe'),
     CountryInfo(name: 'Germany', code: '+49', flag: '🇩🇪', region: 'Europe'),
     CountryInfo(name: 'France', code: '+33', flag: '🇫🇷', region: 'Europe'),
     CountryInfo(name: 'Italy', code: '+39', flag: '🇮🇹', region: 'Europe'),
     CountryInfo(name: 'Spain', code: '+34', flag: '🇪🇸', region: 'Europe'),
-    CountryInfo(name: 'Netherlands', code: '+31', flag: '🇳🇱', region: 'Europe'),
+    CountryInfo(
+        name: 'Netherlands', code: '+31', flag: '🇳🇱', region: 'Europe'),
     // Asia
     CountryInfo(name: 'India', code: '+91', flag: '🇮🇳', region: 'Asia'),
     CountryInfo(name: 'China', code: '+86', flag: '🇨🇳', region: 'Asia'),
     CountryInfo(name: 'Singapore', code: '+65', flag: '🇸🇬', region: 'Asia'),
     CountryInfo(name: 'Japan', code: '+81', flag: '🇯🇵', region: 'Asia'),
     CountryInfo(name: 'South Korea', code: '+82', flag: '🇰🇷', region: 'Asia'),
-    CountryInfo(name: 'Saudi Arabia', code: '+966', flag: '🇸🇦', region: 'Asia'),
+    CountryInfo(
+        name: 'Saudi Arabia', code: '+966', flag: '🇸🇦', region: 'Asia'),
   ];
 
   @override
@@ -3236,7 +3287,9 @@ class _CountryCodePickerSheetState extends State<_CountryCodePickerSheet> {
     }
 
     // Keep regional ordering: Dubai, America, Europe, Asia
-    final orderedRegions = ['Dubai', 'America', 'Europe', 'Asia'].where((r) => grouped.containsKey(r)).toList();
+    final orderedRegions = ['Dubai', 'America', 'Europe', 'Asia']
+        .where((r) => grouped.containsKey(r))
+        .toList();
     // Add any dynamic regions if somehow created
     for (var r in grouped.keys) {
       if (!orderedRegions.contains(r)) {
@@ -3322,7 +3375,8 @@ class _CountryCodePickerSheetState extends State<_CountryCodePickerSheet> {
                       : null,
                   filled: true,
                   fillColor: const Color(0xFF191A2A),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(14),
                     borderSide: BorderSide.none,
@@ -3358,7 +3412,8 @@ class _CountryCodePickerSheetState extends State<_CountryCodePickerSheet> {
                       ),
                     )
                   : ListView.builder(
-                      padding: EdgeInsets.fromLTRB(16, 0, 16, 24 + bottomPadding),
+                      padding:
+                          EdgeInsets.fromLTRB(16, 0, 16, 24 + bottomPadding),
                       itemCount: orderedRegions.length,
                       itemBuilder: (context, regionIndex) {
                         final regionName = orderedRegions[regionIndex];
@@ -3368,7 +3423,8 @@ class _CountryCodePickerSheetState extends State<_CountryCodePickerSheet> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Padding(
-                              padding: const EdgeInsets.only(left: 8, top: 16, bottom: 8),
+                              padding: const EdgeInsets.only(
+                                  left: 8, top: 16, bottom: 8),
                               child: Text(
                                 regionName.toUpperCase(),
                                 style: const TextStyle(
@@ -3382,11 +3438,14 @@ class _CountryCodePickerSheetState extends State<_CountryCodePickerSheet> {
                             ...countries.map((country) {
                               return Theme(
                                 data: Theme.of(context).copyWith(
-                                  splashColor: const Color(0xFF8B5CF6).withValues(alpha: 0.1),
-                                  highlightColor: const Color(0xFF8B5CF6).withValues(alpha: 0.05),
+                                  splashColor: const Color(0xFF8B5CF6)
+                                      .withValues(alpha: 0.1),
+                                  highlightColor: const Color(0xFF8B5CF6)
+                                      .withValues(alpha: 0.05),
                                 ),
                                 child: ListTile(
-                                  contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+                                  contentPadding: const EdgeInsets.symmetric(
+                                      horizontal: 12),
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(12),
                                   ),

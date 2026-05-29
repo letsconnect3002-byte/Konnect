@@ -485,12 +485,40 @@ class _ProfileCardState extends State<ProfileCard> {
               ),
               padding: const EdgeInsets.all(1.5),
               child: ClipOval(
-                child: Image.network(
-                  avatar,
-                  fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) =>
-                      const Icon(Icons.person, color: Colors.white, size: 28),
-                ),
+                child: (avatar.isNotEmpty &&
+                        avatar.contains('supabase.co/storage/v1/object/public/avatars/'))
+                    ? Image.network(
+                        avatar,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) => Container(
+                          color: const Color(0xFF1B1C2A),
+                          alignment: Alignment.center,
+                          child: Text(
+                            name.isNotEmpty
+                                ? name.substring(0, 1).toUpperCase()
+                                : "?",
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      )
+                    : Container(
+                        color: const Color(0xFF1B1C2A),
+                        alignment: Alignment.center,
+                        child: Text(
+                          name.isNotEmpty
+                              ? name.substring(0, 1).toUpperCase()
+                              : "?",
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
               ),
             ),
             const SizedBox(width: 14),

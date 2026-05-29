@@ -20,7 +20,7 @@ class ProfileProvider2 with ChangeNotifier {
   String company = '';
   String bio = '';
   String professionalBio = '';
-  String avatarUrl = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80';
+  String avatarUrl = '';
   bool showProfileToConnections = true;
   int userId = -1;
 
@@ -536,7 +536,7 @@ class ProfileProvider2 with ChangeNotifier {
         company = response['company'] ?? '';
         bio = response['bio'] ?? '';
         professionalBio = response['professional_bio'] ?? '';
-        avatarUrl = response['avatar_url'] ?? 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80';
+        avatarUrl = response['avatar_url'] ?? '';
         showProfileToConnections = response['show_profile_to_connections'] == true;
 
         profileData["name"] = name;
@@ -1012,7 +1012,7 @@ class ProfileProvider2 with ChangeNotifier {
     company = '';
     bio = '';
     professionalBio = '';
-    avatarUrl = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80';
+    avatarUrl = '';
     showProfileToConnections = true;
     isCreated = false;
     userId = -1;

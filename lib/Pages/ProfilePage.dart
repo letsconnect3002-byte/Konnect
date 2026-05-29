@@ -1021,8 +1021,18 @@ class _ProfilePageState extends State<ProfilePage> {
           try {
             final parsedDate = DateTime.parse(createdAtRaw);
             const months = [
-              'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-              'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+              'Jan',
+              'Feb',
+              'Mar',
+              'Apr',
+              'May',
+              'Jun',
+              'Jul',
+              'Aug',
+              'Sep',
+              'Oct',
+              'Nov',
+              'Dec'
             ];
             final monthName = months[parsedDate.month - 1];
             formattedConnectionDate = "Connected $monthName ${parsedDate.year}";
@@ -1070,7 +1080,7 @@ class _ProfilePageState extends State<ProfilePage> {
                     ),
                   ),
                   alignment: Alignment.center,
-                  child: avatarUrl.isNotEmpty
+                  child: (avatarUrl.isNotEmpty && avatarUrl.contains('supabase.co/storage/v1/object/public/avatars/'))
                       ? ClipRRect(
                           borderRadius: BorderRadius.circular(28),
                           child: Image.network(
@@ -1121,46 +1131,46 @@ class _ProfilePageState extends State<ProfilePage> {
                               style: const TextStyle(
                                 color: Colors.white,
                                 fontSize: 14,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
+                                fontWeight: FontWeight.bold,
                               ),
-                            ),
-                            const SizedBox(width: 8),
-                            _buildCardTypeIndicators(connection),
-                          ],
-                        ),
-                        const SizedBox(height: 1),
-                        Text(
-                          displaySubtitle,
-                          style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.4),
-                            fontSize: 11,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        if (formattedConnectionDate != null) ...[
-                          const SizedBox(height: 3),
-                          Text(
-                            formattedConnectionDate,
-                            style: const TextStyle(
-                              color: Color(0xFF5C5E78),
-                              fontSize: 10,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
+                          const SizedBox(width: 8),
+                          _buildCardTypeIndicators(connection),
                         ],
+                      ),
+                      const SizedBox(height: 1),
+                      Text(
+                        displaySubtitle,
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.4),
+                          fontSize: 11,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      if (formattedConnectionDate != null) ...[
+                        const SizedBox(height: 3),
+                        Text(
+                          formattedConnectionDate,
+                          style: const TextStyle(
+                            color: Color(0xFF5C5E78),
+                            fontSize: 10,
+                          ),
+                        ),
                       ],
-                    ),
+                    ],
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
-          );
-        },
-      );
-    }
+          ),
+        );
+      },
+    );
+  }
 
   Widget _buildCardTypeIndicators(Map<String, dynamic> connection) {
     final typesList = connection['cardTypes'];
