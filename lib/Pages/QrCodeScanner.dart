@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'dart:developer';
 import 'dart:io';
 
-import 'package:connect/Models/profile_card_type.dart';
+
 import 'package:connect/Providers/ProviderSQL.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -293,21 +293,12 @@ class ProfileCard extends StatefulWidget {
 
 class _ProfileCardState extends State<ProfileCard> {
   late final ProfileProvider2 provider;
-  ProfileCardType _activeTab = ProfileCardType.professional;
-  String _shareBackType = 'both';
-  bool _showFront = true;
+  String _shareBackType = 'casual';
 
   @override
   void initState() {
     super.initState();
     provider = Provider.of<ProfileProvider2>(context, listen: false);
-
-    final String presenterSharedCard = (widget.profileData['sharedCard'] ?? 'both').toString();
-    if (presenterSharedCard == 'casual') {
-      _activeTab = ProfileCardType.casual;
-    } else {
-      _activeTab = ProfileCardType.professional;
-    }
   }
 
   String _getVisibleField(String fieldKey, String rawValue) {
@@ -333,7 +324,7 @@ class _ProfileCardState extends State<ProfileCard> {
     final bool isCasual = assignment['c'] == true;
     final bool isProfessional = assignment['p'] == true;
 
-    final bool isCasualTab = _activeTab == ProfileCardType.casual;
+    final bool isCasualTab = sharedCard == 'casual';
 
     if (sharedCard == 'casual' && !isCasualTab) return '';
     if (sharedCard == 'professional' && isCasualTab) return '';
@@ -446,321 +437,21 @@ class _ProfileCardState extends State<ProfileCard> {
     });
   }
 
-  Widget _buildCardTypeTabs() {
-    final String presenterSharedCard = (widget.profileData['sharedCard'] ?? 'both').toString();
-    if (presenterSharedCard != 'both') {
-      return Container(
-        margin: const EdgeInsets.only(bottom: 20),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        decoration: BoxDecoration(
-          color: presenterSharedCard == 'casual'
-              ? const Color(0xFF8B5CF6).withOpacity(0.1)
-              : const Color(0xFF00F2FE).withOpacity(0.1),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: presenterSharedCard == 'casual'
-                ? const Color(0xFF8B5CF6).withOpacity(0.3)
-                : const Color(0xFF00F2FE).withOpacity(0.3),
-            width: 1,
-          ),
-        ),
-        child: Text(
-          "${widget.profileData['name']}'s ${presenterSharedCard.toUpperCase()} CARD",
-          style: TextStyle(
-            color: presenterSharedCard == 'casual'
-                ? const Color(0xFFC084FC)
-                : const Color(0xFF22D3EE),
-            fontSize: 12,
-            fontWeight: FontWeight.w900,
-            letterSpacing: 1.5,
-            fontFamily: 'Inter',
-          ),
-        ),
-      );
-    }
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 20),
-      height: 46,
-      decoration: BoxDecoration(
-        color: const Color(0xFF13141F),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFF202130), width: 1.5),
-      ),
-      padding: const EdgeInsets.all(3),
-      child: Row(
-        children: [
-          Expanded(
-            child: _buildSingleTab(
-              type: ProfileCardType.casual,
-              label: "Casual Details",
-              activeColor: const Color(0xFF8B5CF6),
-            ),
-          ),
-          Expanded(
-            child: _buildSingleTab(
-              type: ProfileCardType.professional,
-              label: "Professional Details",
-              activeColor: const Color(0xFF00F2FE),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSingleTab({
-    required ProfileCardType type,
-    required String label,
-    required Color activeColor,
-  }) {
-    final bool isActive = _activeTab == type;
-    return GestureDetector(
-      onTap: () {
-        HapticFeedback.lightImpact();
-        setState(() {
-          _activeTab = type;
-        });
-      },
-      behavior: HitTestBehavior.opaque,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 250),
-        curve: Curves.easeOutCubic,
-        decoration: BoxDecoration(
-          color: isActive ? activeColor.withOpacity(0.15) : Colors.transparent,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(
-            color: isActive ? activeColor.withOpacity(0.4) : Colors.transparent,
-            width: 1,
-          ),
-        ),
-        child: Center(
-          child: Text(
-            label,
-            style: TextStyle(
-              color: isActive ? activeColor : const Color(0xFF8B8C9E),
-              fontSize: 13,
-              fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
-              fontFamily: 'Inter',
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildFlippingCard() {
+  Widget _buildProfileHeaderCard() {
     final String name = widget.profileData['name'] ?? 'Unknown';
+    final String sharedCard = (widget.profileData['sharedCard'] ?? 'both').toString();
+    final bool isCasual = sharedCard == 'casual';
+    final Color accentColor = isCasual ? const Color(0xFF8B5CF6) : const Color(0xFF00F2FE);
+
     final String profession = _getVisibleField('profession', widget.profileData['profession'] ?? '');
     final String company = _getVisibleField('company', widget.profileData['company'] ?? '');
-    final String email = _getVisibleField('email', widget.profileData['email'] ?? '');
-    final String phone = _getVisibleField('phoneNumber', widget.profileData['phoneNumber'] ?? widget.profileData['phone_number'] ?? '');
-    final String bio = _getVisibleField('bio', widget.profileData['bio'] ?? '');
     final String avatar = _getAvatarUrl(name, widget.profileData['avatarUrl']);
 
-    return GestureDetector(
-      onTap: () {
-        HapticFeedback.mediumImpact();
-        setState(() {
-          _showFront = !_showFront;
-        });
-      },
-      child: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 500),
-        transitionBuilder: (child, animation) {
-          final rotate = Tween(begin: 3.14, end: 0.0).animate(animation);
-          return AnimatedBuilder(
-            animation: rotate,
-            builder: (context, widget) {
-              final value = rotate.value;
-              final matrix = Matrix4.identity()
-                ..setEntry(3, 2, 0.001)
-                ..rotateY(value);
-              return Transform(
-                transform: matrix,
-                alignment: Alignment.center,
-                child: widget,
-              );
-            },
-            child: child,
-          );
-        },
-        child: _showFront
-            ? _buildCardFront(name, profession, company, avatar)
-            : _buildCardBack(name, email, phone, bio),
-      ),
-    );
-  }
-
-  Widget _buildCardFront(String name, String profession, String company, String avatar) {
-    final bool isCasual = _activeTab == ProfileCardType.casual;
-    final Color accentColor = isCasual ? const Color(0xFF8B5CF6) : const Color(0xFF00F2FE);
-
-    return Container(
-      key: const ValueKey('front'),
-      width: 320,
-      height: 190,
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: isCasual
-              ? [const Color(0xFF2C1E4D), const Color(0xFF0F0922)]
-              : [const Color(0xFF132A33), const Color(0xFF091316)],
-        ),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: accentColor.withOpacity(0.35), width: 1.5),
-        boxShadow: [
-          BoxShadow(
-            color: accentColor.withOpacity(0.08),
-            blurRadius: 20,
-            spreadRadius: 2,
-          ),
-        ],
-      ),
-      padding: const EdgeInsets.all(20),
-      child: Stack(
-        children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.qr_code_2_rounded,
-                        color: accentColor,
-                        size: 16,
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        isCasual ? "CASUAL CARD" : "PROFESSIONAL CARD",
-                        style: TextStyle(
-                          color: accentColor,
-                          fontSize: 9,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 1.5,
-                          fontFamily: 'Inter',
-                        ),
-                      ),
-                    ],
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: accentColor.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: accentColor.withOpacity(0.3)),
-                    ),
-                    child: const Text(
-                      "SCANNED ID",
-                      style: TextStyle(
-                        color: Colors.white70,
-                        fontSize: 8,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 0.5,
-                        fontFamily: 'Inter',
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const Spacer(),
-              Row(
-                children: [
-                  Container(
-                    width: 54,
-                    height: 54,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: LinearGradient(
-                        colors: isCasual
-                            ? [const Color(0xFF8B5CF6), const Color(0xFFD8B4FE)]
-                            : [const Color(0xFF00F2FE), const Color(0xFF38BDF8)],
-                      ),
-                    ),
-                    padding: const EdgeInsets.all(1.5),
-                    child: ClipOval(
-                      child: Image.network(
-                        avatar,
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) =>
-                            const Icon(Icons.person, color: Colors.white, size: 28),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          name,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            fontFamily: 'Inter',
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        if (profession.isNotEmpty) ...[
-                          const SizedBox(height: 2),
-                          Text(
-                            profession,
-                            style: TextStyle(
-                              color: accentColor.withOpacity(0.9),
-                              fontSize: 12,
-                              fontWeight: FontWeight.w500,
-                              fontFamily: 'Inter',
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ],
-                        if (company.isNotEmpty) ...[
-                          const SizedBox(height: 1),
-                          Text(
-                            company,
-                            style: const TextStyle(
-                              color: Color(0xFF8B8C9E),
-                              fontSize: 11,
-                              fontFamily: 'Inter',
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCardBack(String name, String email, String phone, String bio) {
-    final bool isCasual = _activeTab == ProfileCardType.casual;
-    final Color accentColor = isCasual ? const Color(0xFF8B5CF6) : const Color(0xFF00F2FE);
-
-    final String instagram = _getVisibleField('instagram', widget.profileData['instagram'] ?? '');
-    final String linkedin = _getVisibleField('linkedin', widget.profileData['linkedin'] ?? '');
-    final String twitter = _getVisibleField('twitter', widget.profileData['twitter'] ?? '');
-
-    return Transform(
-      alignment: Alignment.center,
-      transform: Matrix4.identity()..rotateY(3.14),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24),
       child: Container(
-        key: const ValueKey('back'),
-        width: 320,
-        height: 190,
+        width: double.infinity,
+        padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topLeft,
@@ -779,110 +470,221 @@ class _ProfileCardState extends State<ProfileCard> {
             ),
           ],
         ),
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+        child: Row(
           children: [
-            Text(
-              name.toUpperCase(),
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 11,
-                fontWeight: FontWeight.w900,
-                letterSpacing: 1.5,
-                fontFamily: 'Inter',
+            Container(
+              width: 54,
+              height: 54,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: LinearGradient(
+                  colors: isCasual
+                      ? [const Color(0xFF8B5CF6), const Color(0xFFD8B4FE)]
+                      : [const Color(0xFF00F2FE), const Color(0xFF38BDF8)],
+                ),
+              ),
+              padding: const EdgeInsets.all(1.5),
+              child: ClipOval(
+                child: Image.network(
+                  avatar,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) =>
+                      const Icon(Icons.person, color: Colors.white, size: 28),
+                ),
               ),
             ),
-            const SizedBox(height: 6),
+            const SizedBox(width: 14),
             Expanded(
-              child: Text(
-                bio.isNotEmpty ? bio : 'No bio provided for this card.',
-                style: const TextStyle(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    name,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      fontFamily: 'Inter',
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  if (profession.isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      profession,
+                      style: TextStyle(
+                        color: accentColor.withOpacity(0.9),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                        fontFamily: 'Inter',
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                  if (company.isNotEmpty) ...[
+                    const SizedBox(height: 1),
+                    Text(
+                      company,
+                      style: const TextStyle(
+                        color: Color(0xFF8B8C9E),
+                        fontSize: 11,
+                        fontFamily: 'Inter',
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildProfileDetailsSection() {
+    final String sharedCard = (widget.profileData['sharedCard'] ?? 'both').toString();
+    final bool isCasual = sharedCard == 'casual';
+    final Color accentColor = isCasual ? const Color(0xFF8B5CF6) : const Color(0xFF00F2FE);
+
+    final String email = _getVisibleField('email', widget.profileData['email'] ?? '');
+    final String phone = _getVisibleField('phoneNumber', widget.profileData['phoneNumber'] ?? widget.profileData['phone_number'] ?? '');
+    final String bio = _getVisibleField('bio', widget.profileData['bio'] ?? '');
+    final String instagram = _getVisibleField('instagram', widget.profileData['instagram'] ?? '');
+    final String linkedin = _getVisibleField('linkedin', widget.profileData['linkedin'] ?? '');
+    final String twitter = _getVisibleField('twitter', widget.profileData['twitter'] ?? '');
+
+    if (email.isEmpty &&
+        phone.isEmpty &&
+        bio.isEmpty &&
+        instagram.isEmpty &&
+        linkedin.isEmpty &&
+        twitter.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          color: const Color(0xFF131422),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: const Color(0xFF26273C), width: 1.2),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (bio.isNotEmpty) ...[
+              const Text(
+                "ABOUT ME",
+                style: TextStyle(
                   color: Color(0xFF8B8C9E),
-                  fontSize: 11,
-                  height: 1.3,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 1.5,
                   fontFamily: 'Inter',
                 ),
-                maxLines: 3,
-                overflow: TextOverflow.ellipsis,
               ),
-            ),
-            Container(
-              height: 1,
-              color: accentColor.withOpacity(0.2),
-              margin: const EdgeInsets.symmetric(vertical: 8),
-            ),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+              const SizedBox(height: 6),
+              Text(
+                bio,
+                style: const TextStyle(
+                  color: Color(0xFFC0C1D0),
+                  fontSize: 12,
+                  height: 1.4,
+                  fontFamily: 'Inter',
+                ),
+              ),
+              if (email.isNotEmpty || phone.isNotEmpty || instagram.isNotEmpty || linkedin.isNotEmpty || twitter.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  child: Divider(color: accentColor.withOpacity(0.15), height: 1),
+                ),
+            ],
+            if (email.isNotEmpty) ...[
+              Row(
+                children: [
+                  Icon(Icons.alternate_email_rounded, color: accentColor, size: 14),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      email,
+                      style: const TextStyle(
+                        color: Color(0xFFC0C1D0),
+                        fontSize: 12,
+                        fontFamily: 'Inter',
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+              if (phone.isNotEmpty) const SizedBox(height: 10),
+            ],
+            if (phone.isNotEmpty) ...[
+              Row(
+                children: [
+                  Icon(Icons.phone_rounded, color: accentColor, size: 14),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      phone,
+                      style: const TextStyle(
+                        color: Color(0xFFC0C1D0),
+                        fontSize: 12,
+                        fontFamily: 'Inter',
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+            if (instagram.isNotEmpty || linkedin.isNotEmpty || twitter.isNotEmpty) ...[
+              if (email.isNotEmpty || phone.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  child: Divider(color: accentColor.withOpacity(0.15), height: 1),
+                ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    "SOCIALS",
+                    style: TextStyle(
+                      color: Color(0xFF8B8C9E),
+                      fontSize: 10,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 1.5,
+                      fontFamily: 'Inter',
+                    ),
+                  ),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      if (email.isNotEmpty)
-                        Row(
-                          children: [
-                            Icon(Icons.alternate_email_rounded,
-                                color: accentColor, size: 12),
-                            const SizedBox(width: 6),
-                            Expanded(
-                              child: Text(
-                                email,
-                                style: const TextStyle(
-                                  color: Color(0xFFC0C1D0),
-                                  fontSize: 10,
-                                  fontFamily: 'Inter',
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ],
-                        ),
-                      if (phone.isNotEmpty) ...[
-                        const SizedBox(height: 3),
-                        Row(
-                          children: [
-                            Icon(Icons.phone_rounded,
-                                color: accentColor, size: 12),
-                            const SizedBox(width: 6),
-                            Expanded(
-                              child: Text(
-                                phone,
-                                style: const TextStyle(
-                                  color: Color(0xFFC0C1D0),
-                                  fontSize: 10,
-                                  fontFamily: 'Inter',
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ],
-                        ),
+                      if (instagram.isNotEmpty) ...[
+                        Icon(Icons.camera_alt_outlined, color: accentColor, size: 16),
+                        const SizedBox(width: 10),
+                      ],
+                      if (linkedin.isNotEmpty) ...[
+                        Icon(Icons.link_rounded, color: accentColor, size: 16),
+                        const SizedBox(width: 10),
+                      ],
+                      if (twitter.isNotEmpty) ...[
+                        Icon(Icons.chat_bubble_outline_rounded, color: accentColor, size: 16),
                       ],
                     ],
                   ),
-                ),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (instagram.isNotEmpty) ...[
-                      const SizedBox(width: 6),
-                      Icon(Icons.camera_alt_outlined, color: accentColor, size: 14),
-                    ],
-                    if (linkedin.isNotEmpty) ...[
-                      const SizedBox(width: 6),
-                      Icon(Icons.link_rounded, color: accentColor, size: 14),
-                    ],
-                    if (twitter.isNotEmpty) ...[
-                      const SizedBox(width: 6),
-                      Icon(Icons.chat_bubble_outline_rounded, color: accentColor, size: 14),
-                    ],
-                  ],
-                ),
-              ],
-            ),
+                ],
+              ),
+            ],
           ],
         ),
       ),
@@ -902,7 +704,7 @@ class _ProfileCardState extends State<ProfileCard> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            "SHARE YOUR CARD BACK",
+            "HOW DO YOU KNOW THEM?",
             style: TextStyle(
               color: Color(0xFF8B8C9E),
               fontSize: 10,
@@ -913,7 +715,7 @@ class _ProfileCardState extends State<ProfileCard> {
           ),
           const SizedBox(height: 6),
           Text(
-            "Choose which profile card you want to share with ${widget.profileData['name'] ?? 'them'}:",
+            "This helps us show you the right version of your card.",
             style: TextStyle(
               color: Colors.white.withOpacity(0.6),
               fontSize: 12,
@@ -927,7 +729,7 @@ class _ProfileCardState extends State<ProfileCard> {
               Expanded(
                 child: _buildShareBackOption(
                   type: 'casual',
-                  label: "Casual",
+                  label: "From my personal life",
                   color: const Color(0xFF8B5CF6),
                 ),
               ),
@@ -935,16 +737,8 @@ class _ProfileCardState extends State<ProfileCard> {
               Expanded(
                 child: _buildShareBackOption(
                   type: 'professional',
-                  label: "Professional",
+                  label: "From work",
                   color: const Color(0xFF00F2FE),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _buildShareBackOption(
-                  type: 'both',
-                  label: "Both",
-                  color: const Color(0xFFFF007F),
                 ),
               ),
             ],
@@ -971,7 +765,8 @@ class _ProfileCardState extends State<ProfileCard> {
       behavior: HitTestBehavior.opaque,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 250),
-        height: 50,
+        height: 52,
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: BoxDecoration(
           color: isSelected ? color.withOpacity(0.08) : const Color(0xFF0A0A0F),
           borderRadius: BorderRadius.circular(12),
@@ -992,10 +787,11 @@ class _ProfileCardState extends State<ProfileCard> {
         child: Center(
           child: Text(
             label,
+            textAlign: TextAlign.center,
             style: TextStyle(
               color: isSelected ? Colors.white : const Color(0xFF8B8C9E),
               fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-              fontSize: 13,
+              fontSize: 12,
               fontFamily: 'Inter',
             ),
           ),
@@ -1029,21 +825,8 @@ class _ProfileCardState extends State<ProfileCard> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               const SizedBox(height: 10),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24),
-                child: _buildCardTypeTabs(),
-              ),
-              _buildFlippingCard(),
-              const SizedBox(height: 12),
-              const Text(
-                "Tap card to flip and view details",
-                style: TextStyle(
-                  color: Color(0xFF5C5E78),
-                  fontSize: 12,
-                  fontStyle: FontStyle.italic,
-                  fontFamily: 'Inter',
-                ),
-              ),
+              _buildProfileHeaderCard(),
+              _buildProfileDetailsSection(),
               _buildShareBackSelector(),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
@@ -1075,9 +858,11 @@ class _ProfileCardState extends State<ProfileCard> {
                         borderRadius: BorderRadius.circular(16),
                       ),
                     ),
-                    child: const Text(
-                      "Connect & Add to Circle",
-                      style: TextStyle(
+                    child: Text(
+                      _shareBackType == 'casual'
+                          ? "Add to My Circle"
+                          : "Add to My Network",
+                      style: const TextStyle(
                         color: Colors.white,
                         fontWeight: FontWeight.bold,
                         fontSize: 15,

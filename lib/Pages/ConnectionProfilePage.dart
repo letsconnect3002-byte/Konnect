@@ -18,7 +18,6 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
   static const _cardAnimDuration = Duration(milliseconds: 400);
   static const _cardAnimCurve = Curves.easeInOut;
 
-  ProfileCardType _previewCard = ProfileCardType.casual;
   bool _showFront = true;
   bool _isLoading = false;
 
@@ -38,7 +37,7 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
   Map<String, String> _professionalFields = {};
 
   Map<String, String> get _activeFields {
-    if (_previewCard == ProfileCardType.casual) return _casualFields;
+    if (_sharedCardPermission == 'casual') return _casualFields;
     return _professionalFields;
   }
 
@@ -53,16 +52,17 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
     _loadProfileData();
   }
 
-  bool _isFieldVisible(String fieldName, Map<String, dynamic>? fieldAssignments) {
+  bool _isFieldVisible(
+      String fieldName, Map<String, dynamic>? fieldAssignments) {
     if (fieldName == 'name' || fieldName == 'avatarUrl') return true;
     if (fieldAssignments == null) return true;
-    
+
     final assignmentMap = fieldAssignments[fieldName];
     if (assignmentMap == null) return true;
-    
+
     final bool isCasual = assignmentMap['c'] == true;
     final bool isProfessional = assignmentMap['p'] == true;
-    
+
     if (_sharedCardPermission == 'casual') {
       return isCasual;
     } else if (_sharedCardPermission == 'professional') {
@@ -78,9 +78,12 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
     _profession = data['profession'] ?? '';
     _company = data['company'] ?? '';
     _email = data['email'] ?? '';
-    _professionalEmail = data['professionalEmail'] ?? data['professional_email'] ?? '';
+    _professionalEmail =
+        data['professionalEmail'] ?? data['professional_email'] ?? '';
     _phoneNumber = data['phoneNumber'] ?? data['phone_number'] ?? '';
-    _professionalPhoneNumber = data['professionalPhoneNumber'] ?? data['professional_phone_number'] ?? '';
+    _professionalPhoneNumber = data['professionalPhoneNumber'] ??
+        data['professional_phone_number'] ??
+        '';
     _bio = data['bio'] ?? '';
     _avatarUrl = data['avatarUrl'] ?? data['avatar_url'] ?? '';
     _instagram = data['instagram'] ?? '';
@@ -114,7 +117,9 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
         setState(() => _isLoading = true);
       }
       try {
-        final idToFetch = connectionProfileId is int ? connectionProfileId : int.parse(connectionProfileId.toString());
+        final idToFetch = connectionProfileId is int
+            ? connectionProfileId
+            : int.parse(connectionProfileId.toString());
         final response = await Supabase.instance.client
             .from('profiles')
             .select()
@@ -150,30 +155,42 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
           }
         }
 
-        if (_sharedCardPermission == 'casual') {
-          _previewCard = ProfileCardType.casual;
-        } else if (_sharedCardPermission == 'professional') {
-          _previewCard = ProfileCardType.professional;
-        }
-
         if (response != null && mounted) {
-          final Map<String, dynamic>? fieldAssignments = response['field_assignments'] is Map<String, dynamic>
-              ? response['field_assignments'] as Map<String, dynamic>
-              : (response['field_assignments'] is String
-                  ? jsonDecode(response['field_assignments'] as String) as Map<String, dynamic>
-                  : null);
+          final Map<String, dynamic>? fieldAssignments =
+              response['field_assignments'] is Map<String, dynamic>
+                  ? response['field_assignments'] as Map<String, dynamic>
+                  : (response['field_assignments'] is String
+                      ? jsonDecode(response['field_assignments'] as String)
+                          as Map<String, dynamic>
+                      : null);
 
           setState(() {
             _name = response['name'] ?? '';
             _avatarUrl = response['avatar_url'] ?? '';
-            _profession = _isFieldVisible('profession', fieldAssignments) ? (response['profession'] ?? '') : '';
-            _company = _isFieldVisible('company', fieldAssignments) ? (response['company'] ?? '') : '';
-            _email = _isFieldVisible('email', fieldAssignments) ? (response['email'] ?? '') : '';
-            _phoneNumber = _isFieldVisible('phoneNumber', fieldAssignments) ? (response['phone_number'] ?? '') : '';
-            _instagram = _isFieldVisible('instagram', fieldAssignments) ? (response['instagram'] ?? '') : '';
-            _linkedin = _isFieldVisible('linkedin', fieldAssignments) ? (response['linkedin'] ?? '') : '';
-            _twitter = _isFieldVisible('twitter', fieldAssignments) ? (response['twitter'] ?? '') : '';
-            _bio = _isFieldVisible('bio', fieldAssignments) ? (response['bio'] ?? '') : '';
+            _profession = _isFieldVisible('profession', fieldAssignments)
+                ? (response['profession'] ?? '')
+                : '';
+            _company = _isFieldVisible('company', fieldAssignments)
+                ? (response['company'] ?? '')
+                : '';
+            _email = _isFieldVisible('email', fieldAssignments)
+                ? (response['email'] ?? '')
+                : '';
+            _phoneNumber = _isFieldVisible('phoneNumber', fieldAssignments)
+                ? (response['phone_number'] ?? '')
+                : '';
+            _instagram = _isFieldVisible('instagram', fieldAssignments)
+                ? (response['instagram'] ?? '')
+                : '';
+            _linkedin = _isFieldVisible('linkedin', fieldAssignments)
+                ? (response['linkedin'] ?? '')
+                : '';
+            _twitter = _isFieldVisible('twitter', fieldAssignments)
+                ? (response['twitter'] ?? '')
+                : '';
+            _bio = _isFieldVisible('bio', fieldAssignments)
+                ? (response['bio'] ?? '')
+                : '';
           });
 
           // Build per-card filtered field sets
@@ -198,22 +215,30 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
 
           setState(() {
             _casualFields = {
-              'profession': _filterField('profession', response['profession'] ?? ''),
+              'profession':
+                  _filterField('profession', response['profession'] ?? ''),
               'company': _filterField('company', response['company'] ?? ''),
               'email': _filterField('email', response['email'] ?? ''),
-              'phoneNumber': _filterField('phoneNumber', response['phone_number'] ?? ''),
-              'instagram': _filterField('instagram', response['instagram'] ?? ''),
+              'phoneNumber':
+                  _filterField('phoneNumber', response['phone_number'] ?? ''),
+              'instagram':
+                  _filterField('instagram', response['instagram'] ?? ''),
               'linkedin': _filterField('linkedin', response['linkedin'] ?? ''),
               'twitter': _filterField('twitter', response['twitter'] ?? ''),
               'bio': _filterField('bio', response['bio'] ?? ''),
             };
             _professionalFields = {
-              'profession': _filterFieldPro('profession', response['profession'] ?? ''),
+              'profession':
+                  _filterFieldPro('profession', response['profession'] ?? ''),
               'company': _filterFieldPro('company', response['company'] ?? ''),
-              'email': _filterFieldPro('email', response['professional_email'] ?? ''),
-              'phoneNumber': _filterFieldPro('phoneNumber', response['professional_phone_number'] ?? ''),
-              'instagram': _filterFieldPro('instagram', response['instagram'] ?? ''),
-              'linkedin': _filterFieldPro('linkedin', response['linkedin'] ?? ''),
+              'email': _filterFieldPro(
+                  'email', response['professional_email'] ?? ''),
+              'phoneNumber': _filterFieldPro(
+                  'phoneNumber', response['professional_phone_number'] ?? ''),
+              'instagram':
+                  _filterFieldPro('instagram', response['instagram'] ?? ''),
+              'linkedin':
+                  _filterFieldPro('linkedin', response['linkedin'] ?? ''),
               'twitter': _filterFieldPro('twitter', response['twitter'] ?? ''),
               'bio': _filterFieldPro('bio', response['bio'] ?? ''),
             };
@@ -370,100 +395,6 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
     );
   }
 
-  Widget _buildCardTypeTabs() {
-    final bool casualLocked = _sharedCardPermission == 'professional';
-    final bool professionalLocked = _sharedCardPermission == 'casual';
-
-    return Container(
-      height: 40,
-      padding: const EdgeInsets.all(3),
-      decoration: BoxDecoration(
-        color: const Color(0xFF13141F),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFF1F2030)),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: _buildCardTab(
-              label: 'Casual',
-              icon: Icons.person_outline_rounded,
-              isActive: _previewCard == ProfileCardType.casual,
-              isLocked: casualLocked,
-              onTap: casualLocked
-                  ? () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                            content: Text("Access to Casual card restricted by user")),
-                      );
-                    }
-                  : () => setState(() => _previewCard = ProfileCardType.casual),
-            ),
-          ),
-          Expanded(
-            child: _buildCardTab(
-              label: 'Professional',
-              icon: Icons.work_outline_rounded,
-              isActive: _previewCard == ProfileCardType.professional,
-              isLocked: professionalLocked,
-              onTap: professionalLocked
-                  ? () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                            content: Text("Access to Professional card restricted by user")),
-                      );
-                    }
-                  : () => setState(() => _previewCard = ProfileCardType.professional),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCardTab({
-    required String label,
-    required IconData icon,
-    required bool isActive,
-    required bool isLocked,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: isActive && !isLocked ? const Color(0xFF8B5CF6) : Colors.transparent,
-          borderRadius: BorderRadius.circular(17),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              isLocked ? Icons.lock_rounded : icon,
-              size: 16,
-              color: isLocked
-                  ? const Color(0xFF5C5E78).withOpacity(0.5)
-                  : (isActive ? Colors.white : const Color(0xFF8B8C9E)),
-            ),
-            const SizedBox(width: 6),
-            Text(
-              label,
-              style: TextStyle(
-                color: isLocked
-                    ? const Color(0xFF5C5E78).withOpacity(0.5)
-                    : (isActive ? Colors.white : const Color(0xFF8B8C9E)),
-                fontSize: 13,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   Widget _buildFrontBackToggle() {
     return Container(
       height: 32,
@@ -525,90 +456,99 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
   }
 
   Widget _buildDigitalCard() {
-    final isCasual = _previewCard == ProfileCardType.casual;
+    final isCasual = _sharedCardPermission == 'casual';
 
     return LayoutBuilder(
       builder: (context, constraints) {
         final cardWidth = constraints.maxWidth;
         final cardHeight = isCasual ? cardWidth / 0.82 : cardWidth / 1.58;
 
-        return AnimatedContainer(
-          duration: _cardAnimDuration,
-          curve: _cardAnimCurve,
-          width: cardWidth,
-          height: cardHeight,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(24.0),
-            gradient: LinearGradient(
-              colors: isCasual
-                  ? const [
-                      Color(0xFF8B5CF6),
-                      Color(0xFF00F2FE),
-                    ]
-                  : const [
-                      Color(0xFF00F2FE),
-                      Color(0xFF8B5CF6),
-                      Color(0xFFEC4899),
-                    ],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: (isCasual
-                        ? const Color(0xFF8B5CF6)
-                        : const Color(0xFF00F2FE))
-                    .withValues(alpha: 0.1),
-                blurRadius: 14,
-                spreadRadius: 0,
+        return GestureDetector(
+          onDoubleTap: () {
+            HapticFeedback.mediumImpact();
+            setState(() {
+              _showFront = !_showFront;
+            });
+          },
+          behavior: HitTestBehavior.opaque,
+          child: AnimatedContainer(
+            duration: _cardAnimDuration,
+            curve: _cardAnimCurve,
+            width: cardWidth,
+            height: cardHeight,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(24.0),
+              gradient: LinearGradient(
+                colors: isCasual
+                    ? const [
+                        Color(0xFF8B5CF6),
+                        Color(0xFF00F2FE),
+                      ]
+                    : const [
+                        Color(0xFF00F2FE),
+                        Color(0xFF8B5CF6),
+                        Color(0xFFEC4899),
+                      ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
               ),
-            ],
-          ),
-          padding: const EdgeInsets.all(1.5),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(22.5),
-            child: AnimatedContainer(
-              duration: _cardAnimDuration,
-              curve: _cardAnimCurve,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: isCasual
-                      ? const [Color(0xFF16182A), Color(0xFF0E1018)]
-                      : const [Color(0xFF111222), Color(0xFF0A0B10)],
+              boxShadow: [
+                BoxShadow(
+                  color: (isCasual
+                          ? const Color(0xFF8B5CF6)
+                          : const Color(0xFF00F2FE))
+                      .withValues(alpha: 0.1),
+                  blurRadius: 14,
+                  spreadRadius: 0,
                 ),
-                borderRadius: BorderRadius.circular(22.5),
-              ),
-              child: Stack(
-                children: [
-                  Positioned.fill(
-                    child: CustomPaint(
-                      painter: CardPatternPainter(
-                        color: (isCasual
-                                ? const Color(0xFF8B5CF6)
-                                : const Color(0xFF00F2FE))
-                            .withValues(alpha: 0.06),
+              ],
+            ),
+            padding: const EdgeInsets.all(1.5),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(22.5),
+              child: AnimatedContainer(
+                duration: _cardAnimDuration,
+                curve: _cardAnimCurve,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: isCasual
+                        ? const [Color(0xFF16182A), Color(0xFF0E1018)]
+                        : const [Color(0xFF111222), Color(0xFF0A0B10)],
+                  ),
+                  borderRadius: BorderRadius.circular(22.5),
+                ),
+                child: Stack(
+                  children: [
+                    Positioned.fill(
+                      child: CustomPaint(
+                        painter: CardPatternPainter(
+                          color: (isCasual
+                                  ? const Color(0xFF8B5CF6)
+                                  : const Color(0xFF00F2FE))
+                              .withValues(alpha: 0.06),
+                        ),
                       ),
                     ),
-                  ),
-                  AnimatedSwitcher(
-                    duration: _cardAnimDuration,
-                    switchInCurve: _cardAnimCurve,
-                    switchOutCurve: _cardAnimCurve,
-                    transitionBuilder: (child, animation) {
-                      return FadeTransition(
-                        opacity: animation,
-                        child: ScaleTransition(
-                          scale: Tween<double>(begin: 0.96, end: 1.0)
-                              .animate(animation),
-                          child: child,
-                        ),
-                      );
-                    },
-                    child: _buildActiveCardFace(cardWidth),
-                  ),
-                ],
+                    AnimatedSwitcher(
+                      duration: _cardAnimDuration,
+                      switchInCurve: _cardAnimCurve,
+                      switchOutCurve: _cardAnimCurve,
+                      transitionBuilder: (child, animation) {
+                        return FadeTransition(
+                          opacity: animation,
+                          child: ScaleTransition(
+                            scale: Tween<double>(begin: 0.96, end: 1.0)
+                                .animate(animation),
+                            child: child,
+                          ),
+                        );
+                      },
+                      child: _buildActiveCardFace(cardWidth),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -622,14 +562,14 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
     if (isFront) {
       return _wrapCardFace(
         _buildUnifiedFrontCard(cardWidth),
-        _previewCard == ProfileCardType.casual ? 0.82 : 1.58,
+        _sharedCardPermission == 'casual' ? 0.82 : 1.58,
         cardWidth,
         const ValueKey('FrontCard'),
       );
     } else {
       return _wrapCardFace(
         _buildUnifiedBackCard(cardWidth),
-        _previewCard == ProfileCardType.casual ? 0.82 : 1.58,
+        _sharedCardPermission == 'casual' ? 0.82 : 1.58,
         cardWidth,
         const ValueKey('BackCard'),
       );
@@ -659,7 +599,7 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
   }
 
   Widget _buildUnifiedFrontCard(double cardWidth) {
-    final isCasual = _previewCard == ProfileCardType.casual;
+    final isCasual = _sharedCardPermission == 'casual';
     final W = cardWidth;
     final comp = _getCompany(_name, _activeFields['company'] ?? '');
     final avatar = _getAvatarUrl(_name, _avatarUrl);
@@ -912,7 +852,7 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
   }
 
   Widget _buildUnifiedBackCard(double cardWidth) {
-    final isCasual = _previewCard == ProfileCardType.casual;
+    final isCasual = _sharedCardPermission == 'casual';
     final W = cardWidth;
     final H = isCasual ? cardWidth / 0.82 : cardWidth / 1.58;
     final avatar = _getAvatarUrl(_name, _avatarUrl);
@@ -1267,131 +1207,113 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
                 ),
               )
             : SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _buildHeader(context),
-              const SizedBox(height: 28),
-
-              // CARD PREVIEW Tab selectors
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    'CARD PREVIEW',
-                    style: TextStyle(
-                      color: Color(0xFF8B8C9E),
-                      fontSize: 14.0,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 1.5,
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 24.0, vertical: 16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _buildHeader(context),
+                    const SizedBox(height: 16),
+                    Align(
+                      alignment: Alignment.topRight,
+                      child: _buildFrontBackToggle(),
                     ),
-                  ),
-                  _buildFrontBackToggle(),
-                ],
-              ),
-              const SizedBox(height: 12),
-              _buildCardTypeTabs(),
-              const SizedBox(height: 16),
+                    const SizedBox(height: 16),
 
-              // Business card graphic
-              _buildDigitalCard(),
-              const SizedBox(height: 24),
-              _buildAccessControlSection(),
-              const SizedBox(height: 32),
+                    // Business card graphic
+                    _buildDigitalCard(),
+                    const SizedBox(height: 24),
+                    _buildAccessControlSection(),
+                    const SizedBox(height: 32),
 
-              // DETAILS DISPLAY HEADER
-              const Text(
-                'CONNECTION DETAILS',
-                style: TextStyle(
-                  color: Color(0xFF8B8C9E),
-                  fontSize: 14.0,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 1.5,
-                ),
-              ),
-              const SizedBox(height: 16),
+                    // DETAILS DISPLAY HEADER
+                    const Text(
+                      'CONNECTION DETAILS',
+                      style: TextStyle(
+                        color: Color(0xFF8B8C9E),
+                        fontSize: 14.0,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 1.5,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
 
-              // Read-only Details
-              _buildReadOnlyField(
-                label: 'Full Name',
-                value: _name,
-                icon: Icons.person_outline_rounded,
-              ),
-              _buildReadOnlyField(
-                label: 'Profession',
-                value: _profession,
-                icon: Icons.work_outline_rounded,
-              ),
-              _buildReadOnlyField(
-                label: 'Company',
-                value: comp,
-                icon: Icons.apartment_rounded,
-              ),
-              if (_isFieldVisible('email', widget.profileData['field_assignments']))
-                _buildReadOnlyField(
-                  label: 'Casual Email Address',
-                  value: _email,
-                  icon: Icons.email_outlined,
-                ),
-              if (_isFieldVisible('professionalEmail', widget.profileData['field_assignments']))
-                _buildReadOnlyField(
-                  label: 'Professional Email Address',
-                  value: _professionalEmail,
-                  icon: Icons.email_outlined,
-                ),
-              if (_isFieldVisible('phoneNumber', widget.profileData['field_assignments']))
-                _buildReadOnlyField(
-                  label: 'Casual Phone Number',
-                  value: _phoneNumber,
-                  icon: Icons.phone_android_outlined,
-                ),
-              if (_isFieldVisible('professionalPhoneNumber', widget.profileData['field_assignments']))
-                _buildReadOnlyField(
-                  label: 'Professional Phone Number',
-                  value: _professionalPhoneNumber,
-                  icon: Icons.phone_android_outlined,
-                ),
-              _buildReadOnlyField(
-                label: 'Bio',
-                value: bio,
-                icon: Icons.description_outlined,
-              ),
+                    // Read-only Details
+                    _buildReadOnlyField(
+                      label: 'Full Name',
+                      value: _name,
+                      icon: Icons.person_outline_rounded,
+                    ),
+                    _buildReadOnlyField(
+                      label: 'Profession',
+                      value: _profession,
+                      icon: Icons.work_outline_rounded,
+                    ),
+                    _buildReadOnlyField(
+                      label: 'Company',
+                      value: comp,
+                      icon: Icons.apartment_rounded,
+                    ),
+                    _buildReadOnlyField(
+                      label: 'Casual Email Address',
+                      value: _email,
+                      icon: Icons.email_outlined,
+                    ),
+                    _buildReadOnlyField(
+                      label: 'Professional Email Address',
+                      value: _professionalEmail,
+                      icon: Icons.email_outlined,
+                    ),
+                    _buildReadOnlyField(
+                      label: 'Casual Phone Number',
+                      value: _phoneNumber,
+                      icon: Icons.phone_android_outlined,
+                    ),
+                    _buildReadOnlyField(
+                      label: 'Professional Phone Number',
+                      value: _professionalPhoneNumber,
+                      icon: Icons.phone_android_outlined,
+                    ),
+                    _buildReadOnlyField(
+                      label: 'Bio',
+                      value: bio,
+                      icon: Icons.description_outlined,
+                    ),
 
-              // Social media block
-              if (_linkedin.isNotEmpty ||
-                  _twitter.isNotEmpty ||
-                  _instagram.isNotEmpty) ...[
-                const SizedBox(height: 16),
-                const Text(
-                  'SOCIAL HANDLES',
-                  style: TextStyle(
-                    color: Color(0xFF8B8C9E),
-                    fontSize: 14.0,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 1.5,
-                  ),
+                    // Social media block
+                    if (_linkedin.isNotEmpty ||
+                        _twitter.isNotEmpty ||
+                        _instagram.isNotEmpty) ...[
+                      const SizedBox(height: 16),
+                      const Text(
+                        'SOCIAL HANDLES',
+                        style: TextStyle(
+                          color: Color(0xFF8B8C9E),
+                          fontSize: 14.0,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 1.5,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      _buildSocialCard(
+                        title: 'LinkedIn',
+                        handle: _linkedin,
+                        logo: linkedinLogo,
+                      ),
+                      _buildSocialCard(
+                        title: 'Twitter',
+                        handle: _twitter,
+                        logo: twitterLogo,
+                      ),
+                      _buildSocialCard(
+                        title: 'Instagram',
+                        handle: _instagram,
+                        logo: instagramLogo,
+                      ),
+                    ],
+                  ],
                 ),
-                const SizedBox(height: 16),
-                _buildSocialCard(
-                  title: 'LinkedIn',
-                  handle: _linkedin,
-                  logo: linkedinLogo,
-                ),
-                _buildSocialCard(
-                  title: 'Twitter',
-                  handle: _twitter,
-                  logo: twitterLogo,
-                ),
-                _buildSocialCard(
-                  title: 'Instagram',
-                  handle: _instagram,
-                  logo: instagramLogo,
-                ),
-              ],
-            ],
-          ),
-        ),
+              ),
       ),
     );
   }
@@ -1485,21 +1407,25 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
   }
 
   Future<void> _updateSharingAccess(String accessType) async {
-    final connectionProfileId = widget.profileData['connection_profile_id'] ?? widget.profileData['id'];
+    final connectionProfileId =
+        widget.profileData['connection_profile_id'] ?? widget.profileData['id'];
     if (connectionProfileId == null) return;
-    
-    final int otherUserId = connectionProfileId is int ? connectionProfileId : int.parse(connectionProfileId.toString());
-    
+
+    final int otherUserId = connectionProfileId is int
+        ? connectionProfileId
+        : int.parse(connectionProfileId.toString());
+
     setState(() {
       _mySharedCardToThem = accessType;
     });
-    
+
     await provider.updateConnectionAccess(otherUserId, accessType);
-    
+
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text("Sharing settings updated to ${accessType.toUpperCase()}"),
+          content:
+              Text("Sharing settings updated to ${accessType.toUpperCase()}"),
           backgroundColor: const Color(0xFF8B5CF6),
           duration: const Duration(milliseconds: 1500),
         ),

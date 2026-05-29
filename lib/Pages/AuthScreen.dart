@@ -332,7 +332,7 @@ class _AuthScreenState extends State<AuthScreen> {
                       if (!_isOtpMode)
                         Text(
                           _isSignIn
-                              ? "Sign in to access your digital business cards"
+                              ? "Your close circle, not your contacts list."
                               : "Create an account to build your cards & sync contacts",
                           textAlign: TextAlign.center,
                           style: const TextStyle(

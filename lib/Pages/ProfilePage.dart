@@ -1012,14 +1012,24 @@ class _ProfilePageState extends State<ProfilePage> {
         final displaySubtitle = profession.isNotEmpty
             ? profession
             : (email.isNotEmpty ? email : "Connected via Connect");
-        final relativeTime = _getRelativeTime(connection['created_at']);
         final avatarUrl =
             connection['avatarUrl'] ?? connection['avatar_url'] ?? '';
 
-        // Show status dot for some active profiles (e.g. index 0 or even index)
-        final showPresenceDot = false;
-        // Show purple notification dot for the first connection
-        final showPurpleIndicator = false;
+        final String? createdAtRaw = connection['created_at'];
+        String? formattedConnectionDate;
+        if (createdAtRaw != null) {
+          try {
+            final parsedDate = DateTime.parse(createdAtRaw);
+            const months = [
+              'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+              'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+            ];
+            final monthName = months[parsedDate.month - 1];
+            formattedConnectionDate = "Connected $monthName ${parsedDate.year}";
+          } catch (e) {
+            // Ignore parse errors
+          }
+        }
 
         return GestureDetector(
           onLongPress: () =>
@@ -1040,81 +1050,60 @@ class _ProfilePageState extends State<ProfilePage> {
             decoration: BoxDecoration(
               color: const Color(0xFF13141F),
               borderRadius: BorderRadius.circular(24),
-              border: Border.all(color: Colors.white.withOpacity(0.03)),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.03)),
             ),
             child: Row(
               children: [
-                // Avatar with presence indicator dot
-                Stack(
-                  children: [
-                    Container(
-                      width: 45,
-                      height: 45,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        gradient: LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [
-                            Colors.blue.shade600,
-                            Colors.purple.shade500,
-                          ],
-                        ),
-                      ),
-                      alignment: Alignment.center,
-                      child: avatarUrl.isNotEmpty
-                          ? ClipRRect(
-                              borderRadius: BorderRadius.circular(28),
-                              child: Image.network(
-                                avatarUrl,
-                                width: 45,
-                                height: 45,
-                                fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) {
-                                  return Center(
-                                    child: Text(
-                                      name.isNotEmpty
-                                          ? name.substring(0, 1).toUpperCase()
-                                          : "?",
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 20,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  );
-                                },
-                              ),
-                            )
-                          : Text(
-                              name.isNotEmpty
-                                  ? name.substring(0, 1).toUpperCase()
-                                  : "?",
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
+                // Avatar directly without Stack
+                Container(
+                  width: 45,
+                  height: 45,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        Colors.blue.shade600,
+                        Colors.purple.shade500,
+                      ],
                     ),
-                    if (showPresenceDot)
-                      Positioned(
-                        bottom: 0,
-                        right: 0,
-                        child: Container(
-                          width: 14,
-                          height: 14,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF00FF66), // Vibrant green
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: const Color(0xFF13141F),
-                              width: 2,
-                            ),
+                  ),
+                  alignment: Alignment.center,
+                  child: avatarUrl.isNotEmpty
+                      ? ClipRRect(
+                          borderRadius: BorderRadius.circular(28),
+                          child: Image.network(
+                            avatarUrl,
+                            width: 45,
+                            height: 45,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) {
+                              return Center(
+                                child: Text(
+                                  name.isNotEmpty
+                                      ? name.substring(0, 1).toUpperCase()
+                                      : "?",
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        )
+                      : Text(
+                          name.isNotEmpty
+                              ? name.substring(0, 1).toUpperCase()
+                              : "?",
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
                           ),
                         ),
-                      ),
-                  ],
                 ),
                 const SizedBox(width: 16),
 
@@ -1132,65 +1121,46 @@ class _ProfilePageState extends State<ProfilePage> {
                               style: const TextStyle(
                                 color: Colors.white,
                                 fontSize: 14,
-                                fontWeight: FontWeight.bold,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                               ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(width: 8),
+                            _buildCardTypeIndicators(connection),
+                          ],
+                        ),
+                        const SizedBox(height: 1),
+                        Text(
+                          displaySubtitle,
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.4),
+                            fontSize: 11,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        if (formattedConnectionDate != null) ...[
+                          const SizedBox(height: 3),
+                          Text(
+                            formattedConnectionDate,
+                            style: const TextStyle(
+                              color: Color(0xFF5C5E78),
+                              fontSize: 10,
                             ),
                           ),
-                          const SizedBox(width: 8),
-                          _buildCardTypeIndicators(connection),
                         ],
-                      ),
-                      const SizedBox(height: 1),
-                      Text(
-                        displaySubtitle,
-                        style: TextStyle(
-                          color: Colors.white.withOpacity(0.4),
-                          fontSize: 11,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-
-                // Relative time and purple notification dot
-                // Row(
-                //   mainAxisSize: MainAxisSize.min,
-                //   children: [
-                //     Padding(
-                //       padding: const EdgeInsets.only(right: 10),
-                //       child: Text(
-                //         relativeTime,
-                //         style: const TextStyle(
-                //           color: Color(0xFF8B5CF6), // Purple color
-                //           fontSize: 12,
-                //           fontWeight: FontWeight.w600,
-                //         ),
-                //       ),
-                //     ),
-                //     if (showPurpleIndicator) ...[
-                //       const SizedBox(width: 6),
-                //       Container(
-                //         width: 8,
-                //         height: 8,
-                //         decoration: const BoxDecoration(
-                //           color: Color(0xFF8B5CF6),
-                //           shape: BoxShape.circle,
-                //         ),
-                //       ),
-                //     ],
-                //   ],
-                // ),
-              ],
+                ],
+              ),
             ),
-          ),
-        );
-      },
-    );
-  }
+          );
+        },
+      );
+    }
 
   Widget _buildCardTypeIndicators(Map<String, dynamic> connection) {
     final typesList = connection['cardTypes'];

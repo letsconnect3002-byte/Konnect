@@ -194,7 +194,7 @@ class _AppShellState extends State<_AppShell> {
           child: SafeArea(
             top: false,
             child: SizedBox(
-              height: 55,
+              height: 65,
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
@@ -221,6 +221,8 @@ class _AppShellState extends State<_AppShell> {
     required bool isImageIcon,
   }) {
     final bool isActive = _currentIndex == index;
+    final String label = const ["Home", "Circle", "Identity"][index];
+    final Color itemColor = isActive ? Colors.white : const Color(0xFF5C5E78);
 
     return GestureDetector(
       onTap: () {
@@ -231,38 +233,52 @@ class _AppShellState extends State<_AppShell> {
       child: SizedBox(
         width: 72,
         height: 64,
-        child: Center(
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 250),
-            curve: Curves.easeOutCubic,
-            width: 40,
-            height: 40,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: isActive ? const Color(0xFF1A1B2E) : Colors.transparent,
-              boxShadow: isActive
-                  ? [
-                      BoxShadow(
-                        color: const Color(0xFF8B5CF6).withValues(alpha: 0.12),
-                        blurRadius: 8,
-                        spreadRadius: 0,
-                      ),
-                    ]
-                  : null,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 250),
+              curve: Curves.easeOutCubic,
+              width: 36,
+              height: 36,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: isActive ? const Color(0xFF1A1B2E) : Colors.transparent,
+                boxShadow: isActive
+                    ? [
+                        BoxShadow(
+                          color:
+                              const Color(0xFF8B5CF6).withValues(alpha: 0.12),
+                          blurRadius: 8,
+                          spreadRadius: 0,
+                        ),
+                      ]
+                    : null,
+              ),
+              child: isImageIcon
+                  ? ImageIcon(
+                      const AssetImage("assets/icons/Connect Icon2.png"),
+                      size: 24,
+                      color: itemColor,
+                    )
+                  : Icon(
+                      icon,
+                      size: 24,
+                      color: itemColor,
+                    ),
             ),
-            child: isImageIcon
-                ? ImageIcon(
-                    AssetImage("assets/icons/Connect Icon2.png"),
-                    size: 28,
-                    color: isActive ? Colors.white : const Color(0xFF5C5E78),
-                  )
-                : Icon(
-                    icon,
-                    size: 28,
-                    color: isActive ? Colors.white : const Color(0xFF5C5E78),
-                  ),
-          ),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
+                color: itemColor,
+                fontFamily: 'Inter',
+              ),
+            ),
+          ],
         ),
       ),
     );

@@ -900,274 +900,235 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
         ? profileData['id'] as int
         : int.tryParse(profileData['id'].toString()) ?? 0;
 
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            Color(0xFF18192E),
-            Color(0xFF0F1020),
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ConnectionProfilePage(
+              profileData: profileData,
+            ),
+          ),
+        );
+      },
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Color(0xFF18192E),
+              Color(0xFF0F1020),
+            ],
+          ),
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(
+            color: const Color(0xFF26273F),
+            width: 1.0,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.4),
+              blurRadius: 16,
+              offset: const Offset(0, 8),
+            ),
           ],
         ),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(
-          color: const Color(0xFF26273F),
-          width: 1.0,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.4),
-            blurRadius: 16,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 58,
-                height: 58,
-                decoration: const BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: LinearGradient(
-                    colors: [Color(0xFF00F2FE), Color(0xFF8B5CF6)],
-                  ),
-                ),
-                padding: const EdgeInsets.all(2),
-                child: Container(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 58,
+                  height: 58,
                   decoration: const BoxDecoration(
                     shape: BoxShape.circle,
-                    color: Color(0xFF090A0F),
+                    gradient: LinearGradient(
+                      colors: [Color(0xFF00F2FE), Color(0xFF8B5CF6)],
+                    ),
                   ),
                   padding: const EdgeInsets.all(2),
-                  child: ClipOval(
-                    child: Image.network(
-                      avatarUrl,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) {
-                        return const Icon(Icons.person, color: Colors.white);
-                      },
+                  child: Container(
+                    decoration: const BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Color(0xFF090A0F),
+                    ),
+                    padding: const EdgeInsets.all(2),
+                    child: ClipOval(
+                      child: Image.network(
+                        avatarUrl,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) {
+                          return const Icon(Icons.person, color: Colors.white);
+                        },
+                      ),
                     ),
                   ),
                 ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        name,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          fontFamily: 'Inter',
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        profession,
+                        style: const TextStyle(
+                          color: Color(0xFF8B8C9E),
+                          fontSize: 13,
+                          fontFamily: 'Inter',
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 6),
+                      _buildCardTypeBadges(profileData),
+                    ],
+                  ),
+                ),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(
-                      name,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        fontFamily: 'Inter',
+                    PopupMenuButton<int>(
+                      padding: EdgeInsets.zero,
+                      icon: const Icon(Icons.more_vert_rounded,
+                          color: Color(0xFF5C5E78)),
+                      color: const Color(0xFF10111F),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        side: const BorderSide(color: Color(0xFF202138)),
                       ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                      onSelected: (val) async {
+                        if (val == 1) {
+                          try {
+                            await _deleteProfileLocally(profileIdStr, provider);
+                            if (!context.mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text("Profile deleted successfully"),
+                              ),
+                            );
+                          } catch (e) {
+                            if (!context.mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                  content: Text("Error deleting profile: $e")),
+                            );
+                          }
+                        }
+                      },
+                      itemBuilder: (context) => [
+                        const PopupMenuItem(
+                          value: 1,
+                          child: Row(
+                            children: [
+                              Icon(Icons.delete_outline_rounded,
+                                  color: Colors.redAccent, size: 18),
+                              SizedBox(width: 8),
+                              Text("Delete",
+                                  style: TextStyle(
+                                      color: Colors.white, fontSize: 14)),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      profession,
-                      style: const TextStyle(
-                        color: Color(0xFF8B8C9E),
-                        fontSize: 13,
-                        fontFamily: 'Inter',
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 6),
-                    _buildCardTypeBadges(profileData),
                   ],
                 ),
-              ),
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // GestureDetector(
-                  //   onTap: () => _toggleFavorite(profileIdStr),
-                  //   child: Padding(
-                  //     padding: const EdgeInsets.all(6.0),
-                  //     child: Icon(
-                  //       isFavorite
-                  //           ? Icons.star_rounded
-                  //           : Icons.star_outline_rounded,
-                  //       color: isFavorite
-                  //           ? const Color(0xFFFFB020)
-                  //           : const Color(0xFF5C5E78),
-                  //       size: 24,
-                  //     ),
-                  //   ),
-                  // ),
-                  PopupMenuButton<int>(
-                    padding: EdgeInsets.zero,
-                    icon: const Icon(Icons.more_vert_rounded,
-                        color: Color(0xFF5C5E78)),
-                    color: const Color(0xFF10111F),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      side: const BorderSide(color: Color(0xFF202138)),
-                    ),
-                    onSelected: (val) async {
-                      if (val == 1) {
-                        try {
-                          await _deleteProfileLocally(profileIdStr, provider);
-                          if (!context.mounted) return;
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text("Profile deleted successfully"),
-                            ),
-                          );
-                        } catch (e) {
-                          if (!context.mounted) return;
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                                content: Text("Error deleting profile: $e")),
-                          );
-                        }
-                      }
-                    },
-                    itemBuilder: (context) => [
-                      const PopupMenuItem(
-                        value: 1,
-                        child: Row(
-                          children: [
-                            Icon(Icons.delete_outline_rounded,
-                                color: Colors.redAccent, size: 18),
-                            SizedBox(width: 8),
-                            Text("Delete",
-                                style: TextStyle(
-                                    color: Colors.white, fontSize: 14)),
-                          ],
+              ],
+            ),
+            const SizedBox(height: 12),
+            Container(
+              height: 1,
+              color: const Color(0xFF1F2032),
+            ),
+            const SizedBox(height: 12),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (company.isNotEmpty) ...[
+                  Row(
+                    children: [
+                      const Icon(Icons.business_center_rounded,
+                          color: Color(0xFF5C5E78), size: 14),
+                      const SizedBox(width: 8),
+                      Text(
+                        company,
+                        style: const TextStyle(
+                          color: Color(0xFFC0C1D0),
+                          fontSize: 13,
+                          fontFamily: 'Inter',
                         ),
                       ),
                     ],
                   ),
+                  const SizedBox(height: 6),
                 ],
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Container(
-            height: 1,
-            color: const Color(0xFF1F2032),
-          ),
-          const SizedBox(height: 12),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (company.isNotEmpty) ...[
-                Row(
-                  children: [
-                    const Icon(Icons.business_center_rounded,
-                        color: Color(0xFF5C5E78), size: 14),
-                    const SizedBox(width: 8),
-                    Text(
-                      company,
-                      style: const TextStyle(
-                        color: Color(0xFFC0C1D0),
-                        fontSize: 13,
-                        fontFamily: 'Inter',
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 6),
-              ],
-              if (email.isNotEmpty)
-                Row(
-                  children: [
-                    const Icon(Icons.alternate_email_rounded,
-                        color: Color(0xFF5C5E78), size: 14),
-                    const SizedBox(width: 8),
-                    Text(
-                      email,
-                      style: const TextStyle(
-                        color: Color(0xFFC0C1D0),
-                        fontSize: 13,
-                        fontFamily: 'Inter',
-                      ),
-                    ),
-                  ],
-                ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: () {
-                    _showSendMessageDialog(context, profileData);
-                  },
-                  icon: const Icon(Icons.chat_bubble_outline_rounded,
-                      size: 16, color: Colors.white),
-                  label: const Text(
-                    "Message",
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 13,
-                      fontFamily: 'Inter',
-                    ),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF8B5CF6),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    elevation: 0,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => ConnectionProfilePage(
-                          profileData: profileData,
+                if (email.isNotEmpty)
+                  Row(
+                    children: [
+                      const Icon(Icons.alternate_email_rounded,
+                          color: Color(0xFF5C5E78), size: 14),
+                      const SizedBox(width: 8),
+                      Text(
+                        email,
+                        style: const TextStyle(
+                          color: Color(0xFFC0C1D0),
+                          fontSize: 13,
+                          fontFamily: 'Inter',
                         ),
                       ),
-                    );
-                  },
-                  icon: const Icon(Icons.visibility_outlined,
-                      size: 16, color: Colors.white),
-                  label: const Text(
-                    "View Card",
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 13,
-                      fontFamily: 'Inter',
-                    ),
+                    ],
                   ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF1B1D30),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      side:
-                          const BorderSide(color: Color(0xFF2A2C46), width: 1),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      _showSendMessageDialog(context, profileData);
+                    },
+                    icon: const Icon(Icons.chat_bubble_outline_rounded,
+                        size: 16, color: Colors.white),
+                    label: const Text(
+                      "Message",
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                        fontFamily: 'Inter',
+                      ),
                     ),
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    elevation: 0,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF8B5CF6),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      elevation: 0,
+                    ),
                   ),
                 ),
-              ),
-            ],
-          ),
-        ],
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1189,132 +1150,131 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
         ? profileData['id'] as int
         : int.tryParse(profileData['id'].toString()) ?? 0;
 
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 6),
-      decoration: BoxDecoration(
-        color: const Color(0xFF10111F),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFF1F2035), width: 1),
-      ),
-      padding: const EdgeInsets.all(12),
-      child: Row(
-        children: [
-          Container(
-            width: 46,
-            height: 46,
-            decoration: const BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: LinearGradient(
-                colors: [Color(0xFF00F2FE), Color(0xFF8B5CF6)],
-              ),
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ConnectionProfilePage(
+              profileData: profileData,
             ),
-            padding: const EdgeInsets.all(1.5),
-            child: Container(
+          ),
+        );
+      },
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 6),
+        decoration: BoxDecoration(
+          color: const Color(0xFF10111F),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: const Color(0xFF1F2035), width: 1),
+        ),
+        padding: const EdgeInsets.all(12),
+        child: Row(
+          children: [
+            Container(
+              width: 46,
+              height: 46,
               decoration: const BoxDecoration(
                 shape: BoxShape.circle,
-                color: Color(0xFF090A0F),
+                gradient: LinearGradient(
+                  colors: [Color(0xFF00F2FE), Color(0xFF8B5CF6)],
+                ),
               ),
               padding: const EdgeInsets.all(1.5),
-              child: ClipOval(
-                child: Image.network(
-                  avatarUrl,
-                  fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) =>
-                      const Icon(Icons.person, color: Colors.white),
+              child: Container(
+                decoration: const BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Color(0xFF090A0F),
+                ),
+                padding: const EdgeInsets.all(1.5),
+                child: ClipOval(
+                  child: Image.network(
+                    avatarUrl,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) =>
+                        const Icon(Icons.person, color: Colors.white),
+                  ),
                 ),
               ),
             ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  name,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 15,
-                    fontWeight: FontWeight.bold,
-                    fontFamily: 'Inter',
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    name,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      fontFamily: 'Inter',
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  profession.isNotEmpty && company.isNotEmpty
-                      ? "$profession  •  $company"
-                      : (profession.isNotEmpty ? profession : company),
-                  style: const TextStyle(
-                    color: Color(0xFF8B8C9E),
-                    fontSize: 12,
-                    fontFamily: 'Inter',
+                  const SizedBox(height: 3),
+                  Text(
+                    profession.isNotEmpty && company.isNotEmpty
+                        ? "$profession  •  $company"
+                        : (profession.isNotEmpty ? profession : company),
+                    style: const TextStyle(
+                      color: Color(0xFF8B8C9E),
+                      fontSize: 12,
+                      fontFamily: 'Inter',
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                  const SizedBox(height: 5),
+                  _buildCardTypeBadges(profileData),
+                ],
+              ),
+            ),
+            PopupMenuButton<int>(
+              padding: EdgeInsets.zero,
+              icon: const Icon(Icons.more_vert_rounded,
+                  color: Color(0xFF5C5E78), size: 20),
+              color: const Color(0xFF10111F),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+                side: const BorderSide(color: Color(0xFF202138)),
+              ),
+              onSelected: (val) async {
+                if (val == 1) {
+                  try {
+                    await _deleteProfileLocally(profileIdStr, provider);
+                    if (!context.mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text("Profile deleted successfully"),
+                      ),
+                    );
+                  } catch (e) {
+                    if (!context.mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text("Error deleting profile: $e")),
+                    );
+                  }
+                }
+              },
+              itemBuilder: (context) => [
+                const PopupMenuItem(
+                  value: 1,
+                  child: Row(
+                    children: [
+                      Icon(Icons.delete_outline_rounded,
+                          color: Colors.redAccent, size: 18),
+                      SizedBox(width: 8),
+                      Text("Delete",
+                          style: TextStyle(color: Colors.white, fontSize: 14)),
+                    ],
+                  ),
                 ),
-                const SizedBox(height: 5),
-                _buildCardTypeBadges(profileData),
               ],
             ),
-          ),
-          // GestureDetector(
-          //   onTap: () => _toggleFavorite(profileIdStr),
-          //   child: Padding(
-          //     padding: const EdgeInsets.all(8.0),
-          //     child: Icon(
-          //       isFavorite ? Icons.star_rounded : Icons.star_outline_rounded,
-          //       color: isFavorite
-          //           ? const Color(0xFFFFB020)
-          //           : const Color(0xFF5C5E78),
-          //       size: 20,
-          //     ),
-          //   ),
-          // ),
-          PopupMenuButton<int>(
-            padding: EdgeInsets.zero,
-            icon: const Icon(Icons.more_vert_rounded,
-                color: Color(0xFF5C5E78), size: 20),
-            color: const Color(0xFF10111F),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-              side: const BorderSide(color: Color(0xFF202138)),
-            ),
-            onSelected: (val) async {
-              if (val == 1) {
-                try {
-                  await _deleteProfileLocally(profileIdStr, provider);
-                  if (!context.mounted) return;
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text("Profile deleted successfully"),
-                    ),
-                  );
-                } catch (e) {
-                  if (!context.mounted) return;
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text("Error deleting profile: $e")),
-                  );
-                }
-              }
-            },
-            itemBuilder: (context) => [
-              const PopupMenuItem(
-                value: 1,
-                child: Row(
-                  children: [
-                    Icon(Icons.delete_outline_rounded,
-                        color: Colors.redAccent, size: 18),
-                    SizedBox(width: 8),
-                    Text("Delete",
-                        style: TextStyle(color: Colors.white, fontSize: 14)),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
