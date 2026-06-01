@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'package:connect/Pages/QrCodeScanner.dart';
-import 'package:connect/Pages/ConnectionProfilePage.dart';
 import 'package:connect/Providers/ProviderSQL.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -18,9 +17,8 @@ class ProfilePage extends StatefulWidget {
 
 class _ProfilePageState extends State<ProfilePage> {
   bool _isLoading = true;
-  List<Map<String, dynamic>> _connections = [];
   bool _qrGenerated = false;
-  String _selectedShareType = 'both';
+  String _selectedShareType = 'casual';
 
   @override
   void initState() {
@@ -102,88 +100,9 @@ class _ProfilePageState extends State<ProfilePage> {
     });
   }
 
-  // Calculate relative time since creation
-  String _getRelativeTime(dynamic createdAtValue) {
-    if (createdAtValue == null) return "1h";
-    try {
-      DateTime createdAt;
-      if (createdAtValue is String) {
-        createdAt = DateTime.parse(createdAtValue);
-      } else if (createdAtValue is DateTime) {
-        createdAt = createdAtValue;
-      } else {
-        return "2h";
-      }
-
-      final difference = DateTime.now().difference(createdAt.toLocal());
-      if (difference.inMinutes < 1) {
-        return "now";
-      } else if (difference.inMinutes < 60) {
-        return "${difference.inMinutes}m";
-      } else if (difference.inHours < 24) {
-        return "${difference.inHours}h";
-      } else {
-        return "${difference.inDays}d";
-      }
-    } catch (e) {
-      return "3h";
-    }
-  }
-
-  // Delete a connection with dialog confirmation
-  Future<void> _showDeleteConfirmation(BuildContext context,
-      Map<String, dynamic> connection, ProfileProvider2 provider) async {
-    return showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          backgroundColor: const Color(0xFF13141F),
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: const Text(
-            "Delete Connection",
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-          ),
-          content: Text(
-            "Are you sure you want to remove ${connection['name'] ?? 'this contact'} from your Inner Circle?",
-            style: const TextStyle(color: Colors.white70),
-          ),
-          actions: [
-            TextButton(
-              child: const Text("Cancel", style: TextStyle(color: Colors.grey)),
-              onPressed: () => Navigator.pop(context),
-            ),
-            TextButton(
-              child: const Text("Delete",
-                  style: TextStyle(color: Colors.redAccent)),
-              onPressed: () async {
-                Navigator.pop(context);
-                try {
-                  await provider.deleteProfile(connection['id']);
-                  _refreshData();
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text("Connection removed"),
-                        backgroundColor: Colors.redAccent,
-                      ),
-                    );
-                  }
-                } catch (e) {
-                  print("Error deleting connection: $e");
-                }
-              },
-            ),
-          ],
-        );
-      },
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final profileProvider = Provider.of<ProfileProvider2>(context);
-    _connections = profileProvider.connections;
 
     final hasBasicDetails = profileProvider.name.trim().isNotEmpty &&
         profileProvider.profession.trim().isNotEmpty &&
@@ -263,14 +182,6 @@ class _ProfilePageState extends State<ProfilePage> {
 
                       // Quick Action Buttons
                       _buildActionButtons(context, profileProvider),
-                      const SizedBox(height: 40),
-
-                      // Inner Circle Header
-                      _buildInnerCircleHeader(),
-                      const SizedBox(height: 20),
-
-                      // Inner Circle Connections List
-                      _buildInnerCircleList(profileProvider),
                     ],
                   ),
                 ),
@@ -664,7 +575,7 @@ class _ProfilePageState extends State<ProfilePage> {
                       ),
                       const SizedBox(height: 12),
                       _buildOptionTile(
-                        title: "Both Cards (Recommended)",
+                        title: "Both Cards",
                         subtitle:
                             "Share your complete casual and professional profiles.",
                         value: "both",
@@ -922,319 +833,6 @@ class _ProfilePageState extends State<ProfilePage> {
             ),
           ),
         ),
-      ],
-    );
-  }
-
-  // Inner Circle Header Widget
-  Widget _buildInnerCircleHeader() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        const Text(
-          "Inner Circle",
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 22,
-            fontWeight: FontWeight.bold,
-            letterSpacing: -0.5,
-          ),
-        ),
-        // Active connections badge
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          decoration: BoxDecoration(
-            color: const Color(0xFF13141F),
-            borderRadius: BorderRadius.circular(14),
-          ),
-          child: Text(
-            "${_connections.length} Active",
-            style: TextStyle(
-              color: Colors.white.withOpacity(0.45),
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  // Build the Inner Circle connections list
-  Widget _buildInnerCircleList(ProfileProvider2 provider) {
-    if (_connections.isEmpty) {
-      return Container(
-        padding: const EdgeInsets.symmetric(vertical: 40),
-        decoration: BoxDecoration(
-          color: const Color(0xFF13141F).withOpacity(0.3),
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: Colors.white.withOpacity(0.02)),
-        ),
-        child: Column(
-          children: [
-            const Icon(
-              Icons.group_outlined,
-              color: Colors.white24,
-              size: 40,
-            ),
-            const SizedBox(height: 12),
-            const Text(
-              "No connections yet",
-              style: TextStyle(
-                color: Colors.white60,
-                fontSize: 15,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              "Scan someone's QR code to add them here.",
-              style: TextStyle(
-                color: Colors.white.withOpacity(0.3),
-                fontSize: 12,
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-      );
-    }
-
-    return ListView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: _connections.length,
-      itemBuilder: (context, index) {
-        final connection = _connections[index];
-        final name = connection['name'] ?? 'Unknown';
-        final profession = connection['profession'] ?? '';
-        final email = connection['email'] ?? '';
-        final displaySubtitle = profession.isNotEmpty
-            ? profession
-            : (email.isNotEmpty ? email : "Connected via Connect");
-        final avatarUrl =
-            connection['avatarUrl'] ?? connection['avatar_url'] ?? '';
-
-        final String? createdAtRaw = connection['created_at'];
-        String? formattedConnectionDate;
-        if (createdAtRaw != null) {
-          try {
-            final parsedDate = DateTime.parse(createdAtRaw);
-            const months = [
-              'Jan',
-              'Feb',
-              'Mar',
-              'Apr',
-              'May',
-              'Jun',
-              'Jul',
-              'Aug',
-              'Sep',
-              'Oct',
-              'Nov',
-              'Dec'
-            ];
-            final monthName = months[parsedDate.month - 1];
-            formattedConnectionDate = "Connected $monthName ${parsedDate.year}";
-          } catch (e) {
-            // Ignore parse errors
-          }
-        }
-
-        return GestureDetector(
-          onLongPress: () =>
-              _showDeleteConfirmation(context, connection, provider),
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => ConnectionProfilePage(
-                  profileData: connection,
-                ),
-              ),
-            );
-          },
-          child: Container(
-            margin: const EdgeInsets.only(bottom: 12),
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: const Color(0xFF13141F),
-              borderRadius: BorderRadius.circular(24),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.03)),
-            ),
-            child: Row(
-              children: [
-                // Avatar directly without Stack
-                Container(
-                  width: 45,
-                  height: 45,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [
-                        Colors.blue.shade600,
-                        Colors.purple.shade500,
-                      ],
-                    ),
-                  ),
-                  alignment: Alignment.center,
-                  child: (avatarUrl.isNotEmpty && avatarUrl.contains('supabase.co/storage/v1/object/public/avatars/'))
-                      ? ClipRRect(
-                          borderRadius: BorderRadius.circular(28),
-                          child: Image.network(
-                            avatarUrl,
-                            width: 45,
-                            height: 45,
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) {
-                              return Center(
-                                child: Text(
-                                  name.isNotEmpty
-                                      ? name.substring(0, 1).toUpperCase()
-                                      : "?",
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 20,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              );
-                            },
-                          ),
-                        )
-                      : Text(
-                          name.isNotEmpty
-                              ? name.substring(0, 1).toUpperCase()
-                              : "?",
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                ),
-                const SizedBox(width: 16),
-
-                // Name and Description
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          Flexible(
-                            child: Text(
-                              name,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 14,
-                                fontWeight: FontWeight.bold,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          _buildCardTypeIndicators(connection),
-                        ],
-                      ),
-                      const SizedBox(height: 1),
-                      Text(
-                        displaySubtitle,
-                        style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.4),
-                          fontSize: 11,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      if (formattedConnectionDate != null) ...[
-                        const SizedBox(height: 3),
-                        Text(
-                          formattedConnectionDate,
-                          style: const TextStyle(
-                            color: Color(0xFF5C5E78),
-                            fontSize: 10,
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildCardTypeIndicators(Map<String, dynamic> connection) {
-    final typesList = connection['cardTypes'];
-    final List<String> types =
-        typesList != null ? List<String>.from(typesList as List) : <String>[];
-
-    // If cardTypes array is empty in DB, we can infer it
-    if (types.isEmpty) {
-      final hasInstagram =
-          (connection['instagram'] ?? '').toString().isNotEmpty;
-      final hasTwitter = (connection['twitter'] ?? '').toString().isNotEmpty;
-      final hasCasualBio = (connection['bio'] ?? '').toString().isNotEmpty;
-
-      final hasLinkedin = (connection['linkedin'] ?? '').toString().isNotEmpty;
-      final hasCompany = (connection['company'] ?? '').toString().isNotEmpty;
-      final hasEmail = (connection['email'] ?? '').toString().isNotEmpty;
-
-      if (hasInstagram ||
-          hasTwitter ||
-          hasCasualBio ||
-          (!hasLinkedin && !hasCompany)) {
-        types.add('casual');
-      }
-      if (hasLinkedin || hasCompany || hasEmail) {
-        types.add('professional');
-      }
-      if (types.isEmpty) {
-        types.addAll(['casual', 'professional']);
-      }
-    }
-
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        for (final type in types) ...[
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
-            margin: const EdgeInsets.only(right: 4),
-            decoration: BoxDecoration(
-              color: type == 'casual'
-                  ? const Color(0xFF8B5CF6).withValues(alpha: 0.12)
-                  : const Color(0xFF00F2FE).withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(4),
-              border: Border.all(
-                color: type == 'casual'
-                    ? const Color(0xFF8B5CF6).withValues(alpha: 0.35)
-                    : const Color(0xFF00F2FE).withValues(alpha: 0.3),
-                width: 0.8,
-              ),
-            ),
-            child: Text(
-              type == 'casual' ? 'C' : 'P',
-              style: TextStyle(
-                color: type == 'casual'
-                    ? const Color(0xFF8B5CF6)
-                    : const Color(0xFF00F2FE),
-                fontSize: 8,
-                fontWeight: FontWeight.w900,
-                letterSpacing: 0.2,
-                fontFamily: 'Inter',
-              ),
-            ),
-          ),
-        ],
       ],
     );
   }

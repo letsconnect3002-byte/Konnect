@@ -3,6 +3,7 @@ import 'dart:ui';
 import 'package:connect/Config/supabase_config.dart';
 import 'package:connect/Pages/OtherProfilesPage.dart';
 import 'package:connect/Pages/ProfilePage.dart';
+import 'package:connect/Pages/DirectMessagesHubPage.dart';
 import 'package:connect/Pages/yet_to_be_built_profile_page.dart';
 import 'package:connect/Providers/ProfileProvider.dart';
 import 'package:connect/Providers/ProviderSQL.dart';
@@ -157,10 +158,11 @@ class _AppShellState extends State<_AppShell> {
       ProfilePage(
         onSetUpProfile: () {
           setState(() {
-            _currentIndex = 2;
+            _currentIndex = 3;
           });
         },
       ),
+      const DirectMessagesHubPage(),
       const OtherProfilesPage(),
       const YetToBeBuiltProfilePage(),
     ];
@@ -201,11 +203,13 @@ class _AppShellState extends State<_AppShell> {
                   _buildNavItem(
                       index: 0, icon: Icons.home_rounded, isImageIcon: false),
                   _buildNavItem(
-                      index: 1,
+                      index: 1, icon: Icons.chat_bubble_rounded, isImageIcon: false),
+                  _buildNavItem(
+                      index: 2,
                       icon: Icons.chat_bubble_rounded,
                       isImageIcon: true),
                   _buildNavItem(
-                      index: 2, icon: Icons.person_rounded, isImageIcon: false),
+                      index: 3, icon: Icons.person_rounded, isImageIcon: false),
                 ],
               ),
             ),
@@ -221,7 +225,7 @@ class _AppShellState extends State<_AppShell> {
     required bool isImageIcon,
   }) {
     final bool isActive = _currentIndex == index;
-    final String label = const ["Home", "Circle", "Identity"][index];
+    final String label = const ["Home", "Chats", "Circle", "Identity"][index];
     final Color itemColor = isActive ? Colors.white : const Color(0xFF5C5E78);
 
     return GestureDetector(

@@ -2316,6 +2316,7 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
           hint: 'Jordan Miller',
           icon: Icons.person_outline_rounded,
           controller: _nameController,
+          showToggles: false,
         ),
         CardFieldInput(
           fieldKey: 'profession',

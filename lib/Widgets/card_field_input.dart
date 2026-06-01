@@ -15,6 +15,7 @@ class CardFieldInput extends StatefulWidget {
   final TextInputType keyboardType;
   final int maxLines;
   final VoidCallback? onTap;
+  final bool showToggles;
 
   const CardFieldInput({
     super.key,
@@ -28,6 +29,7 @@ class CardFieldInput extends StatefulWidget {
     this.keyboardType = TextInputType.text,
     this.maxLines = 1,
     this.onTap,
+    this.showToggles = true,
   });
 
   @override
@@ -105,19 +107,21 @@ class _CardFieldInputState extends State<CardFieldInput> {
                   ),
                 ),
               ),
-              _CardToggle(
-                icon: Icons.person_outline_rounded,
-                isActive: assignment.casual,
-                onTap: () => provider.toggleFieldOnCard(
-                    widget.fieldKey, ProfileCardType.casual),
-              ),
-              const SizedBox(width: 8),
-              _CardToggle(
-                icon: Icons.work_outline_rounded,
-                isActive: assignment.professional,
-                onTap: () => provider.toggleFieldOnCard(
-                    widget.fieldKey, ProfileCardType.professional),
-              ),
+              if (widget.showToggles) ...[
+                _CardToggle(
+                  icon: Icons.person_outline_rounded,
+                  isActive: assignment.casual,
+                  onTap: () => provider.toggleFieldOnCard(
+                      widget.fieldKey, ProfileCardType.casual),
+                ),
+                const SizedBox(width: 8),
+                _CardToggle(
+                  icon: Icons.work_outline_rounded,
+                  isActive: assignment.professional,
+                  onTap: () => provider.toggleFieldOnCard(
+                      widget.fieldKey, ProfileCardType.professional),
+                ),
+              ],
             ],
           ),
           const SizedBox(height: 12),

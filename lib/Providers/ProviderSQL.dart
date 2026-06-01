@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
+import 'package:connect/Providers/LocalDatabaseHelper.dart';
 
 class ProfileProvider2 with ChangeNotifier {
   // Profile fields
@@ -379,24 +380,39 @@ class ProfileProvider2 with ChangeNotifier {
         }
       }
 
-      // Query the view to find connected user IDs
+      // Query user_connections directly to get connections and permissions
       final response = await Supabase.instance.client
-          .from('network_graph')
-          .select('connected_user_id, shared_card')
-          .eq('primary_user_id', userId);
+          .from('user_connections')
+          .select('user_id_1, user_id_2, user_1_shared_card, user_2_shared_card')
+          .or('user_id_1.eq.$myUserId,user_id_2.eq.$myUserId');
 
       if ((response as List).isEmpty) {
         return [];
       }
 
-      // Build a lookup: connectedUserId -> sharedCard
+      // Build lookups: connectedUserId -> sharedCard (what they share with me), mySharedCard (what I share with them)
       final Map<int, String> sharedCardLookup = {};
+      final Map<int, String> mySharedCardLookup = {};
+      final List<int> connectedIds = [];
+
       for (final row in response as List) {
-        sharedCardLookup[row['connected_user_id'] as int] =
-            (row['shared_card'] ?? 'both').toString();
+        final int id1 = row['user_id_1'] as int;
+        final int id2 = row['user_id_2'] as int;
+        final int otherId = (id1 == myUserId) ? id2 : id1;
+        connectedIds.add(otherId);
+
+        if (id1 == myUserId) {
+          mySharedCardLookup[otherId] = (row['user_1_shared_card'] ?? 'both').toString();
+          sharedCardLookup[otherId] = (row['user_2_shared_card'] ?? 'both').toString();
+        } else {
+          mySharedCardLookup[otherId] = (row['user_2_shared_card'] ?? 'both').toString();
+          sharedCardLookup[otherId] = (row['user_1_shared_card'] ?? 'both').toString();
+        }
       }
 
-      final connectedIds = (response as List).map<int>((row) => row['connected_user_id'] as int).toList();
+      if (connectedIds.isEmpty) {
+        return [];
+      }
 
       // Fetch the profiles for these IDs
       final profilesResponse = await Supabase.instance.client
@@ -405,8 +421,9 @@ class ProfileProvider2 with ChangeNotifier {
           .filter('id', 'in', '(${connectedIds.join(",")})');
 
       return (profilesResponse as List).map((row) {
+        final int profileId = row['id'] as int;
         return {
-          'id': row['id'],
+          'id': profileId,
           'name': row['name'] ?? '',
           'profession': row['profession'] ?? '',
           'email': row['email'] ?? '',
@@ -426,8 +443,9 @@ class ProfileProvider2 with ChangeNotifier {
           'cardTypes': row['card_types'] != null
               ? List<String>.from(row['card_types'] as List)
               : <String>[],
-          'connection_profile_id': row['id'],
-          'shared_card': sharedCardLookup[row['id'] as int] ?? 'both',
+          'connection_profile_id': profileId,
+          'shared_card': sharedCardLookup[profileId] ?? 'both',
+          'my_shared_card': mySharedCardLookup[profileId] ?? 'both',
           'field_assignments': row['field_assignments'], // pass raw jsonb through
         };
       }).toList();
@@ -464,6 +482,7 @@ class ProfileProvider2 with ChangeNotifier {
 
     // Initial fetch to load the data
     fetchConnections();
+    loadChatRooms();
   }
 
   void unsubscribeFromConnections() {
@@ -471,6 +490,10 @@ class ProfileProvider2 with ChangeNotifier {
       Supabase.instance.client.removeChannel(_connectionsSubscription!);
       _connectionsSubscription = null;
     }
+    for (final channel in _roomSubscriptions.values) {
+      Supabase.instance.client.removeChannel(channel);
+    }
+    _roomSubscriptions.clear();
   }
 
   @override
@@ -828,7 +851,7 @@ class ProfileProvider2 with ChangeNotifier {
           .eq('user_id_1', id1)
           .eq('user_id_2', id2);
       print("Updated connection access: $myUserId shares $newAccessType with $otherUserId");
-      notifyListeners();
+      await fetchConnections();
     } catch (e) {
       print("Error updating connection access: $e");
       rethrow;
@@ -1017,5 +1040,342 @@ class ProfileProvider2 with ChangeNotifier {
     isCreated = false;
     userId = -1;
     UserData = {};
+  }
+
+  // --- Messaging and Chat Room properties & methods ---
+  Map<int, String> connectionRooms = {};
+  String? activeRoomId;
+  List<Map<String, dynamic>> activeRoomMessages = [];
+  final Map<String, RealtimeChannel> _roomSubscriptions = {};
+  bool isChatRoomsLoaded = false;
+
+  Future<void> loadChatRooms() async {
+    final myUserId = userId;
+    if (myUserId == -1) return;
+
+    try {
+      // 1. Get all room IDs myUserId belongs to
+      final myRoomsResponse = await Supabase.instance.client
+          .from('room_participants')
+          .select('room_id')
+          .eq('user_id', myUserId);
+
+      final List<String> myRoomIds = (myRoomsResponse as List)
+          .map((r) => r['room_id'] as String)
+          .toList();
+
+      connectionRooms.clear();
+
+      if (myRoomIds.isNotEmpty) {
+        // 2. Fetch all participants of type 'direct' for those rooms
+        final participantsResponse = await Supabase.instance.client
+            .from('room_participants')
+            .select('room_id, user_id, chat_rooms!inner(type)')
+            .eq('chat_rooms.type', 'direct')
+            .filter('room_id', 'in', '(${myRoomIds.join(",")})');
+
+        for (final row in participantsResponse as List) {
+          final int uId = row['user_id'] as int;
+          final String rId = row['room_id'] as String;
+          if (uId != myUserId) {
+            connectionRooms[uId] = rId;
+            // Subscribe to this room
+            subscribeToRoom(rId);
+          }
+        }
+      }
+
+      isChatRoomsLoaded = true;
+      notifyListeners();
+
+      // Fetch any pending messages on app launch
+      await fetchPendingMessages();
+    } catch (e) {
+      print("Error loading chat rooms: $e");
+    }
+  }
+
+  Future<String> getOrCreateDirectRoom(int otherUserId) async {
+    final myUserId = userId;
+    if (myUserId == -1) throw Exception("User not authenticated");
+
+    // Check memory cache first
+    if (connectionRooms.containsKey(otherUserId)) {
+      final roomId = connectionRooms[otherUserId]!;
+      subscribeToRoom(roomId);
+      return roomId;
+    }
+
+    try {
+      // 1. Fetch all room IDs that myUserId is in
+      final myRoomsResponse = await Supabase.instance.client
+          .from('room_participants')
+          .select('room_id')
+          .eq('user_id', myUserId);
+
+      final List<String> myRoomIds = (myRoomsResponse as List)
+          .map((r) => r['room_id'] as String)
+          .toList();
+
+      if (myRoomIds.isNotEmpty) {
+        // 2. See if otherUserId is in any of these rooms, and check if it's a direct room
+        final commonResponse = await Supabase.instance.client
+            .from('room_participants')
+            .select('room_id, chat_rooms!inner(type)')
+            .eq('user_id', otherUserId)
+            .eq('chat_rooms.type', 'direct')
+            .filter('room_id', 'in', '(${myRoomIds.join(",")})')
+            .maybeSingle();
+
+        if (commonResponse != null) {
+          final roomId = commonResponse['room_id'] as String;
+          connectionRooms[otherUserId] = roomId;
+          subscribeToRoom(roomId);
+          notifyListeners();
+          return roomId;
+        }
+      }
+
+      // 3. Create a new direct room if none exists
+      final newRoom = await Supabase.instance.client
+          .from('chat_rooms')
+          .insert({'type': 'direct'})
+          .select('id')
+          .single();
+
+      final roomId = newRoom['id'] as String;
+
+      // 4. Add both participants in room_participants
+      await Supabase.instance.client.from('room_participants').insert([
+        {'room_id': roomId, 'user_id': myUserId},
+        {'room_id': roomId, 'user_id': otherUserId},
+      ]);
+
+      connectionRooms[otherUserId] = roomId;
+      subscribeToRoom(roomId);
+      notifyListeners();
+      return roomId;
+    } catch (e) {
+      print("Error in getOrCreateDirectRoom: $e");
+      rethrow;
+    }
+  }
+
+  Future<void> sendChatMessage({
+    required String roomId,
+    required String text,
+  }) async {
+    final myUserId = userId;
+    if (myUserId == -1) return;
+
+    final messageId = const Uuid().v4(); // Client-generated UUID v4
+
+    try {
+      // Upsert into Supabase for store-and-forward queue
+      await Supabase.instance.client.from('messages').upsert(
+        {
+          'id': messageId,
+          'room_id': roomId,
+          'sender_id': myUserId,
+          'payload': text,
+          'status': 'sent',
+          'created_at': DateTime.now().toUtc().toIso8601String(),
+          'updated_at': DateTime.now().toUtc().toIso8601String(),
+        },
+        onConflict: 'id',
+      );
+
+      // Persist to local SQLite immediately (source of truth)
+      await LocalDatabaseHelper.instance.insertMessage(
+        messageId,
+        roomId,
+        myUserId,
+        text,
+        status: 'sent',
+      );
+
+      // Refresh local messages if viewing this room
+      if (activeRoomId == roomId) {
+        await refreshActiveRoomMessages();
+      }
+    } catch (e) {
+      print("Error sending message: $e");
+      // Still persist locally even if backend fails (offline support)
+      await LocalDatabaseHelper.instance.insertMessage(
+        messageId,
+        roomId,
+        myUserId,
+        text,
+        status: 'sent',
+      );
+      if (activeRoomId == roomId) {
+        await refreshActiveRoomMessages();
+      }
+    }
+  }
+
+  void subscribeToRoom(String roomId) {
+    if (_roomSubscriptions.containsKey(roomId)) return;
+
+    final channel = Supabase.instance.client.channel('room-$roomId');
+
+    channel
+      .onPostgresChanges(
+        event: PostgresChangeEvent.insert,
+        schema: 'public',
+        table: 'messages',
+        filter: PostgresChangeFilter(
+          type: PostgresChangeFilterType.eq,
+          column: 'room_id',
+          value: roomId,
+        ),
+        callback: (payload) async {
+          final msg = payload.newRecord;
+          final msgId = msg['id'] as String;
+          final rId = msg['room_id'] as String;
+          final senderId = msg['sender_id'] as int;
+          final payloadText = msg['payload'] as String;
+
+          // Exclude own messages from processing here since we already stored them on send
+          if (senderId == userId) return;
+
+          final bool isInChat = activeRoomId == rId;
+
+          // 1. Save to local SQLite
+          await LocalDatabaseHelper.instance.insertMessage(
+            msgId,
+            rId,
+            senderId,
+            payloadText,
+            status: isInChat ? 'read' : 'delivered',
+            createdAt: msg['created_at'] as String?,
+          );
+
+          // 2. Acknowledge receipt -> triggers server-side deletion
+          await acknowledgeDelivery(msgId, isActiveInChat: isInChat);
+
+          // 3. If actively in chat, update display list; otherwise notify hub list to update snippet
+          if (isInChat) {
+            await refreshActiveRoomMessages();
+          } else {
+            notifyListeners();
+          }
+        },
+      )
+      .onPostgresChanges(
+        event: PostgresChangeEvent.update,
+        schema: 'public',
+        table: 'messages',
+        filter: PostgresChangeFilter(
+          type: PostgresChangeFilterType.eq,
+          column: 'room_id',
+          value: roomId,
+        ),
+        callback: (payload) async {
+          final newRecord = payload.newRecord;
+          final newStatus = newRecord['status'] as String;
+          final messageId = newRecord['id'] as String;
+          final rId = newRecord['room_id'] as String;
+
+          // Update local SQLite status for receipt indicators
+          await LocalDatabaseHelper.instance.updateMessageStatus(messageId, newStatus);
+
+          if (activeRoomId == rId) {
+            await refreshActiveRoomMessages();
+          }
+        },
+      )
+      .subscribe();
+
+    _roomSubscriptions[roomId] = channel;
+  }
+
+  Future<void> acknowledgeDelivery(String messageId, {bool isActiveInChat = false}) async {
+    try {
+      await Supabase.instance.client
+          .from('messages')
+          .update({'status': isActiveInChat ? 'read' : 'delivered'})
+          .eq('id', messageId);
+    } catch (e) {
+      print("Error acknowledging delivery: $e");
+    }
+  }
+
+  Future<void> fetchPendingMessages() async {
+    final myUserId = userId;
+    if (myUserId == -1) return;
+
+    try {
+      // Step 1: Get all rooms the user belongs to
+      final roomsResponse = await Supabase.instance.client
+          .from('room_participants')
+          .select('room_id')
+          .eq('user_id', myUserId);
+
+      if ((roomsResponse as List).isEmpty) return;
+
+      final roomIds = (roomsResponse as List)
+          .map((r) => r['room_id'] as String)
+          .toList();
+
+      // Step 2: Fetch pending messages (uses store-and-forward sent status)
+      final pendingResponse = await Supabase.instance.client
+          .from('messages')
+          .select()
+          .filter('room_id', 'in', '(${roomIds.join(',')})')
+          .eq('status', 'sent')
+          .neq('sender_id', myUserId);
+
+      // Step 3: Store + acknowledge each message
+      for (final msg in pendingResponse as List) {
+        final msgId = msg['id'] as String;
+        final rId = msg['room_id'] as String;
+        final senderId = msg['sender_id'] as int;
+        final payloadText = msg['payload'] as String;
+
+        final bool isInChat = activeRoomId == rId;
+
+        await LocalDatabaseHelper.instance.insertMessage(
+          msgId,
+          rId,
+          senderId,
+          payloadText,
+          status: isInChat ? 'read' : 'delivered',
+          createdAt: msg['created_at'] as String?,
+        );
+
+        await acknowledgeDelivery(msgId, isActiveInChat: isInChat);
+      }
+
+      if (activeRoomId != null) {
+        await refreshActiveRoomMessages();
+      } else {
+        notifyListeners();
+      }
+    } catch (e) {
+      print("Error fetching pending messages: $e");
+    }
+  }
+
+  Future<void> refreshActiveRoomMessages() async {
+    if (activeRoomId == null) return;
+    activeRoomMessages = List<Map<String, dynamic>>.from(
+      await LocalDatabaseHelper.instance.getMessagesForRoom(activeRoomId!)
+    );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      notifyListeners();
+    });
+  }
+
+  void setActiveRoom(String? roomId) {
+    activeRoomId = roomId;
+    if (roomId != null) {
+      refreshActiveRoomMessages();
+    } else {
+      activeRoomMessages = [];
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        notifyListeners();
+      });
+    }
   }
 }
