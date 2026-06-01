@@ -73,7 +73,8 @@ class ProfileProvider2 with ChangeNotifier {
   Future<void> loadFieldAssignments({bool forceLocal = false}) async {
     _ensureDefaultFieldAssignments();
     // Only load from SharedPreferences if we don't already have non-default assignments loaded from Supabase
-    if (!forceLocal && fieldAssignments.values.any((v) => v.casual || !v.professional)) {
+    if (!forceLocal &&
+        fieldAssignments.values.any((v) => v.casual || !v.professional)) {
       return;
     }
     final prefs = await SharedPreferences.getInstance();
@@ -121,8 +122,7 @@ class ProfileProvider2 with ChangeNotifier {
     _ensureDefaultFieldAssignments();
     final current = fieldAssignments[field]!;
     if (card == ProfileCardType.casual) {
-      fieldAssignments[field] =
-          current.copyWith(casual: !current.casual);
+      fieldAssignments[field] = current.copyWith(casual: !current.casual);
     } else {
       fieldAssignments[field] =
           current.copyWith(professional: !current.professional);
@@ -131,7 +131,8 @@ class ProfileProvider2 with ChangeNotifier {
     await saveFieldAssignments();
     if (userId != -1) {
       try {
-        final assignmentsMap = fieldAssignments.map((k, v) => MapEntry(k, v.toJson()));
+        final assignmentsMap =
+            fieldAssignments.map((k, v) => MapEntry(k, v.toJson()));
         await Supabase.instance.client.from('profiles').update({
           'field_assignments': assignmentsMap,
         }).eq('id', userId);
@@ -142,7 +143,8 @@ class ProfileProvider2 with ChangeNotifier {
     }
   }
 
-  Future<void> setFieldOnCard(String field, ProfileCardType card, bool enabled) async {
+  Future<void> setFieldOnCard(
+      String field, ProfileCardType card, bool enabled) async {
     _ensureDefaultFieldAssignments();
     final current = fieldAssignments[field]!;
     if (card == ProfileCardType.casual) {
@@ -154,7 +156,8 @@ class ProfileProvider2 with ChangeNotifier {
     await saveFieldAssignments();
     if (userId != -1) {
       try {
-        final assignmentsMap = fieldAssignments.map((k, v) => MapEntry(k, v.toJson()));
+        final assignmentsMap =
+            fieldAssignments.map((k, v) => MapEntry(k, v.toJson()));
         await Supabase.instance.client.from('profiles').update({
           'field_assignments': assignmentsMap,
         }).eq('id', userId);
@@ -249,9 +252,12 @@ class ProfileProvider2 with ChangeNotifier {
     name = data['name'] ?? '';
     profession = data['profession'] ?? '';
     email = data['email'] ?? '';
-    professionalEmail = data['professionalEmail'] ?? data['professional_email'] ?? '';
+    professionalEmail =
+        data['professionalEmail'] ?? data['professional_email'] ?? '';
     phoneNumber = data['phoneNumber'] ?? data['phone_number'] ?? '';
-    professionalPhoneNumber = data['professionalPhoneNumber'] ?? data['professional_phone_number'] ?? '';
+    professionalPhoneNumber = data['professionalPhoneNumber'] ??
+        data['professional_phone_number'] ??
+        '';
     instagram = data['instagram'] ?? '';
     linkedin = data['linkedin'] ?? '';
     twitter = data['twitter'] ?? '';
@@ -259,8 +265,9 @@ class ProfileProvider2 with ChangeNotifier {
     bio = data['bio'] ?? bio;
     professionalBio = data['professionalBio'] ?? data['professional_bio'] ?? '';
     avatarUrl = data['avatarUrl'] ?? data['avatar_url'] ?? avatarUrl;
-    
-    final showVal = data['showProfileToConnections'] ?? data['show_profile_to_connections'];
+
+    final showVal =
+        data['showProfileToConnections'] ?? data['show_profile_to_connections'];
     if (showVal is bool) {
       showProfileToConnections = showVal;
     } else if (showVal is String) {
@@ -383,7 +390,8 @@ class ProfileProvider2 with ChangeNotifier {
       // Query user_connections directly to get connections and permissions
       final response = await Supabase.instance.client
           .from('user_connections')
-          .select('user_id_1, user_id_2, user_1_shared_card, user_2_shared_card')
+          .select(
+              'user_id_1, user_id_2, user_1_shared_card, user_2_shared_card')
           .or('user_id_1.eq.$myUserId,user_id_2.eq.$myUserId');
 
       if ((response as List).isEmpty) {
@@ -402,11 +410,15 @@ class ProfileProvider2 with ChangeNotifier {
         connectedIds.add(otherId);
 
         if (id1 == myUserId) {
-          mySharedCardLookup[otherId] = (row['user_1_shared_card'] ?? 'both').toString();
-          sharedCardLookup[otherId] = (row['user_2_shared_card'] ?? 'both').toString();
+          mySharedCardLookup[otherId] =
+              (row['user_1_shared_card'] ?? 'both').toString();
+          sharedCardLookup[otherId] =
+              (row['user_2_shared_card'] ?? 'both').toString();
         } else {
-          mySharedCardLookup[otherId] = (row['user_2_shared_card'] ?? 'both').toString();
-          sharedCardLookup[otherId] = (row['user_1_shared_card'] ?? 'both').toString();
+          mySharedCardLookup[otherId] =
+              (row['user_2_shared_card'] ?? 'both').toString();
+          sharedCardLookup[otherId] =
+              (row['user_1_shared_card'] ?? 'both').toString();
         }
       }
 
@@ -439,14 +451,16 @@ class ProfileProvider2 with ChangeNotifier {
           'avatarUrl': row['avatar_url'] ?? '',
           'bio': row['bio'] ?? '',
           'professionalBio': row['professional_bio'] ?? '',
-          'showProfileToConnections': row['show_profile_to_connections'] == true,
+          'showProfileToConnections':
+              row['show_profile_to_connections'] == true,
           'cardTypes': row['card_types'] != null
               ? List<String>.from(row['card_types'] as List)
               : <String>[],
           'connection_profile_id': profileId,
           'shared_card': sharedCardLookup[profileId] ?? 'both',
           'my_shared_card': mySharedCardLookup[profileId] ?? 'both',
-          'field_assignments': row['field_assignments'], // pass raw jsonb through
+          'field_assignments':
+              row['field_assignments'], // pass raw jsonb through
         };
       }).toList();
     } catch (e) {
@@ -560,7 +574,8 @@ class ProfileProvider2 with ChangeNotifier {
         bio = response['bio'] ?? '';
         professionalBio = response['professional_bio'] ?? '';
         avatarUrl = response['avatar_url'] ?? '';
-        showProfileToConnections = response['show_profile_to_connections'] == true;
+        showProfileToConnections =
+            response['show_profile_to_connections'] == true;
 
         profileData["name"] = name;
         profileData["profession"] = profession;
@@ -582,14 +597,16 @@ class ProfileProvider2 with ChangeNotifier {
         // Load field assignments from database if present
         if (response['field_assignments'] != null) {
           try {
-            final Map<String, dynamic> decoded = response['field_assignments'] is String
-                ? jsonDecode(response['field_assignments'] as String) as Map<String, dynamic>
-                : response['field_assignments'] as Map<String, dynamic>;
+            final Map<String, dynamic> decoded =
+                response['field_assignments'] is String
+                    ? jsonDecode(response['field_assignments'] as String)
+                        as Map<String, dynamic>
+                    : response['field_assignments'] as Map<String, dynamic>;
             _ensureDefaultFieldAssignments();
             for (final entry in decoded.entries) {
               if (entry.value is Map<String, dynamic>) {
-                fieldAssignments[entry.key] =
-                    FieldCardAssignment.fromJson(entry.value as Map<String, dynamic>);
+                fieldAssignments[entry.key] = FieldCardAssignment.fromJson(
+                    entry.value as Map<String, dynamic>);
               }
             }
             // Keep local prefs in sync
@@ -604,7 +621,7 @@ class ProfileProvider2 with ChangeNotifier {
         notifyListeners();
         return profileData; // Return early since DB loaded successfully
       }
-      
+
       // Fallback only if profile doesn't exist in Supabase
       await loadFieldAssignments(forceLocal: true);
     } catch (e) {
@@ -619,7 +636,8 @@ class ProfileProvider2 with ChangeNotifier {
       try {
         final ownerId = await _getOrCreateOwnerId();
         _ensureDefaultFieldAssignments();
-        final assignmentsMap = fieldAssignments.map((k, v) => MapEntry(k, v.toJson()));
+        final assignmentsMap =
+            fieldAssignments.map((k, v) => MapEntry(k, v.toJson()));
 
         final response = await Supabase.instance.client
             .from('profiles')
@@ -674,7 +692,8 @@ class ProfileProvider2 with ChangeNotifier {
   }
 
   Future<void> saveOtherProfileData(
-      bool isMyProfile, Map<String, dynamic> profileData, {int? connectionProfileId}) async {
+      bool isMyProfile, Map<String, dynamic> profileData,
+      {int? connectionProfileId}) async {
     try {
       final ownerId = await _getOrCreateOwnerId();
       await Supabase.instance.client.from('profiles').insert({
@@ -684,7 +703,8 @@ class ProfileProvider2 with ChangeNotifier {
         'email': profileData['email'] ?? '',
         'professional_email': profileData['professionalEmail'] ?? '',
         'phone_number': profileData['phoneNumber'] ?? '',
-        'professional_phone_number': profileData['professionalPhoneNumber'] ?? '',
+        'professional_phone_number':
+            profileData['professionalPhoneNumber'] ?? '',
         'instagram': profileData['instagram'] ?? '',
         'linkedin': profileData['linkedin'] ?? '',
         'twitter': profileData['twitter'] ?? '',
@@ -693,8 +713,11 @@ class ProfileProvider2 with ChangeNotifier {
         'bio': profileData['bio'] ?? '',
         'professional_bio': profileData['professionalBio'] ?? '',
         'avatar_url': profileData['avatarUrl'] ?? '',
-        'show_profile_to_connections': profileData['showProfileToConnections'] == true || profileData['showProfileToConnections'] == 'true',
-        'card_types': profileData['cardTypes'] ?? profileData['card_types'] ?? [],
+        'show_profile_to_connections':
+            profileData['showProfileToConnections'] == true ||
+                profileData['showProfileToConnections'] == 'true',
+        'card_types':
+            profileData['cardTypes'] ?? profileData['card_types'] ?? [],
         'connection_profile_id': connectionProfileId ?? profileData['id'],
       });
       notifyListeners();
@@ -799,7 +822,8 @@ class ProfileProvider2 with ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> connectUsers(int idA, int idB, {String? sharedCardByPresenter, String? sharedCardByScanner}) async {
+  Future<void> connectUsers(int idA, int idB,
+      {String? sharedCardByPresenter, String? sharedCardByScanner}) async {
     if (idA == idB) {
       print("Cannot connect a user to themselves");
       return;
@@ -827,7 +851,8 @@ class ProfileProvider2 with ChangeNotifier {
         'user_1_shared_card': u1Share,
         'user_2_shared_card': u2Share,
       });
-      print("Successfully connected user $id1 and user $id2 (shares: $u1Share, $u2Share)");
+      print(
+          "Successfully connected user $id1 and user $id2 (shares: $u1Share, $u2Share)");
       notifyListeners();
     } catch (e) {
       print("Error connecting users: $e");
@@ -835,14 +860,16 @@ class ProfileProvider2 with ChangeNotifier {
     }
   }
 
-  Future<void> updateConnectionAccess(int otherUserId, String newAccessType) async {
+  Future<void> updateConnectionAccess(
+      int otherUserId, String newAccessType) async {
     final myUserId = userId;
     if (myUserId == -1) return;
 
     final int id1 = myUserId < otherUserId ? myUserId : otherUserId;
     final int id2 = myUserId > otherUserId ? myUserId : otherUserId;
 
-    final String columnToUpdate = myUserId < otherUserId ? 'user_1_shared_card' : 'user_2_shared_card';
+    final String columnToUpdate =
+        myUserId < otherUserId ? 'user_1_shared_card' : 'user_2_shared_card';
 
     try {
       await Supabase.instance.client
@@ -850,7 +877,8 @@ class ProfileProvider2 with ChangeNotifier {
           .update({columnToUpdate: newAccessType})
           .eq('user_id_1', id1)
           .eq('user_id_2', id2);
-      print("Updated connection access: $myUserId shares $newAccessType with $otherUserId");
+      print(
+          "Updated connection access: $myUserId shares $newAccessType with $otherUserId");
       await fetchConnections();
     } catch (e) {
       print("Error updating connection access: $e");
@@ -899,7 +927,8 @@ class ProfileProvider2 with ChangeNotifier {
           'avatarUrl': response['avatar_url'] ?? '',
           'bio': response['bio'] ?? '',
           'professionalBio': response['professional_bio'] ?? '',
-          'showProfileToConnections': response['show_profile_to_connections'] == true,
+          'showProfileToConnections':
+              response['show_profile_to_connections'] == true,
           'cardTypes': response['card_types'] != null
               ? List<String>.from(response['card_types'] as List)
               : <String>[],
@@ -931,7 +960,8 @@ class ProfileProvider2 with ChangeNotifier {
   Future<void> saveOrUpdateProfile() async {
     final ownerId = await _getOrCreateOwnerId();
     _ensureDefaultFieldAssignments();
-    final assignmentsMap = fieldAssignments.map((k, v) => MapEntry(k, v.toJson()));
+    final assignmentsMap =
+        fieldAssignments.map((k, v) => MapEntry(k, v.toJson()));
 
     final data = {
       'name': name,
@@ -958,7 +988,7 @@ class ProfileProvider2 with ChangeNotifier {
             .from('profiles')
             .update(data)
             .eq('id', userId);
-        
+
         UserData = {
           'id': userId,
           'name': name,
@@ -1060,9 +1090,8 @@ class ProfileProvider2 with ChangeNotifier {
           .select('room_id')
           .eq('user_id', myUserId);
 
-      final List<String> myRoomIds = (myRoomsResponse as List)
-          .map((r) => r['room_id'] as String)
-          .toList();
+      final List<String> myRoomIds =
+          (myRoomsResponse as List).map((r) => r['room_id'] as String).toList();
 
       connectionRooms.clear();
 
@@ -1113,9 +1142,8 @@ class ProfileProvider2 with ChangeNotifier {
           .select('room_id')
           .eq('user_id', myUserId);
 
-      final List<String> myRoomIds = (myRoomsResponse as List)
-          .map((r) => r['room_id'] as String)
-          .toList();
+      final List<String> myRoomIds =
+          (myRoomsResponse as List).map((r) => r['room_id'] as String).toList();
 
       if (myRoomIds.isNotEmpty) {
         // 2. See if otherUserId is in any of these rooms, and check if it's a direct room
@@ -1220,82 +1248,84 @@ class ProfileProvider2 with ChangeNotifier {
     final channel = Supabase.instance.client.channel('room-$roomId');
 
     channel
-      .onPostgresChanges(
-        event: PostgresChangeEvent.insert,
-        schema: 'public',
-        table: 'messages',
-        filter: PostgresChangeFilter(
-          type: PostgresChangeFilterType.eq,
-          column: 'room_id',
-          value: roomId,
-        ),
-        callback: (payload) async {
-          final msg = payload.newRecord;
-          final msgId = msg['id'] as String;
-          final rId = msg['room_id'] as String;
-          final senderId = msg['sender_id'] as int;
-          final payloadText = msg['payload'] as String;
+        .onPostgresChanges(
+          event: PostgresChangeEvent.insert,
+          schema: 'public',
+          table: 'messages',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'room_id',
+            value: roomId,
+          ),
+          callback: (payload) async {
+            final msg = payload.newRecord;
+            final msgId = msg['id'] as String;
+            final rId = msg['room_id'] as String;
+            final senderId = msg['sender_id'] as int;
+            final payloadText = msg['payload'] as String;
 
-          // Exclude own messages from processing here since we already stored them on send
-          if (senderId == userId) return;
+            // Exclude own messages from processing here since we already stored them on send
+            if (senderId == userId) return;
 
-          final bool isInChat = activeRoomId == rId;
+            final bool isInChat = activeRoomId == rId;
 
-          // 1. Save to local SQLite
-          await LocalDatabaseHelper.instance.insertMessage(
-            msgId,
-            rId,
-            senderId,
-            payloadText,
-            status: isInChat ? 'read' : 'delivered',
-            createdAt: msg['created_at'] as String?,
-          );
+            // 1. Save to local SQLite
+            await LocalDatabaseHelper.instance.insertMessage(
+              msgId,
+              rId,
+              senderId,
+              payloadText,
+              status: isInChat ? 'read' : 'delivered',
+              createdAt: msg['created_at'] as String?,
+            );
 
-          // 2. Acknowledge receipt -> triggers server-side deletion
-          await acknowledgeDelivery(msgId, isActiveInChat: isInChat);
+            // 2. Acknowledge receipt -> triggers server-side deletion
+            await acknowledgeDelivery(msgId, isActiveInChat: isInChat);
 
-          // 3. If actively in chat, update display list; otherwise notify hub list to update snippet
-          if (isInChat) {
-            await refreshActiveRoomMessages();
-          } else {
-            notifyListeners();
-          }
-        },
-      )
-      .onPostgresChanges(
-        event: PostgresChangeEvent.update,
-        schema: 'public',
-        table: 'messages',
-        filter: PostgresChangeFilter(
-          type: PostgresChangeFilterType.eq,
-          column: 'room_id',
-          value: roomId,
-        ),
-        callback: (payload) async {
-          final newRecord = payload.newRecord;
-          final newStatus = newRecord['status'] as String;
-          final messageId = newRecord['id'] as String;
-          final rId = newRecord['room_id'] as String;
+            // 3. If actively in chat, update display list; otherwise notify hub list to update snippet
+            if (isInChat) {
+              await refreshActiveRoomMessages();
+            } else {
+              notifyListeners();
+            }
+          },
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.update,
+          schema: 'public',
+          table: 'messages',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'room_id',
+            value: roomId,
+          ),
+          callback: (payload) async {
+            final newRecord = payload.newRecord;
+            final newStatus = newRecord['status'] as String;
+            final messageId = newRecord['id'] as String;
+            final rId = newRecord['room_id'] as String;
 
-          // Update local SQLite status for receipt indicators
-          await LocalDatabaseHelper.instance.updateMessageStatus(messageId, newStatus);
+            // Update local SQLite status for receipt indicators
+            await LocalDatabaseHelper.instance
+                .updateMessageStatus(messageId, newStatus);
 
-          if (activeRoomId == rId) {
-            await refreshActiveRoomMessages();
-          }
-        },
-      )
-      .subscribe();
+            if (activeRoomId == rId) {
+              await refreshActiveRoomMessages();
+            }
+          },
+        )
+        .subscribe();
 
     _roomSubscriptions[roomId] = channel;
   }
 
-  Future<void> acknowledgeDelivery(String messageId, {bool isActiveInChat = false}) async {
+  Future<void> acknowledgeDelivery(String messageId,
+      {bool isActiveInChat = false}) async {
     try {
       await Supabase.instance.client
           .from('messages')
-          .update({'status': isActiveInChat ? 'read' : 'delivered'})
-          .eq('id', messageId);
+          .update({'status': isActiveInChat ? 'read' : 'delivered'}).eq(
+              'id', messageId);
     } catch (e) {
       print("Error acknowledging delivery: $e");
     }
@@ -1314,9 +1344,8 @@ class ProfileProvider2 with ChangeNotifier {
 
       if ((roomsResponse as List).isEmpty) return;
 
-      final roomIds = (roomsResponse as List)
-          .map((r) => r['room_id'] as String)
-          .toList();
+      final roomIds =
+          (roomsResponse as List).map((r) => r['room_id'] as String).toList();
 
       // Step 2: Fetch pending messages (uses store-and-forward sent status)
       final pendingResponse = await Supabase.instance.client
@@ -1360,16 +1389,51 @@ class ProfileProvider2 with ChangeNotifier {
   Future<void> refreshActiveRoomMessages() async {
     if (activeRoomId == null) return;
     activeRoomMessages = List<Map<String, dynamic>>.from(
-      await LocalDatabaseHelper.instance.getMessagesForRoom(activeRoomId!)
-    );
+        await LocalDatabaseHelper.instance.getMessagesForRoom(activeRoomId!));
     WidgetsBinding.instance.addPostFrameCallback((_) {
       notifyListeners();
     });
   }
 
+  /// Called when User B opens a chat room.
+  /// Finds any 'delivered' messages in Supabase for this room (rows that
+  /// survived the fixed trigger), promotes them to 'read', and updates SQLite.
+  /// This is what sends the blue-tick Realtime event to the original sender.
+  Future<void> _markDeliveredMessagesAsRead(String roomId) async {
+    final myUserId = userId;
+    if (myUserId == -1) return;
+
+    try {
+      final List<dynamic> deliveredMsgs = await Supabase.instance.client
+          .from('messages')
+          .select('id')
+          .eq('room_id', roomId)
+          .eq('status', 'delivered')
+          .neq('sender_id', myUserId);
+
+      if (deliveredMsgs.isEmpty) return;
+
+      for (final msg in deliveredMsgs) {
+        final msgId = msg['id'] as String;
+        // Update Supabase → 'read' → trigger deletes row
+        //                          → Realtime fires → sender sees blue ticks
+        await acknowledgeDelivery(msgId, isActiveInChat: true);
+        // Mirror in local SQLite
+        await LocalDatabaseHelper.instance.updateMessageStatus(msgId, 'read');
+      }
+
+      await refreshActiveRoomMessages();
+    } catch (e) {
+      print("Error marking delivered messages as read: $e");
+    }
+  }
+
   void setActiveRoom(String? roomId) {
     activeRoomId = roomId;
     if (roomId != null) {
+      // Mark any 'delivered' messages as 'read' now that the user has opened
+      // the chat — this fires the blue-tick Realtime event to the sender.
+      _markDeliveredMessagesAsRead(roomId);
       refreshActiveRoomMessages();
     } else {
       activeRoomMessages = [];
