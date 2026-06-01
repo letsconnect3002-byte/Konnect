@@ -101,6 +101,18 @@ class LocalDatabaseHelper {
     return null;
   }
 
+  /// Returns messages sent by [senderId] that are NOT yet 'read' in SQLite,
+  /// so we can reconcile them against Supabase on next app launch.
+  Future<List<Map<String, dynamic>>> getUnreadSentMessages(int senderId) async {
+    final db = await database;
+    return await db.query(
+      'messages',
+      columns: ['id', 'room_id', 'status'],
+      where: "sender_id = ? AND status != 'read'",
+      whereArgs: [senderId],
+    );
+  }
+
   Future<void> clearDatabase() async {
     final db = await database;
     await db.delete('messages');

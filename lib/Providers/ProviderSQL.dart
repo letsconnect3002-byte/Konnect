@@ -1119,6 +1119,10 @@ class ProfileProvider2 with ChangeNotifier {
 
       // Fetch any pending messages on app launch
       await fetchPendingMessages();
+
+      // Reconcile statuses of messages WE sent — handles the case where
+      // the recipient read our message while we were offline.
+      await syncOutgoingMessageStatuses();
     } catch (e) {
       print("Error loading chat rooms: $e");
     }
@@ -1328,6 +1332,81 @@ class ProfileProvider2 with ChangeNotifier {
               'id', messageId);
     } catch (e) {
       print("Error acknowledging delivery: $e");
+    }
+  }
+
+  /// Reconcile outgoing message statuses with Supabase.
+  /// Messages sent by us that are no longer in Supabase were read+deleted
+  /// by the server trigger — mark them 'read' in local SQLite.
+  /// Messages still present with a newer status get their local copy updated.
+  Future<void> syncOutgoingMessageStatuses() async {
+    final myUserId = userId;
+    if (myUserId == -1) return;
+
+    try {
+      // 1. Get all my sent messages that aren't yet 'read' locally
+      final unreadSent =
+          await LocalDatabaseHelper.instance.getUnreadSentMessages(myUserId);
+      if (unreadSent.isEmpty) return;
+
+      final messageIds = unreadSent.map((m) => m['id'] as String).toList();
+
+      // 2. Check which of these still exist in Supabase
+      final existing = await Supabase.instance.client
+          .from('messages')
+          .select('id, status')
+          .filter('id', 'in', '(${messageIds.join(',')})');
+
+      final Map<String, String> supabaseStatuses = {
+        for (final row in existing as List)
+          row['id'] as String: row['status'] as String
+      };
+
+      // 3. Reconcile
+      for (final local in unreadSent) {
+        final msgId = local['id'] as String;
+        final localStatus = local['status'] as String;
+
+        if (!supabaseStatuses.containsKey(msgId)) {
+          // Row is gone → was read → trigger deleted it
+          if (localStatus != 'read') {
+            await LocalDatabaseHelper.instance
+                .updateMessageStatus(msgId, 'read');
+          }
+        } else {
+          // Row still exists — adopt the server status if it's "ahead"
+          final serverStatus = supabaseStatuses[msgId]!;
+          if (_statusRank(serverStatus) > _statusRank(localStatus)) {
+            await LocalDatabaseHelper.instance
+                .updateMessageStatus(msgId, serverStatus);
+          }
+        }
+      }
+
+      // 4. Refresh UI if user is in a chat
+      if (activeRoomId != null) {
+        await refreshActiveRoomMessages();
+      } else {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          notifyListeners();
+        });
+      }
+    } catch (e) {
+      print("Error syncing outgoing message statuses: $e");
+    }
+  }
+
+  /// Returns a numeric rank for message statuses for comparison.
+  int _statusRank(String status) {
+    switch (status) {
+      case 'sent':
+        return 0;
+      case 'delivered':
+        return 1;
+      case 'read':
+        return 2;
+      default:
+        return -1;
     }
   }
 
