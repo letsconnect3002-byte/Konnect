@@ -1200,10 +1200,23 @@ class ProfileProvider2 with ChangeNotifier {
     final myUserId = userId;
     if (myUserId == -1) return;
 
-    final messageId = const Uuid().v4(); // Client-generated UUID v4
+    final messageId = const Uuid().v4();
+    final createdAt = DateTime.now().toUtc().toIso8601String();
+
+    // ─── STEP 1: Save locally as 'pending' immediately ───────────────────────
+    // User sees the message bubble appear instantly with a clock icon ⏱
+    // This is the WhatsApp "optimistic send" — no waiting for the server.
+    await LocalDatabaseHelper.instance.insertMessage(
+      messageId, roomId, myUserId, text,
+      status: 'pending',
+      createdAt: createdAt,
+    );
+    if (activeRoomId == roomId) {
+      await refreshActiveRoomMessages();
+    }
 
     try {
-      // Upsert into Supabase for store-and-forward queue
+      // ─── STEP 2: Upload to Supabase ────────────────────────────────────────
       await Supabase.instance.client.from('messages').upsert(
         {
           'id': messageId,
@@ -1211,38 +1224,21 @@ class ProfileProvider2 with ChangeNotifier {
           'sender_id': myUserId,
           'payload': text,
           'status': 'sent',
-          'created_at': DateTime.now().toUtc().toIso8601String(),
-          'updated_at': DateTime.now().toUtc().toIso8601String(),
+          'created_at': createdAt,
+          'updated_at': createdAt,
         },
         onConflict: 'id',
       );
 
-      // Persist to local SQLite immediately (source of truth)
-      await LocalDatabaseHelper.instance.insertMessage(
-        messageId,
-        roomId,
-        myUserId,
-        text,
-        status: 'sent',
-      );
-
-      // Refresh local messages if viewing this room
+      // ─── STEP 3: Server confirmed — show single grey tick ✓ ───────────────
+      await LocalDatabaseHelper.instance.updateMessageStatus(messageId, 'sent');
       if (activeRoomId == roomId) {
         await refreshActiveRoomMessages();
       }
     } catch (e) {
       print("Error sending message: $e");
-      // Still persist locally even if backend fails (offline support)
-      await LocalDatabaseHelper.instance.insertMessage(
-        messageId,
-        roomId,
-        myUserId,
-        text,
-        status: 'sent',
-      );
-      if (activeRoomId == roomId) {
-        await refreshActiveRoomMessages();
-      }
+      // Message stays as 'pending' (clock stays visible).
+      // syncOutgoingMessageStatuses will reconcile on next app foreground.
     }
   }
 
@@ -1318,7 +1314,37 @@ class ProfileProvider2 with ChangeNotifier {
             }
           },
         )
-        .subscribe();
+        .onPostgresChanges(
+          event: PostgresChangeEvent.delete,
+          schema: 'public',
+          table: 'messages',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'room_id',
+            value: roomId,
+          ),
+          callback: (payload) async {
+            final oldRecord = payload.oldRecord;
+            final messageId = oldRecord['id'] as String?;
+            final rId = oldRecord['room_id'] as String?;
+
+            if (messageId != null) {
+              // Row was deleted -> this means it was read (trigger deleted it)
+              await LocalDatabaseHelper.instance
+                  .updateMessageStatus(messageId, 'read');
+
+              if (activeRoomId == rId) {
+                await refreshActiveRoomMessages();
+              }
+            }
+          },
+        )
+        .subscribe((status, [error]) {
+          if (status == RealtimeSubscribeStatus.subscribed) {
+            syncOutgoingMessageStatuses();
+            fetchPendingMessages();
+          }
+        });
 
     _roomSubscriptions[roomId] = channel;
   }
@@ -1338,6 +1364,7 @@ class ProfileProvider2 with ChangeNotifier {
   /// Reconcile outgoing message statuses with Supabase.
   /// Messages sent by us that are no longer in Supabase were read+deleted
   /// by the server trigger — mark them 'read' in local SQLite.
+  /// Messages still 'pending' (never reached Supabase) are retried.
   /// Messages still present with a newer status get their local copy updated.
   Future<void> syncOutgoingMessageStatuses() async {
     final myUserId = userId;
@@ -1349,36 +1376,79 @@ class ProfileProvider2 with ChangeNotifier {
           await LocalDatabaseHelper.instance.getUnreadSentMessages(myUserId);
       if (unreadSent.isEmpty) return;
 
-      final messageIds = unreadSent.map((m) => m['id'] as String).toList();
+      // Separate pending (never reached server) from sent/delivered
+      final pendingMsgs =
+          unreadSent.where((m) => m['status'] == 'pending').toList();
+      final serverMsgs =
+          unreadSent.where((m) => m['status'] != 'pending').toList();
 
-      // 2. Check which of these still exist in Supabase
-      final existing = await Supabase.instance.client
-          .from('messages')
-          .select('id, status')
-          .filter('id', 'in', '(${messageIds.join(',')})');
-
-      final Map<String, String> supabaseStatuses = {
-        for (final row in existing as List)
-          row['id'] as String: row['status'] as String
-      };
-
-      // 3. Reconcile
-      for (final local in unreadSent) {
-        final msgId = local['id'] as String;
-        final localStatus = local['status'] as String;
-
-        if (!supabaseStatuses.containsKey(msgId)) {
-          // Row is gone → was read → trigger deleted it
-          if (localStatus != 'read') {
+      // 2a. Retry pending messages — they never reached Supabase
+      for (final msg in pendingMsgs) {
+        final msgId = msg['id'] as String;
+        final roomId = msg['room_id'] as String;
+        try {
+          // Fetch full message from SQLite to get payload
+          final allMsgs =
+              await LocalDatabaseHelper.instance.getMessagesForRoom(roomId);
+          final fullMsg = allMsgs.firstWhere(
+            (m) => m['id'] == msgId,
+            orElse: () => <String, dynamic>{},
+          );
+          if (fullMsg.isNotEmpty) {
+            await Supabase.instance.client.from('messages').upsert(
+              {
+                'id': msgId,
+                'room_id': roomId,
+                'sender_id': myUserId,
+                'payload': fullMsg['payload'],
+                'status': 'sent',
+                'created_at': fullMsg['created_at'],
+                'updated_at': DateTime.now().toUtc().toIso8601String(),
+              },
+              onConflict: 'id',
+            );
             await LocalDatabaseHelper.instance
-                .updateMessageStatus(msgId, 'read');
+                .updateMessageStatus(msgId, 'sent');
           }
-        } else {
-          // Row still exists — adopt the server status if it's "ahead"
-          final serverStatus = supabaseStatuses[msgId]!;
-          if (_statusRank(serverStatus) > _statusRank(localStatus)) {
-            await LocalDatabaseHelper.instance
-                .updateMessageStatus(msgId, serverStatus);
+        } catch (e) {
+          print("Retry failed for pending message $msgId: $e");
+          // Will retry next time syncOutgoingMessageStatuses runs
+        }
+      }
+
+      // 2b. Reconcile sent/delivered messages against Supabase
+      if (serverMsgs.isNotEmpty) {
+        final messageIds =
+            serverMsgs.map((m) => m['id'] as String).toList();
+
+        final existing = await Supabase.instance.client
+            .from('messages')
+            .select('id, status')
+            .filter('id', 'in', '(${messageIds.join(',')})');
+
+        final Map<String, String> supabaseStatuses = {
+          for (final row in existing as List)
+            row['id'] as String: row['status'] as String
+        };
+
+        // 3. Reconcile
+        for (final local in serverMsgs) {
+          final msgId = local['id'] as String;
+          final localStatus = local['status'] as String;
+
+          if (!supabaseStatuses.containsKey(msgId)) {
+            // Row is gone → was read → trigger deleted it
+            if (localStatus != 'read') {
+              await LocalDatabaseHelper.instance
+                  .updateMessageStatus(msgId, 'read');
+            }
+          } else {
+            // Row still exists — adopt the server status if it's "ahead"
+            final serverStatus = supabaseStatuses[msgId]!;
+            if (_statusRank(serverStatus) > _statusRank(localStatus)) {
+              await LocalDatabaseHelper.instance
+                  .updateMessageStatus(msgId, serverStatus);
+            }
           }
         }
       }
@@ -1399,12 +1469,14 @@ class ProfileProvider2 with ChangeNotifier {
   /// Returns a numeric rank for message statuses for comparison.
   int _statusRank(String status) {
     switch (status) {
-      case 'sent':
+      case 'pending':
         return 0;
-      case 'delivered':
+      case 'sent':
         return 1;
-      case 'read':
+      case 'delivered':
         return 2;
+      case 'read':
+        return 3;
       default:
         return -1;
     }

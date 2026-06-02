@@ -147,13 +147,14 @@ class _AppShell extends StatefulWidget {
   State<_AppShell> createState() => _AppShellState();
 }
 
-class _AppShellState extends State<_AppShell> {
+class _AppShellState extends State<_AppShell> with WidgetsBindingObserver {
   int _currentIndex = 0;
   late final List<Widget> _screens;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _screens = [
       ProfilePage(
         onSetUpProfile: () {
@@ -166,6 +167,25 @@ class _AppShellState extends State<_AppShell> {
       const OtherProfilesPage(),
       const YetToBeBuiltProfilePage(),
     ];
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      // App came to foreground — catch any status changes that happened
+      // while the app was backgrounded or the Realtime socket was sleeping
+      final provider = Provider.of<ProfileProvider2>(context, listen: false);
+      if (provider.userId != -1) {
+        provider.syncOutgoingMessageStatuses();
+        provider.fetchPendingMessages();
+      }
+    }
   }
 
   @override

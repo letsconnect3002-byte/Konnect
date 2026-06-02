@@ -360,17 +360,50 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
   }
 
   Widget _buildStatusIcon(String status) {
-    if (status == 'sent') {
-      return Icon(Icons.check_rounded, size: 12, color: Colors.white.withOpacity(0.3));
+    // 🕒 PENDING — saved locally, not yet confirmed by Supabase
+    if (status == 'pending') {
+      return Icon(
+        Icons.access_time_rounded,
+        size: 12,
+        color: Colors.white.withOpacity(0.35),
+      );
     }
-    final isRead = status == 'read';
+
+    // ✓ SENT — message reached Supabase server
+    if (status == 'sent') {
+      return Icon(
+        Icons.check_rounded,
+        size: 12,
+        color: Colors.white.withOpacity(0.3),
+      );
+    }
+
+    // ✓✓ DELIVERED — landed on recipient's device (grey)
+    if (status == 'delivered') {
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.check_rounded, size: 12,
+              color: Colors.white.withOpacity(0.4)),
+          Transform.translate(
+            offset: const Offset(-6, 0),
+            child: Icon(Icons.check_rounded, size: 12,
+                color: Colors.white.withOpacity(0.4)),
+          ),
+        ],
+      );
+    }
+
+    // ✓✓ READ — recipient opened the chat (blue)
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(Icons.check_rounded, size: 12, color: isRead ? const Color(0xFF00F2FE) : Colors.white.withOpacity(0.4)),
+        Icon(Icons.check_rounded, size: 12,
+            color: const Color(0xFF00F2FE)),
         Transform.translate(
           offset: const Offset(-6, 0),
-          child: Icon(Icons.check_rounded, size: 12, color: isRead ? const Color(0xFF00F2FE) : Colors.white.withOpacity(0.4)),
+          child: Icon(Icons.check_rounded, size: 12,
+              color: const Color(0xFF00F2FE)),
         ),
       ],
     );
