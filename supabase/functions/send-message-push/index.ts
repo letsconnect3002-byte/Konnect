@@ -1,0 +1,139 @@
+import { serve } from "https://deno.land/std@0.177.0/http/server.ts"
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4"
+import { JWT } from "npm:google-auth-library@9.0.0"
+
+const supabaseUrl = Deno.env.get("SUPABASE_URL")!
+const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+const serviceAccountJson = JSON.parse(Deno.env.get("FIREBASE_SERVICE_ACCOUNT")!)
+
+serve(async (req) => {
+  try {
+    const payload = await req.json()
+    // The webhook payload from Supabase will contain the inserted row in payload.record
+    const record = payload.record
+
+    if (!record) {
+      return new Response("No record found in payload", { status: 400 })
+    }
+
+    const { id: messageId, room_id: roomId, sender_id: senderId, payload: msgPayload } = record
+
+    // 1. Initialize Supabase Client with Service Role Key (bypasses RLS)
+    const supabase = createClient(supabaseUrl, supabaseServiceKey)
+
+    // 2. Fetch the sender's profile name to display in the notification title
+    const { data: senderProfile } = await supabase
+      .from("profiles")
+      .select("name")
+      .eq("id", senderId)
+      .single()
+
+    const senderName = senderProfile?.name || "New Message"
+
+    // 3. Fetch the other participants in this chat room
+    const { data: participants, error: pError } = await supabase
+      .from("room_participants")
+      .select("user_id")
+      .eq("room_id", roomId)
+      .neq("user_id", senderId)
+
+    if (pError || !participants || participants.length === 0) {
+      console.log(`No recipients found for room ${roomId} other than sender ${senderId}`)
+      return new Response("No recipients found", { status: 200 })
+    }
+
+    const recipientIds = participants.map((p) => p.user_id)
+
+    // 4. Fetch registered FCM tokens for the recipients
+    const { data: tokens, error: tError } = await supabase
+      .from("user_push_tokens")
+      .select("fcm_token")
+      .in("user_id", recipientIds)
+
+    if (tError || !tokens || tokens.length === 0) {
+      console.log("No registered push tokens found for recipients:", recipientIds)
+      return new Response("No push tokens registered", { status: 200 })
+    }
+
+    // 5. Generate Google OAuth2 access token for Firebase Cloud Messaging
+    const jwt = new JWT({
+      email: serviceAccountJson.client_email,
+      key: serviceAccountJson.private_key,
+      scopes: ["https://www.googleapis.com/auth/firebase.messaging"],
+    })
+    const credentials = await jwt.authorize()
+    const accessToken = credentials.access_token
+
+    // 6. Send high-priority background notification + system notification to each device token
+    for (const row of tokens) {
+      const fcmToken = row.fcm_token
+      
+      const body = {
+        message: {
+          token: fcmToken,
+          notification: {
+            title: senderName,
+            body: msgPayload,
+          },
+          data: {
+            message_id: messageId,
+            room_id: roomId,
+            sender_id: String(senderId),
+            payload: msgPayload,
+          },
+          android: {
+            priority: "high",
+            notification: {
+              sound: "default",
+              click_action: "FLUTTER_NOTIFICATION_CLICK",
+              tag: roomId, // Groups/collapses notifications from the same chat room on Android
+            },
+          },
+          apns: {
+            headers: {
+              "apns-priority": "10",
+            },
+            payload: {
+              aps: {
+                sound: "default",
+                badge: 1,
+                "content-available": 1,
+                "thread-id": roomId, // Groups/stacks notifications by chat room on iOS
+              },
+            },
+          },
+        },
+      }
+
+      const response = await fetch(
+        `https://fcm.googleapis.com/v1/projects/${serviceAccountJson.project_id}/messages:send`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify(body),
+        }
+      )
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error(`Failed to send push notification to token ${fcmToken}:`, errorText)
+      } else {
+        console.log(`Successfully sent push notification to token: ${fcmToken}`)
+      }
+    }
+
+    return new Response(JSON.stringify({ success: true }), {
+      headers: { "Content-Type": "application/json" },
+      status: 200,
+    })
+  } catch (err) {
+    console.error("Error processing push webhook:", err)
+    return new Response(JSON.stringify({ error: err.message }), {
+      headers: { "Content-Type": "application/json" },
+      status: 500,
+    })
+  }
+})

@@ -1579,6 +1579,22 @@ class ProfileProvider2 with ChangeNotifier {
     }
   }
 
+  Future<void> updatePushToken(String token) async {
+    final myUserId = userId;
+    if (myUserId == -1) return;
+
+    try {
+      await Supabase.instance.client.from('user_push_tokens').upsert({
+        'user_id': myUserId,
+        'fcm_token': token,
+        'updated_at': DateTime.now().toUtc().toIso8601String(),
+      });
+      print("Push token updated successfully in Supabase");
+    } catch (e) {
+      print("Error updating push token: $e");
+    }
+  }
+
   void setActiveRoom(String? roomId) {
     activeRoomId = roomId;
     if (roomId != null) {

@@ -1,10 +1,14 @@
 import 'dart:ui';
-
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:connect/firebase_options.dart';
+import 'package:connect/Providers/LocalDatabaseHelper.dart';
 import 'package:connect/Config/supabase_config.dart';
 import 'package:connect/Pages/OtherProfilesPage.dart';
 import 'package:connect/Pages/ProfilePage.dart';
 import 'package:connect/Pages/DirectMessagesHubPage.dart';
 import 'package:connect/Pages/yet_to_be_built_profile_page.dart';
+import 'package:connect/Pages/IndividualChatPage.dart';
 import 'package:connect/Providers/ProfileProvider.dart';
 import 'package:connect/Providers/ProviderSQL.dart';
 import 'package:flutter/material.dart';
@@ -15,12 +19,62 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:connect/Pages/AuthScreen.dart';
 
-void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
+@pragma('vm:entry-point')
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  // Initialize Firebase and Supabase in the background isolate
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+
   await Supabase.initialize(
     url: SupabaseConfig.url,
     anonKey: SupabaseConfig.serviceRoleKey,
   );
+
+  final data = message.data;
+  final messageId = data['message_id'] as String?;
+  final roomId = data['room_id'] as String?;
+  final senderIdStr = data['sender_id'] as String?;
+  final payload = data['payload'] as String?;
+
+  if (messageId != null && roomId != null && senderIdStr != null && payload != null) {
+    final senderId = int.tryParse(senderIdStr);
+    if (senderId != null) {
+      // 1. Save to local SQLite
+      await LocalDatabaseHelper.instance.insertMessage(
+        messageId,
+        roomId,
+        senderId,
+        payload,
+        status: 'delivered',
+      );
+
+      // 2. Acknowledge delivery to Supabase
+      try {
+        await Supabase.instance.client
+            .from('messages')
+            .update({'status': 'delivered'})
+            .eq('id', messageId);
+      } catch (e) {
+        print("Error acknowledging delivery in background: $e");
+      }
+    }
+  }
+}
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+
+  await Supabase.initialize(
+    url: SupabaseConfig.url,
+    anonKey: SupabaseConfig.serviceRoleKey,
+  );
+
+  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+
   runApp(const MyApp());
 }
 
@@ -112,6 +166,7 @@ class _AppShellGateState extends State<AppShellGate> {
       if (userId != -1) {
         final userData = await provider.loadProfile(userId);
         provider.setUserData(userData);
+        await _setupPushNotifications(provider);
       }
     } catch (e) {
       print("Error in AppShellGate initialization: $e");
@@ -121,6 +176,40 @@ class _AppShellGateState extends State<AppShellGate> {
           _initialized = true;
         });
       }
+    }
+  }
+
+  Future<void> _setupPushNotifications(ProfileProvider2 provider) async {
+    print("PushNotifications: Initializing...");
+    try {
+      final messaging = FirebaseMessaging.instance;
+      
+      // Request notification permissions for Android 13+ and iOS
+      print("PushNotifications: Requesting permission...");
+      final settings = await messaging.requestPermission(
+        alert: true,
+        badge: true,
+        sound: true,
+      );
+      print("PushNotifications: Authorization status is ${settings.authorizationStatus}");
+
+      // Fetch the token (FCM can generate tokens on Android even if notification permission is denied)
+      print("PushNotifications: Fetching FCM token...");
+      final token = await messaging.getToken();
+      if (token != null) {
+        print("PushNotifications: FCM token retrieved successfully: $token");
+        await provider.updatePushToken(token);
+      } else {
+        print("PushNotifications: FCM token is null.");
+      }
+
+      // Listen for token updates and upsert them
+      messaging.onTokenRefresh.listen((newToken) async {
+        print("PushNotifications: FCM token refreshed: $newToken");
+        await provider.updatePushToken(newToken);
+      });
+    } catch (e) {
+      print("PushNotifications: Error setting up push notifications: $e");
     }
   }
 
@@ -167,6 +256,7 @@ class _AppShellState extends State<_AppShell> with WidgetsBindingObserver {
       const OtherProfilesPage(),
       const YetToBeBuiltProfilePage(),
     ];
+    _setupNotificationTapListeners();
   }
 
   @override
@@ -184,6 +274,47 @@ class _AppShellState extends State<_AppShell> with WidgetsBindingObserver {
       if (provider.userId != -1) {
         provider.syncOutgoingMessageStatuses();
         provider.fetchPendingMessages();
+      }
+    }
+  }
+
+  void _setupNotificationTapListeners() {
+    // 1. Handle notification click when app is in background but still running
+    FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
+      _handleNotificationClick(message);
+    });
+
+    // 2. Handle notification click when app was cold-started from terminated state
+    FirebaseMessaging.instance.getInitialMessage().then((RemoteMessage? message) {
+      if (message != null) {
+        _handleNotificationClick(message);
+      }
+    });
+  }
+
+  Future<void> _handleNotificationClick(RemoteMessage message) async {
+    final data = message.data;
+    final senderIdStr = data['sender_id'] as String?;
+    
+    if (senderIdStr != null) {
+      final senderId = int.tryParse(senderIdStr);
+      if (senderId != null) {
+        final provider = Provider.of<ProfileProvider2>(context, listen: false);
+        try {
+          // Fetch the sender's profile details so we can construct connectionData
+          final profile = await provider.loadProfile(senderId);
+          if (mounted) {
+            // Push IndividualChatPage with the fetched sender profile
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => IndividualChatPage(connectionData: profile),
+              ),
+            );
+          }
+        } catch (e) {
+          print("Error handling notification tap redirection: $e");
+        }
       }
     }
   }
