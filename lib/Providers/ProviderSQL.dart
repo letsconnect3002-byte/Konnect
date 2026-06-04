@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 import 'package:connect/Providers/LocalDatabaseHelper.dart';
 import 'package:sqflite/sqflite.dart';
+import 'package:connect/main.dart';
 
 class ProfileProvider2 with ChangeNotifier {
   int totalUnreadCount = 0;
@@ -1504,7 +1505,14 @@ class ProfileProvider2 with ChangeNotifier {
             final rId = oldRecord['room_id'] as String?;
 
             if (messageId != null) {
-              // Check the local status of the message in our SQLite database.
+              // 1. Cancel notification locally if it exists in the tray
+              try {
+                await cancelLocalNotification(messageId);
+              } catch (e) {
+                print("Error cancelling notification in Postgres change listener: $e");
+              }
+
+              // 2. Check the local status of the message in our SQLite database.
               // If it wasn't read yet, it means the sender deleted it for everyone.
               final localMsg =
                   await LocalDatabaseHelper.instance.getMessageById(messageId);

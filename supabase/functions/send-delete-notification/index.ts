@@ -9,8 +9,8 @@ const serviceAccountJson = JSON.parse(Deno.env.get("FIREBASE_SERVICE_ACCOUNT")!)
 serve(async (req) => {
   try {
     const payload = await req.json()
-    // For a DELETE webhook trigger, the deleted row is in payload.old
-    const record = payload.old || payload.record
+    // For a DELETE webhook trigger, the deleted row is in payload.old_record (or payload.old)
+    const record = payload.old_record || payload.old || payload.record
 
     if (!record) {
       return new Response("No old record found in payload", { status: 400 })
