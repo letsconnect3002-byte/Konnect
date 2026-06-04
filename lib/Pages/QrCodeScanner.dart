@@ -201,9 +201,32 @@ class _QRScannerPageState extends State<QRScannerPage> {
               showDialog(
                 context: context,
                 barrierDismissible: false,
-                builder: (context) => const Center(
-                  child: CircularProgressIndicator(
-                    valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF00F2FE)),
+                builder: (context) => const Dialog(
+                  backgroundColor: Color(0xFF131422),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.all(Radius.circular(16)),
+                  ),
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        CircularProgressIndicator(
+                          valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF00F2FE)),
+                        ),
+                        SizedBox(height: 16),
+                        Text(
+                          "Loading their card...",
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            fontFamily: 'Inter',
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               );
@@ -387,9 +410,32 @@ class _ProfileCardState extends State<ProfileCard> {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => const Center(
-        child: CircularProgressIndicator(
-          valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF00F2FE)),
+      builder: (context) => const Dialog(
+        backgroundColor: Color(0xFF131422),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.all(Radius.circular(16)),
+        ),
+        child: Padding(
+          padding: EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF00F2FE)),
+              ),
+              SizedBox(height: 16),
+              Text(
+                "Saving connection...",
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  fontFamily: 'Inter',
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -612,8 +658,8 @@ class _ProfileCardState extends State<ProfileCard> {
                 "ABOUT ME",
                 style: TextStyle(
                   color: Color(0xFF8B8C9E),
-                  fontSize: 10,
-                  fontWeight: FontWeight.w900,
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
                   letterSpacing: 1.5,
                   fontFamily: 'Inter',
                 ),
@@ -688,8 +734,8 @@ class _ProfileCardState extends State<ProfileCard> {
                     "SOCIALS",
                     style: TextStyle(
                       color: Color(0xFF8B8C9E),
-                      fontSize: 10,
-                      fontWeight: FontWeight.w900,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
                       letterSpacing: 1.5,
                       fontFamily: 'Inter',
                     ),
@@ -735,15 +781,17 @@ class _ProfileCardState extends State<ProfileCard> {
             "HOW DO YOU KNOW THEM?",
             style: TextStyle(
               color: Color(0xFF8B8C9E),
-              fontSize: 10,
-              fontWeight: FontWeight.w900,
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
               letterSpacing: 1.5,
               fontFamily: 'Inter',
             ),
           ),
           const SizedBox(height: 6),
           Text(
-            "This helps us show you the right version of your card.",
+            _shareBackType == 'casual'
+                ? "You'll share your Casual card with them."
+                : "You'll share your Professional card with them.",
             style: TextStyle(
               color: Colors.white.withOpacity(0.6),
               fontSize: 12,
@@ -863,15 +911,19 @@ class _ProfileCardState extends State<ProfileCard> {
                   height: 52,
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(16),
-                    gradient: const LinearGradient(
-                      colors: [
-                        Color(0xFF8B5CF6),
-                        Color(0xFF00F2FE),
-                      ],
+                    gradient: LinearGradient(
+                      colors: _shareBackType == 'casual'
+                          ? const [Color(0xFF8B5CF6), Color(0xFF7C3AED)]
+                          : const [Color(0xFF00F2FE), Color(0xFF0284C7)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: const Color(0xFF00F2FE).withOpacity(0.2),
+                        color: (_shareBackType == 'casual'
+                                ? const Color(0xFF8B5CF6)
+                                : const Color(0xFF00F2FE))
+                            .withValues(alpha: 0.2),
                         blurRadius: 16,
                         offset: const Offset(0, 4),
                       ),

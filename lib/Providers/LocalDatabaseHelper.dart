@@ -19,8 +19,9 @@ class LocalDatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 1,
+      version: 2,
       onCreate: _createDB,
+      onUpgrade: _upgradeDB,
     );
   }
 
@@ -32,12 +33,23 @@ class LocalDatabaseHelper {
         sender_id INTEGER NOT NULL,
         payload TEXT NOT NULL,
         status TEXT NOT NULL,
-        created_at TEXT NOT NULL
+        created_at TEXT NOT NULL,
+        reply_to_message_id TEXT,
+        reply_to_message_payload TEXT,
+        reply_to_message_sender_name TEXT
       )
     ''');
 
     // Create index on room_id for fast retrieval
     await db.execute('CREATE INDEX idx_messages_room_id ON messages (room_id)');
+  }
+
+  Future<void> _upgradeDB(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      await db.execute('ALTER TABLE messages ADD COLUMN reply_to_message_id TEXT');
+      await db.execute('ALTER TABLE messages ADD COLUMN reply_to_message_payload TEXT');
+      await db.execute('ALTER TABLE messages ADD COLUMN reply_to_message_sender_name TEXT');
+    }
   }
 
   Future<void> insertMessage(
@@ -47,6 +59,9 @@ class LocalDatabaseHelper {
     String payload, {
     String status = 'sent',
     String? createdAt,
+    String? replyToMessageId,
+    String? replyToMessagePayload,
+    String? replyToMessageSenderName,
   }) async {
     final db = await database;
     final timeStr = createdAt ?? DateTime.now().toUtc().toIso8601String();
@@ -60,6 +75,9 @@ class LocalDatabaseHelper {
         'payload': payload,
         'status': status,
         'created_at': timeStr,
+        'reply_to_message_id': replyToMessageId,
+        'reply_to_message_payload': replyToMessagePayload,
+        'reply_to_message_sender_name': replyToMessageSenderName,
       },
       conflictAlgorithm: ConflictAlgorithm.ignore, // Upsert idempotency helper
     );
@@ -73,6 +91,28 @@ class LocalDatabaseHelper {
       where: 'id = ?',
       whereArgs: [messageId],
     );
+  }
+
+  Future<void> deleteMessage(String id) async {
+    final db = await database;
+    await db.delete(
+      'messages',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  Future<Map<String, dynamic>?> getMessageById(String id) async {
+    final db = await database;
+    final List<Map<String, dynamic>> results = await db.query(
+      'messages',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+    if (results.isNotEmpty) {
+      return results.first;
+    }
+    return null;
   }
 
   Future<List<Map<String, dynamic>>> getMessagesForRoom(String roomId) async {

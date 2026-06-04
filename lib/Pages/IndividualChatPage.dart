@@ -20,24 +20,32 @@ class IndividualChatPage extends StatefulWidget {
 class _IndividualChatPageState extends State<IndividualChatPage> {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
-  
+
   bool _isTyping = false;
   late String _name;
   late String _avatarUrl;
   late String _profession;
-  
+
   late final ProfileProvider2 _provider;
   String? _roomId;
   bool _isRoomLoading = true;
+  Map<String, dynamic>? _replyMessage;
+  final Map<String, GlobalKey> _messageKeys = {};
+  String? _highlightedMessageId;
+  bool _showScrollToBottom = false;
+  int _previousMessageCount = 0;
 
   @override
   void initState() {
     super.initState();
     _name = widget.connectionData['name'] ?? 'Unknown';
-    _avatarUrl = widget.connectionData['avatarUrl'] ?? widget.connectionData['avatar_url'] ?? '';
+    _avatarUrl = widget.connectionData['avatarUrl'] ??
+        widget.connectionData['avatar_url'] ??
+        '';
     _profession = widget.connectionData['profession'] ?? 'Connection';
 
     _provider = Provider.of<ProfileProvider2>(context, listen: false);
+    _scrollController.addListener(_onScroll);
     _initChatRoom();
   }
 
@@ -63,21 +71,52 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
     }
   }
 
+  void _onScroll() {
+    if (!_scrollController.hasClients) return;
+    final pos = _scrollController.position;
+    // Show the button when user is scrolled more than 100px from bottom
+    final isScrolledUp = pos.maxScrollExtent - pos.pixels > 100;
+    if (isScrolledUp != _showScrollToBottom) {
+      setState(() {
+        _showScrollToBottom = isScrolledUp;
+      });
+    }
+  }
+
+  bool get _isNearBottom {
+    if (!_scrollController.hasClients) return true;
+    final pos = _scrollController.position;
+    return pos.maxScrollExtent - pos.pixels < 100;
+  }
+
   @override
   void dispose() {
     _provider.setActiveRoom(null);
+    _scrollController.removeListener(_onScroll);
     _messageController.dispose();
     _scrollController.dispose();
     super.dispose();
   }
 
-  void _scrollToBottom() {
+  Future<void> _scrollToBottom() async {
+    if (!_scrollController.hasClients) return;
+    // Wait a frame so the layout (especially tall reply-quote bubbles) settles
+    await Future.delayed(const Duration(milliseconds: 50));
+    if (!_scrollController.hasClients || !mounted) return;
+
+    await _scrollController.animateTo(
+      _scrollController.position.maxScrollExtent,
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeOut,
+    );
+
+    // If maxScrollExtent grew during the animation (e.g. images loaded,
+    // new messages arrived), snap to the true bottom.
     if (_scrollController.hasClients) {
-      _scrollController.animateTo(
-        _scrollController.position.maxScrollExtent,
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeOut,
-      );
+      final trueMax = _scrollController.position.maxScrollExtent;
+      if (_scrollController.offset < trueMax - 1) {
+        _scrollController.jumpTo(trueMax);
+      }
     }
   }
 
@@ -87,39 +126,123 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
 
     _messageController.clear();
     HapticFeedback.lightImpact();
-    
-    await _provider.sendChatMessage(roomId: _roomId!, text: text);
-    
+
+    final replyMsg = _replyMessage;
+    setState(() {
+      _replyMessage = null;
+    });
+
+    if (replyMsg != null) {
+      final isReplyMe = replyMsg['sender_id'] == _provider.userId;
+      final replySenderName = isReplyMe ? 'You' : _name;
+      await _provider.sendChatMessage(
+        roomId: _roomId!,
+        text: text,
+        replyToMessageId: replyMsg['id']?.toString(),
+        replyToMessagePayload: replyMsg['payload']?.toString(),
+        replyToMessageSenderName: replySenderName,
+      );
+    } else {
+      await _provider.sendChatMessage(roomId: _roomId!, text: text);
+    }
+
     WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
   }
 
   String _formatMessageTime(String isoString) {
     try {
       final dateTime = DateTime.parse(isoString).toLocal();
-      final now = DateTime.now();
-
-      final hour = dateTime.hour > 12 ? dateTime.hour - 12 : (dateTime.hour == 0 ? 12 : dateTime.hour);
+      final hour = dateTime.hour > 12
+          ? dateTime.hour - 12
+          : (dateTime.hour == 0 ? 12 : dateTime.hour);
       final minute = dateTime.minute.toString().padLeft(2, '0');
       final period = dateTime.hour >= 12 ? 'PM' : 'AM';
-      final timeStr = "$hour:$minute $period";
-
-      if (dateTime.year == now.year && dateTime.month == now.month && dateTime.day == now.day) {
-        return timeStr;
-      }
-
-      final yesterday = DateTime(now.year, now.month, now.day - 1);
-      if (dateTime.year == yesterday.year && dateTime.month == yesterday.month && dateTime.day == yesterday.day) {
-        return "Yesterday, $timeStr";
-      }
-
-      return "${dateTime.day}/${dateTime.month}/${dateTime.year}, $timeStr";
+      return "$hour:$minute $period";
     } catch (_) {
       return "Just now";
     }
   }
 
+  bool _isDifferentDay(String prevIso, String currentIso) {
+    if (prevIso.isEmpty || currentIso.isEmpty) return false;
+    try {
+      final prevDate = DateTime.parse(prevIso).toLocal();
+      final currDate = DateTime.parse(currentIso).toLocal();
+      return prevDate.year != currDate.year ||
+          prevDate.month != currDate.month ||
+          prevDate.day != currDate.day;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  String _formatMessageDateHeader(String isoString) {
+    try {
+      final dateTime = DateTime.parse(isoString).toLocal();
+      final now = DateTime.now();
+
+      if (dateTime.year == now.year &&
+          dateTime.month == now.month &&
+          dateTime.day == now.day) {
+        return "Today";
+      }
+
+      final yesterday = DateTime(now.year, now.month, now.day - 1);
+      if (dateTime.year == yesterday.year &&
+          dateTime.month == yesterday.month &&
+          dateTime.day == yesterday.day) {
+        return "Yesterday";
+      }
+
+      final months = [
+        'January',
+        'February',
+        'March',
+        'April',
+        'May',
+        'June',
+        'July',
+        'August',
+        'September',
+        'October',
+        'November',
+        'December'
+      ];
+      final monthName = months[dateTime.month - 1];
+      return "$monthName ${dateTime.day}, ${dateTime.year}";
+    } catch (_) {
+      return "";
+    }
+  }
+
+  Widget _buildDateHeader(String dateText) {
+    if (dateText.isEmpty) return const SizedBox.shrink();
+    return Center(
+      child: Container(
+        margin: const EdgeInsets.symmetric(vertical: 16),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+        decoration: BoxDecoration(
+          color: const Color(0xFF13141F),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: const Color(0xFF1F2030), width: 0.5),
+        ),
+        child: Text(
+          dateText,
+          style: TextStyle(
+            color: Colors.white.withValues(alpha: 0.4),
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+            fontFamily: 'Inter',
+          ),
+        ),
+      ),
+    );
+  }
+
   String _getAvatarUrl(String name, String? existingUrl) {
-    if (existingUrl != null && existingUrl.isNotEmpty && existingUrl.startsWith('http')) {
+    if (existingUrl != null &&
+        existingUrl.isNotEmpty &&
+        existingUrl.startsWith('http')) {
       return existingUrl;
     }
     final cleanName = name.toLowerCase().trim();
@@ -143,10 +266,13 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
     final provider = Provider.of<ProfileProvider2>(context);
     final messages = provider.activeRoomMessages;
 
-    // Auto-scroll when new messages arrive
-    if (messages.isNotEmpty) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
+    // Auto-scroll ONLY when a genuinely new message arrives AND user is near the bottom
+    if (messages.length > _previousMessageCount && _previousMessageCount > 0) {
+      if (_isNearBottom) {
+        WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
+      }
     }
+    _previousMessageCount = messages.length;
 
     return Scaffold(
       backgroundColor: const Color(0xFF090A0F),
@@ -154,7 +280,8 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
         backgroundColor: const Color(0xFF0F101A),
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 18),
+          icon: const Icon(Icons.arrow_back_ios_new_rounded,
+              color: Colors.white, size: 18),
           onPressed: () => Navigator.pop(context),
         ),
         titleSpacing: 0,
@@ -196,8 +323,13 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
                             color: const Color(0xFF1B1C2A),
                             alignment: Alignment.center,
                             child: Text(
-                              _name.isNotEmpty ? _name.substring(0, 1).toUpperCase() : "?",
-                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                              _name.isNotEmpty
+                                  ? _name.substring(0, 1).toUpperCase()
+                                  : "?",
+                              style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 14),
                             ),
                           ),
                   ),
@@ -218,28 +350,15 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
                       ),
                     ),
                     const SizedBox(height: 2),
-                    Row(
-                      children: [
-                        Container(
-                          width: 6,
-                          height: 6,
-                          decoration: const BoxDecoration(
-                            color: Color(0xFF10B981),
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                        const SizedBox(width: 5),
-                        Text(
-                          _profession,
-                          style: TextStyle(
-                            color: Colors.white.withOpacity(0.4),
-                            fontSize: 11,
-                            fontFamily: 'Inter',
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
+                    Text(
+                      _profession,
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.4),
+                        fontSize: 11,
+                        fontFamily: 'Inter',
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ],
                 ),
@@ -254,32 +373,148 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
             child: _isRoomLoading
                 ? const Center(
                     child: CircularProgressIndicator(
-                      valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF00F2FE)),
+                      valueColor:
+                          AlwaysStoppedAnimation<Color>(Color(0xFF00F2FE)),
                     ),
                   )
-                : ListView.builder(
-                    controller: _scrollController,
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
-                    itemCount: messages.length + (_isTyping ? 1 : 0),
-                    itemBuilder: (context, index) {
-                      if (index == messages.length) {
-                        return _buildTypingIndicator();
-                      }
+                : Stack(
+                    children: [
+                      ListView.builder(
+                        controller: _scrollController,
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 20),
+                        itemCount: messages.length + (_isTyping ? 1 : 0),
+                        itemBuilder: (context, index) {
+                          if (index == messages.length) {
+                            return _buildTypingIndicator();
+                          }
 
-                      final msg = messages[index];
-                      final isMe = msg['sender_id'] == provider.userId;
-                      final timeString = _formatMessageTime(msg['created_at'] as String);
-                      final status = msg['status'] as String?;
+                          final msg = messages[index];
+                          final msgId = msg['id'] as String;
+                          final key = _messageKeys.putIfAbsent(
+                              msgId, () => GlobalKey());
+                          final isMe = msg['sender_id'] == provider.userId;
+                          final timeString =
+                              _formatMessageTime(msg['created_at'] as String);
+                          final status = msg['status'] as String?;
+                          final replyToId =
+                              msg['reply_to_message_id'] as String?;
+                          final replyToPayload =
+                              msg['reply_to_message_payload'] as String?;
+                          final replyToSenderName =
+                              msg['reply_to_message_sender_name'] as String?;
+                          final isHighlighted = msgId == _highlightedMessageId;
 
-                      return _buildMessageBubble(
-                        text: msg['payload'] ?? '',
-                        time: timeString,
-                        isMe: isMe,
-                        status: status,
-                      );
-                    },
+                          Offset tapPosition = Offset.zero;
+
+                          final prevCreatedAt = index > 0
+                              ? (messages[index - 1]['created_at'] as String? ??
+                                  '')
+                              : '';
+                          final currentCreatedAt =
+                              msg['created_at'] as String? ?? '';
+                          final showDateHeader = index == 0 ||
+                              _isDifferentDay(prevCreatedAt, currentCreatedAt);
+
+                          final bubbleWidget = SwipeToReply(
+                            key: key,
+                            onReply: () {
+                              _setReplyMessage(msg, isMe);
+                            },
+                            child: GestureDetector(
+                              onTapDown: (details) {
+                                tapPosition = details.globalPosition;
+                              },
+                              onLongPress: () {
+                                _showContextMenu(
+                                    context, tapPosition, msg, isMe);
+                              },
+                              child: _buildMessageBubble(
+                                text: msg['payload'] ?? '',
+                                time: timeString,
+                                isMe: isMe,
+                                status: status,
+                                replyToId: replyToId,
+                                replyToPayload: replyToPayload,
+                                replyToSenderName: replyToSenderName,
+                                isHighlighted: isHighlighted,
+                              ),
+                            ),
+                          );
+
+                          if (showDateHeader) {
+                            final dateText =
+                                _formatMessageDateHeader(currentCreatedAt);
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                _buildDateHeader(dateText),
+                                bubbleWidget,
+                              ],
+                            );
+                          }
+
+                          return bubbleWidget;
+                        },
+                      ),
+                      // ── Scroll-to-bottom FAB ──
+                      Positioned(
+                        right: 16,
+                        bottom: 16,
+                        child: AnimatedScale(
+                          scale: _showScrollToBottom ? 1.0 : 0.0,
+                          duration: const Duration(milliseconds: 250),
+                          curve: Curves.easeOutBack,
+                          child: AnimatedOpacity(
+                            opacity: _showScrollToBottom ? 1.0 : 0.0,
+                            duration: const Duration(milliseconds: 200),
+                            child: GestureDetector(
+                              onTap: _scrollToBottom,
+                              behavior: HitTestBehavior.opaque,
+                              child: Container(
+                                width: 42,
+                                height: 42,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  gradient: const LinearGradient(
+                                    colors: [
+                                      Color(0xFF8B5CF6),
+                                      Color(0xFF00F2FE)
+                                    ],
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                  ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: const Color(0xFF8B5CF6)
+                                          .withValues(alpha: 0.35),
+                                      blurRadius: 10,
+                                      offset: const Offset(0, 4),
+                                    ),
+                                  ],
+                                ),
+                                child: Container(
+                                  margin: const EdgeInsets.all(1.5),
+                                  decoration: const BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: Color(
+                                        0xFF0D0E1A), // Blend with dark background
+                                  ),
+                                  child: const Icon(
+                                    Icons.keyboard_arrow_down_rounded,
+                                    color: Colors.white,
+                                    size: 24,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
           ),
+          _buildReplyPreview(),
           _buildInputBar(),
         ],
       ),
@@ -291,70 +526,110 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
     required String time,
     required bool isMe,
     String? status,
+    String? replyToId,
+    String? replyToPayload,
+    String? replyToSenderName,
+    bool isHighlighted = false,
   }) {
-    return Align(
-      alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 16),
-        constraints: BoxConstraints(
-          maxWidth: MediaQuery.of(context).size.width * 0.75,
-        ),
-        child: Column(
-          crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-          children: [
-            Container(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.only(
-                  topLeft: const Radius.circular(20),
-                  topRight: const Radius.circular(20),
-                  bottomLeft: isMe ? const Radius.circular(20) : const Radius.circular(4),
-                  bottomRight: isMe ? const Radius.circular(4) : const Radius.circular(20),
-                ),
-                gradient: isMe
-                    ? const LinearGradient(
-                        colors: [Color(0xFF8B5CF6), Color(0xFF5D3FE8)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      )
-                    : null,
-                color: isMe ? null : const Color(0xFF13141F),
-                border: isMe ? null : Border.all(color: const Color(0xFF1F2030)),
-              ),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              child: Text(
-                text,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 14.5,
-                  height: 1.35,
-                  fontFamily: 'Inter',
-                ),
-              ),
+    final bubbleRadius = BorderRadius.only(
+      topLeft: const Radius.circular(20),
+      topRight: const Radius.circular(20),
+      bottomLeft: isMe ? const Radius.circular(20) : const Radius.circular(4),
+      bottomRight: isMe ? const Radius.circular(4) : const Radius.circular(20),
+    );
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Column(
+        crossAxisAlignment:
+            isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+        children: [
+          // ── Full-width highlight band behind the bubble only ──
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeInOut,
+            padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 2),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(14),
+              color: isHighlighted
+                  ? Colors.white.withValues(alpha: 0.08)
+                  : Colors.transparent,
             ),
-            const SizedBox(height: 4),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 6),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  Text(
-                    time,
-                    style: TextStyle(
-                      color: Colors.white.withOpacity(0.25),
-                      fontSize: 10,
-                      fontFamily: 'Inter',
+            child: Align(
+              alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
+              child: Container(
+                constraints: BoxConstraints(
+                  maxWidth: MediaQuery.of(context).size.width * 0.75,
+                ),
+                decoration: BoxDecoration(
+                  borderRadius: bubbleRadius,
+                  gradient: isMe
+                      ? const LinearGradient(
+                          colors: [Color(0xFF8B5CF6), Color(0xFF5D3FE8)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        )
+                      : null,
+                  color: isMe ? null : const Color(0xFF13141F),
+                  border:
+                      isMe ? null : Border.all(color: const Color(0xFF1F2030)),
+                ),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (replyToId != null) ...[
+                      GestureDetector(
+                        onTap: () {
+                          _scrollToAndHighlightMessage(
+                              replyToId, _provider.activeRoomMessages);
+                        },
+                        child: _buildBubbleReplyQuote(replyToSenderName ?? '',
+                            replyToPayload ?? '', isMe),
+                      ),
+                      const SizedBox(height: 6),
+                    ],
+                    Text(
+                      text,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 14.5,
+                        height: 1.35,
+                        fontFamily: 'Inter',
+                      ),
                     ),
-                  ),
-                  if (isMe && status != null) ...[
-                    const SizedBox(width: 4),
-                    _buildStatusIcon(status),
-                  ]
-                ],
+                  ],
+                ),
               ),
             ),
-          ],
-        ),
+          ),
+          const SizedBox(height: 4),
+          // ── Time + status row (never highlighted) ──
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 6),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment:
+                  isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
+              children: [
+                Text(
+                  time,
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.25),
+                    fontSize: 11,
+                    fontFamily: 'Inter',
+                  ),
+                ),
+                if (isMe && status != null) ...[
+                  const SizedBox(width: 4),
+                  _buildStatusIcon(status),
+                ]
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -365,7 +640,7 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
       return Icon(
         Icons.access_time_rounded,
         size: 12,
-        color: Colors.white.withOpacity(0.35),
+        color: Colors.white.withValues(alpha: 0.35),
       );
     }
 
@@ -374,7 +649,7 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
       return Icon(
         Icons.check_rounded,
         size: 12,
-        color: Colors.white.withOpacity(0.3),
+        color: Colors.white.withValues(alpha: 0.3),
       );
     }
 
@@ -383,12 +658,12 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
       return Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.check_rounded, size: 12,
-              color: Colors.white.withOpacity(0.4)),
+          Icon(Icons.check_rounded,
+              size: 12, color: Colors.white.withValues(alpha: 0.4)),
           Transform.translate(
             offset: const Offset(-6, 0),
-            child: Icon(Icons.check_rounded, size: 12,
-                color: Colors.white.withOpacity(0.4)),
+            child: Icon(Icons.check_rounded,
+                size: 12, color: Colors.white.withValues(alpha: 0.4)),
           ),
         ],
       );
@@ -398,12 +673,11 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(Icons.check_rounded, size: 12,
-            color: const Color(0xFF00F2FE)),
+        Icon(Icons.check_rounded, size: 12, color: const Color(0xFF00F2FE)),
         Transform.translate(
           offset: const Offset(-6, 0),
-          child: Icon(Icons.check_rounded, size: 12,
-              color: const Color(0xFF00F2FE)),
+          child: Icon(Icons.check_rounded,
+              size: 12, color: const Color(0xFF00F2FE)),
         ),
       ],
     );
@@ -444,38 +718,19 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
       decoration: BoxDecoration(
         color: const Color(0xFF0F101A),
         border: Border(
-          top: BorderSide(color: Colors.white.withOpacity(0.03)),
+          top: BorderSide(color: Colors.white.withValues(alpha: 0.03)),
         ),
       ),
       child: Row(
         children: [
-          GestureDetector(
-            onTap: () {
-              HapticFeedback.lightImpact();
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text("Attachments coming soon!")),
-              );
-            },
-            child: Container(
-              width: 40,
-              height: 40,
-              decoration: const BoxDecoration(
-                color: Color(0xFF1C1D2A),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(Icons.add_rounded, color: Colors.white60, size: 20),
-            ),
-          ),
-          const SizedBox(width: 10),
           Expanded(
             child: Container(
-              height: 40,
               decoration: BoxDecoration(
                 color: const Color(0xFF13141F),
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(color: const Color(0xFF1F2030)),
               ),
-              padding: const EdgeInsets.symmetric(horizontal: 16),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
               child: TextField(
                 controller: _messageController,
                 style: const TextStyle(color: Colors.white, fontSize: 14.5),
@@ -483,10 +738,12 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
                 decoration: InputDecoration(
                   hintText: 'Type a message...',
                   hintStyle: TextStyle(
-                    color: Colors.white.withOpacity(0.25),
+                    color: Colors.white.withValues(alpha: 0.25),
                     fontSize: 14.5,
                   ),
                   border: InputBorder.none,
+                  isDense: true,
+                  contentPadding: EdgeInsets.zero,
                 ),
                 onSubmitted: (_) => _sendMessage(),
               ),
@@ -506,8 +763,412 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
                 ),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(Icons.send_rounded, color: Colors.white, size: 16),
+              child:
+                  const Icon(Icons.send_rounded, color: Colors.white, size: 16),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBubbleReplyQuote(String senderName, String text, bool isMe) {
+    return IntrinsicWidth(
+      child: IntrinsicHeight(
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+          decoration: BoxDecoration(
+            color: Colors.black.withOpacity(isMe ? 0.15 : 0.22),
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Container(
+                width: 3,
+                decoration: BoxDecoration(
+                  color:
+                      isMe ? const Color(0xFF00F2FE) : const Color(0xFF8B5CF6),
+                  borderRadius: BorderRadius.circular(1.5),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Flexible(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      senderName,
+                      style: TextStyle(
+                        color: isMe
+                            ? const Color(0xFF00F2FE)
+                            : const Color(0xFF8B5CF6),
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        fontFamily: 'Inter',
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 1),
+                    Text(
+                      text,
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.65),
+                        fontSize: 12,
+                        fontFamily: 'Inter',
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _scrollToAndHighlightMessage(
+      String replyToId, List<Map<String, dynamic>> messages) async {
+    final targetIndex = messages.indexWhere((m) => m['id'] == replyToId);
+    if (targetIndex == -1 || !_scrollController.hasClients) return;
+
+    // ── Step 1: Jump close to the target so ListView builds it ──
+    // Estimate a rough position – messages average ~80px but vary.
+    final totalMessages = messages.length;
+    final scrollExtent = _scrollController.position.maxScrollExtent;
+    final double fraction = targetIndex / totalMessages;
+    final double estimatedOffset =
+        (fraction * scrollExtent).clamp(0.0, scrollExtent);
+
+    // Check if the target widget is already built
+    GlobalKey? targetKey = _messageKeys[replyToId];
+    if (targetKey == null || targetKey.currentContext == null) {
+      // Jump immediately (no animation) to get close, then let ListView build
+      _scrollController.jumpTo(estimatedOffset);
+      await Future.delayed(const Duration(milliseconds: 50));
+    }
+
+    // ── Step 2: Precise scroll using ensureVisible ──
+    // Try up to 3 times with small delays to let the list catch up
+    for (int attempt = 0; attempt < 3; attempt++) {
+      targetKey = _messageKeys[replyToId];
+      if (targetKey != null && targetKey.currentContext != null) {
+        await Scrollable.ensureVisible(
+          targetKey.currentContext!,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeInOut,
+          alignment:
+              0.4, // Position the target ~40% from the top of the viewport
+        );
+        break;
+      }
+      await Future.delayed(const Duration(milliseconds: 80));
+    }
+
+    // ── Step 3: Flash highlight ──
+    if (mounted) {
+      setState(() {
+        _highlightedMessageId = replyToId;
+      });
+
+      Timer(const Duration(milliseconds: 1500), () {
+        if (mounted) {
+          setState(() {
+            _highlightedMessageId = null;
+          });
+        }
+      });
+    }
+  }
+
+  Widget _buildReplyPreview() {
+    if (_replyMessage == null) return const SizedBox.shrink();
+
+    final isMe = _replyMessage!['sender_id'] == _provider.userId;
+    final senderName = isMe ? 'You' : _name;
+    final text = _replyMessage!['payload'] ?? '';
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: const BoxDecoration(
+        color: Color(0xFF0F101A),
+        border: Border(
+          top: BorderSide(color: Color(0xFF1F2030), width: 1),
+        ),
+      ),
+      child: Container(
+        decoration: BoxDecoration(
+          color: const Color(0xFF13141F),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 4,
+              height: 44,
+              decoration: const BoxDecoration(
+                color: Color(0xFF8B5CF6),
+                borderRadius: BorderRadius.only(
+                  topLeft: Radius.circular(4),
+                  bottomLeft: Radius.circular(4),
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    senderName,
+                    style: const TextStyle(
+                      color: Color(0xFF8B5CF6),
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.bold,
+                      fontFamily: 'Inter',
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    text,
+                    style: const TextStyle(
+                      color: Colors.white70,
+                      fontSize: 12,
+                      fontFamily: 'Inter',
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+            IconButton(
+              icon: const Icon(Icons.close_rounded,
+                  color: Colors.white38, size: 18),
+              onPressed: () {
+                setState(() {
+                  _replyMessage = null;
+                });
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _setReplyMessage(Map<String, dynamic> message, bool isMe) {
+    setState(() {
+      _replyMessage = message;
+    });
+  }
+
+  void _showContextMenu(BuildContext context, Offset tapPosition,
+      Map<String, dynamic> message, bool isMe) {
+    final RenderBox overlay =
+        Navigator.of(context).overlay!.context.findRenderObject() as RenderBox;
+
+    showMenu(
+      context: context,
+      position: RelativeRect.fromRect(
+        tapPosition & const Size(40, 40),
+        Offset.zero & overlay.size,
+      ),
+      color: const Color(0xFF10111F),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: const BorderSide(color: Color(0xFF202138)),
+      ),
+      items: [
+        const PopupMenuItem(
+          value: 'reply',
+          child: Row(
+            children: [
+              Icon(Icons.reply_rounded, color: Colors.white70, size: 18),
+              SizedBox(width: 8),
+              Text("Reply",
+                  style: TextStyle(color: Colors.white, fontSize: 14)),
+            ],
+          ),
+        ),
+        const PopupMenuItem(
+          value: 'delete',
+          child: Row(
+            children: [
+              Icon(Icons.delete_outline_rounded,
+                  color: Colors.redAccent, size: 18),
+              SizedBox(width: 8),
+              Text("Delete",
+                  style: TextStyle(color: Colors.redAccent, fontSize: 14)),
+            ],
+          ),
+        ),
+      ],
+    ).then((value) {
+      if (value == 'reply') {
+        _setReplyMessage(message, isMe);
+      } else if (value == 'delete') {
+        _handleDeleteMessage(message, isMe);
+      }
+    });
+  }
+
+  void _handleDeleteMessage(Map<String, dynamic> message, bool isMe) {
+    final status = message['status'] as String?;
+    final isSeen = (status == 'read');
+
+    showDialog(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          backgroundColor: const Color(0xFF10111F),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: const BorderSide(color: Color(0xFF202138)),
+          ),
+          title: const Text(
+            "Delete Message?",
+            style: TextStyle(
+                color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+          ),
+          content: Text(
+            isMe
+                ? (isSeen
+                    ? "Want to delete the message?"
+                    : "Do you want to delete this message for everyone or only for yourself?")
+                : "This message will be deleted for you.",
+            style: const TextStyle(color: Colors.white70, fontSize: 14),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text("Cancel",
+                  style: TextStyle(color: Color(0xFF8B8C9E))),
+            ),
+            TextButton(
+              onPressed: () async {
+                Navigator.of(dialogContext).pop();
+                await _provider.deleteChatMessage(message['id'] as String,
+                    deleteForEveryone: false);
+              },
+              child: const Text("Delete for Me",
+                  style: TextStyle(color: Colors.redAccent)),
+            ),
+            if (isMe && !isSeen)
+              TextButton(
+                onPressed: () async {
+                  Navigator.of(dialogContext).pop();
+                  await _provider.deleteChatMessage(message['id'] as String,
+                      deleteForEveryone: true);
+                },
+                child: const Text("Delete for Everyone",
+                    style: TextStyle(color: Color(0xFF00F2FE))),
+              ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class SwipeToReply extends StatefulWidget {
+  final Widget child;
+  final VoidCallback onReply;
+
+  const SwipeToReply({
+    super.key,
+    required this.child,
+    required this.onReply,
+  });
+
+  @override
+  State<SwipeToReply> createState() => _SwipeToReplyState();
+}
+
+class _SwipeToReplyState extends State<SwipeToReply>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  double _dragOffset = 0.0;
+  bool _triggerThresholdReached = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 200),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _onHorizontalDragUpdate(DragUpdateDetails details) {
+    if (details.delta.dx < 0 && _dragOffset <= 0) return;
+
+    setState(() {
+      _dragOffset = (_dragOffset + details.delta.dx * 0.6).clamp(0.0, 70.0);
+      if (_dragOffset >= 50.0 && !_triggerThresholdReached) {
+        _triggerThresholdReached = true;
+        HapticFeedback.lightImpact();
+      } else if (_dragOffset < 50.0 && _triggerThresholdReached) {
+        _triggerThresholdReached = false;
+      }
+    });
+  }
+
+  void _onHorizontalDragEnd(DragEndDetails details) {
+    if (_triggerThresholdReached) {
+      widget.onReply();
+    }
+    setState(() {
+      _dragOffset = 0.0;
+      _triggerThresholdReached = false;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onHorizontalDragUpdate: _onHorizontalDragUpdate,
+      onHorizontalDragEnd: _onHorizontalDragEnd,
+      behavior: HitTestBehavior.translucent,
+      child: Stack(
+        clipBehavior: Clip.none,
+        alignment: Alignment.centerLeft,
+        children: [
+          Positioned(
+            left: -40 + (_dragOffset * 0.4),
+            child: Opacity(
+              opacity: (_dragOffset / 70.0).clamp(0.0, 1.0),
+              child: Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: const Color(0xFF8B5CF6).withOpacity(0.2),
+                ),
+                child: const Icon(
+                  Icons.reply_rounded,
+                  color: Color(0xFF8B5CF6),
+                  size: 18,
+                ),
+              ),
+            ),
+          ),
+          Transform.translate(
+            offset: Offset(_dragOffset, 0),
+            child: widget.child,
           ),
         ],
       ),

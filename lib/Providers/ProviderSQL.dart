@@ -6,8 +6,85 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 import 'package:connect/Providers/LocalDatabaseHelper.dart';
+import 'package:sqflite/sqflite.dart';
 
 class ProfileProvider2 with ChangeNotifier {
+  int totalUnreadCount = 0;
+  int casualUnreadCount = 0;
+  int professionalUnreadCount = 0;
+
+  Future<void> updateUnreadCount() async {
+    final myUserId = userId;
+    if (myUserId == -1) {
+      totalUnreadCount = 0;
+      casualUnreadCount = 0;
+      professionalUnreadCount = 0;
+      return;
+    }
+    try {
+      final db = await LocalDatabaseHelper.instance.database;
+
+      // 1. Get total unread count
+      final result = await db.rawQuery(
+        "SELECT COUNT(*) as count FROM messages WHERE sender_id != ? AND status != 'read'",
+        [myUserId],
+      );
+      if (result.isNotEmpty) {
+        totalUnreadCount = Sqflite.firstIntValue(result) ?? 0;
+      } else {
+        totalUnreadCount = 0;
+      }
+
+      // 2. Get unread messages grouped by room_id
+      final List<Map<String, dynamic>> roomResults = await db.rawQuery(
+        "SELECT room_id, COUNT(*) as count FROM messages WHERE sender_id != ? AND status != 'read' GROUP BY room_id",
+        [myUserId],
+      );
+
+      final Map<String, int> roomUnreadMap = {
+        for (final row in roomResults)
+          row['room_id'] as String: int.tryParse(row['count'].toString()) ?? 0
+      };
+
+      // 3. Map to tabs
+      int casualCount = 0;
+      int professionalCount = 0;
+
+      for (final connection in connections) {
+        final int connId = connection['id'] as int;
+        final String? rId = connectionRooms[connId];
+        if (rId != null && roomUnreadMap.containsKey(rId)) {
+          final int count = roomUnreadMap[rId]!;
+
+          // Determine tab assignments
+          final sharedCard = (connection['my_shared_card'] ??
+                  connection['shared_card'] ??
+                  connection['sharedCard'] ??
+                  'both')
+              .toString()
+              .toLowerCase();
+
+          if (sharedCard == 'casual') {
+            casualCount += count;
+          } else if (sharedCard == 'professional') {
+            professionalCount += count;
+          } else {
+            // both
+            casualCount += count;
+            professionalCount += count;
+          }
+        }
+      }
+
+      casualUnreadCount = casualCount;
+      professionalUnreadCount = professionalCount;
+
+      notifyListeners();
+    } catch (e) {
+      print("Error calculating unread count: $e");
+    }
+  }
+
   // Profile fields
   String name = '';
   String profession = '';
@@ -489,14 +566,16 @@ class ProfileProvider2 with ChangeNotifier {
           callback: (payload) async {
             print("Realtime connection change detected: ${payload.toString()}");
             await fetchConnections();
+            await updateUnreadCount();
           },
         );
 
     _connectionsSubscription?.subscribe();
 
-    // Initial fetch to load the data
-    fetchConnections();
-    loadChatRooms();
+    // Initial fetch to load the data, then load chat rooms to ensure connections list is loaded first
+    fetchConnections().then((_) {
+      loadChatRooms();
+    });
   }
 
   void unsubscribeFromConnections() {
@@ -805,7 +884,7 @@ class ProfileProvider2 with ChangeNotifier {
     notifyListeners();
   }
 
-  // Delete a specific profile by id
+  // Delete a specific profile by id and clear all associated chat history
   Future<void> deleteProfile(int id) async {
     if (id == userId) {
       try {
@@ -816,8 +895,56 @@ class ProfileProvider2 with ChangeNotifier {
         print("Error deleting my profile: $e");
       }
     } else {
-      // If it's someone else's profile, disconnect instead of deleting the profile
-      await disconnectUsers(userId, id);
+      // If it's someone else's profile, disconnect and clear all chat history
+      try {
+        final String? roomId = connectionRooms[id];
+
+        // 1. Disconnect the users
+        await disconnectUsers(userId, id);
+
+        // 2. Clear SQLite local messages
+        if (roomId != null) {
+          final db = await LocalDatabaseHelper.instance.database;
+          await db.delete(
+            'messages',
+            where: 'room_id = ?',
+            whereArgs: [roomId],
+          );
+        }
+
+        // 3. Clear Supabase messages/room
+        if (roomId != null) {
+          try {
+            await Supabase.instance.client
+                .from('messages')
+                .delete()
+                .eq('room_id', roomId);
+            await Supabase.instance.client
+                .from('room_participants')
+                .delete()
+                .eq('room_id', roomId);
+            await Supabase.instance.client
+                .from('chat_rooms')
+                .delete()
+                .eq('id', roomId);
+          } catch (dbErr) {
+            print("Note: Supabase room clean up restricted/skipped: $dbErr");
+          }
+        }
+
+        // 4. Update memory cache
+        connectionRooms.remove(id);
+        if (activeRoomId == roomId) {
+          activeRoomId = null;
+          activeRoomMessages = [];
+        }
+
+        await fetchConnections();
+        await updateUnreadCount();
+      } catch (e) {
+        print("Error deleting someone else's profile/chat: $e");
+        rethrow;
+      }
     }
     notifyListeners();
   }
@@ -1123,6 +1250,9 @@ class ProfileProvider2 with ChangeNotifier {
       // Reconcile statuses of messages WE sent — handles the case where
       // the recipient read our message while we were offline.
       await syncOutgoingMessageStatuses();
+      // Reconcile incoming messages that were read elsewhere/deleted from Supabase
+      await syncIncomingMessageStatuses();
+      await updateUnreadCount();
     } catch (e) {
       print("Error loading chat rooms: $e");
     }
@@ -1196,6 +1326,9 @@ class ProfileProvider2 with ChangeNotifier {
   Future<void> sendChatMessage({
     required String roomId,
     required String text,
+    String? replyToMessageId,
+    String? replyToMessagePayload,
+    String? replyToMessageSenderName,
   }) async {
     final myUserId = userId;
     if (myUserId == -1) return;
@@ -1207,9 +1340,15 @@ class ProfileProvider2 with ChangeNotifier {
     // User sees the message bubble appear instantly with a clock icon ⏱
     // This is the WhatsApp "optimistic send" — no waiting for the server.
     await LocalDatabaseHelper.instance.insertMessage(
-      messageId, roomId, myUserId, text,
+      messageId,
+      roomId,
+      myUserId,
+      text,
       status: 'pending',
       createdAt: createdAt,
+      replyToMessageId: replyToMessageId,
+      replyToMessagePayload: replyToMessagePayload,
+      replyToMessageSenderName: replyToMessageSenderName,
     );
     if (activeRoomId == roomId) {
       await refreshActiveRoomMessages();
@@ -1226,6 +1365,9 @@ class ProfileProvider2 with ChangeNotifier {
           'status': 'sent',
           'created_at': createdAt,
           'updated_at': createdAt,
+          'reply_to_message_id': replyToMessageId,
+          'reply_to_message_payload': replyToMessagePayload,
+          'reply_to_message_sender_name': replyToMessageSenderName,
         },
         onConflict: 'id',
       );
@@ -1239,6 +1381,29 @@ class ProfileProvider2 with ChangeNotifier {
       print("Error sending message: $e");
       // Message stays as 'pending' (clock stays visible).
       // syncOutgoingMessageStatuses will reconcile on next app foreground.
+    }
+  }
+
+  Future<void> deleteChatMessage(String messageId, {required bool deleteForEveryone}) async {
+    try {
+      // 1. Delete from local SQLite
+      await LocalDatabaseHelper.instance.deleteMessage(messageId);
+
+      // 2. If deleteForEveryone, delete from Supabase
+      if (deleteForEveryone) {
+        await Supabase.instance.client
+            .from('messages')
+            .delete()
+            .eq('id', messageId);
+      }
+
+      // 3. Refresh UI
+      if (activeRoomId != null) {
+        await refreshActiveRoomMessages();
+      }
+      await updateUnreadCount();
+    } catch (e) {
+      print("Error deleting chat message: $e");
     }
   }
 
@@ -1268,6 +1433,10 @@ class ProfileProvider2 with ChangeNotifier {
             if (senderId == userId) return;
 
             final bool isInChat = activeRoomId == rId;
+            final replyToId = msg['reply_to_message_id'] as String?;
+            final replyToPayload = msg['reply_to_message_payload'] as String?;
+            final replyToSenderName =
+                msg['reply_to_message_sender_name'] as String?;
 
             // 1. Save to local SQLite
             await LocalDatabaseHelper.instance.insertMessage(
@@ -1277,6 +1446,9 @@ class ProfileProvider2 with ChangeNotifier {
               payloadText,
               status: isInChat ? 'read' : 'delivered',
               createdAt: msg['created_at'] as String?,
+              replyToMessageId: replyToId,
+              replyToMessagePayload: replyToPayload,
+              replyToMessageSenderName: replyToSenderName,
             );
 
             // 2. Acknowledge receipt -> triggers server-side deletion
@@ -1288,6 +1460,7 @@ class ProfileProvider2 with ChangeNotifier {
             } else {
               notifyListeners();
             }
+            await updateUnreadCount();
           },
         )
         .onPostgresChanges(
@@ -1312,6 +1485,7 @@ class ProfileProvider2 with ChangeNotifier {
             if (activeRoomId == rId) {
               await refreshActiveRoomMessages();
             }
+            await updateUnreadCount();
           },
         )
         .onPostgresChanges(
@@ -1329,22 +1503,34 @@ class ProfileProvider2 with ChangeNotifier {
             final rId = oldRecord['room_id'] as String?;
 
             if (messageId != null) {
-              // Row was deleted -> this means it was read (trigger deleted it)
-              await LocalDatabaseHelper.instance
-                  .updateMessageStatus(messageId, 'read');
+              // Check the local status of the message in our SQLite database.
+              // If it wasn't read yet, it means the sender deleted it for everyone.
+              final localMsg = await LocalDatabaseHelper.instance.getMessageById(messageId);
+              if (localMsg != null) {
+                final localStatus = localMsg['status'] as String?;
+                if (localStatus != 'read') {
+                  // Message was not read locally -> Sender deleted it for everyone!
+                  await LocalDatabaseHelper.instance.deleteMessage(messageId);
+                } else {
+                  // Message was already read -> trigger deleted it. Ensure local is 'read'.
+                  await LocalDatabaseHelper.instance.updateMessageStatus(messageId, 'read');
+                }
+              }
 
               if (activeRoomId == rId) {
                 await refreshActiveRoomMessages();
               }
+              await updateUnreadCount();
             }
           },
         )
-        .subscribe((status, [error]) {
-          if (status == RealtimeSubscribeStatus.subscribed) {
-            syncOutgoingMessageStatuses();
-            fetchPendingMessages();
-          }
-        });
+        .subscribe((status, [error]) async {
+      if (status == RealtimeSubscribeStatus.subscribed) {
+        await syncOutgoingMessageStatuses();
+        await fetchPendingMessages();
+        await updateUnreadCount();
+      }
+    });
 
     _roomSubscriptions[roomId] = channel;
   }
@@ -1418,8 +1604,7 @@ class ProfileProvider2 with ChangeNotifier {
 
       // 2b. Reconcile sent/delivered messages against Supabase
       if (serverMsgs.isNotEmpty) {
-        final messageIds =
-            serverMsgs.map((m) => m['id'] as String).toList();
+        final messageIds = serverMsgs.map((m) => m['id'] as String).toList();
 
         final existing = await Supabase.instance.client
             .from('messages')
@@ -1461,6 +1646,9 @@ class ProfileProvider2 with ChangeNotifier {
           notifyListeners();
         });
       }
+      await updateUnreadCount();
+      // Also sync incoming message statuses to clear any read messages
+      await syncIncomingMessageStatuses();
     } catch (e) {
       print("Error syncing outgoing message statuses: $e");
     }
@@ -1522,6 +1710,10 @@ class ProfileProvider2 with ChangeNotifier {
           payloadText,
           status: isInChat ? 'read' : 'delivered',
           createdAt: msg['created_at'] as String?,
+          replyToMessageId: msg['reply_to_message_id'] as String?,
+          replyToMessagePayload: msg['reply_to_message_payload'] as String?,
+          replyToMessageSenderName:
+              msg['reply_to_message_sender_name'] as String?,
         );
 
         await acknowledgeDelivery(msgId, isActiveInChat: isInChat);
@@ -1532,6 +1724,7 @@ class ProfileProvider2 with ChangeNotifier {
       } else {
         notifyListeners();
       }
+      await updateUnreadCount();
     } catch (e) {
       print("Error fetching pending messages: $e");
     }
@@ -1574,6 +1767,7 @@ class ProfileProvider2 with ChangeNotifier {
       }
 
       await refreshActiveRoomMessages();
+      await updateUnreadCount();
     } catch (e) {
       print("Error marking delivered messages as read: $e");
     }
@@ -1595,12 +1789,127 @@ class ProfileProvider2 with ChangeNotifier {
     }
   }
 
+  Future<void> markRoomMessagesAsReadLocally(String roomId) async {
+    final myUserId = userId;
+    if (myUserId == -1) return;
+    try {
+      final db = await LocalDatabaseHelper.instance.database;
+      await db.update(
+        'messages',
+        {'status': 'read'},
+        where: "room_id = ? AND sender_id != ? AND status != 'read'",
+        whereArgs: [roomId, myUserId],
+      );
+    } catch (e) {
+      print("Error marking room messages as read locally: $e");
+    }
+  }
+
+  Future<void> syncIncomingMessageStatuses() async {
+    final myUserId = userId;
+    if (myUserId == -1) return;
+
+    try {
+      // 1. Get all incoming messages that aren't yet 'read' locally
+      final db = await LocalDatabaseHelper.instance.database;
+      final List<Map<String, dynamic>> unreadIncoming = await db.query(
+        'messages',
+        columns: ['id'],
+        where: "sender_id != ? AND status != 'read'",
+        whereArgs: [myUserId],
+      );
+
+      if (unreadIncoming.isEmpty) return;
+
+      final messageIds = unreadIncoming.map((m) => m['id'] as String).toList();
+
+      // 2. Query Supabase to see which of these still exist
+      final existing = await Supabase.instance.client
+          .from('messages')
+          .select('id, status')
+          .filter('id', 'in', '(${messageIds.join(',')})');
+
+      final Set<String> existingIds = {
+        for (final row in existing as List) row['id'] as String
+      };
+
+      // 3. If a message is no longer in Supabase, it has been read/deleted.
+      // Since unreadIncoming only selects incoming messages (sender_id != myUserId)
+      // with status != 'read', any message that is gone from Supabase must have
+      // been deleted for everyone by the sender. So we delete it locally!
+      for (final localId in messageIds) {
+        if (!existingIds.contains(localId)) {
+          await LocalDatabaseHelper.instance.deleteMessage(localId);
+        }
+      }
+
+      // 4. Update the unread count state
+      final result = await db.rawQuery(
+        "SELECT COUNT(*) as count FROM messages WHERE sender_id != ? AND status != 'read'",
+        [myUserId],
+      );
+      if (result.isNotEmpty) {
+        totalUnreadCount = Sqflite.firstIntValue(result) ?? 0;
+      } else {
+        totalUnreadCount = 0;
+      }
+
+      // Group by room to update tab counts
+      final List<Map<String, dynamic>> roomResults = await db.rawQuery(
+        "SELECT room_id, COUNT(*) as count FROM messages WHERE sender_id != ? AND status != 'read' GROUP BY room_id",
+        [myUserId],
+      );
+
+      final Map<String, int> roomUnreadMap = {
+        for (final row in roomResults)
+          row['room_id'] as String: int.tryParse(row['count'].toString()) ?? 0
+      };
+
+      int casualCount = 0;
+      int professionalCount = 0;
+
+      for (final connection in connections) {
+        final int connId = connection['id'] as int;
+        final String? rId = connectionRooms[connId];
+        if (rId != null && roomUnreadMap.containsKey(rId)) {
+          final int count = roomUnreadMap[rId]!;
+          final sharedCard = (connection['my_shared_card'] ??
+                  connection['shared_card'] ??
+                  connection['sharedCard'] ??
+                  'both')
+              .toString()
+              .toLowerCase();
+
+          if (sharedCard == 'casual') {
+            casualCount += count;
+          } else if (sharedCard == 'professional') {
+            professionalCount += count;
+          } else {
+            casualCount += count;
+            professionalCount += count;
+          }
+        }
+      }
+
+      casualUnreadCount = casualCount;
+      professionalUnreadCount = professionalCount;
+
+      notifyListeners();
+    } catch (e) {
+      print("Error syncing incoming message statuses: $e");
+    }
+  }
+
   void setActiveRoom(String? roomId) {
     activeRoomId = roomId;
     if (roomId != null) {
       // Mark any 'delivered' messages as 'read' now that the user has opened
       // the chat — this fires the blue-tick Realtime event to the sender.
       _markDeliveredMessagesAsRead(roomId);
+      // Mark all local messages in SQLite for this room as read immediately
+      markRoomMessagesAsReadLocally(roomId).then((_) {
+        updateUnreadCount();
+      });
       refreshActiveRoomMessages();
     } else {
       activeRoomMessages = [];

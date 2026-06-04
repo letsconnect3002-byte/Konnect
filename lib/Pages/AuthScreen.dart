@@ -324,7 +324,7 @@ class _AuthScreenState extends State<AuthScreen> {
                         style: TextStyle(
                           color: Colors.white,
                           fontSize: 32,
-                          fontWeight: FontWeight.w900,
+                          fontWeight: FontWeight.bold,
                           letterSpacing: 1.0,
                         ),
                       ),

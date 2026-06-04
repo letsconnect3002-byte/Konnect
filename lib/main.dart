@@ -37,7 +37,10 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   final senderIdStr = data['sender_id'] as String?;
   final payload = data['payload'] as String?;
 
-  if (messageId != null && roomId != null && senderIdStr != null && payload != null) {
+  if (messageId != null &&
+      roomId != null &&
+      senderIdStr != null &&
+      payload != null) {
     final senderId = int.tryParse(senderIdStr);
     if (senderId != null) {
       // 1. Save to local SQLite
@@ -53,8 +56,7 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
       try {
         await Supabase.instance.client
             .from('messages')
-            .update({'status': 'delivered'})
-            .eq('id', messageId);
+            .update({'status': 'delivered'}).eq('id', messageId);
       } catch (e) {
         print("Error acknowledging delivery in background: $e");
       }
@@ -167,6 +169,7 @@ class _AppShellGateState extends State<AppShellGate> {
         final userData = await provider.loadProfile(userId);
         provider.setUserData(userData);
         await _setupPushNotifications(provider);
+        await provider.updateUnreadCount();
       }
     } catch (e) {
       print("Error in AppShellGate initialization: $e");
@@ -183,7 +186,7 @@ class _AppShellGateState extends State<AppShellGate> {
     print("PushNotifications: Initializing...");
     try {
       final messaging = FirebaseMessaging.instance;
-      
+
       // Request notification permissions for Android 13+ and iOS
       print("PushNotifications: Requesting permission...");
       final settings = await messaging.requestPermission(
@@ -191,7 +194,15 @@ class _AppShellGateState extends State<AppShellGate> {
         badge: true,
         sound: true,
       );
-      print("PushNotifications: Authorization status is ${settings.authorizationStatus}");
+      print(
+          "PushNotifications: Authorization status is ${settings.authorizationStatus}");
+
+      // Configure foreground notification presentation options
+      await messaging.setForegroundNotificationPresentationOptions(
+        alert: true,
+        badge: true,
+        sound: true,
+      );
 
       // Fetch the token (FCM can generate tokens on Android even if notification permission is denied)
       print("PushNotifications: Fetching FCM token...");
@@ -285,7 +296,9 @@ class _AppShellState extends State<_AppShell> with WidgetsBindingObserver {
     });
 
     // 2. Handle notification click when app was cold-started from terminated state
-    FirebaseMessaging.instance.getInitialMessage().then((RemoteMessage? message) {
+    FirebaseMessaging.instance
+        .getInitialMessage()
+        .then((RemoteMessage? message) {
       if (message != null) {
         _handleNotificationClick(message);
       }
@@ -295,7 +308,7 @@ class _AppShellState extends State<_AppShell> with WidgetsBindingObserver {
   Future<void> _handleNotificationClick(RemoteMessage message) async {
     final data = message.data;
     final senderIdStr = data['sender_id'] as String?;
-    
+
     if (senderIdStr != null) {
       final senderId = int.tryParse(senderIdStr);
       if (senderId != null) {
@@ -308,7 +321,8 @@ class _AppShellState extends State<_AppShell> with WidgetsBindingObserver {
             Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (context) => IndividualChatPage(connectionData: profile),
+                builder: (context) =>
+                    IndividualChatPage(connectionData: profile),
               ),
             );
           }
@@ -354,7 +368,9 @@ class _AppShellState extends State<_AppShell> with WidgetsBindingObserver {
                   _buildNavItem(
                       index: 0, icon: Icons.home_rounded, isImageIcon: false),
                   _buildNavItem(
-                      index: 1, icon: Icons.chat_bubble_rounded, isImageIcon: false),
+                      index: 1,
+                      icon: Icons.chat_bubble_rounded,
+                      isImageIcon: false),
                   _buildNavItem(
                       index: 2,
                       icon: Icons.chat_bubble_rounded,
@@ -376,8 +392,43 @@ class _AppShellState extends State<_AppShell> with WidgetsBindingObserver {
     required bool isImageIcon,
   }) {
     final bool isActive = _currentIndex == index;
-    final String label = const ["Home", "Chats", "Circle", "Identity"][index];
+    final String label = const ["Home", "Chats", "Circle", "My Profile"][index];
     final Color itemColor = isActive ? Colors.white : const Color(0xFF5C5E78);
+    final provider = Provider.of<ProfileProvider2>(context);
+
+    Widget iconWidget = isImageIcon
+        ? ImageIcon(
+            const AssetImage("assets/icons/Connect Icon2.png"),
+            size: 24,
+            color: itemColor,
+          )
+        : Icon(
+            icon,
+            size: 24,
+            color: itemColor,
+          );
+
+    // If it's the Chats tab (index 1) and there are unread messages, overlay a red dot badge
+    if (index == 1 && provider.totalUnreadCount > 0) {
+      iconWidget = Stack(
+        clipBehavior: Clip.none,
+        children: [
+          iconWidget,
+          Positioned(
+            right: -2,
+            top: -2,
+            child: Container(
+              width: 8,
+              height: 8,
+              decoration: const BoxDecoration(
+                color: Color(0xFFEF4444), // Vibrant Red
+                shape: BoxShape.circle,
+              ),
+            ),
+          ),
+        ],
+      );
+    }
 
     return GestureDetector(
       onTap: () {
@@ -411,23 +462,13 @@ class _AppShellState extends State<_AppShell> with WidgetsBindingObserver {
                       ]
                     : null,
               ),
-              child: isImageIcon
-                  ? ImageIcon(
-                      const AssetImage("assets/icons/Connect Icon2.png"),
-                      size: 24,
-                      color: itemColor,
-                    )
-                  : Icon(
-                      icon,
-                      size: 24,
-                      color: itemColor,
-                    ),
+              child: iconWidget,
             ),
             const SizedBox(height: 4),
             Text(
               label,
               style: TextStyle(
-                fontSize: 10,
+                fontSize: 11,
                 fontWeight: FontWeight.bold,
                 color: itemColor,
                 fontFamily: 'Inter',

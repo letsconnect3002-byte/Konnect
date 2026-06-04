@@ -711,7 +711,7 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                           style: TextStyle(
                             color: Color(0xFF8B8C9E),
                             fontSize: 14.0,
-                            fontWeight: FontWeight.w900,
+                            fontWeight: FontWeight.bold,
                             letterSpacing: 1.5,
                           ),
                         ),
@@ -735,7 +735,7 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                           style: TextStyle(
                             color: Color(0xFF8B8C9E),
                             fontSize: 14.0,
-                            fontWeight: FontWeight.w900,
+                            fontWeight: FontWeight.bold,
                             letterSpacing: 1.5,
                           ),
                         ),
@@ -1140,7 +1140,7 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
             ),
             const SizedBox(width: 8),
             Text(
-              'Save Profile Details',
+              'Save Changes',
               style: TextStyle(
                 color: hasChanges ? Colors.white : Colors.white30,
                 fontSize: 16,
@@ -1420,7 +1420,7 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                 'Digital Card',
                 style: TextStyle(
                   color: Color(0xFF8B8C9E),
-                  fontSize: 11.0,
+                  fontSize: 12.0,
                   fontWeight: FontWeight.w500,
                 ),
               ),
@@ -1548,7 +1548,7 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                 gradient: const LinearGradient(
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
-                  colors: [Color(0xFF111222), Color(0xFF0A0B10)],
+                  colors: [Color(0xFF1B1B3A), Color(0xFF0C0C18)],
                 ),
                 borderRadius: BorderRadius.circular(22.5),
               ),
@@ -1688,8 +1688,8 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                 'DIGITAL IDENTITY',
                 style: TextStyle(
                   color: const Color(0xFF00F2FE).withValues(alpha: 0.8),
-                  fontSize: 8,
-                  fontWeight: FontWeight.w900,
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
                   letterSpacing: 1.0,
                   fontFamily: 'Inter',
                 ),
@@ -1743,7 +1743,7 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                     curve: _cardAnimCurve,
                     style: const TextStyle(
                       color: Color(0xFF8B5CF6),
-                      fontSize: 10,
+                      fontSize: 12,
                       fontWeight: FontWeight.w600,
                       fontFamily: 'Inter',
                     ),
@@ -1765,9 +1765,9 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
         AnimatedPositioned(
           duration: _cardAnimDuration,
           curve: _cardAnimCurve,
-          left: W - 98,
+          left: W - 113,
           bottom: 14,
-          width: 80,
+          width: 95,
           child: Container(
             padding: const EdgeInsets.symmetric(
               horizontal: 8,
@@ -1788,15 +1788,15 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                   Icon(
                     Icons.qr_code_2_rounded,
                     color: Color(0xFF00F2FE),
-                    size: 11,
+                    size: 13,
                   ),
                   SizedBox(width: 4),
                   Text(
                     'SCAN',
                     style: TextStyle(
                       color: Colors.white70,
-                      fontSize: 8,
-                      fontWeight: FontWeight.w900,
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
                       letterSpacing: 0.5,
                       fontFamily: 'Inter',
                     ),
@@ -1925,7 +1925,7 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                           curve: _cardAnimCurve,
                           style: const TextStyle(
                             color: Color(0xFF8B5CF6),
-                            fontSize: 10,
+                            fontSize: 12,
                             fontWeight: FontWeight.w600,
                             fontFamily: 'Inter',
                           ),
@@ -2058,7 +2058,7 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                           : _professionalBioController.text.trim()),
                   style: TextStyle(
                     color: Colors.white.withValues(alpha: 0.55),
-                    fontSize: 9,
+                    fontSize: 12,
                     height: 1.25,
                     fontFamily: 'Inter',
                   ),
@@ -2089,41 +2089,41 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
     );
   }
 
-  Widget _buildUnifiedCardRow(IconData icon, String text, bool isCasual) {
-    return Row(
-      children: [
-        AnimatedContainer(
-          duration: _cardAnimDuration,
-          curve: _cardAnimCurve,
-          width: isCasual ? 32 : 18,
-          height: isCasual ? 32 : 18,
-          decoration: const BoxDecoration(
-            color: Color(0xFF171825),
-            shape: BoxShape.circle,
-          ),
-          child: Center(
-            child: Icon(
-              icon,
-              color: isCasual ? const Color(0xFF8B8C9E) : Colors.white54,
-              size: isCasual ? 14 : 10,
-            ),
-          ),
-        ),
-        AnimatedContainer(
-          duration: _cardAnimDuration,
-          curve: _cardAnimCurve,
-          width: isCasual ? 12 : 6,
-        ),
-        Expanded(
-          child: FittedBox(
-            fit: BoxFit.scaleDown,
-            alignment: Alignment.centerLeft,
-            child: AnimatedDefaultTextStyle(
-              duration: _cardAnimDuration,
-              curve: _cardAnimCurve,
-              style: TextStyle(
-                color: isCasual ? const Color(0xFF8B8C9E) : Colors.white70,
-                fontSize: isCasual ? 13 : 9,
+       Widget _buildUnifiedCardRow(IconData icon, String text, bool isCasual) {
+         return Row(
+           children: [
+             AnimatedContainer(
+               duration: _cardAnimDuration,
+               curve: _cardAnimCurve,
+               width: 22,
+               height: 22,
+               decoration: const BoxDecoration(
+                 color: Color(0xFF171825),
+                 shape: BoxShape.circle,
+               ),
+               child: Center(
+                 child: Icon(
+                   icon,
+                   color: Colors.white54,
+                   size: 12,
+                 ),
+               ),
+             ),
+             AnimatedContainer(
+               duration: _cardAnimDuration,
+               curve: _cardAnimCurve,
+               width: 8,
+             ),
+             Expanded(
+               child: FittedBox(
+                 fit: BoxFit.scaleDown,
+                 alignment: Alignment.centerLeft,
+                 child: AnimatedDefaultTextStyle(
+                   duration: _cardAnimDuration,
+                   curve: _cardAnimCurve,
+                   style: TextStyle(
+                     color: isCasual ? const Color(0xFF8B8C9E) : Colors.white70,
+                     fontSize: 12,
                 fontWeight: FontWeight.w500,
                 fontFamily: 'Inter',
               ),

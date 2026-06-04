@@ -232,14 +232,31 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
                               : null,
                         ),
                         alignment: Alignment.center,
-                        child: Text(
-                          "Casual",
-                          style: TextStyle(
-                            color: _selectedTab == 'casual' ? Colors.white : const Color(0xFF8B8C9E),
-                            fontWeight: FontWeight.bold,
-                            fontSize: 14,
-                            fontFamily: 'Inter',
-                          ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              "Casual",
+                              style: TextStyle(
+                                color: _selectedTab == 'casual' ? Colors.white : const Color(0xFF8B8C9E),
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                                fontFamily: 'Inter',
+                              ),
+                            ),
+                            if (provider.casualUnreadCount > 0) ...[
+                              const SizedBox(width: 6),
+                              Container(
+                                width: 6,
+                                height: 6,
+                                decoration: const BoxDecoration(
+                                  color: Color(0xFFEF4444),
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                            ],
+                          ],
                         ),
                       ),
                     ),
@@ -275,14 +292,31 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
                               : null,
                         ),
                         alignment: Alignment.center,
-                        child: Text(
-                          "Professional",
-                          style: TextStyle(
-                            color: _selectedTab == 'professional' ? Colors.white : const Color(0xFF8B8C9E),
-                            fontWeight: FontWeight.bold,
-                            fontSize: 14,
-                            fontFamily: 'Inter',
-                          ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              "Professional",
+                              style: TextStyle(
+                                color: _selectedTab == 'professional' ? Colors.white : const Color(0xFF8B8C9E),
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                                fontFamily: 'Inter',
+                              ),
+                            ),
+                            if (provider.professionalUnreadCount > 0) ...[
+                              const SizedBox(width: 6),
+                              Container(
+                                width: 6,
+                                height: 6,
+                                decoration: const BoxDecoration(
+                                  color: Color(0xFFEF4444),
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                            ],
+                          ],
                         ),
                       ),
                     ),
@@ -319,7 +353,7 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
                       decoration: InputDecoration(
                         hintText: 'Search connections...',
                         hintStyle: TextStyle(
-                          color: Colors.white.withOpacity(0.25),
+                          color: Colors.white.withValues(alpha: 0.25),
                           fontSize: 14,
                         ),
                         border: InputBorder.none,
@@ -388,7 +422,7 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
 
                               final String lastMessageText = lastMsg != null
                                   ? lastMsg['payload'] ?? ''
-                                  : "Start a conversation!";
+                                  : '';
 
                               final String msgTime = lastMsg != null
                                   ? _formatMessageTime(lastMsg['created_at'] as String?)
@@ -413,41 +447,24 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
                                   _showDeleteConfirmation(context, connection, provider);
                                 },
                                 contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                                leading: Stack(
-                                  children: [
-                                    Container(
-                                      width: 44,
-                                      height: 44,
-                                      decoration: const BoxDecoration(
-                                        shape: BoxShape.circle,
-                                      ),
-                                      child: ClipOval(
-                                        child: avatar.isNotEmpty
-                                            ? Image.network(avatar, fit: BoxFit.cover)
-                                            : Container(
-                                                color: const Color(0xFF1B1C2A),
-                                                alignment: Alignment.center,
-                                                child: Text(
-                                                  name.isNotEmpty ? name.substring(0, 1).toUpperCase() : "?",
-                                                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15),
-                                                ),
-                                              ),
-                                      ),
-                                    ),
-                                    Positioned(
-                                      right: 0,
-                                      bottom: 0,
-                                      child: Container(
-                                        width: 10,
-                                        height: 10,
-                                        decoration: BoxDecoration(
-                                          color: const Color(0xFF10B981),
-                                          shape: BoxShape.circle,
-                                          border: Border.all(color: const Color(0xFF090A0F), width: 1.5),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
+                                leading: Container(
+                                  width: 44,
+                                  height: 44,
+                                  decoration: const BoxDecoration(
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: ClipOval(
+                                    child: avatar.isNotEmpty
+                                        ? Image.network(avatar, fit: BoxFit.cover)
+                                        : Container(
+                                            color: const Color(0xFF1B1C2A),
+                                            alignment: Alignment.center,
+                                            child: Text(
+                                              name.isNotEmpty ? name.substring(0, 1).toUpperCase() : "?",
+                                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15),
+                                            ),
+                                          ),
+                                  ),
                                 ),
                                 title: Row(
                                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -466,43 +483,45 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
                                         msgTime,
                                         style: TextStyle(
                                           color: isUnread ? const Color(0xFF8B5CF6) : Colors.white.withValues(alpha: 0.2),
-                                          fontSize: 10.5,
+                                          fontSize: 11,
                                           fontWeight: isUnread ? FontWeight.bold : FontWeight.normal,
                                           fontFamily: 'Inter',
                                         ),
                                       ),
                                   ],
                                 ),
-                                subtitle: Padding(
-                                  padding: const EdgeInsets.only(top: 4.0),
-                                  child: Row(
-                                    children: [
-                                      Expanded(
-                                        child: Text(
-                                          lastMessageText,
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: TextStyle(
-                                            color: isUnread ? Colors.white70 : Colors.white.withValues(alpha: 0.35),
-                                            fontSize: 12.5,
-                                            fontWeight: isUnread ? FontWeight.w600 : FontWeight.normal,
-                                            fontFamily: 'Inter',
-                                          ),
+                                subtitle: lastMessageText.isEmpty
+                                    ? null
+                                    : Padding(
+                                        padding: const EdgeInsets.only(top: 4.0),
+                                        child: Row(
+                                          children: [
+                                            Expanded(
+                                              child: Text(
+                                                lastMessageText,
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: TextStyle(
+                                                  color: isUnread ? Colors.white70 : Colors.white.withValues(alpha: 0.35),
+                                                  fontSize: 12.5,
+                                                  fontWeight: isUnread ? FontWeight.w600 : FontWeight.normal,
+                                                  fontFamily: 'Inter',
+                                                ),
+                                              ),
+                                            ),
+                                            if (isUnread)
+                                              Container(
+                                                margin: const EdgeInsets.only(left: 8),
+                                                width: 8,
+                                                height: 8,
+                                                decoration: const BoxDecoration(
+                                                  color: Color(0xFF8B5CF6),
+                                                  shape: BoxShape.circle,
+                                                ),
+                                              ),
+                                          ],
                                         ),
                                       ),
-                                      if (isUnread)
-                                        Container(
-                                          margin: const EdgeInsets.only(left: 8),
-                                          width: 8,
-                                          height: 8,
-                                          decoration: const BoxDecoration(
-                                            color: Color(0xFF8B5CF6),
-                                            shape: BoxShape.circle,
-                                          ),
-                                        ),
-                                    ],
-                                  ),
-                                ),
                               );
                             },
                           ),

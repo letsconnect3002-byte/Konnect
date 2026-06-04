@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:connect/Pages/ConnectionProfilePage.dart';
+import 'package:connect/Pages/IndividualChatPage.dart';
 import 'package:connect/Pages/QrCodeScanner.dart';
 import 'package:connect/Providers/ProviderSQL.dart';
 import 'package:flutter/material.dart';
@@ -14,7 +15,8 @@ class OtherProfilesPage extends StatefulWidget {
 }
 
 class _OtherProfilesPageState extends State<OtherProfilesPage> {
-  bool _isGridView = true; // true = Card View, false = List View
+  bool _isGridView =
+      false; // true = Card View, false = List View (List is default)
   Set<String> _favoritedIds = {};
   Set<String> _deletedProfileIds = {};
   late ProfileProvider2 profileProvider;
@@ -85,6 +87,61 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
     } catch (e) {
       print("Error deleting profile locally: $e");
     }
+  }
+
+  Future<void> _showDeleteConfirmation(BuildContext context,
+      Map<String, dynamic> connection, ProfileProvider2 provider) async {
+    final name = connection['name'] ?? 'this contact';
+    final profileIdStr = (connection['id'] ?? '').toString();
+
+    return showDialog(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          backgroundColor: const Color(0xFF13141F),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: const Text(
+            "Delete Connection",
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          ),
+          content: Text(
+            "Are you sure you want to remove $name from your connections? This will permanently delete this connection and clear all chat history and text messages.",
+            style: const TextStyle(color: Colors.white70),
+          ),
+          actions: [
+            TextButton(
+              child: const Text("Cancel", style: TextStyle(color: Colors.grey)),
+              onPressed: () => Navigator.pop(dialogContext),
+            ),
+            TextButton(
+              child: const Text("Delete",
+                  style: TextStyle(color: Colors.redAccent)),
+              onPressed: () async {
+                Navigator.pop(dialogContext);
+                try {
+                  await _deleteProfileLocally(profileIdStr, provider);
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text("Connection and chat history deleted"),
+                        backgroundColor: Colors.redAccent,
+                      ),
+                    );
+                  }
+                } catch (e) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text("Error deleting connection: $e")),
+                    );
+                  }
+                }
+              },
+            ),
+          ],
+        );
+      },
+    );
   }
 
   String _getVisibleField(
@@ -264,8 +321,8 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
                 color: type == 'casual'
                     ? const Color(0xFF8B5CF6)
                     : const Color(0xFF00F2FE),
-                fontSize: 8,
-                fontWeight: FontWeight.w900,
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
                 letterSpacing: 0.5,
                 fontFamily: 'Inter',
               ),
@@ -274,154 +331,6 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
           const SizedBox(width: 4),
         ],
       ],
-    );
-  }
-
-  void _showSendMessageDialog(
-      BuildContext context, Map<String, dynamic> profile) {
-    final name = profile['name'] ?? 'Connection';
-    final controller = TextEditingController();
-    bool isSending = false;
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setModalState) {
-            return Container(
-              decoration: const BoxDecoration(
-                color: Color(0xFF0F1020),
-                borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-                border: Border(
-                  top: BorderSide(color: Color(0xFF26273F), width: 1),
-                ),
-              ),
-              padding: EdgeInsets.fromLTRB(
-                24,
-                24,
-                24,
-                MediaQuery.of(context).viewInsets.bottom + 24,
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Center(
-                    child: Container(
-                      width: 40,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF26273F),
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  Text(
-                    "Message to $name",
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      fontFamily: 'Inter',
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    "This will send a message via your connected profile.",
-                    style: TextStyle(
-                      color: Color(0xFF8B8C9E),
-                      fontSize: 13,
-                      fontFamily: 'Inter',
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: controller,
-                    maxLines: 4,
-                    maxLength: 500,
-                    style: const TextStyle(
-                        color: Colors.white, fontSize: 14, fontFamily: 'Inter'),
-                    cursorColor: const Color(0xFF8B5CF6),
-                    decoration: InputDecoration(
-                      hintText: "Write your message here...",
-                      hintStyle: const TextStyle(
-                          color: Color(0xFF5C5E78), fontSize: 14),
-                      fillColor: const Color(0xFF161726),
-                      filled: true,
-                      counterStyle: const TextStyle(color: Color(0xFF5C5E78)),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(14),
-                        borderSide: const BorderSide(color: Color(0xFF26273F)),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(14),
-                        borderSide: const BorderSide(color: Color(0xFF8B5CF6)),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  ElevatedButton(
-                    onPressed: isSending
-                        ? null
-                        : () async {
-                            if (controller.text.trim().isEmpty) return;
-                            setModalState(() {
-                              isSending = true;
-                            });
-                            await Future.delayed(
-                                const Duration(milliseconds: 1200));
-                            if (context.mounted) {
-                              Navigator.pop(context);
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text("Message sent to $name!"),
-                                  backgroundColor: const Color(0xFF8B5CF6),
-                                  behavior: SnackBarBehavior.floating,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                ),
-                              );
-                            }
-                          },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF8B5CF6),
-                      disabledBackgroundColor:
-                          const Color(0xFF8B5CF6).withOpacity(0.5),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                    ),
-                    child: isSending
-                        ? const SizedBox(
-                            height: 18,
-                            width: 18,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor:
-                                  AlwaysStoppedAnimation<Color>(Colors.white),
-                            ),
-                          )
-                        : const Text(
-                            "Send Message",
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 14,
-                              fontFamily: 'Inter',
-                            ),
-                          ),
-                  ),
-                ],
-              ),
-            );
-          },
-        );
-      },
     );
   }
 
@@ -580,8 +489,8 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
                         "CONNECT",
                         style: TextStyle(
                           color: Color(0xFF00F2FE),
-                          fontSize: 10,
-                          fontWeight: FontWeight.w900,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
                           letterSpacing: 2,
                         ),
                       ),
@@ -600,7 +509,7 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
                       "DIGITAL ID",
                       style: TextStyle(
                         color: Color(0xFF00F2FE),
-                        fontSize: 8,
+                        fontSize: 11,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -781,7 +690,7 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
                     email,
                     style: const TextStyle(
                       color: Color(0xFFC0C1D0),
-                      fontSize: 10,
+                      fontSize: 12,
                       fontFamily: 'Inter',
                     ),
                   ),
@@ -798,7 +707,7 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
                     phone,
                     style: const TextStyle(
                       color: Color(0xFFC0C1D0),
-                      fontSize: 10,
+                      fontSize: 12,
                       fontFamily: 'Inter',
                     ),
                   ),
@@ -928,12 +837,6 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
       _getCompany(name, profileData["company"]),
     );
     final avatarUrl = _getAvatarUrl(name, profileData["avatarUrl"]);
-    final profileIdStr = (profileData['id'] ?? '').toString();
-    final isFavorite = _favoritedIds.contains(profileIdStr);
-
-    final int id = profileData['id'] is int
-        ? profileData['id'] as int
-        : int.tryParse(profileData['id'].toString()) ?? 0;
 
     return GestureDetector(
       onTap: () {
@@ -953,8 +856,8 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              Color(0xFF18192E),
-              Color(0xFF0F1020),
+              Color(0xFF1B1B3A),
+              Color(0xFF0C0C18),
             ],
           ),
           borderRadius: BorderRadius.circular(24),
@@ -1076,23 +979,10 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
                         borderRadius: BorderRadius.circular(12),
                         side: const BorderSide(color: Color(0xFF202138)),
                       ),
-                      onSelected: (val) async {
+                      onSelected: (val) {
                         if (val == 1) {
-                          try {
-                            await _deleteProfileLocally(profileIdStr, provider);
-                            if (!context.mounted) return;
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text("Profile deleted successfully"),
-                              ),
-                            );
-                          } catch (e) {
-                            if (!context.mounted) return;
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                  content: Text("Error deleting profile: $e")),
-                            );
-                          }
+                          _showDeleteConfirmation(
+                              context, profileData, provider);
                         }
                       },
                       itemBuilder: (context) => [
@@ -1166,7 +1056,14 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
                 Expanded(
                   child: ElevatedButton.icon(
                     onPressed: () {
-                      _showSendMessageDialog(context, profileData);
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => IndividualChatPage(
+                            connectionData: profileData,
+                          ),
+                        ),
+                      );
                     },
                     icon: const Icon(Icons.chat_bubble_outline_rounded,
                         size: 16, color: Colors.white),
@@ -1207,12 +1104,6 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
       _getCompany(name, profileData["company"]),
     );
     final avatarUrl = _getAvatarUrl(name, profileData["avatarUrl"]);
-    final profileIdStr = (profileData['id'] ?? '').toString();
-    final isFavorite = _favoritedIds.contains(profileIdStr);
-
-    final int id = profileData['id'] is int
-        ? profileData['id'] as int
-        : int.tryParse(profileData['id'].toString()) ?? 0;
 
     return GestureDetector(
       onTap: () {
@@ -1334,22 +1225,9 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
                 borderRadius: BorderRadius.circular(12),
                 side: const BorderSide(color: Color(0xFF202138)),
               ),
-              onSelected: (val) async {
+              onSelected: (val) {
                 if (val == 1) {
-                  try {
-                    await _deleteProfileLocally(profileIdStr, provider);
-                    if (!context.mounted) return;
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text("Profile deleted successfully"),
-                      ),
-                    );
-                  } catch (e) {
-                    if (!context.mounted) return;
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text("Error deleting profile: $e")),
-                    );
-                  }
+                  _showDeleteConfirmation(context, profileData, provider);
                 }
               },
               itemBuilder: (context) => [

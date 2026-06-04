@@ -65,9 +65,10 @@ serve(async (req) => {
     const accessToken = credentials.access_token
 
     // 6. Send high-priority background notification + system notification to each device token
+    const results = []
     for (const row of tokens) {
       const fcmToken = row.fcm_token
-      
+
       const body = {
         message: {
           token: fcmToken,
@@ -117,15 +118,22 @@ serve(async (req) => {
         }
       )
 
+      const responseText = await response.text()
+      results.push({
+        token: fcmToken,
+        ok: response.ok,
+        status: response.status,
+        body: responseText,
+      })
+
       if (!response.ok) {
-        const errorText = await response.text()
-        console.error(`Failed to send push notification to token ${fcmToken}:`, errorText)
+        console.error(`Failed to send push notification to token ${fcmToken}:`, responseText)
       } else {
         console.log(`Successfully sent push notification to token: ${fcmToken}`)
       }
     }
 
-    return new Response(JSON.stringify({ success: true }), {
+    return new Response(JSON.stringify({ success: true, results }), {
       headers: { "Content-Type": "application/json" },
       status: 200,
     })

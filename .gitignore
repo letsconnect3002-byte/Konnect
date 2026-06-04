@@ -45,3 +45,4 @@ app.*.map.json
 # Ignore Supabase configuration (contains sensitive keys)
 lib/Config/supabase_config.dart
 /circle-e21b6-firebase-adminsdk-fbsvc-c020813e82.json
+lib/firebase_options.dart

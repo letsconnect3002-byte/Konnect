@@ -482,7 +482,7 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
                 'FRONT',
                 style: TextStyle(
                   color: _showFront ? Colors.white : const Color(0xFF5C5E78),
-                  fontSize: 10,
+                  fontSize: 12,
                   fontWeight: FontWeight.bold,
                   fontFamily: 'Inter',
                 ),
@@ -504,7 +504,7 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
                 'BACK',
                 style: TextStyle(
                   color: !_showFront ? Colors.white : const Color(0xFF5C5E78),
-                  fontSize: 10,
+                  fontSize: 12,
                   fontWeight: FontWeight.bold,
                   fontFamily: 'Inter',
                 ),
@@ -566,7 +566,7 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
                   gradient: const LinearGradient(
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
-                    colors: [Color(0xFF111222), Color(0xFF0A0B10)],
+                    colors: [Color(0xFF1B1B3A), Color(0xFF0C0C18)],
                   ),
                   borderRadius: BorderRadius.circular(22.5),
                 ),
@@ -710,8 +710,8 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
                 'DIGITAL CARD',
                 style: TextStyle(
                   color: const Color(0xFF00F2FE).withValues(alpha: 0.8),
-                  fontSize: 8,
-                  fontWeight: FontWeight.w900,
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
                   letterSpacing: 1.0,
                   fontFamily: 'Inter',
                 ),
@@ -751,12 +751,12 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
                 AnimatedDefaultTextStyle(
                   duration: _cardAnimDuration,
                   curve: _cardAnimCurve,
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.65),
-                    fontSize: 10,
-                    fontWeight: FontWeight.w500,
-                    fontFamily: 'Inter',
-                  ),
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.65),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                  fontFamily: 'Inter',
+                ),
                   child: Text(
                     professionText,
                     maxLines: 1,
@@ -772,9 +772,9 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
         AnimatedPositioned(
           duration: _cardAnimDuration,
           curve: _cardAnimCurve,
-          left: W - 98,
+          left: W - 113,
           bottom: 14,
-          width: 80,
+          width: 95,
           child: Container(
             padding: const EdgeInsets.symmetric(
               horizontal: 8,
@@ -787,44 +787,27 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
                 color: Colors.white.withValues(alpha: 0.08),
               ),
             ),
-            child: Center(
+            child: const Center(
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(
+                  Icon(
                     Icons.qr_code_2_rounded,
                     color: Color(0xFF00F2FE),
-                    size: 11,
+                    size: 13,
                   ),
-                  const SizedBox(width: 4),
-                  AnimatedCrossFade(
-                    duration: _cardAnimDuration,
-                    firstCurve: _cardAnimCurve,
-                    secondCurve: _cardAnimCurve,
-                    crossFadeState: CrossFadeState.showSecond,
-                    firstChild: const Text(
-                      'SCAN TO CONNECT',
-                      style: TextStyle(
-                        color: Colors.white70,
-                        fontSize: 8,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 0.5,
-                        fontFamily: 'Inter',
-                      ),
-                      maxLines: 1,
+                  SizedBox(width: 4),
+                  Text(
+                    'SCAN',
+                    style: TextStyle(
+                      color: Colors.white70,
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.5,
+                      fontFamily: 'Inter',
                     ),
-                    secondChild: const Text(
-                      'SCAN',
-                      style: TextStyle(
-                        color: Colors.white70,
-                        fontSize: 8,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 0.5,
-                        fontFamily: 'Inter',
-                      ),
-                      maxLines: 1,
-                    ),
+                    maxLines: 1,
                   ),
                 ],
               ),
@@ -940,7 +923,7 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
                         curve: _cardAnimCurve,
                         style: TextStyle(
                           color: Colors.white.withValues(alpha: 0.65),
-                          fontSize: 9,
+                          fontSize: 12,
                           fontWeight: FontWeight.w500,
                           fontFamily: 'Inter',
                         ),
@@ -1036,7 +1019,7 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
                   bioVal,
                   style: TextStyle(
                     color: Colors.white.withValues(alpha: 0.55),
-                    fontSize: 9,
+                    fontSize: 12,
                     height: 1.25,
                     fontFamily: 'Inter',
                   ),
@@ -1074,8 +1057,8 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
         AnimatedContainer(
           duration: _cardAnimDuration,
           curve: _cardAnimCurve,
-          width: isCasual ? 32 : 18,
-          height: isCasual ? 32 : 18,
+          width: 22,
+          height: 22,
           decoration: const BoxDecoration(
             color: Color(0xFF171825),
             shape: BoxShape.circle,
@@ -1086,14 +1069,14 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
               color: isUnavailable
                   ? const Color(0xFF3A3B50)
                   : (isCasual ? const Color(0xFF8B8C9E) : Colors.white54),
-              size: isCasual ? 14 : 10,
+              size: 12,
             ),
           ),
         ),
         AnimatedContainer(
           duration: _cardAnimDuration,
           curve: _cardAnimCurve,
-          width: isCasual ? 12 : 6,
+          width: 8,
         ),
         Expanded(
           child: FittedBox(
@@ -1106,7 +1089,7 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
                 color: isUnavailable
                     ? const Color(0xFF3A3B50)
                     : (isCasual ? const Color(0xFF8B8C9E) : Colors.white70),
-                fontSize: isCasual ? 13 : 9,
+                fontSize: 12,
                 fontWeight: FontWeight.w500,
                 fontStyle: isUnavailable ? FontStyle.italic : FontStyle.normal,
                 fontFamily: 'Inter',
@@ -1330,7 +1313,7 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
                       style: TextStyle(
                         color: Color(0xFF8B8C9E),
                         fontSize: 14.0,
-                        fontWeight: FontWeight.w900,
+                        fontWeight: FontWeight.bold,
                         letterSpacing: 1.5,
                       ),
                     ),
@@ -1396,7 +1379,7 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
                           style: TextStyle(
                             color: Color(0xFF8B8C9E),
                             fontSize: 14.0,
-                            fontWeight: FontWeight.w900,
+                            fontWeight: FontWeight.bold,
                             letterSpacing: 1.5,
                           ),
                         ),
@@ -1514,7 +1497,7 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
         style: TextStyle(
           color: Color(0xFF8B8C9E),
           fontSize: 14.0,
-          fontWeight: FontWeight.w900,
+          fontWeight: FontWeight.bold,
           letterSpacing: 1.5,
         ),
       ));

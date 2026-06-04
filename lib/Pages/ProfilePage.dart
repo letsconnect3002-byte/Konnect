@@ -91,6 +91,7 @@ class _ProfilePageState extends State<ProfilePage> {
     // Copy the profile string format to clipboard
     final profileString = "${profileProvider.UserData}";
     Clipboard.setData(ClipboardData(text: profileString)).then((_) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text("Profile link copied to clipboard!"),
@@ -151,24 +152,12 @@ class _ProfilePageState extends State<ProfilePage> {
 
                       // Title
                       const Text(
-                        "Your Identity",
+                        "My Card",
                         style: TextStyle(
                           color: Colors.white,
                           fontSize: 32,
                           fontWeight: FontWeight.bold,
                           letterSpacing: -0.8,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 10),
-
-                      // Subtitle
-                      Text(
-                        "Scan to connect. No search, no public\nprofiles.",
-                        style: TextStyle(
-                          color: Colors.white.withOpacity(0.5),
-                          fontSize: 15,
-                          height: 1.4,
                         ),
                         textAlign: TextAlign.center,
                       ),
@@ -178,6 +167,70 @@ class _ProfilePageState extends State<ProfilePage> {
                       Center(
                         child: _buildQRFrame(context, qrImage, profileProvider),
                       ),
+                      if (hasBasicDetails && _qrGenerated) ...[
+                        const SizedBox(height: 20),
+                        Center(
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 10),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF13141F),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
+                                color: const Color(0xFF8B5CF6)
+                                    .withValues(alpha: 0.15),
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                // Glowing/active dot indicator
+                                Container(
+                                  width: 8,
+                                  height: 8,
+                                  decoration: const BoxDecoration(
+                                    color: Color(0xFF00F2FE),
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  "Sharing: ${_selectedShareType.toUpperCase()}",
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                    fontFamily: 'Inter',
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                // Vertical divider
+                                Container(
+                                  width: 1,
+                                  height: 14,
+                                  color: Colors.white.withValues(alpha: 0.12),
+                                ),
+                                const SizedBox(width: 12),
+                                // Change action
+                                GestureDetector(
+                                  onTap: () =>
+                                      _showQrOptionsBottomSheet(context),
+                                  child: const Text(
+                                    "Change",
+                                    style: TextStyle(
+                                      color: Color(0xFF8B5CF6),
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.bold,
+                                      fontFamily: 'Inter',
+                                      decoration: TextDecoration.underline,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
                       const SizedBox(height: 36),
 
                       // Quick Action Buttons
@@ -198,7 +251,7 @@ class _ProfilePageState extends State<ProfilePage> {
       decoration: BoxDecoration(
         color: const Color(0xFF13141F),
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.white.withOpacity(0.04)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.04)),
       ),
       child: Row(
         children: [
@@ -208,7 +261,7 @@ class _ProfilePageState extends State<ProfilePage> {
             decoration: BoxDecoration(
               color: const Color(0xFF1B1C2A),
               shape: BoxShape.circle,
-              border: Border.all(color: Colors.white.withOpacity(0.06)),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
             ),
             child: Image.asset(
               'assets/icons/Connect Icon3.png',
@@ -252,7 +305,7 @@ class _ProfilePageState extends State<ProfilePage> {
               decoration: BoxDecoration(
                 color: const Color(0xFF1B1C2A),
                 shape: BoxShape.circle,
-                border: Border.all(color: Colors.white.withOpacity(0.06)),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
               ),
               child: const Icon(
                 Icons.settings,
@@ -284,13 +337,13 @@ class _ProfilePageState extends State<ProfilePage> {
           end: Alignment.bottomRight,
           colors: [
             const Color(0xFF2A2C42),
-            const Color(0xFF3D3560).withOpacity(0.5),
+            const Color(0xFF3D3560).withValues(alpha: 0.5),
             const Color(0xFF2A2C42),
           ],
         ),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF8B5CF6).withOpacity(0.06),
+            color: const Color(0xFF8B5CF6).withValues(alpha: 0.06),
             blurRadius: 10,
             spreadRadius: 0,
             offset: const Offset(0, 2),
@@ -353,7 +406,7 @@ class _ProfilePageState extends State<ProfilePage> {
                           Text(
                             "Create your card to generate a QR",
                             style: TextStyle(
-                              color: Colors.white.withOpacity(0.4),
+                              color: Colors.white.withValues(alpha: 0.4),
                               fontSize: 12,
                             ),
                             textAlign: TextAlign.center,
@@ -382,55 +435,19 @@ class _ProfilePageState extends State<ProfilePage> {
                       ),
                     )
                   : (qrImage != null && _qrGenerated
-                      ? Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Container(
-                              width: 130,
-                              height: 130,
-                              child: PrettyQrView(
-                                qrImage: qrImage,
-                                decoration: const PrettyQrDecoration(
-                                  shape: PrettyQrSmoothSymbol(
-                                    color: Colors.white,
-                                  ),
+                      ? Center(
+                          child: SizedBox(
+                            width: 200,
+                            height: 200,
+                            child: PrettyQrView(
+                              qrImage: qrImage,
+                              decoration: const PrettyQrDecoration(
+                                shape: PrettyQrSmoothSymbol(
+                                  color: Colors.white,
                                 ),
                               ),
                             ),
-                            const SizedBox(height: 10),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 8, vertical: 3),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF1B1C2A),
-                                borderRadius: BorderRadius.circular(6),
-                                border: Border.all(
-                                    color: Colors.white.withOpacity(0.04)),
-                              ),
-                              child: Text(
-                                "Sharing: ${_selectedShareType.toUpperCase()}",
-                                style: const TextStyle(
-                                  color: Color(0xFF00F2FE),
-                                  fontSize: 8,
-                                  fontWeight: FontWeight.bold,
-                                  letterSpacing: 0.5,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 6),
-                            GestureDetector(
-                              onTap: () => _showQrOptionsBottomSheet(context),
-                              child: const Text(
-                                "Change Share Options",
-                                style: TextStyle(
-                                  color: Color(0xFF8B5CF6),
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.bold,
-                                  decoration: TextDecoration.underline,
-                                ),
-                              ),
-                            ),
-                          ],
+                          ),
                         )
                       : Padding(
                           padding: const EdgeInsets.all(24.0),
@@ -455,7 +472,7 @@ class _ProfilePageState extends State<ProfilePage> {
                               Text(
                                 "Choose what you want to share before scanning",
                                 style: TextStyle(
-                                  color: Colors.white.withOpacity(0.4),
+                                  color: Colors.white.withValues(alpha: 0.4),
                                   fontSize: 12,
                                 ),
                                 textAlign: TextAlign.center,
@@ -704,7 +721,7 @@ class _ProfilePageState extends State<ProfilePage> {
     const double thickness = 3.0;
     const Color neonColor = Color(0xFF4A4C6A);
 
-    return Container(
+    return SizedBox(
       width: lineSize,
       height: lineSize,
       child: Stack(
@@ -766,7 +783,7 @@ class _ProfilePageState extends State<ProfilePage> {
               decoration: BoxDecoration(
                 color: const Color(0xFF13141F),
                 borderRadius: BorderRadius.circular(24),
-                border: Border.all(color: Colors.white.withOpacity(0.04)),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.04)),
               ),
               child: const Row(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -804,7 +821,7 @@ class _ProfilePageState extends State<ProfilePage> {
                   borderRadius: BorderRadius.circular(24),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.white.withOpacity(0.03),
+                      color: Colors.white.withValues(alpha: 0.03),
                       blurRadius: 6,
                       offset: const Offset(0, 2),
                     ),
