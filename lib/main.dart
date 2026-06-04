@@ -1,6 +1,8 @@
 import 'dart:ui';
+import 'dart:convert';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:connect/firebase_options.dart';
 import 'package:connect/Providers/LocalDatabaseHelper.dart';
 import 'package:connect/Config/supabase_config.dart';
@@ -19,46 +21,218 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:connect/Pages/AuthScreen.dart';
 
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+
+final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
+    FlutterLocalNotificationsPlugin();
+
+const AndroidNotificationChannel notificationChannel = AndroidNotificationChannel(
+  'messages_channel', // id
+  'Messages', // name
+  description: 'Notifications for new messages', // description
+  importance: Importance.max,
+  playSound: true,
+  enableVibration: true,
+);
+
+int getNotificationId(String messageId) {
+  try {
+    final hex = messageId.replaceAll('-', '').substring(0, 8);
+    return int.parse(hex, radix: 16) & 0x7FFFFFFF;
+  } catch (e) {
+    print("Error parsing UUID for notification ID: $e");
+    return messageId.hashCode & 0x7FFFFFFF;
+  }
+}
+
+Future<void> showLocalNotification(
+    String messageId, String title, String body, Map<String, dynamic> dataPayload) async {
+  final notificationId = getNotificationId(messageId);
+
+  const AndroidNotificationDetails androidNotificationDetails =
+      AndroidNotificationDetails(
+    'messages_channel',
+    'Messages',
+    channelDescription: 'Notifications for new messages',
+    importance: Importance.max,
+    priority: Priority.high,
+    showWhen: true,
+  );
+
+  const DarwinNotificationDetails iosNotificationDetails =
+      DarwinNotificationDetails(
+    presentAlert: true,
+    presentBadge: true,
+    presentSound: true,
+  );
+
+  const NotificationDetails notificationDetails = NotificationDetails(
+    android: androidNotificationDetails,
+    iOS: iosNotificationDetails,
+  );
+
+  await flutterLocalNotificationsPlugin.show(
+    id: notificationId,
+    title: title,
+    body: body,
+    notificationDetails: notificationDetails,
+    payload: jsonEncode(dataPayload),
+  );
+}
+
+Future<void> cancelLocalNotification(String messageId) async {
+  final notificationId = getNotificationId(messageId);
+  await flutterLocalNotificationsPlugin.cancel(id: notificationId);
+}
+
+String? pendingNotificationPayload;
+
+Future<void> handleLocalNotificationClickPayload(String payload) async {
+  try {
+    final data = jsonDecode(payload);
+    final senderIdStr = data['sender_id'] as String?;
+    if (senderIdStr != null) {
+      final senderId = int.tryParse(senderIdStr);
+      if (senderId != null) {
+        final context = navigatorKey.currentContext;
+        if (context != null) {
+          final provider = Provider.of<ProfileProvider2>(context, listen: false);
+          final profile = await provider.loadProfile(senderId);
+          navigatorKey.currentState?.push(
+            MaterialPageRoute(
+              builder: (routeContext) => IndividualChatPage(connectionData: profile),
+            ),
+          );
+        }
+      }
+    }
+  } catch (e) {
+    print("Error handling local notification click payload: $e");
+  }
+}
+
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  // Initialize Firebase and Supabase in the background isolate
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+  WidgetsFlutterBinding.ensureInitialized();
+  
+  // 1. Initialize Firebase safely
+  try {
+    if (Firebase.apps.isEmpty) {
+      await Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform,
+      );
+    }
+  } catch (e) {
+    print("Error initializing Firebase in background: $e");
+  }
 
-  await Supabase.initialize(
-    url: SupabaseConfig.url,
-    anonKey: SupabaseConfig.serviceRoleKey,
-  );
+  // 2. Initialize flutter_local_notifications & register channel safely
+  try {
+    const AndroidInitializationSettings initializationSettingsAndroid =
+        AndroidInitializationSettings('@mipmap/ic_launcher');
+    const DarwinInitializationSettings initializationSettingsDarwin =
+        DarwinInitializationSettings();
+    const InitializationSettings initializationSettings = InitializationSettings(
+      android: initializationSettingsAndroid,
+      iOS: initializationSettingsDarwin,
+    );
+    await flutterLocalNotificationsPlugin.initialize(
+      settings: initializationSettings,
+    );
+    
+    await flutterLocalNotificationsPlugin
+        .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
+        ?.createNotificationChannel(notificationChannel);
+  } catch (e) {
+    print("Error initializing local notifications in background: $e");
+  }
 
   final data = message.data;
+  final action = data['action'] as String?;
   final messageId = data['message_id'] as String?;
-  final roomId = data['room_id'] as String?;
-  final senderIdStr = data['sender_id'] as String?;
-  final payload = data['payload'] as String?;
 
-  if (messageId != null &&
-      roomId != null &&
-      senderIdStr != null &&
-      payload != null) {
-    final senderId = int.tryParse(senderIdStr);
-    if (senderId != null) {
-      // 1. Save to local SQLite
-      await LocalDatabaseHelper.instance.insertMessage(
-        messageId,
-        roomId,
-        senderId,
-        payload,
-        status: 'delivered',
-      );
+  print("PushNotifications: Background message received. action: $action, message_id: $messageId");
 
-      // 2. Acknowledge delivery to Supabase
+  if (action == 'new_message') {
+    final roomId = data['room_id'] as String?;
+    final senderIdStr = data['sender_id'] as String?;
+    final senderName = data['sender_name'] as String? ?? 'New Message';
+    final payload = data['payload'] as String?;
+
+    if (messageId != null &&
+        roomId != null &&
+        senderIdStr != null &&
+        payload != null) {
+      final senderId = int.tryParse(senderIdStr);
+      if (senderId != null) {
+        // 1. Show notification FIRST to guarantee delivery regardless of DB/Network outcomes
+        try {
+          await showLocalNotification(
+            messageId,
+            senderName,
+            payload,
+            {
+              'sender_id': senderIdStr,
+              'room_id': roomId,
+            },
+          );
+          print("PushNotifications: Background notification displayed successfully.");
+        } catch (e) {
+          print("PushNotifications: Error displaying background notification: $e");
+        }
+
+        // 2. Save to local SQLite safely
+        try {
+          await LocalDatabaseHelper.instance.insertMessage(
+            messageId,
+            roomId,
+            senderId,
+            payload,
+            status: 'delivered',
+          );
+          print("PushNotifications: Background message saved to database.");
+        } catch (e) {
+          print("PushNotifications: Error saving message to database in background: $e");
+        }
+
+        // 3. Acknowledge delivery to Supabase safely
+        try {
+          final client = SupabaseClient(
+            SupabaseConfig.url,
+            SupabaseConfig.serviceRoleKey,
+          );
+          await client
+              .from('messages')
+              .update({'status': 'delivered'})
+              .eq('id', messageId);
+          print("PushNotifications: Background status update acknowledged to Supabase.");
+        } catch (e) {
+          print("PushNotifications: Error acknowledging delivery in background: $e");
+        }
+      }
+    }
+  } else if (action == 'delete_message') {
+    if (messageId != null) {
+      // 1. Cancel notification FIRST
       try {
-        await Supabase.instance.client
-            .from('messages')
-            .update({'status': 'delivered'}).eq('id', messageId);
+        await cancelLocalNotification(messageId);
+        print("PushNotifications: Background notification cancelled successfully.");
       } catch (e) {
-        print("Error acknowledging delivery in background: $e");
+        print("PushNotifications: Error cancelling notification in background: $e");
+      }
+
+      // 2. Delete from SQLite if not read
+      try {
+        final localMsg = await LocalDatabaseHelper.instance.getMessageById(messageId);
+        if (localMsg != null) {
+          final localStatus = localMsg['status'] as String?;
+          if (localStatus != 'read') {
+            await LocalDatabaseHelper.instance.deleteMessage(messageId);
+            print("PushNotifications: Background message deleted from SQLite.");
+          }
+        }
+      } catch (e) {
+        print("PushNotifications: Error deleting message from SQLite in background: $e");
       }
     }
   }
@@ -74,6 +248,39 @@ void main() async {
     url: SupabaseConfig.url,
     anonKey: SupabaseConfig.serviceRoleKey,
   );
+
+  // Initialize flutter_local_notifications
+  const AndroidInitializationSettings initializationSettingsAndroid =
+      AndroidInitializationSettings('@mipmap/ic_launcher');
+  const DarwinInitializationSettings initializationSettingsDarwin =
+      DarwinInitializationSettings();
+  const InitializationSettings initializationSettings = InitializationSettings(
+    android: initializationSettingsAndroid,
+    iOS: initializationSettingsDarwin,
+  );
+  await flutterLocalNotificationsPlugin.initialize(
+    settings: initializationSettings,
+    onDidReceiveNotificationResponse: (NotificationResponse response) async {
+      final payload = response.payload;
+      if (payload != null) {
+        final context = navigatorKey.currentContext;
+        if (context != null) {
+          handleLocalNotificationClickPayload(payload);
+        } else {
+          pendingNotificationPayload = payload;
+        }
+      }
+    },
+  );
+
+  // Explicitly create the Android notification channel
+  try {
+    await flutterLocalNotificationsPlugin
+        .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
+        ?.createNotificationChannel(notificationChannel);
+  } catch (e) {
+    print("Error creating notification channel on startup: $e");
+  }
 
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
@@ -91,6 +298,7 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => ProfileProvider2()),
       ],
       child: MaterialApp(
+        navigatorKey: navigatorKey,
         debugShowCheckedModeBanner: false,
         theme: ThemeData(
           brightness: Brightness.dark,
@@ -219,6 +427,122 @@ class _AppShellGateState extends State<AppShellGate> {
         print("PushNotifications: FCM token refreshed: $newToken");
         await provider.updatePushToken(newToken);
       });
+
+      // Request permission for local notifications (needed for Android 13+)
+      await flutterLocalNotificationsPlugin
+          .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
+          ?.requestNotificationsPermission();
+
+      // Listen to foreground FCM messages
+      FirebaseMessaging.onMessage.listen((RemoteMessage message) async {
+        print("PushNotifications: Foreground message received: ${message.messageId}");
+        try {
+          final data = message.data;
+          final action = data['action'] as String?;
+          final messageId = data['message_id'] as String?;
+
+          if (action == 'new_message') {
+            final roomId = data['room_id'] as String?;
+            final senderIdStr = data['sender_id'] as String?;
+            final senderName = data['sender_name'] as String? ?? 'New Message';
+            final payload = data['payload'] as String?;
+
+            if (messageId != null &&
+                roomId != null &&
+                senderIdStr != null &&
+                payload != null) {
+              final senderId = int.tryParse(senderIdStr);
+              if (senderId != null) {
+                // 1. Save to local SQLite
+                final isCurrentRoom = provider.activeRoomId == roomId;
+                try {
+                  await LocalDatabaseHelper.instance.insertMessage(
+                    messageId,
+                    roomId,
+                    senderId,
+                    payload,
+                    status: isCurrentRoom ? 'read' : 'delivered',
+                  );
+                  print("PushNotifications: Foreground message inserted to SQLite.");
+                } catch (e) {
+                  print("PushNotifications: Error inserting message in foreground SQLite: $e");
+                }
+
+                // 2. Acknowledge delivery
+                try {
+                  await Supabase.instance.client
+                      .from('messages')
+                      .update({'status': isCurrentRoom ? 'read' : 'delivered'})
+                      .eq('id', messageId);
+                  print("PushNotifications: Foreground message delivery status updated in Supabase.");
+                } catch (e) {
+                  print("PushNotifications: Error acknowledging delivery in foreground: $e");
+                }
+
+                // 3. Update providers so UI updates immediately
+                try {
+                  await provider.refreshActiveRoomMessages();
+                  await provider.updateUnreadCount();
+                } catch (e) {
+                  print("PushNotifications: Error updating providers: $e");
+                }
+
+                // 4. Show notification ONLY if the user is NOT actively in the chat room
+                if (!isCurrentRoom) {
+                  try {
+                    await showLocalNotification(
+                      messageId,
+                      senderName,
+                      payload,
+                      {
+                        'sender_id': senderIdStr,
+                        'room_id': roomId,
+                      },
+                    );
+                    print("PushNotifications: Foreground local notification displayed successfully.");
+                  } catch (e) {
+                    print("PushNotifications: Error showing local notification in foreground: $e");
+                  }
+                }
+              }
+            }
+          } else if (action == 'delete_message') {
+            if (messageId != null) {
+              // 1. Delete from SQLite if not read
+              try {
+                final localMsg = await LocalDatabaseHelper.instance.getMessageById(messageId);
+                if (localMsg != null) {
+                  final localStatus = localMsg['status'] as String?;
+                  if (localStatus != 'read') {
+                    await LocalDatabaseHelper.instance.deleteMessage(messageId);
+                    print("PushNotifications: Foreground message deleted from SQLite.");
+                  }
+                }
+              } catch (e) {
+                print("PushNotifications: Error deleting message from SQLite in foreground: $e");
+              }
+              
+              // 2. Update providers so UI updates
+              try {
+                await provider.refreshActiveRoomMessages();
+                await provider.updateUnreadCount();
+              } catch (e) {
+                print("PushNotifications: Error updating providers after delete: $e");
+              }
+
+              // 3. Cancel local notification
+              try {
+                await cancelLocalNotification(messageId);
+                print("PushNotifications: Foreground notification cancelled successfully.");
+              } catch (e) {
+                print("PushNotifications: Error cancelling notification in foreground: $e");
+              }
+            }
+          }
+        } catch (e) {
+          print("PushNotifications: Error in foreground message handler: $e");
+        }
+      });
     } catch (e) {
       print("PushNotifications: Error setting up push notifications: $e");
     }
@@ -268,6 +592,15 @@ class _AppShellState extends State<_AppShell> with WidgetsBindingObserver {
       const YetToBeBuiltProfilePage(),
     ];
     _setupNotificationTapListeners();
+
+    // Check if there is a pending local notification click payload stored globally
+    if (pendingNotificationPayload != null) {
+      final payload = pendingNotificationPayload!;
+      pendingNotificationPayload = null; // Clear immediately
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        handleLocalNotificationClickPayload(payload);
+      });
+    }
   }
 
   @override
@@ -301,6 +634,20 @@ class _AppShellState extends State<_AppShell> with WidgetsBindingObserver {
         .then((RemoteMessage? message) {
       if (message != null) {
         _handleNotificationClick(message);
+      }
+    });
+
+    // 3. Handle local notifications plugin launch details (cold start via local notification)
+    flutterLocalNotificationsPlugin
+        .getNotificationAppLaunchDetails()
+        .then((NotificationAppLaunchDetails? details) {
+      if (details != null && details.didNotificationLaunchApp) {
+        final payload = details.notificationResponse?.payload;
+        if (payload != null) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            handleLocalNotificationClickPayload(payload);
+          });
+        }
       }
     });
   }

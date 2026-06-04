@@ -1384,7 +1384,8 @@ class ProfileProvider2 with ChangeNotifier {
     }
   }
 
-  Future<void> deleteChatMessage(String messageId, {required bool deleteForEveryone}) async {
+  Future<void> deleteChatMessage(String messageId,
+      {required bool deleteForEveryone}) async {
     try {
       // 1. Delete from local SQLite
       await LocalDatabaseHelper.instance.deleteMessage(messageId);
@@ -1505,7 +1506,8 @@ class ProfileProvider2 with ChangeNotifier {
             if (messageId != null) {
               // Check the local status of the message in our SQLite database.
               // If it wasn't read yet, it means the sender deleted it for everyone.
-              final localMsg = await LocalDatabaseHelper.instance.getMessageById(messageId);
+              final localMsg =
+                  await LocalDatabaseHelper.instance.getMessageById(messageId);
               if (localMsg != null) {
                 final localStatus = localMsg['status'] as String?;
                 if (localStatus != 'read') {
@@ -1513,7 +1515,8 @@ class ProfileProvider2 with ChangeNotifier {
                   await LocalDatabaseHelper.instance.deleteMessage(messageId);
                 } else {
                   // Message was already read -> trigger deleted it. Ensure local is 'read'.
-                  await LocalDatabaseHelper.instance.updateMessageStatus(messageId, 'read');
+                  await LocalDatabaseHelper.instance
+                      .updateMessageStatus(messageId, 'read');
                 }
               }
 

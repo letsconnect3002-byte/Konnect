@@ -9,28 +9,24 @@ const serviceAccountJson = JSON.parse(Deno.env.get("FIREBASE_SERVICE_ACCOUNT")!)
 serve(async (req) => {
   try {
     const payload = await req.json()
-    // The webhook payload from Supabase will contain the inserted row in payload.record
-    const record = payload.record
+    // For a DELETE webhook trigger, the deleted row is in payload.old
+    const record = payload.old || payload.record
 
     if (!record) {
-      return new Response("No record found in payload", { status: 400 })
+      return new Response("No old record found in payload", { status: 400 })
     }
 
-    const { id: messageId, room_id: roomId, sender_id: senderId, payload: msgPayload } = record
+    const { id: messageId, room_id: roomId, sender_id: senderId } = record
+
+    if (!messageId || !roomId || !senderId) {
+      console.warn("Missing required fields in deleted record:", record)
+      return new Response("Missing required fields", { status: 400 })
+    }
 
     // 1. Initialize Supabase Client with Service Role Key (bypasses RLS)
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-    // 2. Fetch the sender's profile name to display in the notification title
-    const { data: senderProfile } = await supabase
-      .from("profiles")
-      .select("name")
-      .eq("id", senderId)
-      .single()
-
-    const senderName = senderProfile?.name || "New Message"
-
-    // 3. Fetch the other participants in this chat room
+    // 2. Fetch other participants in this chat room
     const { data: participants, error: pError } = await supabase
       .from("room_participants")
       .select("user_id")
@@ -44,7 +40,7 @@ serve(async (req) => {
 
     const recipientIds = participants.map((p) => p.user_id)
 
-    // 4. Fetch registered FCM tokens for the recipients
+    // 3. Fetch registered FCM tokens for the recipients
     const { data: tokens, error: tError } = await supabase
       .from("user_push_tokens")
       .select("fcm_token")
@@ -55,7 +51,7 @@ serve(async (req) => {
       return new Response("No push tokens registered", { status: 200 })
     }
 
-    // 5. Generate Google OAuth2 access token for Firebase Cloud Messaging
+    // 4. Generate Google OAuth2 access token for Firebase Cloud Messaging
     const jwt = new JWT({
       email: serviceAccountJson.client_email,
       key: serviceAccountJson.private_key,
@@ -64,27 +60,18 @@ serve(async (req) => {
     const credentials = await jwt.authorize()
     const accessToken = credentials.access_token
 
-    // 6. Send high-priority background notification + system notification to each device token
+    // 5. Send delete action notification to each device token
     const results = []
     for (const row of tokens) {
       const fcmToken = row.fcm_token
 
-      // Generate a stable numeric notification ID from the message UUID
-      // Take first 8 hex chars of the UUID and convert to a 31-bit positive integer
-      const notificationId = parseInt(messageId.replace(/-/g, "").substring(0, 8), 16) & 0x7FFFFFFF
-
       const body = {
         message: {
           token: fcmToken,
-          // NO 'notification' block — the Flutter app will display via flutter_local_notifications
           data: {
-            action: "new_message",
+            action: "delete_message",
             message_id: messageId,
             room_id: roomId,
-            sender_id: String(senderId),
-            sender_name: senderName,
-            payload: msgPayload,
-            notification_id: String(notificationId),
           },
           android: {
             priority: "high",
@@ -124,9 +111,9 @@ serve(async (req) => {
       })
 
       if (!response.ok) {
-        console.error(`Failed to send push notification to token ${fcmToken}:`, responseText)
+        console.error(`Failed to send delete push notification to token ${fcmToken}:`, responseText)
       } else {
-        console.log(`Successfully sent push notification to token: ${fcmToken}`)
+        console.log(`Successfully sent delete push notification to token: ${fcmToken}`)
       }
     }
 
@@ -135,7 +122,7 @@ serve(async (req) => {
       status: 200,
     })
   } catch (err) {
-    console.error("Error processing push webhook:", err)
+    console.error("Error processing delete push webhook:", err)
     return new Response(JSON.stringify({ error: err.message }), {
       headers: { "Content-Type": "application/json" },
       status: 500,
