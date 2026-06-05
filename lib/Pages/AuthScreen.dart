@@ -21,6 +21,7 @@ class _AuthScreenState extends State<AuthScreen> {
   bool _isLoading = false;
   bool _obscurePassword = true;
   bool _isOtpMode = false;
+  String? _selectedGender;
 
   @override
   void dispose() {
@@ -57,6 +58,9 @@ class _AuthScreenState extends State<AuthScreen> {
         await Supabase.instance.client.auth.signUp(
           email: email,
           password: password,
+          data: {
+            'gender': _selectedGender,
+          },
         );
 
         if (mounted) {
@@ -473,6 +477,9 @@ class _AuthScreenState extends State<AuthScreen> {
                               return null;
                             },
                           ),
+                          const SizedBox(height: 18),
+                          // Gender Selection Field
+                          _buildGenderDropdown(),
                         ],
 
                         const SizedBox(height: 32),
@@ -660,6 +667,57 @@ class _AuthScreenState extends State<AuthScreen> {
         ),
       ),
       validator: validator,
+    );
+  }
+
+  Widget _buildGenderDropdown() {
+    return DropdownButtonFormField<String>(
+      value: _selectedGender,
+      dropdownColor: const Color(0xFF13141F),
+      style: const TextStyle(color: Colors.white, fontSize: 15),
+      icon: const Icon(Icons.arrow_drop_down_rounded, color: Color(0xFF5C5E78), size: 28),
+      decoration: InputDecoration(
+        prefixIcon: const Icon(Icons.wc_rounded, color: Color(0xFF5C5E78), size: 22),
+        hintText: "Select Gender",
+        hintStyle: const TextStyle(color: Color(0xFF5C5E78), fontSize: 14),
+        filled: true,
+        fillColor: const Color(0xFF13141F),
+        errorStyle: const TextStyle(color: Colors.redAccent, fontSize: 12),
+        contentPadding:
+            const EdgeInsets.symmetric(vertical: 16.0, horizontal: 20.0),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(color: Color(0xFF1F2030), width: 1.5),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(color: Color(0xFF8B5CF6), width: 1.5),
+        ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(color: Colors.redAccent, width: 1.5),
+        ),
+        focusedErrorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(color: Colors.redAccent, width: 1.5),
+        ),
+      ),
+      items: const [
+        DropdownMenuItem(value: "Male", child: Text("Male")),
+        DropdownMenuItem(value: "Female", child: Text("Female")),
+        DropdownMenuItem(value: "Others", child: Text("Others")),
+      ],
+      onChanged: (value) {
+        setState(() {
+          _selectedGender = value;
+        });
+      },
+      validator: (value) {
+        if (value == null || value.isEmpty) {
+          return "Please select your gender";
+        }
+        return null;
+      },
     );
   }
 

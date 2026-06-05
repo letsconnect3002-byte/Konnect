@@ -100,6 +100,7 @@ class ProfileProvider2 with ChangeNotifier {
   String bio = '';
   String professionalBio = '';
   String avatarUrl = '';
+  String gender = '';
   bool showProfileToConnections = true;
   int userId = -1;
 
@@ -315,6 +316,7 @@ class ProfileProvider2 with ChangeNotifier {
         name = session.user.email?.split('@')[0] ?? 'User';
         email = session.user.email ?? '';
         profession = 'Professional';
+        gender = session.user.userMetadata?['gender'] as String? ?? '';
         isCreated = false;
 
         await saveProfileData(isMyProfile: true);
@@ -343,6 +345,7 @@ class ProfileProvider2 with ChangeNotifier {
     bio = data['bio'] ?? bio;
     professionalBio = data['professionalBio'] ?? data['professional_bio'] ?? '';
     avatarUrl = data['avatarUrl'] ?? data['avatar_url'] ?? avatarUrl;
+    gender = data['gender'] ?? '';
 
     final showVal =
         data['showProfileToConnections'] ?? data['show_profile_to_connections'];
@@ -396,6 +399,9 @@ class ProfileProvider2 with ChangeNotifier {
         break;
       case 'avatarUrl':
         avatarUrl = value;
+        break;
+      case 'gender':
+        gender = value;
         break;
     }
   }
@@ -631,6 +637,7 @@ class ProfileProvider2 with ChangeNotifier {
       "bio": "",
       "professionalBio": "",
       "avatarUrl": "",
+      "gender": "",
       "showProfileToConnections": true
     };
     try {
@@ -654,6 +661,7 @@ class ProfileProvider2 with ChangeNotifier {
         bio = response['bio'] ?? '';
         professionalBio = response['professional_bio'] ?? '';
         avatarUrl = response['avatar_url'] ?? '';
+        gender = response['gender'] ?? '';
         showProfileToConnections =
             response['show_profile_to_connections'] == true;
 
@@ -670,6 +678,7 @@ class ProfileProvider2 with ChangeNotifier {
         profileData["bio"] = bio;
         profileData["professionalBio"] = professionalBio;
         profileData["avatarUrl"] = avatarUrl;
+        profileData["gender"] = gender;
         profileData["showProfileToConnections"] = showProfileToConnections;
 
         isCreated = true;
@@ -737,6 +746,7 @@ class ProfileProvider2 with ChangeNotifier {
               'bio': bio,
               'professional_bio': professionalBio,
               'avatar_url': avatarUrl,
+              'gender': gender,
               'show_profile_to_connections': showProfileToConnections,
               'field_assignments': assignmentsMap,
             })
@@ -849,6 +859,9 @@ class ProfileProvider2 with ChangeNotifier {
         break;
       case 'avatarUrl':
         avatarUrl = value;
+        break;
+      case 'gender':
+        gender = value;
         break;
     }
 
@@ -1194,6 +1207,7 @@ class ProfileProvider2 with ChangeNotifier {
     bio = '';
     professionalBio = '';
     avatarUrl = '';
+    gender = '';
     showProfileToConnections = true;
     isCreated = false;
     userId = -1;
