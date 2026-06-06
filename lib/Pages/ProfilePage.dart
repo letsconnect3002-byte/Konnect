@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:connect/Pages/QrCodeScanner.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:connect/Providers/ProviderSQL.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -84,21 +85,68 @@ class _ProfilePageState extends State<ProfilePage> {
     }
   }
 
-  // Share profile details by copying to clipboard
-  void _shareProfile(ProfileProvider2 profileProvider) {
+  // Share profile details by generating a VIP Pass and sharing it
+  void _shareProfile(ProfileProvider2 profileProvider) async {
     if (profileProvider.UserData.isEmpty) return;
 
-    // Copy the profile string format to clipboard
-    final profileString = "${profileProvider.UserData}";
-    Clipboard.setData(ClipboardData(text: profileString)).then((_) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Profile link copied to clipboard!"),
-          backgroundColor: Color(0xFF8B5CF6),
+    // Show a progress dialog while generating VIP code
+    if (mounted) {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const Dialog(
+          backgroundColor: Color(0xFF131422),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.all(Radius.circular(16)),
+          ),
+          child: Padding(
+            padding: EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                CircularProgressIndicator(
+                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF00F2FE)),
+                ),
+                SizedBox(height: 16),
+                Text(
+                  "Generating VIP Pass...",
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    fontFamily: 'Inter',
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       );
-    });
+    }
+
+    try {
+      final code = await profileProvider.generateInviteCode(_selectedShareType);
+
+      if (mounted) {
+        Navigator.pop(context); // Dismiss loading dialog
+      }
+
+      final shareMessage =
+          "Hey,I'm inviting you to my private circle on Mandala. Download the app here: joinmandala.in and use my single-use VIP code to connect: *$code*.";
+
+      await SharePlus.instance.share(ShareParams(text: shareMessage));
+    } catch (e) {
+      if (mounted) {
+        Navigator.pop(context); // Dismiss loading dialog
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("Error generating VIP code: $e"),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   @override
@@ -264,7 +312,7 @@ class _ProfilePageState extends State<ProfilePage> {
               border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
             ),
             child: Image.asset(
-              'assets/icons/Connect Icon3.png',
+              'assets/icons/Mandala Icon 1.png',
               width: 22,
               height: 22,
               color: const Color(0xFF00F2FE), // Teal color link logo
@@ -276,7 +324,7 @@ class _ProfilePageState extends State<ProfilePage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                "Connect",
+                "Mandala",
                 style: TextStyle(
                   color: Colors.white,
                   fontSize: 18,
@@ -285,7 +333,7 @@ class _ProfilePageState extends State<ProfilePage> {
                 ),
               ),
               Text(
-                "Zero Noise.",
+                "Your Circle",
                 style: TextStyle(
                   color: Colors.white30,
                   fontSize: 12,
@@ -639,6 +687,136 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
+  void _showShareOptionsBottomSheet(
+      BuildContext context, ProfileProvider2 profileProvider) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Container(
+              decoration: const BoxDecoration(
+                color: Color(0xFF0F1020),
+                borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+                border: Border(
+                  top: BorderSide(color: Color(0xFF26273F), width: 1),
+                ),
+              ),
+              padding: EdgeInsets.only(
+                left: 24,
+                right: 24,
+                top: 24,
+                bottom: 24 + MediaQuery.of(context).viewInsets.bottom,
+              ),
+              child: SafeArea(
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Center(
+                        child: Container(
+                          width: 40,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF26273F),
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      const Text(
+                        "Share VIP Pass Options",
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          fontFamily: 'Inter',
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        "Select which digital card you want to share with this VIP Pass code:",
+                        style: TextStyle(
+                          color: Color(0xFF8B8C9E),
+                          fontSize: 13,
+                          fontFamily: 'Inter',
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      _buildOptionTile(
+                        title: "Casual Card Only",
+                        subtitle: "Share bio, socials, name & basic details.",
+                        value: "casual",
+                        groupValue: _selectedShareType,
+                        onChanged: (val) {
+                          setModalState(() {
+                            _selectedShareType = val!;
+                          });
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      _buildOptionTile(
+                        title: "Professional Card Only",
+                        subtitle:
+                            "Share company, email, phone & professional bio.",
+                        value: "professional",
+                        groupValue: _selectedShareType,
+                        onChanged: (val) {
+                          setModalState(() {
+                            _selectedShareType = val!;
+                          });
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      _buildOptionTile(
+                        title: "Both Cards",
+                        subtitle:
+                            "Share your complete casual and professional profiles.",
+                        value: "both",
+                        groupValue: _selectedShareType,
+                        onChanged: (val) {
+                          setModalState(() {
+                            _selectedShareType = val!;
+                          });
+                        },
+                      ),
+                      const SizedBox(height: 24),
+                      ElevatedButton(
+                        onPressed: () {
+                          Navigator.pop(context);
+                          _shareProfile(profileProvider);
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF00F2FE),
+                          foregroundColor: Colors.black,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                        ),
+                        child: const Text(
+                          "Share VIP Pass",
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                            fontFamily: 'Inter',
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   Widget _buildOptionTile({
     required String title,
     required String subtitle,
@@ -811,7 +989,9 @@ class _ProfilePageState extends State<ProfilePage> {
         // Share Link Action
         Expanded(
           child: GestureDetector(
-            onTap: hasProfile ? () => _shareProfile(profileProvider) : null,
+            onTap: hasProfile
+                ? () => _showShareOptionsBottomSheet(context, profileProvider)
+                : null,
             child: Opacity(
               opacity: hasProfile ? 1.0 : 0.4,
               child: Container(

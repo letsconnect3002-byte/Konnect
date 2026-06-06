@@ -1657,7 +1657,7 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                 ),
                 child: Center(
                   child: Image.asset(
-                    'assets/icons/Connect Icon2.png',
+                    'assets/icons/Mandala Icon 1.png',
                     width: 22,
                     height: 22,
                     color: const Color(0xFF00F2FE),

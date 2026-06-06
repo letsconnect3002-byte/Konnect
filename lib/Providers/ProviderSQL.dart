@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math';
 
 import 'package:connect/Models/profile_card_type.dart';
 import 'package:flutter/material.dart';
@@ -961,6 +962,76 @@ class ProfileProvider2 with ChangeNotifier {
       }
     }
     notifyListeners();
+  }
+
+  Future<String> generateInviteCode(String sharedCardType) async {
+    if (userId == -1) {
+      throw Exception("User is not signed in or profile is not loaded");
+    }
+    
+    // Generate a random 6-character alphanumeric code
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    final rand = Random();
+    final suffix = List.generate(6, (index) => chars[rand.nextInt(chars.length)]).join();
+    final generatedCode = 'MNDL-$suffix';
+    
+    try {
+      await Supabase.instance.client.from('invite_codes').insert({
+        'code': generatedCode,
+        'sender_id': userId,
+        'shared_card_type': sharedCardType,
+        'is_used': false,
+      });
+      print("Successfully generated invite code: $generatedCode");
+      return generatedCode;
+    } catch (e) {
+      print("Error generating invite code: $e");
+      rethrow;
+    }
+  }
+
+  Future<int> redeemInviteCode(String code, String mySharedCardType) async {
+    if (userId == -1) {
+      throw Exception("User is not signed in or profile is not loaded");
+    }
+
+    try {
+      // 1. Query the code
+      final response = await Supabase.instance.client
+          .from('invite_codes')
+          .select()
+          .eq('code', code.trim().toUpperCase())
+          .eq('is_used', false)
+          .maybeSingle();
+
+      if (response == null) {
+        throw Exception("Invalid or already used code");
+      }
+
+      final int senderId = response['sender_id'] as int;
+      final String sharedCardType = response['shared_card_type'] as String;
+
+      // 2. Connect users
+      // Note: myUserId (userId) is the scanner/redeemer, and senderId is the presenter.
+      await connectUsers(
+        userId,
+        senderId,
+        sharedCardByPresenter: sharedCardType,
+        sharedCardByScanner: mySharedCardType,
+      );
+
+      // 3. Mark the code as used
+      await Supabase.instance.client
+          .from('invite_codes')
+          .update({'is_used': true})
+          .eq('id', response['id']);
+
+      print("Successfully redeemed invite code: $code");
+      return senderId;
+    } catch (e) {
+      print("Error redeeming invite code: $e");
+      rethrow;
+    }
   }
 
   Future<void> connectUsers(int idA, int idB,

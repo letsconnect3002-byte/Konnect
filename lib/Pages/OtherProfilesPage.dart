@@ -34,6 +34,252 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
     });
   }
 
+  void _showRedeemVipDialog(BuildContext context, ProfileProvider2 provider) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        String selectedType = 'casual';
+        final TextEditingController controller = TextEditingController();
+        bool isDialogLoading = false;
+
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              backgroundColor: const Color(0xFF131422),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+                side: const BorderSide(color: Color(0xFF26273C), width: 1.5),
+              ),
+              title: const Text(
+                "Redeem VIP Pass",
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontFamily: 'Inter',
+                ),
+              ),
+              content: isDialogLoading
+                  ? const SizedBox(
+                      height: 150,
+                      child: Center(
+                        child: CircularProgressIndicator(
+                          valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF00F2FE)),
+                        ),
+                      ),
+                    )
+                  : Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          "Enter the 6-character VIP code to connect immediately.",
+                          style: TextStyle(
+                            color: Color(0xFF8B8C9E),
+                            fontSize: 12,
+                            fontFamily: 'Inter',
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        TextField(
+                          controller: controller,
+                          textCapitalization: TextCapitalization.characters,
+                          style: const TextStyle(color: Colors.white, fontFamily: 'Inter'),
+                          decoration: InputDecoration(
+                            hintText: "MNDL-XXXXXX",
+                            hintStyle: const TextStyle(color: Colors.white24, fontFamily: 'Inter'),
+                            filled: true,
+                            fillColor: const Color(0xFF0A0A0F),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: const BorderSide(color: Color(0xFF26273C)),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: const BorderSide(color: Color(0xFF00F2FE)),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                        const Text(
+                          "SHARE BACK YOUR CARD",
+                          style: TextStyle(
+                            color: Color(0xFF8B8C9E),
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 1.5,
+                            fontFamily: 'Inter',
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: GestureDetector(
+                                onTap: () {
+                                  setState(() {
+                                    selectedType = 'casual';
+                                  });
+                                },
+                                child: Container(
+                                  height: 44,
+                                  alignment: Alignment.center,
+                                  decoration: BoxDecoration(
+                                    color: selectedType == 'casual'
+                                        ? const Color(0xFF8B5CF6).withOpacity(0.1)
+                                        : const Color(0xFF0A0A0F),
+                                    borderRadius: BorderRadius.circular(10),
+                                    border: Border.all(
+                                      color: selectedType == 'casual'
+                                          ? const Color(0xFF8B5CF6)
+                                          : const Color(0xFF26273C),
+                                    ),
+                                  ),
+                                  child: const Text(
+                                    "Casual",
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.bold,
+                                      fontFamily: 'Inter',
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: GestureDetector(
+                                onTap: () {
+                                  setState(() {
+                                    selectedType = 'professional';
+                                  });
+                                },
+                                child: Container(
+                                  height: 44,
+                                  alignment: Alignment.center,
+                                  decoration: BoxDecoration(
+                                    color: selectedType == 'professional'
+                                        ? const Color(0xFF00F2FE).withOpacity(0.1)
+                                        : const Color(0xFF0A0A0F),
+                                    borderRadius: BorderRadius.circular(10),
+                                    border: Border.all(
+                                      color: selectedType == 'professional'
+                                          ? const Color(0xFF00F2FE)
+                                          : const Color(0xFF26273C),
+                                    ),
+                                  ),
+                                  child: const Text(
+                                    "Professional",
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.bold,
+                                      fontFamily: 'Inter',
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+              actions: isDialogLoading
+                  ? []
+                  : [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text(
+                          "Cancel",
+                          style: TextStyle(color: Colors.white54, fontFamily: 'Inter'),
+                        ),
+                      ),
+                      ElevatedButton(
+                        onPressed: () async {
+                          final codeStr = controller.text.trim();
+                          if (codeStr.isEmpty) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text("Please enter a VIP code")),
+                            );
+                            return;
+                          }
+                          
+                          setState(() {
+                            isDialogLoading = true;
+                          });
+                          
+                          try {
+                            await provider.redeemInviteCode(codeStr, selectedType);
+                            // Refresh connection list
+                            await provider.fetchConnections();
+                            await provider.updateUnreadCount();
+                            
+                            if (context.mounted) {
+                              Navigator.pop(context); // Dismiss dialog
+                              
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Row(
+                                    children: [
+                                      const Icon(Icons.check_circle_rounded, color: Color(0xFF00F2FE)),
+                                      const SizedBox(width: 10),
+                                      const Expanded(
+                                        child: Text(
+                                          "Successfully connected with VIP Pass!",
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.bold,
+                                            fontFamily: 'Inter',
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  backgroundColor: const Color(0xFF131422),
+                                  behavior: SnackBarBehavior.floating,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(14),
+                                    side: const BorderSide(color: Color(0xFF26273C), width: 1),
+                                  ),
+                                ),
+                              );
+                            }
+                          } catch (e) {
+                            setState(() {
+                              isDialogLoading = false;
+                            });
+                            String errorMsg = e.toString();
+                            if (errorMsg.contains("Exception:")) {
+                              errorMsg = errorMsg.replaceAll("Exception:", "").trim();
+                            }
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text("Failed to redeem: $errorMsg"),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                          }
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF00F2FE),
+                          foregroundColor: Colors.black,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                        child: const Text(
+                          "Redeem",
+                          style: TextStyle(fontWeight: FontWeight.bold, fontFamily: 'Inter'),
+                        ),
+                      ),
+                    ],
+            );
+          },
+        );
+      },
+    );
+  }
+
   Future<void> _loadFavorites() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -259,7 +505,7 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
     } else if (cleanName.contains('santosh')) {
       return 'Fullstack developer & designer crafting seamless experiences across web and mobile ecosystems.';
     }
-    return 'Digital Identity on Connect. Tap scan or view profile to start connecting and collaborating.';
+    return 'Digital Identity on Mandala. Tap scan or view profile to start connecting and collaborating.';
   }
 
   List<String> _getCardTypesForProfile(Map<String, dynamic> profile) {
@@ -464,7 +710,7 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
             child: Opacity(
               opacity: 0.08,
               child: Image.asset(
-                'assets/icons/Connect Icon2.png',
+                'assets/icons/Mandala Icon 1.png',
                 width: 160,
                 height: 160,
               ),
@@ -479,7 +725,7 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
                   Row(
                     children: [
                       Image.asset(
-                        'assets/icons/Connect Icon2.png',
+                        'assets/icons/Mandala Icon 1.png',
                         width: 18,
                         height: 18,
                         color: const Color(0xFF00F2FE),
@@ -1294,6 +1540,13 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
                   ),
                   Row(
                     children: [
+                      _buildCircularActionButton(
+                        icon: Icons.key_rounded,
+                        onPressed: () {
+                          _showRedeemVipDialog(context, provider);
+                        },
+                      ),
+                      const SizedBox(width: 12),
                       _buildCircularActionButton(
                         icon: Icons.qr_code_scanner_rounded,
                         onPressed: () {

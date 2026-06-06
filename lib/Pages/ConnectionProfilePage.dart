@@ -364,7 +364,7 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
     } else if (cleanName.contains('santosh')) {
       return 'Fullstack developer & designer crafting seamless experiences across web and mobile ecosystems.';
     }
-    return 'Digital Identity on Connect. Tap scan or view profile to start connecting and collaborating.';
+    return 'Digital Identity on Mandala. Tap scan or view profile to start connecting and collaborating.';
   }
 
   Widget _buildHeader(BuildContext context) {
@@ -681,7 +681,7 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
                 ),
                 child: Center(
                   child: Image.asset(
-                    'assets/icons/Connect Icon2.png',
+                    'assets/icons/Mandala Icon 1.png',
                     width: 22,
                     height: 22,
                     color: const Color(0xFF00F2FE),

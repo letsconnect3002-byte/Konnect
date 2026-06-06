@@ -22,6 +22,8 @@ class _AuthScreenState extends State<AuthScreen> {
   bool _obscurePassword = true;
   bool _isOtpMode = false;
   String? _selectedGender;
+  bool _isRecoveryMode = false;
+  bool _isRecoveryOtpMode = false;
 
   @override
   void dispose() {
@@ -241,6 +243,134 @@ class _AuthScreenState extends State<AuthScreen> {
     }
   }
 
+  void _forgotPassword() {
+    setState(() {
+      _isSignIn = false;
+      _isRecoveryMode = true;
+    });
+  }
+
+  Future<void> _sendRecoveryCode() async {
+    final email = _emailController.text.trim();
+    if (email.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Please enter your email address"),
+          backgroundColor: Colors.orangeAccent,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isLoading = true);
+    HapticFeedback.mediumImpact();
+
+    try {
+      await Supabase.instance.client.auth.resetPasswordForEmail(
+        email,
+      );
+      if (mounted) {
+        setState(() {
+          _isRecoveryMode = false;
+          _isRecoveryOtpMode = true;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Recovery code sent! Please check your email."),
+            backgroundColor: Color(0xFF8B5CF6),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } on AuthException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.message),
+            backgroundColor: Colors.redAccent,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.toString().replaceAll("Exception: ", "")),
+            backgroundColor: Colors.redAccent,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  Future<void> _verifyRecoveryOtp() async {
+    final email = _emailController.text.trim();
+    final token = _otpController.text.trim();
+
+    if (token.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Please enter the recovery code"),
+          backgroundColor: Colors.orangeAccent,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isLoading = true);
+    HapticFeedback.mediumImpact();
+
+    try {
+      await Supabase.instance.client.auth.verifyOTP(
+        type: OtpType.recovery,
+        token: token,
+        email: email,
+      );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Code verified! Redirecting to reset password..."),
+            backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } on AuthException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.message),
+            backgroundColor: Colors.redAccent,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.toString().replaceAll("Exception: ", "")),
+            backgroundColor: Colors.redAccent,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
@@ -313,7 +443,7 @@ class _AuthScreenState extends State<AuthScreen> {
                               ],
                             ),
                             child: Image.asset(
-                              'assets/icons/Connect Icon2.png',
+                              'assets/icons/Mandala Icon 1.png',
                               fit: BoxFit.contain,
                             ),
                           ),
@@ -323,7 +453,7 @@ class _AuthScreenState extends State<AuthScreen> {
 
                       // Text Headers
                       const Text(
-                        "Connect",
+                        "Mandala",
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           color: Colors.white,
@@ -333,7 +463,7 @@ class _AuthScreenState extends State<AuthScreen> {
                         ),
                       ),
                       const SizedBox(height: 6),
-                      if (!_isOtpMode)
+                      if (!_isOtpMode && !_isRecoveryMode && !_isRecoveryOtpMode)
                         Text(
                           _isSignIn
                               ? "Your close circle, not your contacts list."
@@ -402,6 +532,122 @@ class _AuthScreenState extends State<AuthScreen> {
                             ),
                           ),
                         ),
+                      ] else if (_isRecoveryOtpMode) ...[
+                        const Text(
+                          "Verify Recovery Code",
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 22,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          "We've sent a 6-digit recovery code to\n${_emailController.text.trim()}",
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            color: Color(0xFF8B8C9E),
+                            fontSize: 14,
+                            height: 1.4,
+                          ),
+                        ),
+                        const SizedBox(height: 32),
+                        _buildInputField(
+                          controller: _otpController,
+                          hint: "6-Digit Recovery Code",
+                          icon: Icons.pin_rounded,
+                          keyboardType: TextInputType.number,
+                          validator: (value) {
+                            if (value == null || value.trim().isEmpty) {
+                              return "Recovery code is required";
+                            }
+                            if (value.trim().length != 6) {
+                              return "Code must be 6 digits";
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 32),
+                        _buildRecoveryOtpSubmitButton(),
+                        const SizedBox(height: 18),
+                        TextButton(
+                          onPressed: () {
+                            setState(() {
+                              _isRecoveryOtpMode = false;
+                              _isSignIn = true;
+                              _otpController.clear();
+                            });
+                          },
+                          child: const Text(
+                            "Back to Sign In",
+                            style: TextStyle(
+                              color: Color(0xFF8B5CF6),
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ] else if (_isRecoveryMode) ...[
+                        const Text(
+                          "Reset Password",
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 22,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        const Text(
+                          "Enter your email address to receive a 6-digit recovery code.",
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: Color(0xFF8B8C9E),
+                            fontSize: 14,
+                            height: 1.4,
+                          ),
+                        ),
+                        const SizedBox(height: 32),
+                        _buildInputField(
+                          controller: _emailController,
+                          hint: "Email Address",
+                          icon: Icons.email_rounded,
+                          keyboardType: TextInputType.emailAddress,
+                          validator: (value) {
+                            if (value == null || value.trim().isEmpty) {
+                              return "Email is required";
+                            }
+                            final emailRegExp = RegExp(
+                              r'^[a-zA-Z0-9.]+@[a-zA-Z0-9]+\.[a-zA-Z]+',
+                            );
+                            if (!emailRegExp.hasMatch(value.trim())) {
+                              return "Please enter a valid email address";
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 32),
+                        _buildSendRecoveryCodeButton(),
+                        const SizedBox(height: 18),
+                        TextButton(
+                          onPressed: () {
+                            setState(() {
+                              _isRecoveryMode = false;
+                              _isSignIn = true;
+                            });
+                          },
+                          child: const Text(
+                            "Back to Sign In",
+                            style: TextStyle(
+                              color: Color(0xFF8B5CF6),
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
                       ] else ...[
                         // Sliding Tab Switcher
                         _buildAuthToggle(),
@@ -457,6 +703,29 @@ class _AuthScreenState extends State<AuthScreen> {
                             return null;
                           },
                         ),
+                        if (_isSignIn) ...[
+                          const SizedBox(height: 12),
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: TextButton(
+                              onPressed: _forgotPassword,
+                              style: TextButton.styleFrom(
+                                padding: EdgeInsets.zero,
+                                minimumSize: Size.zero,
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              ),
+                              child: const Text(
+                                "Forgot Password?",
+                                style: TextStyle(
+                                  color: Color(0xFF00F2FE),
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                  fontFamily: 'Inter',
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
 
                         if (!_isSignIn) ...[
                           const SizedBox(height: 18),
@@ -845,6 +1114,100 @@ class _AuthScreenState extends State<AuthScreen> {
         },
         child: const Text(
           "Verify Code",
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 0.5,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRecoveryOtpSubmitButton() {
+    return Container(
+      height: 52,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        gradient: const LinearGradient(
+          colors: [
+            Color(0xFF00F2FE),
+            Color(0xFF8B5CF6),
+          ],
+          begin: Alignment.centerLeft,
+          end: Alignment.centerRight,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF8B5CF6).withValues(alpha: 0.3),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: ElevatedButton(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.transparent,
+          shadowColor: Colors.transparent,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+        ),
+        onPressed: () {
+          if (_formKey.currentState!.validate()) {
+            _verifyRecoveryOtp();
+          }
+        },
+        child: const Text(
+          "Verify Code",
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 0.5,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSendRecoveryCodeButton() {
+    return Container(
+      height: 52,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        gradient: const LinearGradient(
+          colors: [
+            Color(0xFF00F2FE),
+            Color(0xFF8B5CF6),
+          ],
+          begin: Alignment.centerLeft,
+          end: Alignment.centerRight,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF8B5CF6).withValues(alpha: 0.3),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: ElevatedButton(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.transparent,
+          shadowColor: Colors.transparent,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+        ),
+        onPressed: () {
+          if (_formKey.currentState!.validate()) {
+            _sendRecoveryCode();
+          }
+        },
+        child: const Text(
+          "Send Recovery Code",
           style: TextStyle(
             color: Colors.white,
             fontSize: 16,

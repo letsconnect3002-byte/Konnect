@@ -1,6 +1,6 @@
 {
-    "name": "connect",
-    "short_name": "connect",
+    "name": "Mandala",
+    "short_name": "Mandala",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

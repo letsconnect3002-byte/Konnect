@@ -9,8 +9,8 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # followed by an optional build number separated by a +.
 # Both the version and the builder number may be overridden in flutter
 # build by specifying --build-name and --build-number, respectively.
-# In Android, build-name is used as versionName while build-number used as versionCode.
-# Read more about Android versioning at https://developer.android.com/studio/publish/versioning
+# In andriod, build-name is used as versionName while build-number used as versionCode.
+# Read more about andriod versioning at https://developer.andriod.com/studio/publish/versioning
 # In iOS, build-name is used as CFBundleShortVersionString while build-number is used as CFBundleVersion.
 # Read more about iOS versioning at
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
@@ -55,6 +55,7 @@ dependencies:
   google_sign_in: ^7.2.0
   image_picker: ^1.1.2
   image: ^4.3.0
+  share_plus: ^13.1.0
   # flutter_launcher_icons: ^0.14.1
   # flutter_native_splash: ^2.4.2
   # image_gallery_saver: ^2.0.3
@@ -62,7 +63,9 @@ dependencies:
 flutter_icons:
   andriod: true
   ios: true
-  image_path: 'assets/icons/Connect Icon2.png' 
+  image_path: 'assets/icons/Mandala Icon 1.png'
+  adaptive_icon_background: "#000000"
+  adaptive_icon_foreground: 'assets/icons/Mandala Icon 1.png' 
 
 dev_dependencies:
   flutter_test:
@@ -71,8 +74,12 @@ dev_dependencies:
 
 flutter_native_splash:
   color: "#000000"
-  image: 'assets/icons/Connect Icon3.png'
-  # branding: 'assets/Icons/Connect Icon2.png'
+  image: 'assets/icons/Mandala Icon 2.png'
+  
+  android_12:
+    color: "#000000"
+    image: 'assets/icons/Mandala Icon 2.png'
+    icon_background_color: "#000000" # This removes the white box around the splash icon
 
   # The "flutter_lints" package below contains a set of recommended lints to
   # encourage good coding practices. The lint set provided by the package is
@@ -94,9 +101,9 @@ flutter:
 
   # To add assets to your application, add an assets section, like this:
   assets:
-    - assets/icons/Connect Icon.png
-    - assets/icons/Connect Icon2.png
-    - assets/icons/Connect Icon3.png
+    - assets/icons/Mandala Icon 1.png
+    - assets/icons/Mandala Icon 1.svg
+    - assets/icons/Mandala Icon 2.png
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

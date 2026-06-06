@@ -46,9 +46,12 @@ class LocalDatabaseHelper {
 
   Future<void> _upgradeDB(Database db, int oldVersion, int newVersion) async {
     if (oldVersion < 2) {
-      await db.execute('ALTER TABLE messages ADD COLUMN reply_to_message_id TEXT');
-      await db.execute('ALTER TABLE messages ADD COLUMN reply_to_message_payload TEXT');
-      await db.execute('ALTER TABLE messages ADD COLUMN reply_to_message_sender_name TEXT');
+      await db
+          .execute('ALTER TABLE messages ADD COLUMN reply_to_message_id TEXT');
+      await db.execute(
+          'ALTER TABLE messages ADD COLUMN reply_to_message_payload TEXT');
+      await db.execute(
+          'ALTER TABLE messages ADD COLUMN reply_to_message_sender_name TEXT');
     }
   }
 

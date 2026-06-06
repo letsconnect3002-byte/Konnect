@@ -20,13 +20,15 @@ import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:connect/Pages/AuthScreen.dart';
+import 'package:connect/Pages/ResetPasswordScreen.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
     FlutterLocalNotificationsPlugin();
 
-const AndroidNotificationChannel notificationChannel = AndroidNotificationChannel(
+const AndroidNotificationChannel notificationChannel =
+    AndroidNotificationChannel(
   'messages_channel', // id
   'Messages', // name
   description: 'Notifications for new messages', // description
@@ -45,8 +47,8 @@ int getNotificationId(String messageId) {
   }
 }
 
-Future<void> showLocalNotification(
-    String messageId, String title, String body, Map<String, dynamic> dataPayload) async {
+Future<void> showLocalNotification(String messageId, String title, String body,
+    Map<String, dynamic> dataPayload) async {
   final notificationId = getNotificationId(messageId);
 
   const AndroidNotificationDetails androidNotificationDetails =
@@ -96,11 +98,13 @@ Future<void> handleLocalNotificationClickPayload(String payload) async {
       if (senderId != null) {
         final context = navigatorKey.currentContext;
         if (context != null) {
-          final provider = Provider.of<ProfileProvider2>(context, listen: false);
+          final provider =
+              Provider.of<ProfileProvider2>(context, listen: false);
           final profile = await provider.loadProfile(senderId);
           navigatorKey.currentState?.push(
             MaterialPageRoute(
-              builder: (routeContext) => IndividualChatPage(connectionData: profile),
+              builder: (routeContext) =>
+                  IndividualChatPage(connectionData: profile),
             ),
           );
         }
@@ -114,7 +118,7 @@ Future<void> handleLocalNotificationClickPayload(String payload) async {
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   WidgetsFlutterBinding.ensureInitialized();
-  
+
   // 1. Initialize Firebase safely
   try {
     if (Firebase.apps.isEmpty) {
@@ -132,16 +136,18 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
         AndroidInitializationSettings('@mipmap/ic_launcher');
     const DarwinInitializationSettings initializationSettingsDarwin =
         DarwinInitializationSettings();
-    const InitializationSettings initializationSettings = InitializationSettings(
+    const InitializationSettings initializationSettings =
+        InitializationSettings(
       android: initializationSettingsAndroid,
       iOS: initializationSettingsDarwin,
     );
     await flutterLocalNotificationsPlugin.initialize(
       settings: initializationSettings,
     );
-    
+
     await flutterLocalNotificationsPlugin
-        .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
+        .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>()
         ?.createNotificationChannel(notificationChannel);
   } catch (e) {
     print("Error initializing local notifications in background: $e");
@@ -151,7 +157,8 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   final action = data['action'] as String?;
   final messageId = data['message_id'] as String?;
 
-  print("PushNotifications: Background message received. action: $action, message_id: $messageId");
+  print(
+      "PushNotifications: Background message received. action: $action, message_id: $messageId");
 
   if (action == 'new_message') {
     final roomId = data['room_id'] as String?;
@@ -176,9 +183,11 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
               'room_id': roomId,
             },
           );
-          print("PushNotifications: Background notification displayed successfully.");
+          print(
+              "PushNotifications: Background notification displayed successfully.");
         } catch (e) {
-          print("PushNotifications: Error displaying background notification: $e");
+          print(
+              "PushNotifications: Error displaying background notification: $e");
         }
 
         // 2. Save to local SQLite safely
@@ -192,7 +201,8 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
           );
           print("PushNotifications: Background message saved to database.");
         } catch (e) {
-          print("PushNotifications: Error saving message to database in background: $e");
+          print(
+              "PushNotifications: Error saving message to database in background: $e");
         }
 
         // 3. Acknowledge delivery to Supabase safely
@@ -203,11 +213,12 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
           );
           await client
               .from('messages')
-              .update({'status': 'delivered'})
-              .eq('id', messageId);
-          print("PushNotifications: Background status update acknowledged to Supabase.");
+              .update({'status': 'delivered'}).eq('id', messageId);
+          print(
+              "PushNotifications: Background status update acknowledged to Supabase.");
         } catch (e) {
-          print("PushNotifications: Error acknowledging delivery in background: $e");
+          print(
+              "PushNotifications: Error acknowledging delivery in background: $e");
         }
       }
     }
@@ -216,14 +227,17 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
       // 1. Cancel notification FIRST
       try {
         await cancelLocalNotification(messageId);
-        print("PushNotifications: Background notification cancelled successfully.");
+        print(
+            "PushNotifications: Background notification cancelled successfully.");
       } catch (e) {
-        print("PushNotifications: Error cancelling notification in background: $e");
+        print(
+            "PushNotifications: Error cancelling notification in background: $e");
       }
 
       // 2. Delete from SQLite if not read
       try {
-        final localMsg = await LocalDatabaseHelper.instance.getMessageById(messageId);
+        final localMsg =
+            await LocalDatabaseHelper.instance.getMessageById(messageId);
         if (localMsg != null) {
           final localStatus = localMsg['status'] as String?;
           if (localStatus != 'read') {
@@ -232,7 +246,8 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
           }
         }
       } catch (e) {
-        print("PushNotifications: Error deleting message from SQLite in background: $e");
+        print(
+            "PushNotifications: Error deleting message from SQLite in background: $e");
       }
     }
   }
@@ -276,7 +291,8 @@ void main() async {
   // Explicitly create the Android notification channel
   try {
     await flutterLocalNotificationsPlugin
-        .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
+        .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>()
         ?.createNotificationChannel(notificationChannel);
   } catch (e) {
     print("Error creating notification channel on startup: $e");
@@ -342,6 +358,12 @@ class AuthGate extends StatelessWidget {
         }
 
         final session = snapshot.data?.session;
+        final event = snapshot.data?.event;
+
+        if (event == AuthChangeEvent.passwordRecovery) {
+          return const ResetPasswordScreen();
+        }
+
         if (session != null) {
           return const AppShellGate();
         }
@@ -430,12 +452,14 @@ class _AppShellGateState extends State<AppShellGate> {
 
       // Request permission for local notifications (needed for Android 13+)
       await flutterLocalNotificationsPlugin
-          .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
+          .resolvePlatformSpecificImplementation<
+              AndroidFlutterLocalNotificationsPlugin>()
           ?.requestNotificationsPermission();
 
       // Listen to foreground FCM messages
       FirebaseMessaging.onMessage.listen((RemoteMessage message) async {
-        print("PushNotifications: Foreground message received: ${message.messageId}");
+        print(
+            "PushNotifications: Foreground message received: ${message.messageId}");
         try {
           final data = message.data;
           final action = data['action'] as String?;
@@ -463,20 +487,23 @@ class _AppShellGateState extends State<AppShellGate> {
                     payload,
                     status: isCurrentRoom ? 'read' : 'delivered',
                   );
-                  print("PushNotifications: Foreground message inserted to SQLite.");
+                  print(
+                      "PushNotifications: Foreground message inserted to SQLite.");
                 } catch (e) {
-                  print("PushNotifications: Error inserting message in foreground SQLite: $e");
+                  print(
+                      "PushNotifications: Error inserting message in foreground SQLite: $e");
                 }
 
                 // 2. Acknowledge delivery
                 try {
-                  await Supabase.instance.client
-                      .from('messages')
-                      .update({'status': isCurrentRoom ? 'read' : 'delivered'})
-                      .eq('id', messageId);
-                  print("PushNotifications: Foreground message delivery status updated in Supabase.");
+                  await Supabase.instance.client.from('messages').update({
+                    'status': isCurrentRoom ? 'read' : 'delivered'
+                  }).eq('id', messageId);
+                  print(
+                      "PushNotifications: Foreground message delivery status updated in Supabase.");
                 } catch (e) {
-                  print("PushNotifications: Error acknowledging delivery in foreground: $e");
+                  print(
+                      "PushNotifications: Error acknowledging delivery in foreground: $e");
                 }
 
                 // 3. Update providers so UI updates immediately
@@ -499,9 +526,11 @@ class _AppShellGateState extends State<AppShellGate> {
                         'room_id': roomId,
                       },
                     );
-                    print("PushNotifications: Foreground local notification displayed successfully.");
+                    print(
+                        "PushNotifications: Foreground local notification displayed successfully.");
                   } catch (e) {
-                    print("PushNotifications: Error showing local notification in foreground: $e");
+                    print(
+                        "PushNotifications: Error showing local notification in foreground: $e");
                   }
                 }
               }
@@ -510,32 +539,38 @@ class _AppShellGateState extends State<AppShellGate> {
             if (messageId != null) {
               // 1. Delete from SQLite if not read
               try {
-                final localMsg = await LocalDatabaseHelper.instance.getMessageById(messageId);
+                final localMsg = await LocalDatabaseHelper.instance
+                    .getMessageById(messageId);
                 if (localMsg != null) {
                   final localStatus = localMsg['status'] as String?;
                   if (localStatus != 'read') {
                     await LocalDatabaseHelper.instance.deleteMessage(messageId);
-                    print("PushNotifications: Foreground message deleted from SQLite.");
+                    print(
+                        "PushNotifications: Foreground message deleted from SQLite.");
                   }
                 }
               } catch (e) {
-                print("PushNotifications: Error deleting message from SQLite in foreground: $e");
+                print(
+                    "PushNotifications: Error deleting message from SQLite in foreground: $e");
               }
-              
+
               // 2. Update providers so UI updates
               try {
                 await provider.refreshActiveRoomMessages();
                 await provider.updateUnreadCount();
               } catch (e) {
-                print("PushNotifications: Error updating providers after delete: $e");
+                print(
+                    "PushNotifications: Error updating providers after delete: $e");
               }
 
               // 3. Cancel local notification
               try {
                 await cancelLocalNotification(messageId);
-                print("PushNotifications: Foreground notification cancelled successfully.");
+                print(
+                    "PushNotifications: Foreground notification cancelled successfully.");
               } catch (e) {
-                print("PushNotifications: Error cancelling notification in foreground: $e");
+                print(
+                    "PushNotifications: Error cancelling notification in foreground: $e");
               }
             }
           }
@@ -723,7 +758,9 @@ class _AppShellState extends State<_AppShell> with WidgetsBindingObserver {
                       icon: Icons.chat_bubble_rounded,
                       isImageIcon: true),
                   _buildNavItem(
-                      index: 3, icon: Icons.person_rounded, isImageIcon: false),
+                      index: 3,
+                      icon: Icons.contact_mail_rounded,
+                      isImageIcon: false),
                 ],
               ),
             ),
@@ -739,13 +776,13 @@ class _AppShellState extends State<_AppShell> with WidgetsBindingObserver {
     required bool isImageIcon,
   }) {
     final bool isActive = _currentIndex == index;
-    final String label = const ["Home", "Chats", "Circle", "My Profile"][index];
+    final String label = const ["Home", "Chat", "Mandal", "My Card"][index];
     final Color itemColor = isActive ? Colors.white : const Color(0xFF5C5E78);
     final provider = Provider.of<ProfileProvider2>(context);
 
     Widget iconWidget = isImageIcon
         ? ImageIcon(
-            const AssetImage("assets/icons/Connect Icon2.png"),
+            const AssetImage("assets/icons/Mandala Icon 1.png"),
             size: 24,
             color: itemColor,
           )
