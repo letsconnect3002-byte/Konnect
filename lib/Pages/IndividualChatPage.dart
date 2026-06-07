@@ -2,8 +2,9 @@ import 'dart:async';
 import 'package:connect/Pages/ConnectionProfilePage.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:connect/Providers/profile_provider.dart';
+import 'package:connect/Providers/chat_provider.dart';
 import 'package:provider/provider.dart';
-import 'package:connect/Providers/ProviderSQL.dart';
 
 class IndividualChatPage extends StatefulWidget {
   final Map<String, dynamic> connectionData;
@@ -26,7 +27,8 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
   late String _avatarUrl;
   late String _profession;
 
-  late final ProfileProvider2 _provider;
+  late final ChatProvider _provider;
+  late final int? _myUserId;
   String? _roomId;
   bool _isRoomLoading = true;
   Map<String, dynamic>? _replyMessage;
@@ -44,7 +46,8 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
         '';
     _profession = widget.connectionData['profession'] ?? 'Connection';
 
-    _provider = Provider.of<ProfileProvider2>(context, listen: false);
+    _provider = Provider.of<ChatProvider>(context, listen: false);
+    _myUserId = Provider.of<ProfileProvider>(context, listen: false).userId;
     _scrollController.addListener(_onScroll);
     _initChatRoom();
   }
@@ -133,7 +136,7 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
     });
 
     if (replyMsg != null) {
-      final isReplyMe = replyMsg['sender_id'] == _provider.userId;
+      final isReplyMe = replyMsg['sender_id'] == _myUserId;
       final replySenderName = isReplyMe ? 'You' : _name;
       await _provider.sendChatMessage(
         roomId: _roomId!,
@@ -263,7 +266,7 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
   @override
   Widget build(BuildContext context) {
     final avatar = _getAvatarUrl(_name, _avatarUrl);
-    final provider = Provider.of<ProfileProvider2>(context);
+    final provider = Provider.of<ChatProvider>(context);
     final messages = provider.activeRoomMessages;
 
     // Auto-scroll ONLY when a genuinely new message arrives AND user is near the bottom
@@ -393,7 +396,7 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
                           final msgId = msg['id'] as String;
                           final key = _messageKeys.putIfAbsent(
                               msgId, () => GlobalKey());
-                          final isMe = msg['sender_id'] == provider.userId;
+                          final isMe = msg['sender_id'] == _myUserId;
                           final timeString =
                               _formatMessageTime(msg['created_at'] as String);
                           final status = msg['status'] as String?;
@@ -890,7 +893,7 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
   Widget _buildReplyPreview() {
     if (_replyMessage == null) return const SizedBox.shrink();
 
-    final isMe = _replyMessage!['sender_id'] == _provider.userId;
+    final isMe = _replyMessage!['sender_id'] == _myUserId;
     final senderName = isMe ? 'You' : _name;
     final text = _replyMessage!['payload'] ?? '';
 

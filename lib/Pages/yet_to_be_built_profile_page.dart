@@ -1,5 +1,5 @@
 import 'package:connect/Models/profile_card_type.dart';
-import 'package:connect/Providers/ProviderSQL.dart';
+import 'package:connect/Providers/profile_provider.dart';
 import 'package:connect/Widgets/card_field_input.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -43,22 +43,58 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
   late FocusNode _professionalEmailFocusNode;
   late FocusNode _phoneFocusNode;
   late FocusNode _professionalPhoneFocusNode;
-  bool _showProfileToConnections = true;
   String _casualCountryCode = '+91';
   String _professionalCountryCode = '+91';
+
+  final Map<String, bool> _editMode = {
+    'name': false,
+    'profession': false,
+    'company': false,
+    'email': false,
+    'professionalEmail': false,
+    'phoneNumber': false,
+    'professionalPhoneNumber': false,
+    'bio': false,
+    'professionalBio': false,
+  };
+
+  bool _isEditing(String field) => _editMode[field] ?? false;
+
+  void _setEditMode(String field, bool value) {
+    if (_editMode[field] != value) {
+      setState(() => _editMode[field] = value);
+    }
+  }
 
   @override
   void initState() {
     super.initState();
-    _nameController = TextEditingController();
-    _professionController = TextEditingController();
-    _companyController = TextEditingController();
-    _emailController = TextEditingController();
-    _professionalEmailController = TextEditingController();
-    _phoneController = TextEditingController();
-    _professionalPhoneController = TextEditingController();
-    _bioController = TextEditingController();
-    _professionalBioController = TextEditingController();
+    final provider = Provider.of<ProfileProvider>(context, listen: false);
+
+    // If profile is already loaded, we do not need to show the loading screen initially
+    _isLoading = provider.userId == null;
+
+    _nameController = TextEditingController(text: provider.name);
+    _professionController = TextEditingController(text: provider.profession);
+    _companyController = TextEditingController(text: provider.company);
+    _emailController = TextEditingController(text: provider.email);
+    _professionalEmailController =
+        TextEditingController(text: provider.professionalEmail);
+
+    final casualPhoneParsed = _parsePhone(provider.phoneNumber);
+    _casualCountryCode = casualPhoneParsed['code']!;
+    _phoneController =
+        TextEditingController(text: casualPhoneParsed['number']!);
+
+    final profPhoneParsed = _parsePhone(provider.professionalPhoneNumber);
+    _professionalCountryCode = profPhoneParsed['code']!;
+    _professionalPhoneController =
+        TextEditingController(text: profPhoneParsed['number']!);
+
+    _bioController = TextEditingController(text: provider.bio);
+    _professionalBioController =
+        TextEditingController(text: provider.professionalBio);
+
     _bioFocusNode = FocusNode();
     _professionalBioFocusNode = FocusNode();
     _emailFocusNode = FocusNode();
@@ -79,54 +115,48 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
 
     _bioFocusNode.addListener(() {
       if (!_bioFocusNode.hasFocus) {
-        final provider = Provider.of<ProfileProvider2>(context, listen: false);
-        if (provider.editMode['bio'] == true) {
-          provider.setEditMode('bio', false);
+        if (_isEditing('bio')) {
+          _setEditMode('bio', false);
         }
       }
     });
 
     _professionalBioFocusNode.addListener(() {
       if (!_professionalBioFocusNode.hasFocus) {
-        final provider = Provider.of<ProfileProvider2>(context, listen: false);
-        if (provider.editMode['professionalBio'] == true) {
-          provider.setEditMode('professionalBio', false);
+        if (_isEditing('professionalBio')) {
+          _setEditMode('professionalBio', false);
         }
       }
     });
 
     _emailFocusNode.addListener(() {
       if (!_emailFocusNode.hasFocus) {
-        final provider = Provider.of<ProfileProvider2>(context, listen: false);
-        if (provider.editMode['email'] == true) {
-          provider.setEditMode('email', false);
+        if (_isEditing('email')) {
+          _setEditMode('email', false);
         }
       }
     });
 
     _professionalEmailFocusNode.addListener(() {
       if (!_professionalEmailFocusNode.hasFocus) {
-        final provider = Provider.of<ProfileProvider2>(context, listen: false);
-        if (provider.editMode['professionalEmail'] == true) {
-          provider.setEditMode('professionalEmail', false);
+        if (_isEditing('professionalEmail')) {
+          _setEditMode('professionalEmail', false);
         }
       }
     });
 
     _phoneFocusNode.addListener(() {
       if (!_phoneFocusNode.hasFocus) {
-        final provider = Provider.of<ProfileProvider2>(context, listen: false);
-        if (provider.editMode['phoneNumber'] == true) {
-          provider.setEditMode('phoneNumber', false);
+        if (_isEditing('phoneNumber')) {
+          _setEditMode('phoneNumber', false);
         }
       }
     });
 
     _professionalPhoneFocusNode.addListener(() {
       if (!_professionalPhoneFocusNode.hasFocus) {
-        final provider = Provider.of<ProfileProvider2>(context, listen: false);
-        if (provider.editMode['professionalPhoneNumber'] == true) {
-          provider.setEditMode('professionalPhoneNumber', false);
+        if (_isEditing('professionalPhoneNumber')) {
+          _setEditMode('professionalPhoneNumber', false);
         }
       }
     });
@@ -208,7 +238,7 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
 
   bool _isDataChanged() {
     if (!mounted) return false;
-    final provider = Provider.of<ProfileProvider2>(context, listen: false);
+    final provider = Provider.of<ProfileProvider>(context, listen: false);
 
     final String casualPhoneText = _phoneController.text.trim();
     final String casualPhoneToCompare = casualPhoneText.isNotEmpty
@@ -235,59 +265,22 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
 
   Future<void> _loadInitialData() async {
     if (!mounted) return;
-    setState(() => _isLoading = true);
 
-    final provider = Provider.of<ProfileProvider2>(context, listen: false);
+    final provider = Provider.of<ProfileProvider>(context, listen: false);
+
+    // Only show full loading spinner if we don't have user ID or details loaded yet
+    if (provider.userId == null) {
+      setState(() => _isLoading = true);
+    }
+
     try {
       final userid = await provider.fetchAndSetUserId2(true);
-      if (userid != -1) {
-        final userData = await provider.loadProfile(userid);
-        if (userData.isNotEmpty) {
-          provider.setUserData(userData);
-          _nameController.text = provider.name;
-          _professionController.text = provider.profession;
-          _companyController.text = provider.company;
-          _emailController.text = provider.email;
-          _professionalEmailController.text = provider.professionalEmail;
+      if (userid != null) {
+        await provider.loadProfile(userid);
+      }
 
-          final casualPhoneParsed = _parsePhone(provider.phoneNumber);
-          _casualCountryCode = casualPhoneParsed['code']!;
-          _phoneController.text = casualPhoneParsed['number']!;
-
-          final profPhoneParsed = _parsePhone(provider.professionalPhoneNumber);
-          _professionalCountryCode = profPhoneParsed['code']!;
-          _professionalPhoneController.text = profPhoneParsed['number']!;
-
-          _bioController.text = provider.bio;
-          _professionalBioController.text = provider.professionalBio;
-          _showProfileToConnections = provider.showProfileToConnections;
-          _avatarUrl = provider.avatarUrl.isNotEmpty
-              ? provider.avatarUrl
-              : _defaultAvatarUrl;
-        }
-      } else {
-        // Use default placeholders
-        _nameController.text = provider.name;
-        _professionController.text = provider.profession;
-        _companyController.text = provider.company;
-        _emailController.text = provider.email;
-        _professionalEmailController.text = provider.professionalEmail;
-
-        final casualPhoneParsed = _parsePhone(provider.phoneNumber);
-        _casualCountryCode = casualPhoneParsed['code']!;
-        _phoneController.text = casualPhoneParsed['number']!;
-
-        final profPhoneParsed = _parsePhone(provider.professionalPhoneNumber);
-        _professionalCountryCode = profPhoneParsed['code']!;
-        _professionalPhoneController.text = profPhoneParsed['number']!;
-
-        _bioController.text = provider.bio;
-        _professionalBioController.text = provider.professionalBio;
-        _showProfileToConnections = provider.showProfileToConnections;
-        _avatarUrl = provider.avatarUrl.isNotEmpty
-            ? provider.avatarUrl
-            : _defaultAvatarUrl;
-        await provider.loadFieldAssignments();
+      if (mounted) {
+        _populateControllers(provider);
       }
     } catch (e) {
       print("Error loading initial data in profile tab: $e");
@@ -298,11 +291,32 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
     }
   }
 
+  void _populateControllers(ProfileProvider provider) {
+    _nameController.text = provider.name;
+    _professionController.text = provider.profession;
+    _companyController.text = provider.company;
+    _emailController.text = provider.email;
+    _professionalEmailController.text = provider.professionalEmail;
+
+    final casualPhoneParsed = _parsePhone(provider.phoneNumber);
+    _casualCountryCode = casualPhoneParsed['code']!;
+    _phoneController.text = casualPhoneParsed['number']!;
+
+    final profPhoneParsed = _parsePhone(provider.professionalPhoneNumber);
+    _professionalCountryCode = profPhoneParsed['code']!;
+    _professionalPhoneController.text = profPhoneParsed['number']!;
+
+    _bioController.text = provider.bio;
+    _professionalBioController.text = provider.professionalBio;
+    _avatarUrl =
+        provider.avatarUrl.isNotEmpty ? provider.avatarUrl : _defaultAvatarUrl;
+  }
+
   Future<void> _saveProfile() async {
     FocusScope.of(context).unfocus();
     setState(() => _isSaving = true);
 
-    final provider = Provider.of<ProfileProvider2>(context, listen: false);
+    final provider = Provider.of<ProfileProvider>(context, listen: false);
     try {
       provider.setValue('name', _nameController.text.trim());
       provider.setValue('profession', _professionController.text.trim());
@@ -327,10 +341,8 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
       provider.setValue(
           'professionalBio', _professionalBioController.text.trim());
       provider.setValue('avatarUrl', _avatarUrl);
-      provider.setShowProfileToConnections(_showProfileToConnections);
 
       await provider.saveOrUpdateProfile();
-      await provider.saveFieldAssignments();
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -402,7 +414,7 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
     required Function(String) onUploadSuccess,
     required Function(String) onUploadError,
   }) async {
-    final provider = Provider.of<ProfileProvider2>(context, listen: false);
+    final provider = Provider.of<ProfileProvider>(context, listen: false);
     final picker = ImagePicker();
     try {
       final XFile? imageFile = await picker.pickImage(
@@ -449,7 +461,7 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
 
       final String timestamp = DateTime.now().millisecondsSinceEpoch.toString();
       final String folderName =
-          provider.userId != -1 ? '${provider.userId}' : 'temp_user';
+          provider.userId != null ? '${provider.userId}' : 'temp_user';
       final String fileName = '$folderName/avatar_$timestamp.jpg';
 
       await Supabase.instance.client.storage.from('avatars').uploadBinary(
@@ -573,13 +585,13 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                                   _avatarUrl = publicUrl;
                                 });
                                 // Immediately persist to provider + database
-                                final provider = Provider.of<ProfileProvider2>(
+                                final provider = Provider.of<ProfileProvider>(
                                     context,
                                     listen: false);
                                 provider.setValue('avatarUrl', publicUrl);
-                                if (provider.userId != -1) {
+                                if (provider.userId != null) {
                                   provider.updateProfileField(
-                                      'avatarUrl', publicUrl, provider.userId);
+                                      'avatarUrl', publicUrl, provider.userId!);
                                 } else {
                                   provider.saveOrUpdateProfile();
                                 }
@@ -681,7 +693,7 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
     }
 
     // Rebuild card preview when Casual/Professional field toggles change.
-    context.watch<ProfileProvider2>();
+    context.watch<ProfileProvider>();
 
     return GestureDetector(
       onTap: () {
@@ -748,13 +760,10 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                     const SizedBox(height: 32),
 
                     _buildSocialLinksSection(),
-                    const SizedBox(height: 32),
+                    const SizedBox(height: 16),
 
                     _buildSaveButton(),
-                    // const SizedBox(height: 32),
-
-                    // _buildPrivacySection(),
-                    // const SizedBox(height: 24),
+                    const SizedBox(height: 0),
                   ],
                 ),
               ),
@@ -776,7 +785,7 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
   }
 
   Widget _buildSocialLinksSection() {
-    final provider = Provider.of<ProfileProvider2>(context);
+    final provider = Provider.of<ProfileProvider>(context);
 
     // LinkedIn
     final linkedinLogo = Container(
@@ -890,7 +899,7 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
     required Widget logo,
     required VoidCallback onEdit,
   }) {
-    final provider = context.watch<ProfileProvider2>();
+    final provider = context.watch<ProfileProvider>();
     final assignment = provider.fieldAssignments[fieldKey] ??
         FieldCardAssignment(casual: false, professional: true);
     final hasHandle = handle.isNotEmpty;
@@ -1080,10 +1089,10 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
   }
 
   Future<void> _updateSocialLink(String field, String value) async {
-    final provider = Provider.of<ProfileProvider2>(context, listen: false);
+    final provider = Provider.of<ProfileProvider>(context, listen: false);
     try {
-      if (provider.userId != -1) {
-        await provider.updateProfileField(field, value, provider.userId);
+      if (provider.userId != null) {
+        await provider.updateProfileField(field, value, provider.userId!);
       } else {
         provider.setValue(field, value);
       }
@@ -1150,96 +1159,6 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
           ],
         ),
       ),
-    );
-  }
-
-  Widget _buildPrivacySection() {
-    final provider = Provider.of<ProfileProvider2>(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: const [
-            Icon(Icons.security_rounded, color: Color(0xFF8B5CF6), size: 18),
-            SizedBox(width: 8),
-            Text(
-              'PRIVACY',
-              style: TextStyle(
-                color: Color(0xFF8B8C9E),
-                fontSize: 14.0,
-                fontWeight: FontWeight.w900,
-                letterSpacing: 1.5,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Container(
-          decoration: BoxDecoration(
-            color: const Color(0xFF13141F),
-            borderRadius: BorderRadius.circular(16.0),
-            border: Border.all(
-              color: const Color(0xFF1F2030),
-              width: 1.0,
-            ),
-          ),
-          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 16.0),
-          child: Row(
-            children: [
-              Container(
-                width: 38,
-                height: 38,
-                decoration: const BoxDecoration(
-                  color: Color(0xFF1C1D2A),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.visibility_rounded,
-                  color: Color(0xFF8B5CF6),
-                  size: 20,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: const [
-                    Text(
-                      "Show Profile to Connections",
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 14.0,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    SizedBox(height: 2),
-                    Text(
-                      "Your card is visible to your circle",
-                      style: TextStyle(
-                        color: Colors.white30,
-                        fontSize: 12.0,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Switch(
-                value: _showProfileToConnections,
-                activeThumbColor: Colors.white,
-                activeTrackColor: const Color(0xFF8B5CF6),
-                inactiveThumbColor: Colors.grey,
-                inactiveTrackColor: Colors.white12,
-                onChanged: (val) async {
-                  setState(() {
-                    _showProfileToConnections = val;
-                  });
-                  await provider.setShowProfileToConnections(val);
-                },
-              ),
-            ],
-          ),
-        ),
-      ],
     );
   }
 
@@ -1359,12 +1278,12 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
   }
 
   bool _fieldVisible(String field) {
-    final provider = Provider.of<ProfileProvider2>(context);
+    final provider = Provider.of<ProfileProvider>(context);
     return provider.isFieldOnCard(field, _previewCard);
   }
 
   Widget _buildHeader(BuildContext context) {
-    final provider = Provider.of<ProfileProvider2>(context, listen: false);
+    final provider = Provider.of<ProfileProvider>(context, listen: false);
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 12.0, horizontal: 16.0),
       decoration: BoxDecoration(
@@ -1748,9 +1667,9 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                       fontFamily: 'Inter',
                     ),
                     child: Text(
-                      _previewCard == ProfileCardType.casual
-                          ? 'Casual'
-                          : 'Professional',
+                      _professionController.text.trim().isEmpty
+                          ? 'Product Designer'
+                          : _professionController.text.trim(),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -1930,9 +1849,9 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                             fontFamily: 'Inter',
                           ),
                           child: Text(
-                            _previewCard == ProfileCardType.casual
-                                ? 'Casual'
-                                : 'Professional',
+                            _professionController.text.trim().isEmpty
+                                ? 'Product Designer'
+                                : _professionController.text.trim(),
                             maxLines: 1,
                           ),
                         ),
@@ -2089,41 +2008,41 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
     );
   }
 
-       Widget _buildUnifiedCardRow(IconData icon, String text, bool isCasual) {
-         return Row(
-           children: [
-             AnimatedContainer(
-               duration: _cardAnimDuration,
-               curve: _cardAnimCurve,
-               width: 22,
-               height: 22,
-               decoration: const BoxDecoration(
-                 color: Color(0xFF171825),
-                 shape: BoxShape.circle,
-               ),
-               child: Center(
-                 child: Icon(
-                   icon,
-                   color: Colors.white54,
-                   size: 12,
-                 ),
-               ),
-             ),
-             AnimatedContainer(
-               duration: _cardAnimDuration,
-               curve: _cardAnimCurve,
-               width: 8,
-             ),
-             Expanded(
-               child: FittedBox(
-                 fit: BoxFit.scaleDown,
-                 alignment: Alignment.centerLeft,
-                 child: AnimatedDefaultTextStyle(
-                   duration: _cardAnimDuration,
-                   curve: _cardAnimCurve,
-                   style: TextStyle(
-                     color: isCasual ? const Color(0xFF8B8C9E) : Colors.white70,
-                     fontSize: 12,
+  Widget _buildUnifiedCardRow(IconData icon, String text, bool isCasual) {
+    return Row(
+      children: [
+        AnimatedContainer(
+          duration: _cardAnimDuration,
+          curve: _cardAnimCurve,
+          width: 22,
+          height: 22,
+          decoration: const BoxDecoration(
+            color: Color(0xFF171825),
+            shape: BoxShape.circle,
+          ),
+          child: Center(
+            child: Icon(
+              icon,
+              color: Colors.white54,
+              size: 12,
+            ),
+          ),
+        ),
+        AnimatedContainer(
+          duration: _cardAnimDuration,
+          curve: _cardAnimCurve,
+          width: 8,
+        ),
+        Expanded(
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: AnimatedDefaultTextStyle(
+              duration: _cardAnimDuration,
+              curve: _cardAnimCurve,
+              style: TextStyle(
+                color: isCasual ? const Color(0xFF8B8C9E) : Colors.white70,
+                fontSize: 12,
                 fontWeight: FontWeight.w500,
                 fontFamily: 'Inter',
               ),
@@ -2139,7 +2058,7 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
   }
 
   Widget _buildProfilePhotoSection() {
-    final provider = context.watch<ProfileProvider2>();
+    final provider = context.watch<ProfileProvider>();
     final assignment = provider.fieldAssignments['avatarUrl'] ??
         FieldCardAssignment(casual: false, professional: true);
 
@@ -2317,6 +2236,8 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
           icon: Icons.person_outline_rounded,
           controller: _nameController,
           showToggles: false,
+          isEditing: _isEditing('name'),
+          onEditingChanged: (val) => _setEditMode('name', val),
         ),
         CardFieldInput(
           fieldKey: 'profession',
@@ -2324,6 +2245,8 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
           hint: 'Product Designer',
           icon: Icons.work_outline_rounded,
           controller: _professionController,
+          isEditing: _isEditing('profession'),
+          onEditingChanged: (val) => _setEditMode('profession', val),
         ),
         CardFieldInput(
           fieldKey: 'company',
@@ -2331,6 +2254,8 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
           hint: 'Design Studio Inc.',
           icon: Icons.apartment_rounded,
           controller: _companyController,
+          isEditing: _isEditing('company'),
+          onEditingChanged: (val) => _setEditMode('company', val),
         ),
         _buildEmailSection(),
         _buildPhoneSection(),
@@ -2398,15 +2323,15 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
   }
 
   Widget _buildEmailSection() {
-    final provider = context.watch<ProfileProvider2>();
+    final provider = context.watch<ProfileProvider>();
     final assignment = provider.fieldAssignments['email'] ??
         FieldCardAssignment(casual: true, professional: true);
 
-    final isCasualEditing = provider.editMode['email'] ?? false;
+    final isCasualEditing = _isEditing('email');
     final isCasualFilled = _emailController.text.isNotEmpty;
     final casualReadOnly = isCasualFilled && !isCasualEditing;
 
-    final isProfEditing = provider.editMode['professionalEmail'] ?? false;
+    final isProfEditing = _isEditing('professionalEmail');
     final isProfFilled = _professionalEmailController.text.isNotEmpty;
     final profReadOnly = isProfFilled && !isProfEditing;
 
@@ -2504,10 +2429,10 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                   ? GestureDetector(
                       onTap: () {
                         if (isCasualEditing) {
-                          provider.setEditMode('email', false);
+                          _setEditMode('email', false);
                           _emailFocusNode.unfocus();
                         } else {
-                          provider.setEditMode('email', true);
+                          _setEditMode('email', true);
                         }
                       },
                       child: Icon(
@@ -2584,10 +2509,10 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                   ? GestureDetector(
                       onTap: () {
                         if (isProfEditing) {
-                          provider.setEditMode('professionalEmail', false);
+                          _setEditMode('professionalEmail', false);
                           _professionalEmailFocusNode.unfocus();
                         } else {
-                          provider.setEditMode('professionalEmail', true);
+                          _setEditMode('professionalEmail', true);
                         }
                       },
                       child: Icon(
@@ -2634,15 +2559,15 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
   }
 
   Widget _buildPhoneSection() {
-    final provider = context.watch<ProfileProvider2>();
+    final provider = context.watch<ProfileProvider>();
     final assignment = provider.fieldAssignments['phoneNumber'] ??
         FieldCardAssignment(casual: true, professional: true);
 
-    final isCasualEditing = provider.editMode['phoneNumber'] ?? false;
+    final isCasualEditing = _isEditing('phoneNumber');
     final isCasualFilled = _phoneController.text.isNotEmpty;
     final casualReadOnly = isCasualFilled && !isCasualEditing;
 
-    final isProfEditing = provider.editMode['professionalPhoneNumber'] ?? false;
+    final isProfEditing = _isEditing('professionalPhoneNumber');
     final isProfFilled = _professionalPhoneController.text.isNotEmpty;
     final profReadOnly = isProfFilled && !isProfEditing;
 
@@ -2785,10 +2710,10 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                         ? GestureDetector(
                             onTap: () {
                               if (isCasualEditing) {
-                                provider.setEditMode('phoneNumber', false);
+                                _setEditMode('phoneNumber', false);
                                 _phoneFocusNode.unfocus();
                               } else {
-                                provider.setEditMode('phoneNumber', true);
+                                _setEditMode('phoneNumber', true);
                               }
                             },
                             child: Icon(
@@ -2913,12 +2838,10 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                         ? GestureDetector(
                             onTap: () {
                               if (isProfEditing) {
-                                provider.setEditMode(
-                                    'professionalPhoneNumber', false);
+                                _setEditMode('professionalPhoneNumber', false);
                                 _professionalPhoneFocusNode.unfocus();
                               } else {
-                                provider.setEditMode(
-                                    'professionalPhoneNumber', true);
+                                _setEditMode('professionalPhoneNumber', true);
                               }
                             },
                             child: Icon(
@@ -2968,15 +2891,15 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
   }
 
   Widget _buildBioSection() {
-    final provider = context.watch<ProfileProvider2>();
+    final provider = context.watch<ProfileProvider>();
     final assignment = provider.fieldAssignments['bio'] ??
         FieldCardAssignment(casual: false, professional: true);
 
-    final isBioEditing = provider.editMode['bio'] ?? false;
+    final isBioEditing = _isEditing('bio');
     final isBioFilled = _bioController.text.isNotEmpty;
     final bioReadOnly = isBioFilled && !isBioEditing;
 
-    final isProfBioEditing = provider.editMode['professionalBio'] ?? false;
+    final isProfBioEditing = _isEditing('professionalBio');
     final isProfBioFilled = _professionalBioController.text.isNotEmpty;
     final profBioReadOnly = isProfBioFilled && !isProfBioEditing;
 
@@ -3074,10 +2997,10 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                   ? GestureDetector(
                       onTap: () {
                         if (isBioEditing) {
-                          provider.setEditMode('bio', false);
+                          _setEditMode('bio', false);
                           _bioFocusNode.unfocus();
                         } else {
-                          provider.setEditMode('bio', true);
+                          _setEditMode('bio', true);
                         }
                       },
                       child: Icon(
@@ -3154,10 +3077,10 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                   ? GestureDetector(
                       onTap: () {
                         if (isProfBioEditing) {
-                          provider.setEditMode('professionalBio', false);
+                          _setEditMode('professionalBio', false);
                           _professionalBioFocusNode.unfocus();
                         } else {
-                          provider.setEditMode('professionalBio', true);
+                          _setEditMode('professionalBio', true);
                         }
                       },
                       child: Icon(

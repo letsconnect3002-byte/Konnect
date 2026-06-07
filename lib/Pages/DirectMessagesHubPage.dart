@@ -1,6 +1,9 @@
 import 'package:connect/Pages/IndividualChatPage.dart';
-import 'package:connect/Providers/ProviderSQL.dart';
+import 'package:connect/Providers/profile_provider.dart';
+import 'package:connect/Providers/connection_provider.dart';
+import 'package:connect/Providers/chat_provider.dart';
 import 'package:connect/Providers/LocalDatabaseHelper.dart';
+import 'package:connect/Models/app_error.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -20,18 +23,6 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final provider = Provider.of<ProfileProvider2>(context, listen: false);
-      if (provider.userId != -1) {
-        provider.subscribeToConnections();
-      } else {
-        provider.fetchAndSetUserId2(true).then((uid) {
-          if (uid != -1) {
-            provider.subscribeToConnections();
-          }
-        });
-      }
-    });
   }
 
   List<String> _getCardTypesForConnection(Map<String, dynamic> connection) {
@@ -102,7 +93,7 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
   }
 
   Future<void> _showDeleteConfirmation(BuildContext context,
-      Map<String, dynamic> connection, ProfileProvider2 provider) async {
+      Map<String, dynamic> connection, ConnectionProvider provider) async {
     return showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -129,7 +120,9 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
               onPressed: () async {
                 Navigator.pop(context);
                 try {
-                  await provider.deleteProfile(connection['id']);
+                  await provider.deleteProfile(connection['id'], onRoomCleanup: (profileId, roomId) async {
+                    await Provider.of<ChatProvider>(context, listen: false).handleRoomCleanup(profileId, roomId);
+                  });
                   if (context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
@@ -151,8 +144,35 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
 
   @override
   Widget build(BuildContext context) {
-    final provider = Provider.of<ProfileProvider2>(context);
-    final connections = provider.connections;
+    final profileProvider = Provider.of<ProfileProvider>(context);
+    final connectionProvider = Provider.of<ConnectionProvider>(context);
+    final chatProvider = Provider.of<ChatProvider>(context);
+    
+    final connections = connectionProvider.connections;
+    final myUserId = profileProvider.userId;
+
+    if (chatProvider.lastError != null) {
+      final AppError error = chatProvider.lastError!;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text("Error: ${error.message}"),
+              backgroundColor: const Color(0xFFEF4444),
+              behavior: SnackBarBehavior.floating,
+              action: SnackBarAction(
+                label: 'Dismiss',
+                textColor: Colors.white,
+                onPressed: () {
+                  ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                },
+              ),
+            ),
+          );
+          chatProvider.clearError();
+        }
+      });
+    }
 
     // Filter connections based on tab and query
     final filteredConnections = connections.where((c) {
@@ -245,7 +265,7 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
                                 fontFamily: 'Inter',
                               ),
                             ),
-                            if (provider.casualUnreadCount > 0) ...[
+                             if (chatProvider.casualUnreadCount > 0) ...[
                               const SizedBox(width: 6),
                               Container(
                                 width: 6,
@@ -305,7 +325,7 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
                                 fontFamily: 'Inter',
                               ),
                             ),
-                            if (provider.professionalUnreadCount > 0) ...[
+                             if (chatProvider.professionalUnreadCount > 0) ...[
                               const SizedBox(width: 6),
                               Container(
                                 width: 6,
@@ -402,7 +422,7 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
                       final name = connection['name'] ?? 'Unknown';
                       final avatar = _getAvatarUrl(name, connection['avatarUrl'] ?? connection['avatar_url']);
 
-                      final roomId = provider.connectionRooms[connection['id']];
+                      final roomId = chatProvider.connectionRooms[connection['id']];
 
                       return Container(
                         margin: const EdgeInsets.only(bottom: 8),
@@ -429,7 +449,7 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
                                   : '';
 
                               final bool isUnread = lastMsg != null &&
-                                  lastMsg['sender_id'] != provider.userId &&
+                                  lastMsg['sender_id'] != myUserId &&
                                   lastMsg['status'] != 'read';
 
                               return ListTile(
@@ -444,7 +464,7 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
                                 },
                                 onLongPress: () {
                                   HapticFeedback.mediumImpact();
-                                  _showDeleteConfirmation(context, connection, provider);
+                                  _showDeleteConfirmation(context, connection, connectionProvider);
                                 },
                                 contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                                 leading: Container(

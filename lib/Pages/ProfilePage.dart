@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'package:connect/Pages/QrCodeScanner.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:connect/Providers/ProviderSQL.dart';
+import 'package:connect/Providers/profile_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -26,22 +26,18 @@ class _ProfilePageState extends State<ProfilePage> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final profileProvider =
-          Provider.of<ProfileProvider2>(context, listen: false);
+          Provider.of<ProfileProvider>(context, listen: false);
       _initializeData(profileProvider);
     });
   }
 
-  Future<void> _initializeData(ProfileProvider2 profileProvider) async {
+  Future<void> _initializeData(ProfileProvider profileProvider) async {
     setState(() => _isLoading = true);
 
     try {
       final userid = await profileProvider.fetchAndSetUserId2(true);
-      if (userid != -1) {
-        final userData = await profileProvider.loadProfile(userid);
-        if (userData.isNotEmpty) {
-          profileProvider.setUserData(userData);
-        }
-        profileProvider.subscribeToConnections();
+      if (userid != null) {
+        await profileProvider.loadProfile(userid);
       }
     } catch (e) {
       print("Error initializing data: $e");
@@ -54,7 +50,7 @@ class _ProfilePageState extends State<ProfilePage> {
 
   Future<void> _refreshData() async {
     final profileProvider =
-        Provider.of<ProfileProvider2>(context, listen: false);
+        Provider.of<ProfileProvider>(context, listen: false);
     await _initializeData(profileProvider);
   }
 
@@ -86,8 +82,8 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   // Share profile details by generating a VIP Pass and sharing it
-  void _shareProfile(ProfileProvider2 profileProvider) async {
-    if (profileProvider.UserData.isEmpty) return;
+  void _shareProfile(ProfileProvider profileProvider) async {
+    if (profileProvider.userId == null) return;
 
     // Show a progress dialog while generating VIP code
     if (mounted) {
@@ -151,7 +147,7 @@ class _ProfilePageState extends State<ProfilePage> {
 
   @override
   Widget build(BuildContext context) {
-    final profileProvider = Provider.of<ProfileProvider2>(context);
+    final profileProvider = Provider.of<ProfileProvider>(context);
 
     final hasBasicDetails = profileProvider.name.trim().isNotEmpty &&
         profileProvider.profession.trim().isNotEmpty &&
@@ -159,19 +155,19 @@ class _ProfilePageState extends State<ProfilePage> {
             profileProvider.professionalPhoneNumber.trim().isNotEmpty);
 
     debugPrint(
-        "ProfilePage Build: userId=${profileProvider.userId}, UserData=${profileProvider.UserData}, hasBasicDetails=$hasBasicDetails, name='${profileProvider.name}', profession='${profileProvider.profession}', phoneNumber='${profileProvider.phoneNumber}'");
+        "ProfilePage Build: userId=${profileProvider.userId}, hasBasicDetails=$hasBasicDetails, name='${profileProvider.name}', profession='${profileProvider.profession}', phoneNumber='${profileProvider.phoneNumber}'");
 
     // Get QR image if profile data is present, basic details are filled, and QR is generated
     QrImage? qrImage;
-    if (profileProvider.userId != -1 &&
-        profileProvider.UserData.isNotEmpty &&
+    if (profileProvider.userId != null &&
+        profileProvider.name.trim().isNotEmpty &&
         hasBasicDetails &&
         _qrGenerated) {
       final qrPayload = jsonEncode({
         "userId": profileProvider.userId,
         "sharedCard": _selectedShareType,
       });
-      qrImage = _generateQrImage(qrPayload, profileProvider.userId);
+      qrImage = _generateQrImage(qrPayload, profileProvider.userId!);
     }
 
     return Scaffold(
@@ -293,7 +289,7 @@ class _ProfilePageState extends State<ProfilePage> {
 
   // Header bar matching the user mockup
   Widget _buildTopHeader(
-      BuildContext context, ProfileProvider2 profileProvider) {
+      BuildContext context, ProfileProvider profileProvider) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
@@ -369,7 +365,7 @@ class _ProfilePageState extends State<ProfilePage> {
 
   // QR Container with Glowing Border and L-Corner brackets
   Widget _buildQRFrame(BuildContext context, QrImage? qrImage,
-      ProfileProvider2 profileProvider) {
+      ProfileProvider profileProvider) {
     const double outerSize = 280.0;
     final hasBasicDetails = profileProvider.name.trim().isNotEmpty &&
         profileProvider.profession.trim().isNotEmpty &&
@@ -688,7 +684,7 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   void _showShareOptionsBottomSheet(
-      BuildContext context, ProfileProvider2 profileProvider) {
+      BuildContext context, ProfileProvider profileProvider) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -941,9 +937,9 @@ class _ProfilePageState extends State<ProfilePage> {
 
   // Row of quick action buttons
   Widget _buildActionButtons(
-      BuildContext context, ProfileProvider2 profileProvider) {
+      BuildContext context, ProfileProvider profileProvider) {
     final hasProfile =
-        profileProvider.userId != -1 && profileProvider.UserData.isNotEmpty;
+        profileProvider.userId != null && profileProvider.name.trim().isNotEmpty;
 
     return Row(
       children: [

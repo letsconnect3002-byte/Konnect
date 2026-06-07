@@ -3,7 +3,8 @@ import 'dart:developer';
 import 'dart:io';
 
 
-import 'package:connect/Providers/ProviderSQL.dart';
+import 'package:connect/Providers/profile_provider.dart';
+import 'package:connect/Providers/connection_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -233,7 +234,7 @@ class _QRScannerPageState extends State<QRScannerPage> {
             }
 
             if (!mounted) return;
-            final profileProvider = Provider.of<ProfileProvider2>(context, listen: false);
+            final profileProvider = Provider.of<ProfileProvider>(context, listen: false);
             final fetchedData = await profileProvider.fetchProfileDataOnly(idToFetch);
             if (fetchedData.isNotEmpty) {
               fetchedData['sharedCard'] = decodedData['sharedCard'] ?? 'both';
@@ -315,13 +316,15 @@ class ProfileCard extends StatefulWidget {
 }
 
 class _ProfileCardState extends State<ProfileCard> {
-  late final ProfileProvider2 provider;
+  late final ProfileProvider profileProvider;
+  late final ConnectionProvider connectionProvider;
   String _shareBackType = 'casual';
 
   @override
   void initState() {
     super.initState();
-    provider = Provider.of<ProfileProvider2>(context, listen: false);
+    profileProvider = Provider.of<ProfileProvider>(context, listen: false);
+    connectionProvider = Provider.of<ConnectionProvider>(context, listen: false);
   }
 
   String _getVisibleField(String fieldKey, String rawValue) {
@@ -347,15 +350,12 @@ class _ProfileCardState extends State<ProfileCard> {
     final bool isCasual = assignment['c'] == true;
     final bool isProfessional = assignment['p'] == true;
 
-    final bool isCasualTab = sharedCard == 'casual';
-
-    if (sharedCard == 'casual' && !isCasualTab) return '';
-    if (sharedCard == 'professional' && isCasualTab) return '';
-
-    if (isCasualTab) {
+    if (sharedCard == 'casual') {
       return isCasual ? rawValue : '';
-    } else {
+    } else if (sharedCard == 'professional') {
       return isProfessional ? rawValue : '';
+    } else {
+      return (isCasual || isProfessional) ? rawValue : '';
     }
   }
 
@@ -390,7 +390,7 @@ class _ProfileCardState extends State<ProfileCard> {
   }
 
   void saveProfile() async {
-    if (provider.userId == -1) {
+    if (profileProvider.userId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Please set up your profile first")),
       );
@@ -440,8 +440,8 @@ class _ProfileCardState extends State<ProfileCard> {
       ),
     );
 
-    provider.connectUsers(
-      provider.userId, 
+    connectionProvider.connectUsers(
+      profileProvider.userId!, 
       scannedUserId, 
       sharedCardByPresenter: presenterSharedCard,
       sharedCardByScanner: _shareBackType,

@@ -1,11 +1,10 @@
 import 'dart:convert';
-import 'package:connect/Models/profile_card_type.dart';
 import 'package:connect/Pages/IndividualChatPage.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:connect/Providers/profile_provider.dart';
+import 'package:connect/Providers/connection_provider.dart';
 import 'package:provider/provider.dart';
-import 'package:connect/Providers/ProviderSQL.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 class ConnectionProfilePage extends StatefulWidget {
   final Map<String, dynamic> profileData;
@@ -57,14 +56,17 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
     return _activeFields;
   }
 
-  late final ProfileProvider2 provider;
+  late final ProfileProvider profileProvider;
+  late final ConnectionProvider connectionProvider;
   String _sharedCardPermission = 'both'; // what they share with me
   String _mySharedCardToThem = 'both'; // what I share with them
 
   @override
   void initState() {
     super.initState();
-    provider = Provider.of<ProfileProvider2>(context, listen: false);
+    profileProvider = Provider.of<ProfileProvider>(context, listen: false);
+    connectionProvider =
+        Provider.of<ConnectionProvider>(context, listen: false);
     _loadProfileData();
   }
 
@@ -146,40 +148,10 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
         final idToFetch = connectionProfileId is int
             ? connectionProfileId
             : int.parse(connectionProfileId.toString());
-        final response = await Supabase.instance.client
-            .from('profiles')
-            .select()
-            .eq('id', idToFetch)
-            .maybeSingle();
-
-        final myUserId = provider.userId;
-        if (myUserId != -1) {
-          final connResponse = await Supabase.instance.client
-              .from('network_graph')
-              .select('shared_card')
-              .eq('primary_user_id', myUserId)
-              .eq('connected_user_id', idToFetch)
-              .maybeSingle();
-          if (connResponse != null) {
-            _sharedCardPermission = connResponse['shared_card'] ?? 'both';
-          }
-
-          final int id1 = myUserId < idToFetch ? myUserId : idToFetch;
-          final int id2 = myUserId > idToFetch ? myUserId : idToFetch;
-          final rawConn = await Supabase.instance.client
-              .from('user_connections')
-              .select()
-              .eq('user_id_1', id1)
-              .eq('user_id_2', id2)
-              .maybeSingle();
-          if (rawConn != null) {
-            if (myUserId < idToFetch) {
-              _mySharedCardToThem = rawConn['user_1_shared_card'] ?? 'both';
-            } else {
-              _mySharedCardToThem = rawConn['user_2_shared_card'] ?? 'both';
-            }
-          }
-        }
+        final details = await profileProvider.fetchConnectionDetails(idToFetch);
+        final response = details['profile'] as Map<String, dynamic>?;
+        _sharedCardPermission = details['sharedCardPermission'] as String;
+        _mySharedCardToThem = details['mySharedCardToThem'] as String;
 
         if (response != null && mounted) {
           final Map<String, dynamic>? fieldAssignments =
@@ -751,12 +723,12 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
                 AnimatedDefaultTextStyle(
                   duration: _cardAnimDuration,
                   curve: _cardAnimCurve,
-                style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.65),
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                  fontFamily: 'Inter',
-                ),
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.65),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    fontFamily: 'Inter',
+                  ),
                   child: Text(
                     professionText,
                     maxLines: 1,
@@ -1682,7 +1654,7 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
       _mySharedCardToThem = accessType;
     });
 
-    await provider.updateConnectionAccess(otherUserId, accessType);
+    await connectionProvider.updateConnectionAccess(otherUserId, accessType);
 
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(

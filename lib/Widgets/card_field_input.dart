@@ -1,5 +1,5 @@
 import 'package:connect/Models/profile_card_type.dart';
-import 'package:connect/Providers/ProviderSQL.dart';
+import 'package:connect/Providers/profile_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -17,6 +17,9 @@ class CardFieldInput extends StatefulWidget {
   final VoidCallback? onTap;
   final bool showToggles;
 
+  final bool isEditing;
+  final ValueChanged<bool> onEditingChanged;
+
   const CardFieldInput({
     super.key,
     required this.fieldKey,
@@ -30,6 +33,8 @@ class CardFieldInput extends StatefulWidget {
     this.maxLines = 1,
     this.onTap,
     this.showToggles = true,
+    required this.isEditing,
+    required this.onEditingChanged,
   });
 
   @override
@@ -56,20 +61,19 @@ class _CardFieldInputState extends State<CardFieldInput> {
   void _onFocusChange() {
     if (!_focusNode.hasFocus) {
       // Lock field again if it has focus loss and contains data
-      final provider = Provider.of<ProfileProvider2>(context, listen: false);
-      if (provider.editMode[widget.fieldKey] == true) {
-        provider.setEditMode(widget.fieldKey, false);
+      if (widget.isEditing) {
+        widget.onEditingChanged(false);
       }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final provider = context.watch<ProfileProvider2>();
+    final provider = context.watch<ProfileProvider>();
     final assignment = provider.fieldAssignments[widget.fieldKey] ??
         FieldCardAssignment(casual: false, professional: true);
 
-    final isEditing = provider.editMode[widget.fieldKey] ?? false;
+    final isEditing = widget.isEditing;
     final isFilled = (widget.controller?.text ?? '').isNotEmpty;
     final readOnly = isFilled && !isEditing;
 
@@ -173,11 +177,11 @@ class _CardFieldInputState extends State<CardFieldInput> {
                         onTap: () {
                           if (isEditing) {
                             // Stop editing (lock it)
-                            provider.setEditMode(widget.fieldKey, false);
+                            widget.onEditingChanged(false);
                             _focusNode.unfocus();
                           } else {
                             // Start editing
-                            provider.setEditMode(widget.fieldKey, true);
+                            widget.onEditingChanged(true);
                           }
                         },
                         child: Icon(

@@ -11,8 +11,12 @@ import 'package:connect/Pages/ProfilePage.dart';
 import 'package:connect/Pages/DirectMessagesHubPage.dart';
 import 'package:connect/Pages/yet_to_be_built_profile_page.dart';
 import 'package:connect/Pages/IndividualChatPage.dart';
-import 'package:connect/Providers/ProfileProvider.dart';
-import 'package:connect/Providers/ProviderSQL.dart';
+import 'package:connect/Providers/profile_provider.dart';
+import 'package:connect/Providers/connection_provider.dart';
+import 'package:connect/Providers/chat_provider.dart';
+import 'package:connect/Repositories/profile_repository.dart';
+import 'package:connect/Repositories/connection_repository.dart';
+import 'package:connect/Repositories/chat_repository.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
@@ -99,7 +103,7 @@ Future<void> handleLocalNotificationClickPayload(String payload) async {
         final context = navigatorKey.currentContext;
         if (context != null) {
           final provider =
-              Provider.of<ProfileProvider2>(context, listen: false);
+              Provider.of<ProfileProvider>(context, listen: false);
           final profile = await provider.loadProfile(senderId);
           navigatorKey.currentState?.push(
             MaterialPageRoute(
@@ -310,8 +314,34 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-        ChangeNotifierProvider(create: (_) => ProfileProvider()),
-        ChangeNotifierProvider(create: (_) => ProfileProvider2()),
+        ChangeNotifierProvider<ProfileProvider>(
+          create: (_) => ProfileProvider(
+            profileRepository: SupabaseProfileRepository(),
+          ),
+        ),
+        ChangeNotifierProxyProvider<ProfileProvider, ConnectionProvider>(
+          create: (_) => ConnectionProvider(
+            connectionRepository: SupabaseConnectionRepository(),
+          ),
+          update: (_, profileProvider, connectionProvider) {
+            connectionProvider!.updateUserId(profileProvider.userId);
+            return connectionProvider;
+          },
+        ),
+        ChangeNotifierProxyProvider2<ProfileProvider, ConnectionProvider, ChatProvider>(
+          create: (_) => ChatProvider(
+            chatRepository: SupabaseChatRepository(
+              localDb: LocalDatabaseHelper.instance,
+            ),
+          ),
+          update: (_, profileProvider, connectionProvider, chatProvider) {
+            chatProvider!.updateFromProviders(
+              profileProvider.userId,
+              connectionProvider.connections,
+            );
+            return chatProvider;
+          },
+        ),
       ],
       child: MaterialApp(
         navigatorKey: navigatorKey,
@@ -387,19 +417,22 @@ class _AppShellGateState extends State<AppShellGate> {
   @override
   void initState() {
     super.initState();
-    _initUser();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _initUser();
+    });
   }
 
   Future<void> _initUser() async {
-    final provider = Provider.of<ProfileProvider2>(context, listen: false);
+    final profileProvider = Provider.of<ProfileProvider>(context, listen: false);
+    final chatProvider = Provider.of<ChatProvider>(context, listen: false);
     try {
-      await provider.ensureProfileExists();
-      final userId = await provider.fetchAndSetUserId2(true);
-      if (userId != -1) {
-        final userData = await provider.loadProfile(userId);
-        provider.setUserData(userData);
-        await _setupPushNotifications(provider);
-        await provider.updateUnreadCount();
+      await profileProvider.ensureProfileExists();
+      final userId = await profileProvider.fetchAndSetUserId2(true);
+      if (userId != null) {
+        await profileProvider.loadProfile(userId);
+        await chatProvider.loadChatRooms();
+        await _setupPushNotifications(chatProvider);
+        await chatProvider.updateUnreadCount();
       }
     } catch (e) {
       print("Error in AppShellGate initialization: $e");
@@ -412,7 +445,7 @@ class _AppShellGateState extends State<AppShellGate> {
     }
   }
 
-  Future<void> _setupPushNotifications(ProfileProvider2 provider) async {
+  Future<void> _setupPushNotifications(ChatProvider provider) async {
     print("PushNotifications: Initializing...");
     try {
       final messaging = FirebaseMessaging.instance;
@@ -649,10 +682,11 @@ class _AppShellState extends State<_AppShell> with WidgetsBindingObserver {
     if (state == AppLifecycleState.resumed) {
       // App came to foreground — catch any status changes that happened
       // while the app was backgrounded or the Realtime socket was sleeping
-      final provider = Provider.of<ProfileProvider2>(context, listen: false);
-      if (provider.userId != -1) {
-        provider.syncOutgoingMessageStatuses();
-        provider.fetchPendingMessages();
+      final profileProvider = Provider.of<ProfileProvider>(context, listen: false);
+      final chatProvider = Provider.of<ChatProvider>(context, listen: false);
+      if (profileProvider.userId != null) {
+        chatProvider.syncOutgoingMessageStatuses();
+        chatProvider.fetchPendingMessages();
       }
     }
   }
@@ -694,7 +728,7 @@ class _AppShellState extends State<_AppShell> with WidgetsBindingObserver {
     if (senderIdStr != null) {
       final senderId = int.tryParse(senderIdStr);
       if (senderId != null) {
-        final provider = Provider.of<ProfileProvider2>(context, listen: false);
+        final provider = Provider.of<ProfileProvider>(context, listen: false);
         try {
           // Fetch the sender's profile details so we can construct connectionData
           final profile = await provider.loadProfile(senderId);
@@ -778,7 +812,7 @@ class _AppShellState extends State<_AppShell> with WidgetsBindingObserver {
     final bool isActive = _currentIndex == index;
     final String label = const ["Home", "Chat", "Mandal", "My Card"][index];
     final Color itemColor = isActive ? Colors.white : const Color(0xFF5C5E78);
-    final provider = Provider.of<ProfileProvider2>(context);
+    final provider = Provider.of<ChatProvider>(context);
 
     Widget iconWidget = isImageIcon
         ? ImageIcon(

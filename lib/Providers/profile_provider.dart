@@ -1,0 +1,643 @@
+import 'dart:convert';
+import 'dart:math';
+
+import 'package:connect/Models/profile_card_type.dart';
+import 'package:connect/Models/app_error.dart';
+import 'package:connect/Repositories/profile_repository.dart';
+import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:uuid/uuid.dart';
+
+sealed class ProfileState {}
+class ProfileInitial extends ProfileState {}
+class ProfileLoading extends ProfileState {}
+class ProfileLoaded extends ProfileState {
+  final int userId;
+  final bool isCreated;
+  ProfileLoaded(this.userId, this.isCreated);
+}
+class ProfileError extends ProfileState {
+  final AppError error;
+  ProfileError(this.error);
+}
+
+class ProfileProvider with ChangeNotifier {
+  final ProfileRepository _repository;
+
+  ProfileProvider({ProfileRepository? profileRepository})
+      : _repository = profileRepository ?? SupabaseProfileRepository();
+
+  // Profile fields
+  String name = '';
+  String profession = '';
+  String email = '';
+  String professionalEmail = '';
+  String phoneNumber = '';
+  String professionalPhoneNumber = '';
+  String instagram = '';
+  String linkedin = '';
+  String twitter = '';
+  String company = '';
+  String bio = '';
+  String professionalBio = '';
+  String avatarUrl = '';
+  String gender = '';
+  bool showProfileToConnections = true;
+
+  String? _ownerId;
+
+  ProfileState _state = ProfileInitial();
+  ProfileState get state => _state;
+
+  int? get userId => _state is ProfileLoaded ? (_state as ProfileLoaded).userId : null;
+  bool get isCreated => _state is ProfileLoaded ? (_state as ProfileLoaded).isCreated : false;
+  AppError? get lastError => _state is ProfileError ? (_state as ProfileError).error : null;
+
+  void _setError(Object e) {
+    _state = ProfileError(AppError.from(e));
+    notifyListeners();
+  }
+
+  void clearError() {
+    _state = ProfileLoaded(userId ?? 0, isCreated);
+    notifyListeners();
+  }
+
+  // Which card(s) each field appears on (Casual / Professional).
+  Map<String, FieldCardAssignment> fieldAssignments = {};
+
+  void _ensureDefaultFieldAssignments() {
+    for (final field in assignableProfileFields) {
+      fieldAssignments.putIfAbsent(
+        field,
+        () {
+          if (field == 'email' || field == 'phoneNumber' || field == 'bio') {
+            return FieldCardAssignment(casual: true, professional: true);
+          }
+          if (field == 'name' || field == 'avatarUrl') {
+            return FieldCardAssignment(casual: true, professional: true);
+          }
+          return FieldCardAssignment(casual: false, professional: true);
+        },
+      );
+    }
+  }
+
+  bool isFieldOnCard(String field, ProfileCardType card) {
+    final assignment = fieldAssignments[field];
+    if (assignment == null) return card == ProfileCardType.professional;
+    return card == ProfileCardType.casual
+        ? assignment.casual
+        : assignment.professional;
+  }
+
+  Future<void> toggleFieldOnCard(String field, ProfileCardType card) async {
+    _ensureDefaultFieldAssignments();
+    final current = fieldAssignments[field]!;
+    if (card == ProfileCardType.casual) {
+      fieldAssignments[field] = current.copyWith(casual: !current.casual);
+    } else {
+      fieldAssignments[field] =
+          current.copyWith(professional: !current.professional);
+    }
+    notifyListeners();
+    final currentUserId = userId;
+    if (currentUserId != null) {
+      try {
+        final assignmentsMap =
+            fieldAssignments.map((k, v) => MapEntry(k, v.toJson()));
+        await _repository.updateProfileField(currentUserId, 'field_assignments', assignmentsMap);
+        print("Updated field assignments in Supabase");
+      } catch (e) {
+        print("Error saving field assignments to Supabase: $e");
+        _setError(e);
+      }
+    }
+  }
+
+  Future<void> setFieldOnCard(
+      String field, ProfileCardType card, bool enabled) async {
+    _ensureDefaultFieldAssignments();
+    final current = fieldAssignments[field]!;
+    if (card == ProfileCardType.casual) {
+      fieldAssignments[field] = current.copyWith(casual: enabled);
+    } else {
+      fieldAssignments[field] = current.copyWith(professional: enabled);
+    }
+    notifyListeners();
+    final currentUserId = userId;
+    if (currentUserId != null) {
+      try {
+        final assignmentsMap =
+            fieldAssignments.map((k, v) => MapEntry(k, v.toJson()));
+        await _repository.updateProfileField(currentUserId, 'field_assignments', assignmentsMap);
+        print("Updated field assignments in Supabase");
+      } catch (e) {
+        print("Error saving field assignments to Supabase: $e");
+        _setError(e);
+      }
+    }
+  }
+
+  String? getFieldValue(String field) {
+    switch (field) {
+      case 'name':
+        return name;
+      case 'profession':
+        return profession;
+      case 'company':
+        return company;
+      case 'email':
+        return email;
+      case 'professionalEmail':
+        return professionalEmail;
+      case 'phoneNumber':
+        return phoneNumber;
+      case 'professionalPhoneNumber':
+        return professionalPhoneNumber;
+      case 'bio':
+        return bio;
+      case 'professionalBio':
+        return professionalBio;
+      case 'avatarUrl':
+        return avatarUrl;
+      case 'linkedin':
+        return linkedin;
+      case 'twitter':
+        return twitter;
+      case 'instagram':
+        return instagram;
+      default:
+        return null;
+    }
+  }
+
+  // Helper to get or create a unique owner_id for this device
+  Future<String> _getOrCreateOwnerId() async {
+    final session = Supabase.instance.client.auth.currentSession;
+    if (session != null) {
+      _ownerId = session.user.id;
+      return _ownerId!;
+    }
+    if (_ownerId != null) return _ownerId!;
+    final prefs = await SharedPreferences.getInstance();
+    String? storedId = prefs.getString('owner_id');
+    if (storedId == null) {
+      storedId = const Uuid().v4();
+      await prefs.setString('owner_id', storedId);
+    }
+    _ownerId = storedId;
+    return _ownerId!;
+  }
+
+  Future<void> ensureProfileExists() async {
+    final session = Supabase.instance.client.auth.currentSession;
+    if (session == null) return;
+
+    final ownerId = session.user.id;
+    try {
+      _state = ProfileLoading();
+      notifyListeners();
+
+      final list = await _repository.checkMyProfileExists(ownerId);
+      if (list.isEmpty) {
+        clearFields();
+        name = session.user.email?.split('@')[0] ?? 'User';
+        email = session.user.email ?? '';
+        profession = 'Professional';
+        gender = session.user.userMetadata?['gender'] as String? ?? '';
+        
+        _state = ProfileLoaded(0, false);
+        await saveProfileData(isMyProfile: true);
+        print("Default profile created for owner ID: $ownerId");
+      } else {
+        final existingId = list.first['id'] as int;
+        _state = ProfileLoaded(existingId, true);
+        notifyListeners();
+      }
+    } catch (e) {
+      print("Error in ensureProfileExists: $e");
+      _setError(e);
+    }
+  }
+
+  void setValue(String field, String value) {
+    switch (field) {
+      case 'name':
+        name = value;
+        break;
+      case 'profession':
+        profession = value;
+        break;
+      case 'email':
+        email = value;
+        break;
+      case 'professionalEmail':
+        professionalEmail = value;
+        break;
+      case 'phoneNumber':
+        phoneNumber = value;
+        break;
+      case 'professionalPhoneNumber':
+        professionalPhoneNumber = value;
+        break;
+      case 'instagram':
+        instagram = value;
+        break;
+      case 'linkedin':
+        linkedin = value;
+        break;
+      case 'twitter':
+        twitter = value;
+        break;
+      case 'company':
+        company = value;
+        break;
+      case 'bio':
+        bio = value;
+        break;
+      case 'professionalBio':
+        professionalBio = value;
+        break;
+      case 'avatarUrl':
+        avatarUrl = value;
+        break;
+      case 'gender':
+        gender = value;
+        break;
+    }
+  }
+
+  // Update a specific field in the profile
+  Future<void> updateProfileField(String field, String value, int id) async {
+    setValue(field, value);
+
+    String dbField = field;
+    if (field == 'phoneNumber') {
+      dbField = 'phone_number';
+    } else if (field == 'professionalEmail') {
+      dbField = 'professional_email';
+    } else if (field == 'professionalPhoneNumber') {
+      dbField = 'professional_phone_number';
+    } else if (field == 'professionalBio') {
+      dbField = 'professional_bio';
+    } else if (field == 'avatarUrl') {
+      dbField = 'avatar_url';
+    }
+
+    try {
+      await _repository.updateProfileField(id, dbField, value);
+      print("Updated field $field in database to $value");
+    } catch (e) {
+      print("Error updating profile field: $e");
+      _setError(e);
+    }
+
+    notifyListeners();
+  }
+
+  Future<void> setShowProfileToConnections(bool value) async {
+    showProfileToConnections = value;
+    notifyListeners();
+    final currentUserId = userId;
+    if (currentUserId != null) {
+      try {
+        await _repository.updateProfileField(currentUserId, 'show_profile_to_connections', value);
+        print("Updated show_profile_to_connections in Supabase to $value");
+      } catch (e) {
+        print("Error updating show_profile_to_connections in Supabase: $e");
+        _setError(e);
+      }
+    }
+  }
+
+  // Method to fetch and set userId by profile type (isMyProfile)
+  Future<void> fetchAndSetUserId(bool isMyProfile) async {
+    final res = await fetchAndSetUserId2(isMyProfile);
+    print("userId set to: $res");
+  }
+
+  Future<int?> fetchAndSetUserId2(bool isMyProfile) async {
+    try {
+      _state = ProfileLoading();
+      notifyListeners();
+
+      final ownerId = await _getOrCreateOwnerId();
+      final list = await _repository.fetchProfileIdsByOwner(ownerId, isMyProfile);
+
+      if (list.isNotEmpty) {
+        final int id = list.first['id'] as int;
+        _state = ProfileLoaded(id, true);
+        notifyListeners();
+        return id;
+      }
+    } catch (e) {
+      print("Error fetching user ID: $e");
+      _setError(e);
+    }
+    _state = ProfileInitial();
+    notifyListeners();
+    return null;
+  }
+
+  // Method to fetch and set userId by email
+  Future<void> fetchAndSetUserIdEmail(String email) async {
+    try {
+      _state = ProfileLoading();
+      notifyListeners();
+
+      final list = await _repository.fetchProfileIdsByEmail(email);
+      if (list.isNotEmpty) {
+        final int id = list.first['id'] as int;
+        _state = ProfileLoaded(id, true);
+        notifyListeners();
+      } else {
+        _state = ProfileInitial();
+        notifyListeners();
+      }
+    } catch (e) {
+      print("Error fetching user ID by email: $e");
+      _setError(e);
+    }
+  }
+
+  // Load profile data from the database
+  Future<Map<String, dynamic>> loadProfile(int id) async {
+    final Map<String, dynamic> profileData = {
+      "id": id,
+      "name": "",
+      "profession": "",
+      "email": "",
+      "professionalEmail": "",
+      "phoneNumber": "",
+      "professionalPhoneNumber": "",
+      "instagram": "",
+      "linkedin": "",
+      "twitter": "",
+      "company": "",
+      "bio": "",
+      "professionalBio": "",
+      "avatarUrl": "",
+      "gender": "",
+      "showProfileToConnections": true
+    };
+    try {
+      _state = ProfileLoading();
+      notifyListeners();
+
+      final response = await _repository.loadProfile(id);
+
+      if (response != null) {
+        name = response['name'] ?? '';
+        profession = response['profession'] ?? '';
+        email = response['email'] ?? '';
+        professionalEmail = response['professional_email'] ?? '';
+        phoneNumber = response['phone_number'] ?? '';
+        professionalPhoneNumber = response['professional_phone_number'] ?? '';
+        instagram = response['instagram'] ?? '';
+        linkedin = response['linkedin'] ?? '';
+        twitter = response['twitter'] ?? '';
+        company = response['company'] ?? '';
+        bio = response['bio'] ?? '';
+        professionalBio = response['professional_bio'] ?? '';
+        avatarUrl = response['avatar_url'] ?? '';
+        gender = response['gender'] ?? '';
+        showProfileToConnections =
+            response['show_profile_to_connections'] == true;
+
+        profileData["name"] = name;
+        profileData["profession"] = profession;
+        profileData["email"] = email;
+        profileData["professionalEmail"] = professionalEmail;
+        profileData["phoneNumber"] = phoneNumber;
+        profileData["professionalPhoneNumber"] = professionalPhoneNumber;
+        profileData["instagram"] = instagram;
+        profileData["linkedin"] = linkedin;
+        profileData["twitter"] = twitter;
+        profileData["company"] = company;
+        profileData["bio"] = bio;
+        profileData["professionalBio"] = professionalBio;
+        profileData["avatarUrl"] = avatarUrl;
+        profileData["gender"] = gender;
+        profileData["showProfileToConnections"] = showProfileToConnections;
+
+        _state = ProfileLoaded(id, true);
+
+        // Load field assignments from database if present
+        if (response['field_assignments'] != null) {
+          try {
+            final Map<String, dynamic> decoded =
+                response['field_assignments'] is String
+                    ? jsonDecode(response['field_assignments'] as String)
+                        as Map<String, dynamic>
+                    : response['field_assignments'] as Map<String, dynamic>;
+            _ensureDefaultFieldAssignments();
+            for (final entry in decoded.entries) {
+              if (entry.value is Map<String, dynamic>) {
+                fieldAssignments[entry.key] = FieldCardAssignment.fromJson(
+                    entry.value as Map<String, dynamic>);
+              }
+            }
+          } catch (e) {
+            print("Error parsing field_assignments: $e");
+          }
+        } else {
+          _ensureDefaultFieldAssignments();
+        }
+
+        notifyListeners();
+        return profileData;
+      }
+    } catch (e) {
+      print("Error loading profile: $e");
+      _setError(e);
+    }
+    return profileData;
+  }
+
+  // Save profile data to the database
+  Future<void> saveProfileData({bool isMyProfile = true}) async {
+    if (!isCreated) {
+      try {
+        final ownerId = await _getOrCreateOwnerId();
+        _ensureDefaultFieldAssignments();
+        final assignmentsMap =
+            fieldAssignments.map((k, v) => MapEntry(k, v.toJson()));
+
+        final insertedId = await _repository.insertProfile({
+          'owner_id': ownerId,
+          'name': name,
+          'profession': profession,
+          'email': email,
+          'professional_email': professionalEmail,
+          'phone_number': phoneNumber,
+          'professional_phone_number': professionalPhoneNumber,
+          'instagram': instagram,
+          'linkedin': linkedin,
+          'twitter': twitter,
+          'is_my_profile': isMyProfile,
+          'company': company,
+          'bio': bio,
+          'professional_bio': professionalBio,
+          'avatar_url': avatarUrl,
+          'gender': gender,
+          'show_profile_to_connections': showProfileToConnections,
+          'field_assignments': assignmentsMap,
+        });
+
+        _state = ProfileLoaded(insertedId, true);
+        notifyListeners();
+        print("inserted");
+      } catch (e) {
+        print("Error saving profile data: $e");
+        _setError(e);
+      }
+    }
+  }
+
+  Future<void> saveOrUpdateProfile() async {
+    final ownerId = await _getOrCreateOwnerId();
+    _ensureDefaultFieldAssignments();
+    final assignmentsMap =
+        fieldAssignments.map((k, v) => MapEntry(k, v.toJson()));
+
+    final data = {
+      'name': name,
+      'profession': profession,
+      'email': email,
+      'professional_email': professionalEmail,
+      'phone_number': phoneNumber,
+      'professional_phone_number': professionalPhoneNumber,
+      'instagram': instagram,
+      'linkedin': linkedin,
+      'twitter': twitter,
+      'company': company,
+      'bio': bio,
+      'professional_bio': professionalBio,
+      'avatar_url': avatarUrl,
+      'show_profile_to_connections': showProfileToConnections,
+      'field_assignments': assignmentsMap,
+    };
+
+    try {
+      final currentUserId = userId;
+      if (currentUserId != null) {
+        await _repository.updateProfile(currentUserId, data);
+        print("Profile updated successfully in Supabase");
+      } else {
+        final insertedId = await _repository.insertProfile({
+          ...data,
+          'owner_id': ownerId,
+          'is_my_profile': true,
+        });
+        _state = ProfileLoaded(insertedId, true);
+        print("Profile created successfully in Supabase with id: $insertedId");
+      }
+    } catch (e) {
+      print("Error saving/updating profile in Supabase: $e");
+      _setError(e);
+    }
+    notifyListeners();
+  }
+
+  // Clear profile fields after deletion
+  void clearFields() {
+    name = '';
+    profession = '';
+    email = '';
+    professionalEmail = '';
+    phoneNumber = '';
+    professionalPhoneNumber = '';
+    instagram = '';
+    linkedin = '';
+    twitter = '';
+    company = '';
+    bio = '';
+    professionalBio = '';
+    avatarUrl = '';
+    gender = '';
+    showProfileToConnections = true;
+    _state = ProfileInitial();
+    notifyListeners();
+  }
+
+  Future<Map<String, dynamic>> fetchProfileDataOnly(int id) async {
+    try {
+      final response = await _repository.fetchProfileDataOnly(id);
+
+      if (response != null) {
+        return {
+          'id': response['id'],
+          'name': response['name'] ?? '',
+          'profession': response['profession'] ?? '',
+          'email': response['email'] ?? '',
+          'phoneNumber': response['phone_number'] ?? '',
+          'instagram': response['instagram'] ?? '',
+          'linkedin': response['linkedin'] ?? '',
+          'twitter': response['twitter'] ?? '',
+          'isMyProfile': response['is_my_profile'] == true,
+          'created_at': response['created_at'],
+          'company': response['company'] ?? '',
+          'avatarUrl': response['avatar_url'] ?? '',
+          'bio': response['bio'] ?? '',
+          'professionalBio': response['professional_bio'] ?? '',
+          'showProfileToConnections':
+              response['show_profile_to_connections'] == true,
+          'cardTypes': response['card_types'] != null
+              ? List<String>.from(response['card_types'] as List)
+              : <String>[],
+          'connection_profile_id': response['id'],
+          'field_assignments': response['field_assignments'],
+        };
+      }
+    } catch (e) {
+      print("Error fetching profile data only: $e");
+      _setError(e);
+    }
+    return {};
+  }
+
+  Future<Map<String, dynamic>> fetchConnectionDetails(int idToFetch) async {
+    final currentUserId = userId;
+    if (currentUserId == null) {
+      return {
+        'profile': null,
+        'sharedCardPermission': 'both',
+        'mySharedCardToThem': 'both',
+      };
+    }
+    try {
+      return await _repository.fetchConnectionDetails(currentUserId, idToFetch);
+    } catch (e) {
+      print("Error in fetchConnectionDetails: $e");
+      _setError(e);
+      return {
+        'profile': null,
+        'sharedCardPermission': 'both',
+        'mySharedCardToThem': 'both',
+      };
+    }
+  }
+
+  Future<String> generateInviteCode(String sharedCardType) async {
+    final currentUserId = userId;
+    if (currentUserId == null) {
+      throw Exception("User is not signed in or profile is not loaded");
+    }
+
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    final rand = Random();
+    final suffix = List.generate(6, (index) => chars[rand.nextInt(chars.length)]).join();
+    final generatedCode = 'MNDL-$suffix';
+
+    try {
+      await _repository.insertInviteCode(generatedCode, currentUserId, sharedCardType);
+      print("Successfully generated invite code: $generatedCode");
+      return generatedCode;
+    } catch (e) {
+      _setError(e);
+      rethrow;
+    }
+  }
+}

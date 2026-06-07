@@ -2,7 +2,8 @@ import 'dart:convert';
 import 'package:connect/Pages/ConnectionProfilePage.dart';
 import 'package:connect/Pages/IndividualChatPage.dart';
 import 'package:connect/Pages/QrCodeScanner.dart';
-import 'package:connect/Providers/ProviderSQL.dart';
+import 'package:connect/Providers/connection_provider.dart';
+import 'package:connect/Providers/chat_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -19,7 +20,7 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
       false; // true = Card View, false = List View (List is default)
   Set<String> _favoritedIds = {};
   Set<String> _deletedProfileIds = {};
-  late ProfileProvider2 profileProvider;
+  late ConnectionProvider connectionProvider;
 
   @override
   void initState() {
@@ -28,13 +29,13 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
     _loadDeletedProfiles();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
-        profileProvider = Provider.of<ProfileProvider2>(context, listen: false);
+        connectionProvider = Provider.of<ConnectionProvider>(context, listen: false);
         setState(() {});
       }
     });
   }
 
-  void _showRedeemVipDialog(BuildContext context, ProfileProvider2 provider) {
+  void _showRedeemVipDialog(BuildContext context, ConnectionProvider provider) {
     showDialog(
       context: context,
       builder: (context) {
@@ -212,7 +213,9 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
                             await provider.redeemInviteCode(codeStr, selectedType);
                             // Refresh connection list
                             await provider.fetchConnections();
-                            await provider.updateUnreadCount();
+                            if (context.mounted) {
+                              await Provider.of<ChatProvider>(context, listen: false).updateUnreadCount();
+                            }
                             
                             if (context.mounted) {
                               Navigator.pop(context); // Dismiss dialog
@@ -326,17 +329,19 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
   }
 
   Future<void> _deleteProfileLocally(
-      String id, ProfileProvider2 provider) async {
+      String id, ConnectionProvider provider) async {
     try {
       final intId = int.tryParse(id) ?? 0;
-      await provider.deleteProfile(intId);
+      await provider.deleteProfile(intId, onRoomCleanup: (profileId, roomId) async {
+        await Provider.of<ChatProvider>(context, listen: false).handleRoomCleanup(profileId, roomId);
+      });
     } catch (e) {
       print("Error deleting profile locally: $e");
     }
   }
 
   Future<void> _showDeleteConfirmation(BuildContext context,
-      Map<String, dynamic> connection, ProfileProvider2 provider) async {
+      Map<String, dynamic> connection, ConnectionProvider provider) async {
     final name = connection['name'] ?? 'this contact';
     final profileIdStr = (connection['id'] ?? '').toString();
 
@@ -1072,7 +1077,7 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
   }
 
   Widget _buildCardItem(
-      Map<String, dynamic> profileData, ProfileProvider2 provider) {
+      Map<String, dynamic> profileData, ConnectionProvider provider) {
     final name = profileData["name"] ?? "Unknown";
     final profession = profileData["profession"] ?? "";
     final String email =
@@ -1341,7 +1346,7 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
   }
 
   Widget _buildListItem(
-      Map<String, dynamic> profileData, ProfileProvider2 provider) {
+      Map<String, dynamic> profileData, ConnectionProvider provider) {
     final name = profileData["name"] ?? "Unknown";
     final profession = profileData["profession"] ?? "";
     final String company = _getVisibleField(
@@ -1499,7 +1504,7 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
 
   @override
   Widget build(BuildContext context) {
-    final provider = context.watch<ProfileProvider2>();
+    final provider = context.watch<ConnectionProvider>();
     final allProfiles = provider.connections;
     final count = allProfiles.length;
 
