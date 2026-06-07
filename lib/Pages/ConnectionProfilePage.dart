@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:connect/Providers/profile_provider.dart';
 import 'package:connect/Providers/connection_provider.dart';
 import 'package:provider/provider.dart';
+import 'package:connect/Utils/profile_field_filter.dart';
 
 class ConnectionProfilePage extends StatefulWidget {
   final Map<String, dynamic> profileData;
@@ -70,34 +71,6 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
     _loadProfileData();
   }
 
-  bool _isFieldVisible(
-      String fieldName, Map<String, dynamic>? fieldAssignments) {
-    String key = fieldName;
-    if (fieldName == 'professionalEmail') {
-      key = 'email';
-    } else if (fieldName == 'professionalPhoneNumber') {
-      key = 'phoneNumber';
-    } else if (fieldName == 'professionalBio') {
-      key = 'bio';
-    }
-
-    if (key == 'name' || key == 'avatarUrl') return true;
-    if (fieldAssignments == null) return true;
-
-    final assignmentMap = fieldAssignments[key];
-    if (assignmentMap == null) return true;
-
-    final bool isCasual = assignmentMap['c'] == true;
-    final bool isProfessional = assignmentMap['p'] == true;
-
-    if (_sharedCardPermission == 'casual') {
-      return isCasual;
-    } else if (_sharedCardPermission == 'professional') {
-      return isProfessional;
-    } else {
-      return isCasual || isProfessional;
-    }
-  }
 
   Future<void> _loadProfileData() async {
     final data = widget.profileData;
@@ -167,67 +140,25 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
             _avatarUrl = response['avatar_url'] ?? '';
             _profession = response['profession'] ?? '';
             _company = response['company'] ?? '';
-            _email = _isFieldVisible('email', fieldAssignments)
-                ? (response['email'] ?? '')
-                : '';
-            _professionalEmail =
-                _isFieldVisible('professionalEmail', fieldAssignments)
-                    ? (response['professional_email'] ?? '')
-                    : '';
-            _phoneNumber = _isFieldVisible('phoneNumber', fieldAssignments)
-                ? (response['phone_number'] ?? '')
-                : '';
-            _professionalPhoneNumber =
-                _isFieldVisible('professionalPhoneNumber', fieldAssignments)
-                    ? (response['professional_phone_number'] ?? '')
-                    : '';
-            _instagram = _isFieldVisible('instagram', fieldAssignments)
-                ? (response['instagram'] ?? '')
-                : '';
-            _linkedin = _isFieldVisible('linkedin', fieldAssignments)
-                ? (response['linkedin'] ?? '')
-                : '';
-            _twitter = _isFieldVisible('twitter', fieldAssignments)
-                ? (response['twitter'] ?? '')
-                : '';
-            _bio = _isFieldVisible('bio', fieldAssignments)
-                ? (response['bio'] ?? '')
-                : '';
+            _email = ProfileFieldFilter.getVisibleValue('email', response['email'] ?? '', _sharedCardPermission, fieldAssignments);
+            _professionalEmail = ProfileFieldFilter.getVisibleValue('professionalEmail', response['professional_email'] ?? '', _sharedCardPermission, fieldAssignments);
+            _phoneNumber = ProfileFieldFilter.getVisibleValue('phoneNumber', response['phone_number'] ?? '', _sharedCardPermission, fieldAssignments);
+            _professionalPhoneNumber = ProfileFieldFilter.getVisibleValue('professionalPhoneNumber', response['professional_phone_number'] ?? '', _sharedCardPermission, fieldAssignments);
+            _instagram = ProfileFieldFilter.getVisibleValue('instagram', response['instagram'] ?? '', _sharedCardPermission, fieldAssignments);
+            _linkedin = ProfileFieldFilter.getVisibleValue('linkedin', response['linkedin'] ?? '', _sharedCardPermission, fieldAssignments);
+            _twitter = ProfileFieldFilter.getVisibleValue('twitter', response['twitter'] ?? '', _sharedCardPermission, fieldAssignments);
+            _bio = ProfileFieldFilter.getVisibleValue('bio', response['bio'] ?? '', _sharedCardPermission, fieldAssignments);
           });
 
           // Build per-card filtered field sets
           final Map<String, dynamic>? fa = fieldAssignments;
 
-          String _filterField(String field, String rawValue) {
-            String key = field;
-            if (field == 'professionalEmail') {
-              key = 'email';
-            } else if (field == 'professionalPhoneNumber') {
-              key = 'phoneNumber';
-            } else if (field == 'professionalBio') {
-              key = 'bio';
-            }
-            if (key == 'name' || key == 'avatarUrl') return rawValue;
-            if (fa == null) return rawValue;
-            final assignmentMap = fa[key];
-            if (assignmentMap == null) return rawValue;
-            return assignmentMap['c'] == true ? rawValue : '';
+          String filterField(String field, String rawValue) {
+            return ProfileFieldFilter.getVisibleValue(field, rawValue, 'casual', fa);
           }
 
-          String _filterFieldPro(String field, String rawValue) {
-            String key = field;
-            if (field == 'professionalEmail') {
-              key = 'email';
-            } else if (field == 'professionalPhoneNumber') {
-              key = 'phoneNumber';
-            } else if (field == 'professionalBio') {
-              key = 'bio';
-            }
-            if (key == 'name' || key == 'avatarUrl') return rawValue;
-            if (fa == null) return rawValue;
-            final assignmentMap = fa[key];
-            if (assignmentMap == null) return rawValue;
-            return assignmentMap['p'] == true ? rawValue : '';
+          String filterFieldPro(String field, String rawValue) {
+            return ProfileFieldFilter.getVisibleValue(field, rawValue, 'professional', fa);
           }
 
           setState(() {
@@ -237,41 +168,38 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
             final String rawProfPhone =
                 response['professional_phone_number'] ?? '';
 
-            final String filterCasualEmail = _filterField('email', rawEmail);
+            final String filterCasualEmail = filterField('email', rawEmail);
             final String filterCasualPhone =
-                _filterField('phoneNumber', rawPhone);
+                filterField('phoneNumber', rawPhone);
 
             final String filterProfEmail =
-                _filterFieldPro('professionalEmail', rawProfEmail);
+                filterFieldPro('professionalEmail', rawProfEmail);
 
             final String filterProfPhone =
-                _filterFieldPro('professionalPhoneNumber', rawProfPhone);
+                filterFieldPro('professionalPhoneNumber', rawProfPhone);
 
             _casualFields = {
               'email': filterCasualEmail,
               'phoneNumber': filterCasualPhone,
               'instagram':
-                  _filterField('instagram', response['instagram'] ?? ''),
-              'linkedin': _filterField('linkedin', response['linkedin'] ?? ''),
-              'twitter': _filterField('twitter', response['twitter'] ?? ''),
-              'bio': _filterField('bio', response['bio'] ?? ''),
+                  filterField('instagram', response['instagram'] ?? ''),
+              'linkedin': filterField('linkedin', response['linkedin'] ?? ''),
+              'twitter': filterField('twitter', response['twitter'] ?? ''),
+              'bio': filterField('bio', response['bio'] ?? ''),
             };
 
             final String rawProfBio = response['professional_bio'] ?? '';
-            _professionalBio =
-                _isFieldVisible('professionalBio', fieldAssignments)
-                    ? rawProfBio
-                    : '';
+            _professionalBio = ProfileFieldFilter.getVisibleValue('professionalBio', rawProfBio, _sharedCardPermission, fieldAssignments);
 
             _professionalFields = {
               'email': filterProfEmail,
               'phoneNumber': filterProfPhone,
               'instagram':
-                  _filterFieldPro('instagram', response['instagram'] ?? ''),
+                  filterFieldPro('instagram', response['instagram'] ?? ''),
               'linkedin':
-                  _filterFieldPro('linkedin', response['linkedin'] ?? ''),
-              'twitter': _filterFieldPro('twitter', response['twitter'] ?? ''),
-              'bio': _filterFieldPro('professionalBio', rawProfBio),
+                  filterFieldPro('linkedin', response['linkedin'] ?? ''),
+              'twitter': filterFieldPro('twitter', response['twitter'] ?? ''),
+              'bio': filterFieldPro('professionalBio', rawProfBio),
             };
           });
         }
@@ -294,49 +222,11 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
   }
 
   String _getCompany(String name, String comp) {
-    if (comp.isNotEmpty) {
-      return comp;
-    }
-    final cleanName = name.toLowerCase().trim();
-    if (cleanName.contains('sarah') || cleanName.contains('chen')) {
-      return 'TechFlow Inc.';
-    } else if (cleanName.contains('marcus') || cleanName.contains('lee')) {
-      return 'CodeCraft Studios';
-    } else if (cleanName.contains('asha')) {
-      return 'Innovate Labs';
-    } else if (cleanName.contains('alex') || cleanName.contains('vance')) {
-      return 'Vortex Media';
-    } else if (cleanName.contains('santosh')) {
-      return 'Antigravity Labs';
-    }
-    final hash = name.codeUnits.fold<int>(0, (prev, element) => prev + element);
-    final companies = [
-      'TechFlow Inc.',
-      'CodeCraft Studios',
-      'Synergy Corp',
-      'Pixel Perfect',
-      'AppVentures',
-    ];
-    return companies[hash % companies.length];
+    return comp;
   }
 
   String _getBio(String name, String bioText) {
-    if (bioText.isNotEmpty) {
-      return bioText;
-    }
-    final cleanName = name.toLowerCase().trim();
-    if (cleanName.contains('sarah') || cleanName.contains('chen')) {
-      return 'Senior Product Designer at TechFlow Inc. Passionate about crafting high-fidelity design systems and user experiences.';
-    } else if (cleanName.contains('marcus') || cleanName.contains('lee')) {
-      return 'Lead Software Engineer. Building robust mobile apps and cloud architectures with Flutter and Go.';
-    } else if (cleanName.contains('asha')) {
-      return 'Product Manager. Driving innovation in AI-first developer tools and user-centric features.';
-    } else if (cleanName.contains('alex') || cleanName.contains('vance')) {
-      return 'Creative Director. Design strategist and tech enthusiast helping early-stage startups establish their visual identity.';
-    } else if (cleanName.contains('santosh')) {
-      return 'Fullstack developer & designer crafting seamless experiences across web and mobile ecosystems.';
-    }
-    return 'Digital Identity on Mandala. Tap scan or view profile to start connecting and collaborating.';
+    return bioText;
   }
 
   Widget _buildHeader(BuildContext context) {
@@ -489,7 +379,6 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
   }
 
   Widget _buildDigitalCard() {
-    final isCasual = false;
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -620,7 +509,6 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
   }
 
   Widget _buildUnifiedFrontCard(double cardWidth) {
-    final isCasual = false;
     final W = cardWidth;
     final comp = _getCompany(_name, _company);
     final nameText = _name.isEmpty ? 'Jordan Miller' : _name;
@@ -791,9 +679,7 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
   }
 
   Widget _buildUnifiedBackCard(double cardWidth) {
-    final isCasual = false;
     final W = cardWidth;
-    final H = cardWidth / 1.58;
     final avatar = _getAvatarUrl(_name, _avatarUrl);
     final comp = _getCompany(_name, _company);
     final bioVal = _getBio(_name, _previewFields['bio'] ?? '');
@@ -1211,10 +1097,6 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
 
   @override
   Widget build(BuildContext context) {
-    final String avatar = _getAvatarUrl(_name, _avatarUrl);
-    final String comp = _getCompany(_name, _company);
-    final String bio = _getBio(_name, _bio);
-
     // Mock social media logos matching profile page
     final linkedinLogo = Container(
       width: 36,

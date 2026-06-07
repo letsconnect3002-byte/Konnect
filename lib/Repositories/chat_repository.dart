@@ -28,6 +28,7 @@ abstract class ChatRepository {
   Future<int> getTotalUnreadCountLocally(int myUserId);
   Future<List<Map<String, dynamic>>> getRoomUnreadCountsLocally(int myUserId);
   Future<void> clearLocalDatabase();
+  Future<Map<String, dynamic>?> getLastMessageForRoom(String roomId);
   Future<void> upsertMessageToSupabase(Map<String, dynamic> messageData);
   Future<void> deleteMessageInSupabase(String messageId);
   Future<void> updateMessageStatusInSupabase(String messageId, String status);
@@ -188,6 +189,11 @@ class SupabaseChatRepository implements ChatRepository {
   @override
   Future<void> clearLocalDatabase() async {
     await _localDb.clearDatabase();
+  }
+
+  @override
+  Future<Map<String, dynamic>?> getLastMessageForRoom(String roomId) async {
+    return await _localDb.getLastMessageForRoom(roomId);
   }
 
   @override

@@ -6,7 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:image/image.dart' as img;
+import 'package:connect/services/image_upload_service.dart';
 import 'package:connect/Pages/crop_image_page.dart';
 
 class YetToBeBuiltProfilePage extends StatefulWidget {
@@ -377,38 +377,6 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
     }
   }
 
-  Future<Uint8List> _compressImageTo10Kb(Uint8List originalBytes) async {
-    if (originalBytes.length <= 10 * 1024) {
-      return originalBytes;
-    }
-
-    final image = img.decodeImage(originalBytes);
-    if (image == null) return originalBytes;
-
-    int width = 150;
-    int height = (image.height * (width / image.width)).round();
-    img.Image resized = img.copyResize(image, width: width, height: height);
-
-    int quality = 80;
-    Uint8List compressedBytes;
-    do {
-      compressedBytes =
-          Uint8List.fromList(img.encodeJpg(resized, quality: quality));
-      if (compressedBytes.length <= 10 * 1024 || quality <= 10) {
-        break;
-      }
-      quality -= 15;
-      if (quality < 10) quality = 10;
-    } while (compressedBytes.length > 10 * 1024);
-
-    if (compressedBytes.length > 10 * 1024) {
-      resized = img.copyResize(image, width: 80, height: 80);
-      compressedBytes = Uint8List.fromList(img.encodeJpg(resized, quality: 15));
-    }
-
-    return compressedBytes;
-  }
-
   Future<void> _pickAndUploadImage({
     required StateSetter setModalState,
     required Function(String) onUploadSuccess,
@@ -450,32 +418,12 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
       // Re-trigger loading state in bottom sheet UI
       setModalState(() {});
 
-      final compressedBytes = await _compressImageTo10Kb(croppedBytes);
+      final compressedBytes = await ImageUploadService.compressImageTo10Kb(croppedBytes);
 
-      try {
-        await Supabase.instance.client.storage
-            .createBucket('avatars', const BucketOptions(public: true));
-      } catch (_) {
-        // Safe to ignore if bucket already exists
-      }
-
-      final String timestamp = DateTime.now().millisecondsSinceEpoch.toString();
-      final String folderName =
-          provider.userId != null ? '${provider.userId}' : 'temp_user';
-      final String fileName = '$folderName/avatar_$timestamp.jpg';
-
-      await Supabase.instance.client.storage.from('avatars').uploadBinary(
-            fileName,
-            compressedBytes,
-            fileOptions: const FileOptions(
-              contentType: 'image/jpeg',
-              upsert: true,
-            ),
-          );
-
-      final String publicUrl = Supabase.instance.client.storage
-          .from('avatars')
-          .getPublicUrl(fileName);
+      final String publicUrl = await ImageUploadService.uploadAvatarImage(
+        provider.userId,
+        compressedBytes,
+      );
 
       onUploadSuccess(publicUrl);
     } catch (e) {

@@ -298,20 +298,30 @@ class _ProfilePageState extends State<ProfilePage> {
         border: Border.all(color: Colors.white.withValues(alpha: 0.04)),
       ),
       child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
           // Infinity link logo inside circle
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: const Color(0xFF1B1C2A),
-              shape: BoxShape.circle,
-              border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
-            ),
-            child: Image.asset(
-              'assets/icons/Mandala Icon 1.png',
-              width: 22,
-              height: 22,
-              color: const Color(0xFF00F2FE), // Teal color link logo
+          SizedBox(
+            // width: 70,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.start,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1B1C2A),
+                    shape: BoxShape.circle,
+                    border:
+                        Border.all(color: Colors.white.withValues(alpha: 0.06)),
+                  ),
+                  child: Image.asset(
+                    'assets/icons/Mandala Icon 1.png',
+                    width: 22,
+                    height: 22,
+                    color: const Color(0xFF00F2FE), // Teal color link logo
+                  ),
+                ),
+              ],
             ),
           ),
           const SizedBox(width: 12),
@@ -338,34 +348,35 @@ class _ProfilePageState extends State<ProfilePage> {
               ),
             ],
           ),
-          const Spacer(),
+          // const Spacer(),
+          Container(width: 80, height: 20)
           // Settings button
-          GestureDetector(
-            onTap: () {
-              widget.onSetUpProfile?.call();
-            },
-            child: Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: const Color(0xFF1B1C2A),
-                shape: BoxShape.circle,
-                border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
-              ),
-              child: const Icon(
-                Icons.settings,
-                color: Colors.white60,
-                size: 20,
-              ),
-            ),
-          ),
+          // GestureDetector(
+          //   onTap: () {
+          //     widget.onSetUpProfile?.call();
+          //   },
+          //   child: Container(
+          //     padding: const EdgeInsets.all(10),
+          //     decoration: BoxDecoration(
+          //       color: const Color(0xFF1B1C2A),
+          //       shape: BoxShape.circle,
+          //       border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+          //     ),
+          //     child: const Icon(
+          //       Icons.settings,
+          //       color: Colors.white60,
+          //       size: 20,
+          //     ),
+          //   ),
+          // ),
         ],
       ),
     );
   }
 
   // QR Container with Glowing Border and L-Corner brackets
-  Widget _buildQRFrame(BuildContext context, QrImage? qrImage,
-      ProfileProvider profileProvider) {
+  Widget _buildQRFrame(
+      BuildContext context, QrImage? qrImage, ProfileProvider profileProvider) {
     const double outerSize = 280.0;
     final hasBasicDetails = profileProvider.name.trim().isNotEmpty &&
         profileProvider.profession.trim().isNotEmpty &&
@@ -938,8 +949,8 @@ class _ProfilePageState extends State<ProfilePage> {
   // Row of quick action buttons
   Widget _buildActionButtons(
       BuildContext context, ProfileProvider profileProvider) {
-    final hasProfile =
-        profileProvider.userId != null && profileProvider.name.trim().isNotEmpty;
+    final hasProfile = profileProvider.userId != null &&
+        profileProvider.name.trim().isNotEmpty;
 
     return Row(
       children: [

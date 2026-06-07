@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:qr_code_scanner_plus/qr_code_scanner_plus.dart';
+import 'package:connect/Utils/profile_field_filter.dart';
 
 class QRScannerPage extends StatefulWidget {
   const QRScannerPage({Key? key}) : super(key: key);
@@ -327,66 +328,13 @@ class _ProfileCardState extends State<ProfileCard> {
     connectionProvider = Provider.of<ConnectionProvider>(context, listen: false);
   }
 
-  String _getVisibleField(String fieldKey, String rawValue) {
-    if (fieldKey == 'name' || fieldKey == 'avatarUrl') return rawValue;
-
-    final String sharedCard = (widget.profileData['sharedCard'] ?? 'both').toString();
-    final dynamic faRaw = widget.profileData['field_assignments'];
-    if (faRaw == null) return rawValue;
-
-    Map<String, dynamic> fa;
-    try {
-      fa = faRaw is String
-          ? jsonDecode(faRaw) as Map<String, dynamic>
-          : faRaw as Map<String, dynamic>;
-    } catch (_) {
-      return rawValue;
-    }
-
-    final dynamic assignmentRaw = fa[fieldKey];
-    if (assignmentRaw == null) return rawValue;
-
-    final Map<String, dynamic> assignment = assignmentRaw as Map<String, dynamic>;
-    final bool isCasual = assignment['c'] == true;
-    final bool isProfessional = assignment['p'] == true;
-
-    if (sharedCard == 'casual') {
-      return isCasual ? rawValue : '';
-    } else if (sharedCard == 'professional') {
-      return isProfessional ? rawValue : '';
-    } else {
-      return (isCasual || isProfessional) ? rawValue : '';
-    }
-  }
-
   String _getAvatarUrl(String name, String? existingUrl) {
     if (existingUrl != null &&
         existingUrl.isNotEmpty &&
         existingUrl.startsWith('http')) {
       return existingUrl;
     }
-    final cleanName = name.toLowerCase().trim();
-    if (cleanName.contains('sarah') || cleanName.contains('chen')) {
-      return 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=300&q=80';
-    } else if (cleanName.contains('marcus') || cleanName.contains('lee')) {
-      return 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=300&q=80';
-    } else if (cleanName.contains('asha')) {
-      return 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80';
-    } else if (cleanName.contains('alex') || cleanName.contains('vance')) {
-      return 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=300&q=80';
-    } else if (cleanName.contains('santosh')) {
-      return 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&w=300&q=80';
-    }
-
-    final hash = name.codeUnits.fold<int>(0, (prev, element) => prev + element);
-    final avatars = [
-      'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=300&q=80',
-      'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=300&q=80',
-      'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80',
-      'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=300&q=80',
-      'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&w=300&q=80',
-    ];
-    return avatars[hash % avatars.length];
+    return '';
   }
 
   void saveProfile() async {
@@ -489,8 +437,8 @@ class _ProfileCardState extends State<ProfileCard> {
     final bool isCasual = sharedCard == 'casual';
     final Color accentColor = isCasual ? const Color(0xFF8B5CF6) : const Color(0xFF00F2FE);
 
-    final String profession = _getVisibleField('profession', widget.profileData['profession'] ?? '');
-    final String company = _getVisibleField('company', widget.profileData['company'] ?? '');
+    final String profession = ProfileFieldFilter.getVisibleValue('profession', widget.profileData['profession'] ?? '', sharedCard, widget.profileData['field_assignments']);
+    final String company = ProfileFieldFilter.getVisibleValue('company', widget.profileData['company'] ?? '', sharedCard, widget.profileData['field_assignments']);
     final String avatar = _getAvatarUrl(name, widget.profileData['avatarUrl']);
 
     return Padding(
@@ -624,12 +572,12 @@ class _ProfileCardState extends State<ProfileCard> {
     final bool isCasual = sharedCard == 'casual';
     final Color accentColor = isCasual ? const Color(0xFF8B5CF6) : const Color(0xFF00F2FE);
 
-    final String email = _getVisibleField('email', widget.profileData['email'] ?? '');
-    final String phone = _getVisibleField('phoneNumber', widget.profileData['phoneNumber'] ?? widget.profileData['phone_number'] ?? '');
-    final String bio = _getVisibleField('bio', widget.profileData['bio'] ?? '');
-    final String instagram = _getVisibleField('instagram', widget.profileData['instagram'] ?? '');
-    final String linkedin = _getVisibleField('linkedin', widget.profileData['linkedin'] ?? '');
-    final String twitter = _getVisibleField('twitter', widget.profileData['twitter'] ?? '');
+    final String email = ProfileFieldFilter.getVisibleValue('email', widget.profileData['email'] ?? '', sharedCard, widget.profileData['field_assignments']);
+    final String phone = ProfileFieldFilter.getVisibleValue('phoneNumber', widget.profileData['phoneNumber'] ?? widget.profileData['phone_number'] ?? '', sharedCard, widget.profileData['field_assignments']);
+    final String bio = ProfileFieldFilter.getVisibleValue('bio', widget.profileData['bio'] ?? '', sharedCard, widget.profileData['field_assignments']);
+    final String instagram = ProfileFieldFilter.getVisibleValue('instagram', widget.profileData['instagram'] ?? '', sharedCard, widget.profileData['field_assignments']);
+    final String linkedin = ProfileFieldFilter.getVisibleValue('linkedin', widget.profileData['linkedin'] ?? '', sharedCard, widget.profileData['field_assignments']);
+    final String twitter = ProfileFieldFilter.getVisibleValue('twitter', widget.profileData['twitter'] ?? '', sharedCard, widget.profileData['field_assignments']);
 
     if (email.isEmpty &&
         phone.isEmpty &&

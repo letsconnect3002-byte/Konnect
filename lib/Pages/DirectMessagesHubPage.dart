@@ -2,7 +2,6 @@ import 'package:connect/Pages/IndividualChatPage.dart';
 import 'package:connect/Providers/profile_provider.dart';
 import 'package:connect/Providers/connection_provider.dart';
 import 'package:connect/Providers/chat_provider.dart';
-import 'package:connect/Providers/LocalDatabaseHelper.dart';
 import 'package:connect/Models/app_error.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -26,7 +25,7 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
   }
 
   List<String> _getCardTypesForConnection(Map<String, dynamic> connection) {
-    final sharedCard = (connection['my_shared_card'] ?? connection['shared_card'] ?? connection['sharedCard'] ?? 'both').toString().toLowerCase();
+    final sharedCard = (connection['my_shared_card'] ?? 'both').toString().toLowerCase();
     if (sharedCard == 'casual') {
       return ['casual'];
     } else if (sharedCard == 'professional') {
@@ -36,9 +35,9 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
     }
   }
 
-  Future<Map<String, dynamic>?> _getLastMessage(String? roomId) async {
+  Future<Map<String, dynamic>?> _getLastMessage(String? roomId, ChatProvider chatProvider) async {
     if (roomId == null) return null;
-    return await LocalDatabaseHelper.instance.getLastMessageForRoom(roomId);
+    return await chatProvider.getLastMessageForRoom(roomId);
   }
 
   @override
@@ -76,18 +75,6 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
   String _getAvatarUrl(String name, String? existingUrl) {
     if (existingUrl != null && existingUrl.isNotEmpty && existingUrl.startsWith('http')) {
       return existingUrl;
-    }
-    final cleanName = name.toLowerCase().trim();
-    if (cleanName.contains('sarah') || cleanName.contains('chen')) {
-      return 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=300&q=80';
-    } else if (cleanName.contains('marcus') || cleanName.contains('lee')) {
-      return 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=300&q=80';
-    } else if (cleanName.contains('asha')) {
-      return 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80';
-    } else if (cleanName.contains('alex') || cleanName.contains('vance')) {
-      return 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=300&q=80';
-    } else if (cleanName.contains('santosh')) {
-      return 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&w=300&q=80';
     }
     return '';
   }
@@ -436,7 +423,7 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
                           clipBehavior: Clip.antiAlias,
                           borderRadius: BorderRadius.circular(16),
                           child: FutureBuilder<Map<String, dynamic>?>(
-                            future: _getLastMessage(roomId),
+                            future: _getLastMessage(roomId, chatProvider),
                             builder: (context, snapshot) {
                               final lastMsg = snapshot.data;
 

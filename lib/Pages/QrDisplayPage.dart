@@ -125,13 +125,7 @@
 //   }
 // }
 
-import 'dart:io';
-import 'dart:typed_data';
-import 'dart:ui';
-
 import 'package:flutter/material.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:permission_handler/permission_handler.dart';
 import 'package:pretty_qr_code/pretty_qr_code.dart';
 
 class QrDisplayPage extends StatefulWidget {
@@ -191,72 +185,6 @@ class _QrDisplayPageState extends State<QrDisplayPage> {
     }
   }
 
-  Future<void> _saveQrCodeImage() async {
-    if (hasError) return;
-
-    // Request storage permission
-    final status = await Permission.storage.request();
-    if (status.isGranted) {
-      try {
-        // Generate QR code image bytes with custom color
-        final qrImageBytes = await qrImage.toImageAsBytes(
-          size: 512,
-          format: ImageByteFormat.png,
-          decoration: const PrettyQrDecoration(
-            background: Colors.white,
-          ),
-        );
-
-        if (qrImageBytes == null) {
-          throw Exception('Failed to generate QR image bytes');
-        }
-
-        // Convert ByteData to Uint8List
-        final uint8List = Uint8List.view(qrImageBytes.buffer);
-
-        // Get the Downloads directory
-        Directory? downloadsDirectory;
-        if (Platform.isAndroid) {
-          downloadsDirectory = Directory('/storage/emulated/0/Download');
-        } else if (Platform.isIOS) {
-          downloadsDirectory = await getApplicationDocumentsDirectory();
-        }
-
-        if (downloadsDirectory != null && await downloadsDirectory.exists()) {
-          final filePath = '${downloadsDirectory.path}/custom_qr_code.png';
-
-          // Write the file
-          final file = File(filePath);
-          await file.writeAsBytes(uint8List);
-
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('QR code saved at: $filePath')),
-          );
-        } else {
-          throw Exception('Downloads directory not accessible');
-        }
-      } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error saving QR code: ${e.toString()}')),
-        );
-      }
-    } else if (status.isPermanentlyDenied) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Storage permission is permanently denied. Please enable it in settings.',
-          ),
-        ),
-      );
-      await openAppSettings();
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Storage permission denied. Unable to save QR code.'),
-        ),
-      );
-    }
-  }
 
   @override
   Widget build(BuildContext context) {

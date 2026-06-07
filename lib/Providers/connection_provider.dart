@@ -27,6 +27,8 @@ class ConnectionProvider with ChangeNotifier {
 
   RealtimeChannel? _connectionsSubscription;
 
+  List<Map<String, dynamic>> _lastKnownConnections = [];
+
   UserConnectionState _state = UserConnectionInitial();
   UserConnectionState get state => _state;
 
@@ -40,8 +42,13 @@ class ConnectionProvider with ChangeNotifier {
     notifyListeners();
   }
 
+  void _setLoadedState(List<Map<String, dynamic>> list) {
+    _lastKnownConnections = list;
+    _state = UserConnectionLoaded(list);
+  }
+
   void clearError() {
-    _state = UserConnectionLoaded(connections);
+    _state = UserConnectionLoaded(_lastKnownConnections);
     notifyListeners();
   }
 
@@ -52,7 +59,7 @@ class ConnectionProvider with ChangeNotifier {
         subscribeToConnections();
       } else {
         unsubscribeFromConnections();
-        _state = UserConnectionLoaded([]);
+        _setLoadedState([]);
         notifyListeners();
       }
     }
@@ -90,7 +97,7 @@ class ConnectionProvider with ChangeNotifier {
     _state = UserConnectionLoading();
     notifyListeners();
     final list = await getOtherProfiles();
-    _state = UserConnectionLoaded(list);
+    _setLoadedState(list);
     notifyListeners();
     return list;
   }

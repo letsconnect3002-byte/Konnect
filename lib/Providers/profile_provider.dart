@@ -46,6 +46,8 @@ class ProfileProvider with ChangeNotifier {
   bool showProfileToConnections = true;
 
   String? _ownerId;
+  int? _lastKnownUserId;
+  bool _lastKnownIsCreated = false;
 
   ProfileState _state = ProfileInitial();
   ProfileState get state => _state;
@@ -59,9 +61,36 @@ class ProfileProvider with ChangeNotifier {
     notifyListeners();
   }
 
+  void _setLoadedState(int userIdVal, bool isCreatedVal) {
+    _lastKnownUserId = userIdVal;
+    _lastKnownIsCreated = isCreatedVal;
+    _state = ProfileLoaded(userIdVal, isCreatedVal);
+  }
+
   void clearError() {
-    _state = ProfileLoaded(userId ?? 0, isCreated);
+    if (_lastKnownUserId != null) {
+      _state = ProfileLoaded(_lastKnownUserId!, _lastKnownIsCreated);
+    } else {
+      _state = ProfileInitial();
+    }
     notifyListeners();
+  }
+
+  void _clearDataFields() {
+    name = '';
+    profession = '';
+    email = '';
+    professionalEmail = '';
+    phoneNumber = '';
+    professionalPhoneNumber = '';
+    instagram = '';
+    linkedin = '';
+    twitter = '';
+    company = '';
+    bio = '';
+    professionalBio = '';
+    avatarUrl = '';
+    gender = '';
   }
 
   // Which card(s) each field appears on (Casual / Professional).
@@ -208,12 +237,12 @@ class ProfileProvider with ChangeNotifier {
         profession = 'Professional';
         gender = session.user.userMetadata?['gender'] as String? ?? '';
         
-        _state = ProfileLoaded(0, false);
+        _setLoadedState(0, false);
         await saveProfileData(isMyProfile: true);
         print("Default profile created for owner ID: $ownerId");
       } else {
         final existingId = list.first['id'] as int;
-        _state = ProfileLoaded(existingId, true);
+        _setLoadedState(existingId, true);
         notifyListeners();
       }
     } catch (e) {
@@ -267,6 +296,7 @@ class ProfileProvider with ChangeNotifier {
         gender = value;
         break;
     }
+    notifyListeners();
   }
 
   // Update a specific field in the profile
@@ -320,6 +350,7 @@ class ProfileProvider with ChangeNotifier {
 
   Future<int?> fetchAndSetUserId2(bool isMyProfile) async {
     try {
+      _clearDataFields();
       _state = ProfileLoading();
       notifyListeners();
 
@@ -328,7 +359,7 @@ class ProfileProvider with ChangeNotifier {
 
       if (list.isNotEmpty) {
         final int id = list.first['id'] as int;
-        _state = ProfileLoaded(id, true);
+        _setLoadedState(id, true);
         notifyListeners();
         return id;
       }
@@ -350,7 +381,7 @@ class ProfileProvider with ChangeNotifier {
       final list = await _repository.fetchProfileIdsByEmail(email);
       if (list.isNotEmpty) {
         final int id = list.first['id'] as int;
-        _state = ProfileLoaded(id, true);
+        _setLoadedState(id, true);
         notifyListeners();
       } else {
         _state = ProfileInitial();
@@ -422,7 +453,7 @@ class ProfileProvider with ChangeNotifier {
         profileData["gender"] = gender;
         profileData["showProfileToConnections"] = showProfileToConnections;
 
-        _state = ProfileLoaded(id, true);
+        _setLoadedState(id, true);
 
         // Load field assignments from database if present
         if (response['field_assignments'] != null) {
@@ -486,7 +517,7 @@ class ProfileProvider with ChangeNotifier {
           'field_assignments': assignmentsMap,
         });
 
-        _state = ProfileLoaded(insertedId, true);
+        _setLoadedState(insertedId, true);
         notifyListeners();
         print("inserted");
       } catch (e) {
@@ -531,7 +562,7 @@ class ProfileProvider with ChangeNotifier {
           'owner_id': ownerId,
           'is_my_profile': true,
         });
-        _state = ProfileLoaded(insertedId, true);
+        _setLoadedState(insertedId, true);
         print("Profile created successfully in Supabase with id: $insertedId");
       }
     } catch (e) {

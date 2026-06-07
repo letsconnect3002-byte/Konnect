@@ -248,18 +248,6 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
         existingUrl.startsWith('http')) {
       return existingUrl;
     }
-    final cleanName = name.toLowerCase().trim();
-    if (cleanName.contains('sarah') || cleanName.contains('chen')) {
-      return 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=300&q=80';
-    } else if (cleanName.contains('marcus') || cleanName.contains('lee')) {
-      return 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=300&q=80';
-    } else if (cleanName.contains('asha')) {
-      return 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80';
-    } else if (cleanName.contains('alex') || cleanName.contains('vance')) {
-      return 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=300&q=80';
-    } else if (cleanName.contains('santosh')) {
-      return 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&w=300&q=80';
-    }
     return '';
   }
 

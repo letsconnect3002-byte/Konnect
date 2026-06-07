@@ -36,6 +36,8 @@ class ChatProvider with ChangeNotifier {
   int casualUnreadCount = 0;
   int professionalUnreadCount = 0;
 
+  Map<int, String> _lastKnownRooms = {};
+
   ChatState _state = ChatInitial();
   ChatState get state => _state;
 
@@ -50,22 +52,42 @@ class ChatProvider with ChangeNotifier {
     notifyListeners();
   }
 
+  void _setRoomsLoadedState(Map<int, String> rooms) {
+    _lastKnownRooms = rooms;
+    _state = ChatRoomsLoaded(rooms);
+  }
+
   void clearError() {
-    _state = ChatRoomsLoaded(connectionRooms);
+    _state = ChatRoomsLoaded(_lastKnownRooms);
     notifyListeners();
   }
 
-  void updateFromProviders(
-      int? userId, List<Map<String, dynamic>> connections) {
+  void updateFromProviders(int? userId, List<Map<String, dynamic>> connections) {
     final bool userIdChanged = _userId != userId;
+    
+    // Only update connections reference if the list content changed
+    // Use a simple length + first-id check as a cheap guard
+    final bool connectionsChanged = _connectionsChanged(connections);
+    
     _userId = userId;
-    _externalConnections = connections;
+    if (connectionsChanged) {
+      _externalConnections = List.from(connections);
+    }
 
     if (userIdChanged && userId != null) {
       loadChatRooms();
-    } else if (userId != null) {
+    } else if (connectionsChanged && userId != null) {
+      // Only recalculate unread counts when connection list actually changes
       updateUnreadCount();
     }
+  }
+
+  bool _connectionsChanged(List<Map<String, dynamic>> newConnections) {
+    if (newConnections.length != _externalConnections.length) return true;
+    if (newConnections.isEmpty) return false;
+    // Check first and last id as a quick proxy for list identity
+    return newConnections.first['id'] != _externalConnections.first['id'] ||
+        newConnections.last['id'] != _externalConnections.last['id'];
   }
 
   Future<void> loadChatRooms() async {
@@ -93,7 +115,7 @@ class ChatProvider with ChangeNotifier {
         }
       }
 
-      _state = ChatRoomsLoaded(newRooms);
+      _setRoomsLoadedState(newRooms);
       notifyListeners();
 
       await fetchPendingMessages();
@@ -127,7 +149,7 @@ class ChatProvider with ChangeNotifier {
           final roomId = common['room_id'] as String;
           final currentRooms = Map<int, String>.from(connectionRooms);
           currentRooms[otherUserId] = roomId;
-          _state = ChatRoomsLoaded(currentRooms);
+          _setRoomsLoadedState(currentRooms);
           subscribeToRoom(roomId);
           notifyListeners();
           return roomId;
@@ -139,7 +161,7 @@ class ChatProvider with ChangeNotifier {
 
       final currentRooms = Map<int, String>.from(connectionRooms);
       currentRooms[otherUserId] = roomId;
-      _state = ChatRoomsLoaded(currentRooms);
+      _setRoomsLoadedState(currentRooms);
       subscribeToRoom(roomId);
       notifyListeners();
       return roomId;
@@ -393,9 +415,7 @@ class ChatProvider with ChangeNotifier {
       if (activeRoomId != null) {
         await refreshActiveRoomMessages();
       } else {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          notifyListeners();
-        });
+        notifyListeners();
       }
       await updateUnreadCount();
       await syncIncomingMessageStatuses();
@@ -470,9 +490,7 @@ class ChatProvider with ChangeNotifier {
     if (activeRoomId == null) return;
     _activeRoomMessages = List<Map<String, dynamic>>.from(
         await _repository.getMessagesForRoomLocally(activeRoomId!));
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      notifyListeners();
-    });
+    notifyListeners();
   }
 
   Future<void> _markDeliveredMessagesAsRead(String roomId) async {
@@ -561,10 +579,7 @@ class ChatProvider with ChangeNotifier {
         final String? rId = connectionRooms[connId];
         if (rId != null && roomUnreadMap.containsKey(rId)) {
           final int count = roomUnreadMap[rId]!;
-          final sharedCard = (connection['my_shared_card'] ??
-                  connection['shared_card'] ??
-                  connection['sharedCard'] ??
-                  'both')
+          final sharedCard = (connection['my_shared_card'] ?? 'both')
               .toString()
               .toLowerCase();
 
@@ -632,10 +647,7 @@ class ChatProvider with ChangeNotifier {
         if (rId != null && roomUnreadMap.containsKey(rId)) {
           final int count = roomUnreadMap[rId]!;
 
-          final sharedCard = (connection['my_shared_card'] ??
-                  connection['shared_card'] ??
-                  connection['sharedCard'] ??
-                  'both')
+          final sharedCard = (connection['my_shared_card'] ?? 'both')
               .toString()
               .toLowerCase();
 
@@ -682,7 +694,7 @@ class ChatProvider with ChangeNotifier {
 
     final currentRooms = Map<int, String>.from(connectionRooms);
     currentRooms.remove(profileId);
-    _state = ChatRoomsLoaded(currentRooms);
+    _setRoomsLoadedState(currentRooms);
 
     if (activeRoomId == roomId) {
       activeRoomId = null;
@@ -691,5 +703,9 @@ class ChatProvider with ChangeNotifier {
 
     await updateUnreadCount();
     notifyListeners();
+  }
+
+  Future<Map<String, dynamic>?> getLastMessageForRoom(String roomId) {
+    return _repository.getLastMessageForRoom(roomId);
   }
 }

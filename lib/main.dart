@@ -209,7 +209,11 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
               "PushNotifications: Error saving message to database in background: $e");
         }
 
-        // 3. Acknowledge delivery to Supabase safely
+        // 3. Acknowledge delivery to Supabase safely.
+        // NOTE: This background handler runs in a separate background isolate. 
+        // The main application state and initialized Supabase singleton are not shared or accessible here.
+        // Therefore, we must instantiate a fresh, dedicated SupabaseClient using raw config keys 
+        // to perform database mutations within the background isolate context.
         try {
           final client = SupabaseClient(
             SupabaseConfig.url,
@@ -529,11 +533,9 @@ class _AppShellGateState extends State<AppShellGate> {
 
                 // 2. Acknowledge delivery
                 try {
-                  await Supabase.instance.client.from('messages').update({
-                    'status': isCurrentRoom ? 'read' : 'delivered'
-                  }).eq('id', messageId);
+                  await provider.acknowledgeDelivery(messageId, isActiveInChat: isCurrentRoom);
                   print(
-                      "PushNotifications: Foreground message delivery status updated in Supabase.");
+                      "PushNotifications: Foreground message delivery status updated in Supabase via provider.");
                 } catch (e) {
                   print(
                       "PushNotifications: Error acknowledging delivery in foreground: $e");
