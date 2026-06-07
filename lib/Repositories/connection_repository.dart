@@ -163,6 +163,7 @@ class SupabaseConnectionRepository implements ConnectionRepository {
           .eq('user_id', otherUserId)
           .eq('chat_rooms.type', 'direct')
           .filter('room_id', 'in', '(${roomIds.join(",")})')
+          .limit(1)
           .maybeSingle();
       if (common != null) {
         return common['room_id'] as String;

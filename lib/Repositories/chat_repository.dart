@@ -82,6 +82,7 @@ class SupabaseChatRepository implements ChatRepository {
         .eq('user_id', otherUserId)
         .eq('chat_rooms.type', 'direct')
         .filter('room_id', 'in', '(${myRoomIds.join(",")})')
+        .limit(1)
         .maybeSingle();
   }
 

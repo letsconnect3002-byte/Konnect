@@ -104,13 +104,16 @@ Future<void> handleLocalNotificationClickPayload(String payload) async {
         if (context != null) {
           final provider =
               Provider.of<ProfileProvider>(context, listen: false);
-          final profile = await provider.loadProfile(senderId);
-          navigatorKey.currentState?.push(
-            MaterialPageRoute(
-              builder: (routeContext) =>
-                  IndividualChatPage(connectionData: profile),
-            ),
-          );
+          // Use fetchProfileDataOnly to avoid mutating the logged-in user's profile state
+          final profile = await provider.fetchProfileDataOnly(senderId);
+          if (profile.isNotEmpty) {
+            navigatorKey.currentState?.push(
+              MaterialPageRoute(
+                builder: (routeContext) =>
+                    IndividualChatPage(connectionData: profile),
+              ),
+            );
+          }
         }
       }
     }
@@ -732,9 +735,9 @@ class _AppShellState extends State<_AppShell> with WidgetsBindingObserver {
       if (senderId != null) {
         final provider = Provider.of<ProfileProvider>(context, listen: false);
         try {
-          // Fetch the sender's profile details so we can construct connectionData
-          final profile = await provider.loadProfile(senderId);
-          if (mounted) {
+          // Use fetchProfileDataOnly to avoid mutating the logged-in user's profile state
+          final profile = await provider.fetchProfileDataOnly(senderId);
+          if (mounted && profile.isNotEmpty) {
             // Push IndividualChatPage with the fetched sender profile
             Navigator.push(
               context,
