@@ -1,0 +1,101 @@
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+abstract class NotificationRepository {
+  Future<List<Map<String, dynamic>>> getNotifications(int userId);
+  Future<void> insertNotification({
+    required int userId,
+    required int otherUserId,
+    required String type,
+  });
+  Future<void> markAsSeen(String notificationId);
+  Future<void> markAllAsSeen(int userId);
+  Future<void> deleteNotification(String notificationId);
+  RealtimeChannel subscribeToNotifications(
+      int userId, void Function(dynamic payload) callback);
+  void removeChannel(RealtimeChannel channel);
+}
+
+class SupabaseNotificationRepository implements NotificationRepository {
+  final SupabaseClient _client;
+
+  SupabaseNotificationRepository({SupabaseClient? client})
+      : _client = client ?? Supabase.instance.client;
+
+  @override
+  Future<List<Map<String, dynamic>>> getNotifications(int userId) async {
+    final response = await _client
+        .from('connection_notifications')
+        .select('*, other_user:profiles!other_user_id(*)')
+        .eq('user_id', userId)
+        .order('created_at', ascending: false);
+
+    final List<dynamic> rows = response as List;
+    return rows.map((row) => Map<String, dynamic>.from(row)).toList();
+  }
+
+  @override
+  Future<void> insertNotification({
+    required int userId,
+    required int otherUserId,
+    required String type,
+  }) async {
+    await _client.from('connection_notifications').insert({
+      'user_id': userId,
+      'other_user_id': otherUserId,
+      'type': type,
+      'is_seen': false,
+    });
+  }
+
+  @override
+  Future<void> markAsSeen(String notificationId) async {
+    await _client
+        .from('connection_notifications')
+        .update({'is_seen': true})
+        .eq('id', notificationId);
+  }
+
+  @override
+  Future<void> markAllAsSeen(int userId) async {
+    await _client
+        .from('connection_notifications')
+        .update({'is_seen': true})
+        .eq('user_id', userId)
+        .eq('is_seen', false);
+  }
+
+  @override
+  Future<void> deleteNotification(String notificationId) async {
+    await _client
+        .from('connection_notifications')
+        .delete()
+        .eq('id', notificationId);
+  }
+
+  @override
+  RealtimeChannel subscribeToNotifications(
+      int userId, void Function(dynamic payload) callback) {
+    final channel = _client
+        .channel('public:connection_notifications_user_$userId')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'connection_notifications',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'user_id',
+            value: userId.toString(),
+          ),
+          callback: callback,
+        );
+    channel.subscribe((status, [error]) {
+      print("Realtime notifications subscription status for user $userId: $status, error: $error");
+    });
+    return channel;
+  }
+
+  @override
+  void removeChannel(RealtimeChannel channel) {
+    _client.removeChannel(channel);
+  }
+}

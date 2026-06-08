@@ -26,7 +26,8 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
     _loadDeletedProfiles();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
-        connectionProvider = Provider.of<ConnectionProvider>(context, listen: false);
+        connectionProvider =
+            Provider.of<ConnectionProvider>(context, listen: false);
         setState(() {});
       }
     });
@@ -61,7 +62,8 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
                       height: 150,
                       child: Center(
                         child: CircularProgressIndicator(
-                          valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF00F2FE)),
+                          valueColor:
+                              AlwaysStoppedAnimation<Color>(Color(0xFF00F2FE)),
                         ),
                       ),
                     )
@@ -81,19 +83,23 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
                         TextField(
                           controller: controller,
                           textCapitalization: TextCapitalization.characters,
-                          style: const TextStyle(color: Colors.white, fontFamily: 'Inter'),
+                          style: const TextStyle(
+                              color: Colors.white, fontFamily: 'Inter'),
                           decoration: InputDecoration(
                             hintText: "MNDL-XXXXXX",
-                            hintStyle: const TextStyle(color: Colors.white24, fontFamily: 'Inter'),
+                            hintStyle: const TextStyle(
+                                color: Colors.white24, fontFamily: 'Inter'),
                             filled: true,
                             fillColor: const Color(0xFF0A0A0F),
                             enabledBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
-                              borderSide: const BorderSide(color: Color(0xFF26273C)),
+                              borderSide:
+                                  const BorderSide(color: Color(0xFF26273C)),
                             ),
                             focusedBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
-                              borderSide: const BorderSide(color: Color(0xFF00F2FE)),
+                              borderSide:
+                                  const BorderSide(color: Color(0xFF00F2FE)),
                             ),
                           ),
                         ),
@@ -123,7 +129,8 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
                                   alignment: Alignment.center,
                                   decoration: BoxDecoration(
                                     color: selectedType == 'casual'
-                                        ? const Color(0xFF8B5CF6).withOpacity(0.1)
+                                        ? const Color(0xFF8B5CF6)
+                                            .withOpacity(0.1)
                                         : const Color(0xFF0A0A0F),
                                     borderRadius: BorderRadius.circular(10),
                                     border: Border.all(
@@ -157,7 +164,8 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
                                   alignment: Alignment.center,
                                   decoration: BoxDecoration(
                                     color: selectedType == 'professional'
-                                        ? const Color(0xFF00F2FE).withOpacity(0.1)
+                                        ? const Color(0xFF00F2FE)
+                                            .withOpacity(0.1)
                                         : const Color(0xFF0A0A0F),
                                     borderRadius: BorderRadius.circular(10),
                                     border: Border.all(
@@ -189,7 +197,8 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
                         onPressed: () => Navigator.pop(context),
                         child: const Text(
                           "Cancel",
-                          style: TextStyle(color: Colors.white54, fontFamily: 'Inter'),
+                          style: TextStyle(
+                              color: Colors.white54, fontFamily: 'Inter'),
                         ),
                       ),
                       ElevatedButton(
@@ -197,31 +206,36 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
                           final codeStr = controller.text.trim();
                           if (codeStr.isEmpty) {
                             ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text("Please enter a VIP code")),
+                              const SnackBar(
+                                  content: Text("Please enter a VIP code")),
                             );
                             return;
                           }
-                          
+
                           setState(() {
                             isDialogLoading = true;
                           });
-                          
+
                           try {
-                            await provider.redeemInviteCode(codeStr, selectedType);
+                            await provider.redeemInviteCode(
+                                codeStr, selectedType);
                             // Refresh connection list
                             await provider.fetchConnections();
                             if (context.mounted) {
-                              await Provider.of<ChatProvider>(context, listen: false).updateUnreadCount();
+                              await Provider.of<ChatProvider>(context,
+                                      listen: false)
+                                  .updateUnreadCount();
                             }
-                            
+
                             if (context.mounted) {
                               Navigator.pop(context); // Dismiss dialog
-                              
+
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
                                   content: Row(
                                     children: [
-                                      const Icon(Icons.check_circle_rounded, color: Color(0xFF00F2FE)),
+                                      const Icon(Icons.check_circle_rounded,
+                                          color: Color(0xFF00F2FE)),
                                       const SizedBox(width: 10),
                                       const Expanded(
                                         child: Text(
@@ -239,7 +253,8 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
                                   behavior: SnackBarBehavior.floating,
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(14),
-                                    side: const BorderSide(color: Color(0xFF26273C), width: 1),
+                                    side: const BorderSide(
+                                        color: Color(0xFF26273C), width: 1),
                                   ),
                                 ),
                               );
@@ -250,7 +265,8 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
                             });
                             String errorMsg = e.toString();
                             if (errorMsg.contains("Exception:")) {
-                              errorMsg = errorMsg.replaceAll("Exception:", "").trim();
+                              errorMsg =
+                                  errorMsg.replaceAll("Exception:", "").trim();
                             }
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
@@ -269,7 +285,8 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
                         ),
                         child: const Text(
                           "Redeem",
-                          style: TextStyle(fontWeight: FontWeight.bold, fontFamily: 'Inter'),
+                          style: TextStyle(
+                              fontWeight: FontWeight.bold, fontFamily: 'Inter'),
                         ),
                       ),
                     ],
@@ -279,8 +296,6 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
       },
     );
   }
-
-
 
   Future<void> _loadDeletedProfiles() async {
     try {
@@ -297,8 +312,10 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
       String id, ConnectionProvider provider) async {
     try {
       final intId = int.tryParse(id) ?? 0;
-      await provider.deleteProfile(intId, onRoomCleanup: (profileId, roomId) async {
-        await Provider.of<ChatProvider>(context, listen: false).handleRoomCleanup(profileId, roomId);
+      await provider.deleteProfile(intId,
+          onRoomCleanup: (profileId, roomId) async {
+        await Provider.of<ChatProvider>(context, listen: false)
+            .handleRoomCleanup(profileId, roomId);
       });
     } catch (e) {
       print("Error deleting profile locally: $e");
@@ -374,8 +391,6 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
     return existingCompany ?? '';
   }
 
-
-
   List<String> _getCardTypesForProfile(Map<String, dynamic> profile) {
     if (profile.containsKey('cardTypes')) {
       return List<String>.from(profile['cardTypes']);
@@ -447,7 +462,6 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
       ],
     );
   }
-
 
   Widget _buildCircularActionButton({
     required IconData icon,
@@ -558,7 +572,9 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
       Map<String, dynamic> profileData, ConnectionProvider provider) {
     final name = profileData["name"] ?? "Unknown";
     final profession = profileData["profession"] ?? "";
-    final String sharedCard = (profileData['sharedCard'] ?? profileData['shared_card'] ?? 'both').toString();
+    final String sharedCard =
+        (profileData['sharedCard'] ?? profileData['shared_card'] ?? 'both')
+            .toString();
     final String email = ProfileFieldFilter.getVisibleValue(
       'email',
       profileData["email"] ?? '',
@@ -833,7 +849,9 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
       Map<String, dynamic> profileData, ConnectionProvider provider) {
     final name = profileData["name"] ?? "Unknown";
     final profession = profileData["profession"] ?? "";
-    final String sharedCard = (profileData['sharedCard'] ?? profileData['shared_card'] ?? 'both').toString();
+    final String sharedCard =
+        (profileData['sharedCard'] ?? profileData['shared_card'] ?? 'both')
+            .toString();
     final String company = ProfileFieldFilter.getVisibleValue(
       'company',
       _getCompany(name, profileData["company"]),
@@ -1062,6 +1080,7 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
                 duration: const Duration(milliseconds: 300),
                 child: allProfiles.isEmpty
                     ? const Center(
+                        key: ValueKey<String>('empty_state'),
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [

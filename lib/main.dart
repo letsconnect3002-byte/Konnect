@@ -17,6 +17,8 @@ import 'package:connect/Providers/chat_provider.dart';
 import 'package:connect/Repositories/profile_repository.dart';
 import 'package:connect/Repositories/connection_repository.dart';
 import 'package:connect/Repositories/chat_repository.dart';
+import 'package:connect/Providers/notification_provider.dart';
+import 'package:connect/Repositories/notification_repository.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
@@ -329,10 +331,20 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProxyProvider<ProfileProvider, ConnectionProvider>(
           create: (_) => ConnectionProvider(
             connectionRepository: SupabaseConnectionRepository(),
+            notificationRepository: SupabaseNotificationRepository(),
           ),
           update: (_, profileProvider, connectionProvider) {
             connectionProvider!.updateUserId(profileProvider.userId);
             return connectionProvider;
+          },
+        ),
+        ChangeNotifierProxyProvider<ProfileProvider, NotificationProvider>(
+          create: (_) => NotificationProvider(
+            notificationRepository: SupabaseNotificationRepository(),
+          ),
+          update: (_, profileProvider, notificationProvider) {
+            notificationProvider!.updateUserId(profileProvider.userId);
+            return notificationProvider;
           },
         ),
         ChangeNotifierProxyProvider2<ProfileProvider, ConnectionProvider, ChatProvider>(

@@ -43,7 +43,9 @@ class ChatProvider with ChangeNotifier {
 
   bool get isChatRoomsLoaded => _state is ChatRoomsLoaded;
   Map<int, String> get connectionRooms =>
-      _state is ChatRoomsLoaded ? (_state as ChatRoomsLoaded).connectionRooms : {};
+      _state is ChatRoomsLoaded
+          ? (_state as ChatRoomsLoaded).connectionRooms
+          : _lastKnownRooms;
   AppError? get lastError =>
       _state is ChatError ? (_state as ChatError).error : null;
 

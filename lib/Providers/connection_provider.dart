@@ -1,5 +1,6 @@
 import 'package:connect/Models/app_error.dart';
 import 'package:connect/Repositories/connection_repository.dart';
+import 'package:connect/Repositories/notification_repository.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -18,9 +19,13 @@ class UserConnectionError extends UserConnectionState {
 
 class ConnectionProvider with ChangeNotifier {
   final ConnectionRepository _repository;
+  final NotificationRepository _notificationRepository;
 
-  ConnectionProvider({ConnectionRepository? connectionRepository})
-      : _repository = connectionRepository ?? SupabaseConnectionRepository();
+  ConnectionProvider({
+    ConnectionRepository? connectionRepository,
+    NotificationRepository? notificationRepository,
+  })  : _repository = connectionRepository ?? SupabaseConnectionRepository(),
+        _notificationRepository = notificationRepository ?? SupabaseNotificationRepository();
 
   int? _userId;
   int? get userId => _userId;
@@ -33,7 +38,9 @@ class ConnectionProvider with ChangeNotifier {
   UserConnectionState get state => _state;
 
   List<Map<String, dynamic>> get connections =>
-      _state is UserConnectionLoaded ? (_state as UserConnectionLoaded).connections : [];
+      _state is UserConnectionLoaded
+          ? (_state as UserConnectionLoaded).connections
+          : _lastKnownConnections;
   AppError? get lastError =>
       _state is UserConnectionError ? (_state as UserConnectionError).error : null;
 
@@ -165,7 +172,7 @@ class ConnectionProvider with ChangeNotifier {
   }
 
   Future<void> connectUsers(int idA, int idB,
-      {String? sharedCardByPresenter, String? sharedCardByScanner}) async {
+      {String? sharedCardByPresenter, String? sharedCardByScanner, String connectionType = 'qr_code'}) async {
     if (idA == idB) {
       print("Cannot connect a user to themselves");
       return;
@@ -188,6 +195,24 @@ class ConnectionProvider with ChangeNotifier {
       await _repository.connectUsers(id1, id2, u1Share, u2Share);
       print(
           "Successfully connected user $id1 and user $id2 (shares: $u1Share, $u2Share)");
+      
+      // Insert notifications for both users
+      try {
+        await _notificationRepository.insertNotification(
+          userId: idA,
+          otherUserId: idB,
+          type: connectionType,
+        );
+        await _notificationRepository.insertNotification(
+          userId: idB,
+          otherUserId: idA,
+          type: connectionType,
+        );
+        print("Inserted connection notifications");
+      } catch (notifErr) {
+        print("Non-fatal error inserting notifications: $notifErr");
+      }
+
       notifyListeners();
     } catch (e) {
       _setError(e);
@@ -253,9 +278,10 @@ class ConnectionProvider with ChangeNotifier {
         senderId,
         sharedCardByPresenter: sharedCardType,
         sharedCardByScanner: mySharedCardType,
+        connectionType: 'vip_pass_key',
       );
 
-      await _repository.markInviteCodeAsUsed(response['id']);
+      await _repository.markInviteCodeAsUsed(response['id'] as String);
 
       print("Successfully redeemed invite code: $code");
       return senderId;

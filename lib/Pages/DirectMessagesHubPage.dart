@@ -3,6 +3,8 @@ import 'package:connect/Providers/profile_provider.dart';
 import 'package:connect/Providers/connection_provider.dart';
 import 'package:connect/Providers/chat_provider.dart';
 import 'package:connect/Models/app_error.dart';
+import 'package:connect/Providers/notification_provider.dart';
+import 'package:connect/Pages/NotificationPage.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -194,6 +196,71 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
             fontFamily: 'Inter',
           ),
         ),
+        actions: [
+          Consumer<NotificationProvider>(
+            builder: (context, notifProvider, child) {
+              final unread = notifProvider.unreadCount;
+              return Padding(
+                padding: const EdgeInsets.only(right: 16.0),
+                child: Center(
+                  child: GestureDetector(
+                    onTap: () {
+                      HapticFeedback.lightImpact();
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const NotificationPage(),
+                        ),
+                      );
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF13141F),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white.withValues(alpha: 0.04)),
+                      ),
+                      child: Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          const Icon(
+                            Icons.notifications_rounded,
+                            color: Colors.white70,
+                            size: 20,
+                          ),
+                          if (unread > 0)
+                            Positioned(
+                              right: -1,
+                              top: -1,
+                              child: Container(
+                                padding: const EdgeInsets.all(2),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFEF4444), // Vibrant Red
+                                  shape: BoxShape.circle,
+                                  border: Border.all(color: const Color(0xFF13141F), width: 1.5),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: const Color(0xFFEF4444).withValues(alpha: 0.4),
+                                      blurRadius: 4,
+                                      spreadRadius: 1,
+                                    ),
+                                  ],
+                                ),
+                                constraints: const BoxConstraints(
+                                  minWidth: 8,
+                                  minHeight: 8,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(60),
           child: Padding(

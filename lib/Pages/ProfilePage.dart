@@ -6,6 +6,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:pretty_qr_code/pretty_qr_code.dart';
+import 'package:connect/Providers/notification_provider.dart';
+import 'package:connect/Pages/NotificationPage.dart';
 
 class ProfilePage extends StatefulWidget {
   final VoidCallback? onSetUpProfile;
@@ -298,36 +300,28 @@ class _ProfilePageState extends State<ProfilePage> {
         border: Border.all(color: Colors.white.withValues(alpha: 0.04)),
       ),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           // Infinity link logo inside circle
-          SizedBox(
-            // width: 70,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.start,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF1B1C2A),
-                    shape: BoxShape.circle,
-                    border:
-                        Border.all(color: Colors.white.withValues(alpha: 0.06)),
-                  ),
-                  child: Image.asset(
-                    'assets/icons/Mandala Icon 1.png',
-                    width: 22,
-                    height: 22,
-                    color: const Color(0xFF00F2FE), // Teal color link logo
-                  ),
-                ),
-              ],
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: const Color(0xFF1B1C2A),
+              shape: BoxShape.circle,
+              border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+            ),
+            child: Image.asset(
+              'assets/icons/Mandala Icon 1.png',
+              width: 22,
+              height: 22,
+              color: const Color(0xFF00F2FE), // Teal color link logo
             ),
           ),
-          const SizedBox(width: 12),
+          // const SizedBox(width: 12),
           // Brand Title and Subtitle
           const Column(
             crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
             children: [
               Text(
                 "Mandala",
@@ -349,7 +343,69 @@ class _ProfilePageState extends State<ProfilePage> {
             ],
           ),
           // const Spacer(),
-          Container(width: 80, height: 20)
+          // Notifications Bell button
+          Consumer<NotificationProvider>(
+            builder: (context, notifProvider, child) {
+              final unread = notifProvider.unreadCount;
+              return GestureDetector(
+                onTap: () {
+                  HapticFeedback.lightImpact();
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const NotificationPage(),
+                    ),
+                  );
+                },
+                child: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1B1C2A),
+                    shape: BoxShape.circle,
+                    border:
+                        Border.all(color: Colors.white.withValues(alpha: 0.06)),
+                  ),
+                  child: Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      const Icon(
+                        Icons.notifications_rounded,
+                        color: Colors.white70,
+                        size: 20,
+                      ),
+                      if (unread > 0)
+                        Positioned(
+                          right: -2,
+                          top: -2,
+                          child: Container(
+                            padding: const EdgeInsets.all(2),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFEF4444), // Vibrant Red
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                  color: const Color(0xFF1B1C2A), width: 1.5),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: const Color(0xFFEF4444)
+                                      .withValues(alpha: 0.4),
+                                  blurRadius: 4,
+                                  spreadRadius: 1,
+                                ),
+                              ],
+                            ),
+                            constraints: const BoxConstraints(
+                              minWidth: 8,
+                              minHeight: 8,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+          // const SizedBox(width: 8),
           // Settings button
           // GestureDetector(
           //   onTap: () {
@@ -363,7 +419,7 @@ class _ProfilePageState extends State<ProfilePage> {
           //       border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
           //     ),
           //     child: const Icon(
-          //       Icons.settings,
+          //       Icons.settings_rounded,
           //       color: Colors.white60,
           //       size: 20,
           //     ),
