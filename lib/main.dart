@@ -325,7 +325,7 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider<ProfileProvider>(
           create: (_) => ProfileProvider(
             profileRepository: SupabaseProfileRepository(),
-          ),
+          )..loadBackgroundBlurPref(),
         ),
         ChangeNotifierProxyProvider<ProfileProvider, ConnectionProvider>(
           create: (_) => ConnectionProvider(
@@ -366,6 +366,34 @@ class MyApp extends StatelessWidget {
         navigatorKey: navigatorKey,
         debugShowCheckedModeBanner: false,
         theme: AppTheme.darkTheme,
+        builder: (context, child) {
+          final profileProvider = Provider.of<ProfileProvider>(context);
+          final blurEnabled = profileProvider.blurBackground;
+
+          Widget backgroundGradient = Container(
+            decoration: BoxDecoration(
+              gradient: context.felineBackgroundGradient,
+            ),
+          );
+
+          if (blurEnabled) {
+            backgroundGradient = ImageFiltered(
+              imageFilter: ImageFilter.blur(sigmaX: 50.0, sigmaY: 50.0),
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: context.felineBackgroundGradient,
+                ),
+              ),
+            );
+          }
+
+          return Stack(
+            children: [
+              Positioned.fill(child: backgroundGradient),
+              if (child != null) Positioned.fill(child: child),
+            ],
+          );
+        },
         home: const AuthGate(),
       ),
     );
@@ -798,7 +826,7 @@ class _AppShellState extends State<_AppShell> with WidgetsBindingObserver {
     return SafeArea(
       top: false,
       child: Padding(
-        padding: const EdgeInsets.only(left: 24.0, right: 24.0, bottom: 16.0),
+        padding: const EdgeInsets.only(left: 24.0, right: 24.0, bottom: 10.0),
         child: Container(
           // Parent container holds the shadow so that ClipRRect does not clip it
           decoration: BoxDecoration(

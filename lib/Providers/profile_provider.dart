@@ -24,9 +24,24 @@ class ProfileError extends ProfileState {
 
 class ProfileProvider with ChangeNotifier {
   final ProfileRepository _repository;
+  bool _blurBackground = true;
+  bool get blurBackground => _blurBackground;
 
   ProfileProvider({ProfileRepository? profileRepository})
       : _repository = profileRepository ?? SupabaseProfileRepository();
+
+  Future<void> setBlurBackground(bool val) async {
+    _blurBackground = val;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('blur_background', val);
+  }
+
+  Future<void> loadBackgroundBlurPref() async {
+    final prefs = await SharedPreferences.getInstance();
+    _blurBackground = prefs.getBool('blur_background') ?? true;
+    notifyListeners();
+  }
 
   // Profile fields
   String name = '';

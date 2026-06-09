@@ -26,11 +26,35 @@ class AppColors {
       255, 30, 215, 96); // Neon Volt Green (Volt scan neon fill start color)
   static const Color accentSecondary =
       Color.fromARGB(255, 30, 215, 96); // Neon Electric Violet
+
+  static const Color felineColor10 = Color(0xFF000000);
+  static const Color felineColor20 = Color(0xFF0A0A0C);
+  static const Color felineColor30 = Color.fromARGB(255, 32, 32, 32);
 }
 
 /// AppGradients contains high-fidelity accent gradients instead of flat primary colors.
 class AppGradients {
   AppGradients._();
+
+  // static const LinearGradient felineBackgroundGradient = LinearGradient(
+  //   colors: [
+  //     AppColors.felineColor10,
+  //     AppColors.felineColor20,
+  //     AppColors.felineColor30,
+  //   ],
+  //   begin: Alignment.bottomLeft,
+  //   end: Alignment.topRight,
+  // );
+
+  static const LinearGradient felineBackgroundGradient = LinearGradient(
+    colors: [
+      AppColors.felineColor10,
+      AppColors.felineColor20,
+      AppColors.felineColor30,
+    ],
+    begin: Alignment.bottomLeft,
+    end: Alignment.topRight,
+  );
 
   static const LinearGradient voltScanGradient = LinearGradient(
     colors: [Color(0xFFCEF143), Color(0xFF76EC68)],
@@ -104,7 +128,7 @@ class AppTheme {
   static ThemeData get darkTheme {
     return ThemeData(
       brightness: Brightness.dark,
-      scaffoldBackgroundColor: AppColors.canvasBackground,
+      scaffoldBackgroundColor: Colors.transparent,
       canvasColor: AppColors.canvasBackground,
       cardColor: AppColors.surfacePrimary,
       primaryColor: AppColors.textPrimary,
@@ -138,7 +162,7 @@ class AppTheme {
 /// AppThemeExtension on ThemeData allows querying custom colors/typography
 /// directly using ThemeData.
 extension AppThemeExtension on ThemeData {
-  Color get canvasBackground => AppColors.canvasBackground;
+  Color get canvasBackground => Colors.transparent;
   Color get surfacePrimary => AppColors.surfacePrimary;
   Color get surfaceSecondary => AppColors.surfaceSecondary;
   Color get borderMuted => AppColors.borderMuted;
@@ -148,6 +172,8 @@ extension AppThemeExtension on ThemeData {
   Color get textSecondary => AppColors.textSecondary;
   Color get textMuted => AppColors.textMuted;
 
+  LinearGradient get felineBackgroundGradient =>
+      AppGradients.felineBackgroundGradient;
   LinearGradient get voltScanGradient => AppGradients.voltScanGradient;
   LinearGradient get ticketGradient => AppGradients.ticketGradient;
 
@@ -163,7 +189,7 @@ extension AppThemeExtension on ThemeData {
 extension AppBuildContextExtension on BuildContext {
   ThemeData get theme => Theme.of(this);
 
-  Color get canvasBackground => theme.canvasBackground;
+  Color get canvasBackground => Colors.transparent;
   Color get surfacePrimary => theme.surfacePrimary;
   Color get surfaceSecondary => theme.surfaceSecondary;
   Color get borderMuted => theme.borderMuted;
@@ -173,6 +199,7 @@ extension AppBuildContextExtension on BuildContext {
   Color get textSecondary => theme.textSecondary;
   Color get textMuted => theme.textMuted;
 
+  LinearGradient get felineBackgroundGradient => theme.felineBackgroundGradient;
   LinearGradient get voltScanGradient => theme.voltScanGradient;
   LinearGradient get ticketGradient => theme.ticketGradient;
 

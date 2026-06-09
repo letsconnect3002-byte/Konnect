@@ -377,7 +377,7 @@ class _AuthScreenState extends State<AuthScreen> {
     final size = MediaQuery.of(context).size;
 
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: Colors.transparent,
       body: Stack(
         children: [
           // Background decorative gradient circles

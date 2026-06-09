@@ -1632,31 +1632,31 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                     ),
                   ),
                 ),
-              if (_fieldVisible('profession')) ...[
-                const SizedBox(height: 4),
-                AnimatedAlign(
+              const SizedBox(height: 4),
+              AnimatedAlign(
+                duration: _cardAnimDuration,
+                curve: _cardAnimCurve,
+                alignment: Alignment.centerLeft,
+                child: AnimatedDefaultTextStyle(
                   duration: _cardAnimDuration,
                   curve: _cardAnimCurve,
-                  alignment: Alignment.centerLeft,
-                  child: AnimatedDefaultTextStyle(
-                    duration: _cardAnimDuration,
-                    curve: _cardAnimCurve,
-                    style: TextStyle(
-                      color: context.accentSecondary,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      fontFamily: 'Inter',
-                    ),
-                    child: Text(
-                      _professionController.text.trim().isEmpty
-                          ? 'Product Designer'
-                          : _professionController.text.trim(),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
+                  style: TextStyle(
+                    color: _previewCard == ProfileCardType.casual
+                        ? context.accentPrimary
+                        : context.accentSecondary,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    fontFamily: 'Inter',
+                  ),
+                  child: Text(
+                    _previewCard == ProfileCardType.casual
+                        ? 'Casual Card'
+                        : 'Professional Card',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
-              ],
+              ),
             ],
           ),
         ),
