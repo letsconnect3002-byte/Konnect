@@ -5,12 +5,16 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 
 sealed class ChatState {}
+
 class ChatInitial extends ChatState {}
+
 class ChatLoading extends ChatState {}
+
 class ChatRoomsLoaded extends ChatState {
   final Map<int, String> connectionRooms;
   ChatRoomsLoaded(this.connectionRooms);
 }
+
 class ChatError extends ChatState {
   final AppError error;
   ChatError(this.error);
@@ -42,10 +46,9 @@ class ChatProvider with ChangeNotifier {
   ChatState get state => _state;
 
   bool get isChatRoomsLoaded => _state is ChatRoomsLoaded;
-  Map<int, String> get connectionRooms =>
-      _state is ChatRoomsLoaded
-          ? (_state as ChatRoomsLoaded).connectionRooms
-          : _lastKnownRooms;
+  Map<int, String> get connectionRooms => _state is ChatRoomsLoaded
+      ? (_state as ChatRoomsLoaded).connectionRooms
+      : _lastKnownRooms;
   AppError? get lastError =>
       _state is ChatError ? (_state as ChatError).error : null;
 
@@ -64,13 +67,14 @@ class ChatProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  void updateFromProviders(int? userId, List<Map<String, dynamic>> connections) {
+  void updateFromProviders(
+      int? userId, List<Map<String, dynamic>> connections) {
     final bool userIdChanged = _userId != userId;
-    
+
     // Only update connections reference if the list content changed
     // Use a simple length + first-id check as a cheap guard
     final bool connectionsChanged = _connectionsChanged(connections);
-    
+
     _userId = userId;
     if (connectionsChanged) {
       _externalConnections = List.from(connections);
@@ -105,7 +109,8 @@ class ChatProvider with ChangeNotifier {
       final Map<int, String> newRooms = {};
 
       if (myRoomIds.isNotEmpty) {
-        final participants = await _repository.fetchDirectParticipants(myRoomIds, myUserId);
+        final participants =
+            await _repository.fetchDirectParticipants(myRoomIds, myUserId);
 
         for (final row in participants) {
           final int uId = row['user_id'] as int;
@@ -145,7 +150,8 @@ class ChatProvider with ChangeNotifier {
       final myRoomIds = await _repository.fetchUserRoomIds(myUserId);
 
       if (myRoomIds.isNotEmpty) {
-        final common = await _repository.getCommonDirectRoom(myUserId, otherUserId, myRoomIds);
+        final common = await _repository.getCommonDirectRoom(
+            myUserId, otherUserId, myRoomIds);
 
         if (common != null) {
           final roomId = common['room_id'] as String;
@@ -354,7 +360,8 @@ class ChatProvider with ChangeNotifier {
     if (myUserId == null) return;
 
     try {
-      final unreadSent = await _repository.getUnreadSentMessagesLocally(myUserId);
+      final unreadSent =
+          await _repository.getUnreadSentMessagesLocally(myUserId);
       if (unreadSent.isEmpty) return;
 
       final pendingMsgs =
@@ -390,7 +397,8 @@ class ChatProvider with ChangeNotifier {
 
       if (serverMsgs.isNotEmpty) {
         final messageIds = serverMsgs.map((m) => m['id'] as String).toList();
-        final existing = await _repository.fetchSupabaseMessageStatuses(messageIds);
+        final existing =
+            await _repository.fetchSupabaseMessageStatuses(messageIds);
 
         final Map<String, String> supabaseStatuses = {
           for (final row in existing)
@@ -450,7 +458,8 @@ class ChatProvider with ChangeNotifier {
       final roomIds = await _repository.fetchUserRoomIds(myUserId);
       if (roomIds.isEmpty) return;
 
-      final pendingResponse = await _repository.fetchPendingMessagesFromSupabase(roomIds, myUserId);
+      final pendingResponse =
+          await _repository.fetchPendingMessagesFromSupabase(roomIds, myUserId);
 
       for (final msg in pendingResponse) {
         final msgId = msg['id'] as String;
@@ -500,7 +509,8 @@ class ChatProvider with ChangeNotifier {
     if (myUserId == null) return;
 
     try {
-      final deliveredMsgs = await _repository.fetchDeliveredMessagesFromSupabase(roomId, myUserId);
+      final deliveredMsgs = await _repository
+          .fetchDeliveredMessagesFromSupabase(roomId, myUserId);
 
       if (deliveredMsgs.isEmpty) return;
 
@@ -547,11 +557,14 @@ class ChatProvider with ChangeNotifier {
     if (myUserId == null) return;
 
     try {
-      final unreadIncoming = await _repository.getUnreadIncomingMessagesLocally(myUserId);
+      final unreadIncoming =
+          await _repository.getUnreadIncomingMessagesLocally(myUserId);
 
       if (unreadIncoming.isNotEmpty) {
-        final messageIds = unreadIncoming.map((m) => m['id'] as String).toList();
-        final existing = await _repository.fetchSupabaseMessageStatuses(messageIds);
+        final messageIds =
+            unreadIncoming.map((m) => m['id'] as String).toList();
+        final existing =
+            await _repository.fetchSupabaseMessageStatuses(messageIds);
 
         final Set<String> existingIds = {
           for (final row in existing) row['id'] as String
@@ -566,7 +579,8 @@ class ChatProvider with ChangeNotifier {
 
       totalUnreadCount = await _repository.getTotalUnreadCountLocally(myUserId);
 
-      final roomResults = await _repository.getRoomUnreadCountsLocally(myUserId);
+      final roomResults =
+          await _repository.getRoomUnreadCountsLocally(myUserId);
 
       final Map<String, int> roomUnreadMap = {
         for (final row in roomResults)
@@ -581,9 +595,8 @@ class ChatProvider with ChangeNotifier {
         final String? rId = connectionRooms[connId];
         if (rId != null && roomUnreadMap.containsKey(rId)) {
           final int count = roomUnreadMap[rId]!;
-          final sharedCard = (connection['my_shared_card'] ?? 'both')
-              .toString()
-              .toLowerCase();
+          final sharedCard =
+              (connection['my_shared_card'] ?? 'both').toString().toLowerCase();
 
           if (sharedCard == 'casual') {
             casualCount += count;
@@ -633,7 +646,8 @@ class ChatProvider with ChangeNotifier {
     try {
       totalUnreadCount = await _repository.getTotalUnreadCountLocally(myUserId);
 
-      final roomResults = await _repository.getRoomUnreadCountsLocally(myUserId);
+      final roomResults =
+          await _repository.getRoomUnreadCountsLocally(myUserId);
 
       final Map<String, int> roomUnreadMap = {
         for (final row in roomResults)
@@ -649,9 +663,8 @@ class ChatProvider with ChangeNotifier {
         if (rId != null && roomUnreadMap.containsKey(rId)) {
           final int count = roomUnreadMap[rId]!;
 
-          final sharedCard = (connection['my_shared_card'] ?? 'both')
-              .toString()
-              .toLowerCase();
+          final sharedCard =
+              (connection['my_shared_card'] ?? 'both').toString().toLowerCase();
 
           if (sharedCard == 'casual') {
             casualCount += count;
@@ -680,14 +693,16 @@ class ChatProvider with ChangeNotifier {
 
     if (roomId != null) {
       try {
-        await _repository.deleteDirectRoomParticipantsLocallyAndRemotely(profileId, roomId, myUserId);
+        await _repository.deleteDirectRoomParticipantsLocallyAndRemotely(
+            profileId, roomId, myUserId);
 
         final channel = _roomSubscriptions.remove(roomId);
         if (channel != null) {
           _repository.removeChannel(channel);
         }
 
-        print("Chat rooms state and subscriptions updated for deleted profile: $profileId");
+        print(
+            "Chat rooms state and subscriptions updated for deleted profile: $profileId");
       } catch (e) {
         print("Error in handleRoomCleanup during profile deletion: $e");
         _setError(e);

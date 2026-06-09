@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:skeletonizer/skeletonizer.dart';
+import 'package:connect/Config/app_theme.dart';
 
 class DirectMessagesHubPage extends StatefulWidget {
   const DirectMessagesHubPage({super.key});
@@ -84,43 +85,46 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
 
   Future<void> _showDeleteConfirmation(BuildContext context,
       Map<String, dynamic> connection, ConnectionProvider provider) async {
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+    final chatProvider = Provider.of<ChatProvider>(context, listen: false);
+
     return showDialog(
       context: context,
-      builder: (BuildContext context) {
+      builder: (BuildContext dialogContext) {
         return AlertDialog(
-          backgroundColor: const Color(0xFF13141F),
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: const Text(
+          backgroundColor: context.surfacePrimary,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppDimensions.radiusPremiumCard),
+            side: BorderSide(color: context.surfaceSecondary, width: 1.5),
+          ),
+          title: Text(
             "Delete Connection",
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+            style: context.screenHeading.copyWith(fontWeight: FontWeight.bold),
           ),
           content: Text(
             "Are you sure you want to remove ${connection['name'] ?? 'this contact'} from your connections?",
-            style: const TextStyle(color: Colors.white70),
+            style: context.bodyText.copyWith(color: context.textSecondary),
           ),
           actions: [
             TextButton(
-              child: const Text("Cancel", style: TextStyle(color: Colors.grey)),
-              onPressed: () => Navigator.pop(context),
+              child: Text("Cancel", style: TextStyle(color: context.textSecondary)),
+              onPressed: () => Navigator.pop(dialogContext),
             ),
             TextButton(
               child: const Text("Delete",
-                  style: TextStyle(color: Colors.redAccent)),
+                  style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
               onPressed: () async {
-                Navigator.pop(context);
+                Navigator.pop(dialogContext);
                 try {
                   await provider.deleteProfile(connection['id'], onRoomCleanup: (profileId, roomId) async {
-                    await Provider.of<ChatProvider>(context, listen: false).handleRoomCleanup(profileId, roomId);
+                    await chatProvider.handleRoomCleanup(profileId, roomId);
                   });
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text("Connection removed"),
-                        backgroundColor: Colors.redAccent,
-                      ),
-                    );
-                  }
+                  scaffoldMessenger.showSnackBar(
+                    const SnackBar(
+                      content: Text("Connection removed"),
+                      backgroundColor: Colors.redAccent,
+                    ),
+                  );
                 } catch (e) {
                   print("Error deleting connection: $e");
                 }
@@ -180,7 +184,7 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
     }).toList();
 
     return Scaffold(
-      backgroundColor: const Color(0xFF090A0F),
+      backgroundColor: context.canvasBackground,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -190,14 +194,9 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
                 onPressed: () => Navigator.pop(context),
               )
             : null,
-        title: const Text(
+        title: Text(
           'Direct Messages',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-            fontFamily: 'Inter',
-          ),
+          style: context.screenHeading,
         ),
         actions: [
           Consumer<NotificationProvider>(
@@ -219,7 +218,7 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
                     child: Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF13141F),
+                        color: context.surfacePrimary,
                         shape: BoxShape.circle,
                         border: Border.all(color: Colors.white.withValues(alpha: 0.04)),
                       ),
@@ -240,7 +239,7 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
                                 decoration: BoxDecoration(
                                   color: const Color(0xFFEF4444), // Vibrant Red
                                   shape: BoxShape.circle,
-                                  border: Border.all(color: const Color(0xFF13141F), width: 1.5),
+                                  border: Border.all(color: context.surfacePrimary, width: 1.5),
                                   boxShadow: [
                                     BoxShadow(
                                       color: const Color(0xFFEF4444).withValues(alpha: 0.4),
@@ -267,13 +266,17 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(60),
           child: Padding(
-            padding: const EdgeInsets.only(left: 20, right: 20, bottom: 10),
+            padding: const EdgeInsets.only(
+              left: AppDimensions.marginStandard,
+              right: AppDimensions.marginStandard,
+              bottom: 10,
+            ),
             child: Container(
               height: 46,
               decoration: BoxDecoration(
-                color: const Color(0xFF13141F),
+                color: context.surfacePrimary,
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: const Color(0xFF1F2030)),
+                border: Border.all(color: context.surfaceSecondary),
               ),
               padding: const EdgeInsets.all(4),
               child: Row(
@@ -291,17 +294,13 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
                         curve: Curves.easeOutCubic,
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(12),
-                          gradient: _selectedTab == 'casual'
-                              ? const LinearGradient(
-                                  colors: [Color(0xFF8B5CF6), Color(0xFF6D28D9)],
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
-                                )
-                              : null,
+                          color: _selectedTab == 'casual'
+                              ? context.accentSecondary
+                              : Colors.transparent,
                           boxShadow: _selectedTab == 'casual'
                               ? [
                                   BoxShadow(
-                                    color: const Color(0xFF8B5CF6).withValues(alpha: 0.3),
+                                    color: context.accentSecondary.withValues(alpha: 0.3),
                                     blurRadius: 8,
                                     offset: const Offset(0, 2),
                                   ),
@@ -316,7 +315,7 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
                             Text(
                               "Casual",
                               style: TextStyle(
-                                color: _selectedTab == 'casual' ? Colors.white : const Color(0xFF8B8C9E),
+                                color: _selectedTab == 'casual' ? Colors.white : context.textSecondary,
                                 fontWeight: FontWeight.bold,
                                 fontSize: 14,
                                 fontFamily: 'Inter',
@@ -351,17 +350,13 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
                         curve: Curves.easeOutCubic,
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(12),
-                          gradient: _selectedTab == 'professional'
-                              ? const LinearGradient(
-                                  colors: [Color(0xFF00F2FE), Color(0xFF00B5FE)],
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
-                                )
-                              : null,
+                          color: _selectedTab == 'professional'
+                              ? context.accentPrimary
+                              : Colors.transparent,
                           boxShadow: _selectedTab == 'professional'
                               ? [
                                   BoxShadow(
-                                    color: const Color(0xFF00F2FE).withValues(alpha: 0.3),
+                                    color: context.accentPrimary.withValues(alpha: 0.3),
                                     blurRadius: 8,
                                     offset: const Offset(0, 2),
                                   ),
@@ -376,7 +371,7 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
                             Text(
                               "Professional",
                               style: TextStyle(
-                                color: _selectedTab == 'professional' ? Colors.white : const Color(0xFF8B8C9E),
+                                color: _selectedTab == 'professional' ? Colors.black : context.textSecondary,
                                 fontWeight: FontWeight.bold,
                                 fontSize: 14,
                                 fontFamily: 'Inter',
@@ -409,29 +404,28 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
         children: [
           // 1. Search Box
           Padding(
-            padding: const EdgeInsets.only(left: 20, right: 20, top: 12, bottom: 8),
+            padding: const EdgeInsets.only(left: AppDimensions.marginStandard, right: AppDimensions.marginStandard, top: 12, bottom: 8),
             child: Container(
               height: 44,
               decoration: BoxDecoration(
-                color: const Color(0xFF13141F),
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: const Color(0xFF1F2030)),
+                color: context.surfaceSecondary,
+                borderRadius: BorderRadius.circular(AppDimensions.radiusComponent),
+                border: Border.all(color: context.surfaceSecondary),
               ),
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Row(
                 children: [
-                  const Icon(Icons.search_rounded, color: Color(0xFF5C5E78), size: 18),
+                  Icon(Icons.search_rounded, color: context.textMuted, size: 18),
                   const SizedBox(width: 10),
                   Expanded(
                     child: TextField(
                       controller: _searchController,
-                      style: const TextStyle(color: Colors.white, fontSize: 14),
-                      cursorColor: const Color(0xFF8B5CF6),
+                      style: context.bodyText.copyWith(color: context.textPrimary),
+                      cursorColor: context.accentSecondary,
                       decoration: InputDecoration(
                         hintText: 'Search connections...',
-                        hintStyle: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.25),
-                          fontSize: 14,
+                        hintStyle: context.bodyText.copyWith(
+                          color: context.textMuted,
                         ),
                         border: InputBorder.none,
                       ),
@@ -459,26 +453,29 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            const Icon(
+                            Icon(
                               Icons.chat_bubble_outline_rounded,
-                              color: Color(0xFF5C5E78),
+                              color: context.textMuted,
                               size: 40,
                             ),
                             const SizedBox(height: 16),
                             Text(
                               _searchQuery.isEmpty ? "No active conversations yet" : "No results match your search",
-                              style: const TextStyle(
-                                color: Color(0xFF8B8C9E),
-                                fontSize: 14,
-                                fontFamily: 'Inter',
+                              style: context.bodyText.copyWith(
+                                color: context.textSecondary,
                               ),
                             ),
                           ],
                         ),
                       )
-                    : ListView.builder(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    : ListView.separated(
+                    padding: const EdgeInsets.only(
+                        left: AppDimensions.marginStandard,
+                        right: AppDimensions.marginStandard,
+                        top: 8,
+                        bottom: 100),
                     itemCount: filteredConnections.length,
+                    separatorBuilder: (context, index) => const SizedBox(height: 12.0),
                     itemBuilder: (context, index) {
                       final connection = filteredConnections[index];
                       final name = connection['name'] ?? 'Unknown';
@@ -487,16 +484,18 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
                       final roomId = chatProvider.connectionRooms[connection['id']];
 
                       return Container(
-                        margin: const EdgeInsets.only(bottom: 8),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF13141F).withValues(alpha: 0.4),
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: Colors.white.withValues(alpha: 0.02)),
+                          color: context.surfacePrimary,
+                          borderRadius: BorderRadius.circular(AppDimensions.radiusPremiumCard),
+                          border: Border.all(
+                            color: context.surfaceSecondary.withValues(alpha: 0.5),
+                            width: 1.0,
+                          ),
                         ),
                         child: Material(
                           color: Colors.transparent,
                           clipBehavior: Clip.antiAlias,
-                          borderRadius: BorderRadius.circular(16),
+                          borderRadius: BorderRadius.circular(AppDimensions.radiusPremiumCard),
                           child: FutureBuilder<Map<String, dynamic>?>(
                             future: _getLastMessage(roomId, chatProvider),
                             builder: (context, snapshot) {
@@ -539,11 +538,11 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
                                     child: avatar.isNotEmpty
                                         ? Image.network(avatar, fit: BoxFit.cover)
                                         : Container(
-                                            color: const Color(0xFF1B1C2A),
+                                            color: context.surfaceSecondary,
                                             alignment: Alignment.center,
                                             child: Text(
                                               name.isNotEmpty ? name.substring(0, 1).toUpperCase() : "?",
-                                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15),
+                                              style: TextStyle(color: context.textPrimary, fontWeight: FontWeight.bold, fontSize: 15),
                                             ),
                                           ),
                                   ),
@@ -553,21 +552,17 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
                                   children: [
                                     Text(
                                       name,
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 14.5,
+                                      style: context.cardTitle.copyWith(
                                         fontWeight: FontWeight.bold,
-                                        fontFamily: 'Inter',
+                                        color: context.textPrimary,
                                       ),
                                     ),
                                     if (msgTime.isNotEmpty)
                                       Text(
                                         msgTime,
-                                        style: TextStyle(
-                                          color: isUnread ? const Color(0xFF8B5CF6) : Colors.white.withValues(alpha: 0.2),
-                                          fontSize: 11,
+                                        style: context.captionText.copyWith(
+                                          color: isUnread ? context.accentSecondary : context.textMuted,
                                           fontWeight: isUnread ? FontWeight.bold : FontWeight.normal,
-                                          fontFamily: 'Inter',
                                         ),
                                       ),
                                   ],
@@ -583,11 +578,10 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
                                                 lastMessageText,
                                                 maxLines: 1,
                                                 overflow: TextOverflow.ellipsis,
-                                                style: TextStyle(
-                                                  color: isUnread ? Colors.white70 : Colors.white.withValues(alpha: 0.35),
+                                                style: context.bodyText.copyWith(
+                                                  color: isUnread ? context.textPrimary : context.textSecondary,
                                                   fontSize: 12.5,
                                                   fontWeight: isUnread ? FontWeight.w600 : FontWeight.normal,
-                                                  fontFamily: 'Inter',
                                                 ),
                                               ),
                                             ),
@@ -596,8 +590,8 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
                                                 margin: const EdgeInsets.only(left: 8),
                                                 width: 8,
                                                 height: 8,
-                                                decoration: const BoxDecoration(
-                                                  color: Color(0xFF8B5CF6),
+                                                decoration: BoxDecoration(
+                                                  color: context.accentSecondary,
                                                   shape: BoxShape.circle,
                                                 ),
                                               ),
@@ -618,17 +612,17 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
   }
 
   Widget _buildSkeletonChatRooms() {
-    return ListView.builder(
+    return ListView.separated(
       physics: const NeverScrollableScrollPhysics(),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: AppDimensions.marginStandard, vertical: 8),
       itemCount: 5,
+      separatorBuilder: (context, index) => const SizedBox(height: 12.0),
       itemBuilder: (context, index) {
         return Container(
-          margin: const EdgeInsets.only(bottom: 8),
           decoration: BoxDecoration(
-            color: const Color(0xFF13141F).withValues(alpha: 0.4),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.02)),
+            color: context.surfacePrimary,
+            borderRadius: BorderRadius.circular(AppDimensions.radiusPremiumCard),
+            border: Border.all(color: context.surfaceSecondary.withValues(alpha: 0.5)),
           ),
           child: ListTile(
             contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),

@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:connect/Providers/profile_provider.dart';
 import 'package:connect/Providers/chat_provider.dart';
 import 'package:provider/provider.dart';
+import 'package:connect/Config/app_theme.dart';
 
 class IndividualChatPage extends StatefulWidget {
   final Map<String, dynamic> connectionData;
@@ -22,7 +23,7 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
 
-  bool _isTyping = false;
+  final bool _isTyping = false; // Keep final since it is not set dynamically yet
   late String _name;
   late String _avatarUrl;
   late String _profession;
@@ -225,17 +226,15 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
         margin: const EdgeInsets.symmetric(vertical: 16),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
         decoration: BoxDecoration(
-          color: const Color(0xFF13141F),
+          color: context.surfaceSecondary,
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: const Color(0xFF1F2030), width: 0.5),
+          border: Border.all(color: context.surfaceSecondary, width: 0.5),
         ),
         child: Text(
           dateText,
-          style: TextStyle(
-            color: Colors.white.withValues(alpha: 0.4),
-            fontSize: 11,
+          style: context.captionText.copyWith(
+            color: context.textSecondary,
             fontWeight: FontWeight.w600,
-            fontFamily: 'Inter',
           ),
         ),
       ),
@@ -266,9 +265,9 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
     _previousMessageCount = messages.length;
 
     return Scaffold(
-      backgroundColor: const Color(0xFF090A0F),
+      backgroundColor: context.canvasBackground,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF0F101A),
+        backgroundColor: context.canvasBackground,
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded,
@@ -294,31 +293,32 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
               Container(
                 width: 38,
                 height: 38,
-                decoration: const BoxDecoration(
+                decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  gradient: LinearGradient(
-                    colors: [Color(0xFF00F2FE), Color(0xFF8B5CF6)],
+                  border: Border.all(
+                    color: context.accentPrimary,
+                    width: 2.0,
                   ),
                 ),
                 padding: const EdgeInsets.all(1.5),
                 child: Container(
-                  decoration: const BoxDecoration(
+                  decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: Color(0xFF090A0F),
+                    color: context.surfaceSecondary,
                   ),
                   padding: const EdgeInsets.all(1.5),
                   child: ClipOval(
                     child: avatar.isNotEmpty
                         ? Image.network(avatar, fit: BoxFit.cover)
                         : Container(
-                            color: const Color(0xFF1B1C2A),
+                            color: context.surfaceSecondary,
                             alignment: Alignment.center,
                             child: Text(
                               _name.isNotEmpty
                                   ? _name.substring(0, 1).toUpperCase()
                                   : "?",
-                              style: const TextStyle(
-                                  color: Colors.white,
+                              style: TextStyle(
+                                  color: context.textPrimary,
                                   fontWeight: FontWeight.bold,
                                   fontSize: 14),
                             ),
@@ -333,20 +333,16 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
                   children: [
                     Text(
                       _name,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 15,
+                      style: context.bodyText.copyWith(
+                        color: context.textPrimary,
                         fontWeight: FontWeight.bold,
-                        fontFamily: 'Inter',
                       ),
                     ),
                     const SizedBox(height: 2),
                     Text(
                       _profession,
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.4),
-                        fontSize: 11,
-                        fontFamily: 'Inter',
+                      style: context.captionText.copyWith(
+                        color: context.textSecondary,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -362,10 +358,10 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
         children: [
           Expanded(
             child: _isRoomLoading
-                ? const Center(
+                ? Center(
                     child: CircularProgressIndicator(
                       valueColor:
-                          AlwaysStoppedAnimation<Color>(Color(0xFF00F2FE)),
+                          AlwaysStoppedAnimation<Color>(context.accentPrimary),
                     ),
                   )
                 : Stack(
@@ -467,17 +463,10 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
                                 height: 42,
                                 decoration: BoxDecoration(
                                   shape: BoxShape.circle,
-                                  gradient: const LinearGradient(
-                                    colors: [
-                                      Color(0xFF8B5CF6),
-                                      Color(0xFF00F2FE)
-                                    ],
-                                    begin: Alignment.topLeft,
-                                    end: Alignment.bottomRight,
-                                  ),
+                                  color: context.accentSecondary,
                                   boxShadow: [
                                     BoxShadow(
-                                      color: const Color(0xFF8B5CF6)
+                                      color: context.accentSecondary
                                           .withValues(alpha: 0.35),
                                       blurRadius: 10,
                                       offset: const Offset(0, 4),
@@ -486,10 +475,9 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
                                 ),
                                 child: Container(
                                   margin: const EdgeInsets.all(1.5),
-                                  decoration: const BoxDecoration(
+                                  decoration: BoxDecoration(
                                     shape: BoxShape.circle,
-                                    color: Color(
-                                        0xFF0D0E1A), // Blend with dark background
+                                    color: context.surfacePrimary, // Blend with dark background
                                   ),
                                   child: const Icon(
                                     Icons.keyboard_arrow_down_rounded,
@@ -523,10 +511,10 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
     bool isHighlighted = false,
   }) {
     final bubbleRadius = BorderRadius.only(
-      topLeft: const Radius.circular(20),
-      topRight: const Radius.circular(20),
-      bottomLeft: isMe ? const Radius.circular(20) : const Radius.circular(4),
-      bottomRight: isMe ? const Radius.circular(4) : const Radius.circular(20),
+      topLeft: const Radius.circular(AppDimensions.radiusPremiumCard),
+      topRight: const Radius.circular(AppDimensions.radiusPremiumCard),
+      bottomLeft: isMe ? const Radius.circular(AppDimensions.radiusPremiumCard) : const Radius.circular(4.0),
+      bottomRight: isMe ? const Radius.circular(4.0) : const Radius.circular(AppDimensions.radiusPremiumCard),
     );
 
     return Padding(
@@ -554,16 +542,13 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
                 ),
                 decoration: BoxDecoration(
                   borderRadius: bubbleRadius,
-                  gradient: isMe
-                      ? const LinearGradient(
-                          colors: [Color(0xFF8B5CF6), Color(0xFF5D3FE8)],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        )
-                      : null,
-                  color: isMe ? null : const Color(0xFF13141F),
-                  border:
-                      isMe ? null : Border.all(color: const Color(0xFF1F2030)),
+                  color: isMe ? context.surfaceSecondary : context.surfacePrimary,
+                  border: Border.all(
+                    color: isMe 
+                        ? context.accentSecondary.withValues(alpha: 0.5) 
+                        : context.surfaceSecondary.withValues(alpha: 0.5),
+                    width: 1.5,
+                  ),
                 ),
                 padding:
                     const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -584,11 +569,9 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
                     ],
                     Text(
                       text,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 14.5,
+                      style: context.bodyText.copyWith(
+                        color: context.textPrimary,
                         height: 1.35,
-                        fontFamily: 'Inter',
                       ),
                     ),
                   ],
@@ -607,10 +590,8 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
               children: [
                 Text(
                   time,
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.25),
-                    fontSize: 11,
-                    fontFamily: 'Inter',
+                  style: context.captionText.copyWith(
+                    color: context.textMuted,
                   ),
                 ),
                 if (isMe && status != null) ...[
@@ -631,7 +612,7 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
       return Icon(
         Icons.access_time_rounded,
         size: 12,
-        color: Colors.white.withValues(alpha: 0.35),
+        color: context.textMuted,
       );
     }
 
@@ -640,7 +621,7 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
       return Icon(
         Icons.check_rounded,
         size: 12,
-        color: Colors.white.withValues(alpha: 0.3),
+        color: context.textSecondary.withValues(alpha: 0.5),
       );
     }
 
@@ -650,11 +631,11 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(Icons.check_rounded,
-              size: 12, color: Colors.white.withValues(alpha: 0.4)),
+              size: 12, color: context.textSecondary.withValues(alpha: 0.6)),
           Transform.translate(
             offset: const Offset(-6, 0),
             child: Icon(Icons.check_rounded,
-                size: 12, color: Colors.white.withValues(alpha: 0.4)),
+              size: 12, color: context.textSecondary.withValues(alpha: 0.6)),
           ),
         ],
       );
@@ -682,8 +663,8 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(20),
-          color: const Color(0xFF13141F),
-          border: Border.all(color: const Color(0xFF1F2030)),
+          color: context.surfacePrimary,
+          border: Border.all(color: context.surfaceSecondary),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -692,8 +673,8 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
               margin: const EdgeInsets.symmetric(horizontal: 2),
               width: 6,
               height: 6,
-              decoration: const BoxDecoration(
-                color: Color(0xFF8B5CF6),
+              decoration: BoxDecoration(
+                color: context.accentSecondary,
                 shape: BoxShape.circle,
               ),
             );
@@ -704,34 +685,32 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
   }
 
   Widget _buildInputBar() {
-    return Container(
-      padding: const EdgeInsets.only(left: 16, right: 16, bottom: 24, top: 12),
-      decoration: BoxDecoration(
-        color: const Color(0xFF0F101A),
-        border: Border(
-          top: BorderSide(color: Colors.white.withValues(alpha: 0.03)),
+    return SafeArea(
+      child: Container(
+        margin: const EdgeInsets.fromLTRB(16.0, 8.0, 16.0, 16.0), // Floating above bottom zone
+        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 6.0), // Horiz padding 16.0 matched
+        decoration: BoxDecoration(
+          color: context.surfacePrimary, // input field structure matching AppTheme.surfacePrimary
+          borderRadius: BorderRadius.circular(AppDimensions.radiusPill), // Capsule row profile
+          border: Border.all(color: context.surfaceSecondary.withValues(alpha: 0.8), width: 1),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.4),
+              blurRadius: 16,
+              offset: const Offset(0, 4),
+            ),
+          ],
         ),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Container(
-              decoration: BoxDecoration(
-                color: const Color(0xFF13141F),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: const Color(0xFF1F2030)),
-              ),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        child: Row(
+          children: [
+            Expanded(
               child: TextField(
                 controller: _messageController,
-                style: const TextStyle(color: Colors.white, fontSize: 14.5),
-                cursorColor: const Color(0xFF8B5CF6),
+                style: context.bodyText.copyWith(color: context.textPrimary),
+                cursorColor: context.accentPrimary,
                 decoration: InputDecoration(
                   hintText: 'Type a message...',
-                  hintStyle: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.25),
-                    fontSize: 14.5,
-                  ),
+                  hintStyle: context.bodyText.copyWith(color: context.textMuted),
                   border: InputBorder.none,
                   isDense: true,
                   contentPadding: EdgeInsets.zero,
@@ -739,26 +718,32 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
                 onSubmitted: (_) => _sendMessage(),
               ),
             ),
-          ),
-          const SizedBox(width: 10),
-          GestureDetector(
-            onTap: _sendMessage,
-            child: Container(
-              width: 40,
-              height: 40,
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [Color(0xFF8B5CF6), Color(0xFF00F2FE)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
+            const SizedBox(width: 10),
+            GestureDetector(
+              onTap: _sendMessage,
+              child: Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: context.accentPrimary, // sharp circular neon asset powered by AppTheme.accentPrimary
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: context.accentPrimary.withValues(alpha: 0.3),
+                      blurRadius: 8,
+                      spreadRadius: 1,
+                    ),
+                  ],
                 ),
-                shape: BoxShape.circle,
+                child: const Icon(
+                  Icons.send_rounded,
+                  color: Colors.black, // contrasting black icon label
+                  size: 18,
+                ),
               ),
-              child:
-                  const Icon(Icons.send_rounded, color: Colors.white, size: 16),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -769,7 +754,7 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
           decoration: BoxDecoration(
-            color: Colors.black.withOpacity(isMe ? 0.15 : 0.22),
+            color: Colors.black.withValues(alpha: isMe ? 0.15 : 0.22),
             borderRadius: BorderRadius.circular(6),
           ),
           child: Row(
@@ -780,7 +765,7 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
                 width: 3,
                 decoration: BoxDecoration(
                   color:
-                      isMe ? const Color(0xFF00F2FE) : const Color(0xFF8B5CF6),
+                      isMe ? const Color(0xFF00F2FE) : context.accentSecondary,
                   borderRadius: BorderRadius.circular(1.5),
                 ),
               ),
@@ -795,7 +780,7 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
                       style: TextStyle(
                         color: isMe
                             ? const Color(0xFF00F2FE)
-                            : const Color(0xFF8B5CF6),
+                            : context.accentSecondary,
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
                         fontFamily: 'Inter',
@@ -807,7 +792,7 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
                     Text(
                       text,
                       style: TextStyle(
-                        color: Colors.white.withOpacity(0.65),
+                        color: Colors.white.withValues(alpha: 0.65),
                         fontSize: 12,
                         fontFamily: 'Inter',
                       ),
@@ -830,7 +815,6 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
     if (targetIndex == -1 || !_scrollController.hasClients) return;
 
     // ── Step 1: Jump close to the target so ListView builds it ──
-    // Estimate a rough position – messages average ~80px but vary.
     final totalMessages = messages.length;
     final scrollExtent = _scrollController.position.maxScrollExtent;
     final double fraction = targetIndex / totalMessages;
@@ -840,13 +824,11 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
     // Check if the target widget is already built
     GlobalKey? targetKey = _messageKeys[replyToId];
     if (targetKey == null || targetKey.currentContext == null) {
-      // Jump immediately (no animation) to get close, then let ListView build
       _scrollController.jumpTo(estimatedOffset);
       await Future.delayed(const Duration(milliseconds: 50));
     }
 
     // ── Step 2: Precise scroll using ensureVisible ──
-    // Try up to 3 times with small delays to let the list catch up
     for (int attempt = 0; attempt < 3; attempt++) {
       targetKey = _messageKeys[replyToId];
       if (targetKey != null && targetKey.currentContext != null) {
@@ -854,8 +836,7 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
           targetKey.currentContext!,
           duration: const Duration(milliseconds: 300),
           curve: Curves.easeInOut,
-          alignment:
-              0.4, // Position the target ~40% from the top of the viewport
+          alignment: 0.4,
         );
         break;
       }
@@ -887,15 +868,15 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      decoration: const BoxDecoration(
-        color: Color(0xFF0F101A),
+      decoration: BoxDecoration(
+        color: context.canvasBackground,
         border: Border(
-          top: BorderSide(color: Color(0xFF1F2030), width: 1),
+          top: BorderSide(color: context.surfaceSecondary, width: 1),
         ),
       ),
       child: Container(
         decoration: BoxDecoration(
-          color: const Color(0xFF13141F),
+          color: context.surfacePrimary,
           borderRadius: BorderRadius.circular(12),
         ),
         child: Row(
@@ -903,9 +884,9 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
             Container(
               width: 4,
               height: 44,
-              decoration: const BoxDecoration(
-                color: Color(0xFF8B5CF6),
-                borderRadius: BorderRadius.only(
+              decoration: BoxDecoration(
+                color: context.accentSecondary,
+                borderRadius: const BorderRadius.only(
                   topLeft: Radius.circular(4),
                   bottomLeft: Radius.circular(4),
                 ),
@@ -919,8 +900,8 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
                 children: [
                   Text(
                     senderName,
-                    style: const TextStyle(
-                      color: Color(0xFF8B5CF6),
+                    style: TextStyle(
+                      color: context.accentSecondary,
                       fontSize: 12.5,
                       fontWeight: FontWeight.bold,
                       fontFamily: 'Inter',
@@ -965,6 +946,7 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
       Map<String, dynamic> message, bool isMe) {
     final RenderBox overlay =
         Navigator.of(context).overlay!.context.findRenderObject() as RenderBox;
+    final surfaceSecondaryColor = context.surfaceSecondary;
 
     showMenu(
       context: context,
@@ -972,10 +954,10 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
         tapPosition & const Size(40, 40),
         Offset.zero & overlay.size,
       ),
-      color: const Color(0xFF10111F),
+      color: context.surfaceSecondary,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: const BorderSide(color: Color(0xFF202138)),
+        side: BorderSide(color: surfaceSecondaryColor),
       ),
       items: [
         const PopupMenuItem(
@@ -1019,15 +1001,14 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
       context: context,
       builder: (BuildContext dialogContext) {
         return AlertDialog(
-          backgroundColor: const Color(0xFF10111F),
+          backgroundColor: context.surfacePrimary,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
-            side: const BorderSide(color: Color(0xFF202138)),
+            side: BorderSide(color: context.surfaceSecondary),
           ),
-          title: const Text(
+          title: Text(
             "Delete Message?",
-            style: TextStyle(
-                color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+            style: context.screenHeading.copyWith(fontWeight: FontWeight.bold),
           ),
           content: Text(
             isMe
@@ -1035,13 +1016,13 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
                     ? "Want to delete the message?"
                     : "Do you want to delete this message for everyone or only for yourself?")
                 : "This message will be deleted for you.",
-            style: const TextStyle(color: Colors.white70, fontSize: 14),
+            style: context.bodyText.copyWith(color: context.textSecondary),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(dialogContext).pop(),
-              child: const Text("Cancel",
-                  style: TextStyle(color: Color(0xFF8B8C9E))),
+              child: Text("Cancel",
+                  style: TextStyle(color: context.textSecondary)),
             ),
             TextButton(
               onPressed: () async {
@@ -1147,11 +1128,11 @@ class _SwipeToReplyState extends State<SwipeToReply>
                 height: 32,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: const Color(0xFF8B5CF6).withOpacity(0.2),
+                  color: context.accentSecondary.withValues(alpha: 0.2),
                 ),
-                child: const Icon(
+                child: Icon(
                   Icons.reply_rounded,
-                  color: Color(0xFF8B5CF6),
+                  color: context.accentSecondary,
                   size: 18,
                 ),
               ),

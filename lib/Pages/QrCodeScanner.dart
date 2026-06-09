@@ -9,9 +9,10 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:qr_code_scanner_plus/qr_code_scanner_plus.dart';
 import 'package:connect/Utils/profile_field_filter.dart';
+import 'package:connect/Config/app_theme.dart';
 
 class QRScannerPage extends StatefulWidget {
-  const QRScannerPage({Key? key}) : super(key: key);
+  const QRScannerPage({super.key});
 
   @override
   State<StatefulWidget> createState() => _QRScannerPageState();
@@ -34,20 +35,18 @@ class _QRScannerPageState extends State<QRScannerPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF090A0F),
+      backgroundColor: context.canvasBackground,
       appBar: AppBar(
-        title: const Text(
+        title: Text(
           "Scan Identity QR",
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-            fontFamily: 'Inter',
-          ),
+          style: context.screenHeading,
         ),
-        backgroundColor: const Color(0xFF090A0F),
+        backgroundColor: Colors.transparent,
         elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.white),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 18),
+          onPressed: () => Navigator.pop(context),
+        ),
       ),
       body: Column(
         children: <Widget>[
@@ -55,29 +54,24 @@ class _QRScannerPageState extends State<QRScannerPage> {
           Expanded(
             flex: 1,
             child: Container(
-              color: const Color(0xFF090A0F),
+              color: context.canvasBackground,
               padding: const EdgeInsets.symmetric(horizontal: 24),
               child: Center(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Text(
+                    Text(
                       "Hold your device over the QR code",
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 16,
+                      style: context.bodyText.copyWith(
                         fontWeight: FontWeight.bold,
-                        fontFamily: 'Inter',
                       ),
                       textAlign: TextAlign.center,
                     ),
                     const SizedBox(height: 6),
                     Text(
                       "Scanning is secure & connects you directly.",
-                      style: TextStyle(
-                        color: Colors.white.withOpacity(0.5),
-                        fontSize: 13,
-                        fontFamily: 'Inter',
+                      style: context.captionText.copyWith(
+                        color: context.textSecondary,
                       ),
                       textAlign: TextAlign.center,
                     ),
@@ -90,28 +84,18 @@ class _QRScannerPageState extends State<QRScannerPage> {
       ),
     );
   }
-  // bool isTripleQuoted(String str) {
-  //     return str.startsWith("'''") && str.endsWith("'''");
-  //   }
 
-  //   // Check for single quotes by context (this test won't work exactly in Dart's runtime but demonstrates logic)
-  //   bool isSingleQuoted(String str) {
-  //     return !isTripleQuoted(str); // Fallback logic for single-quoted strings
-  //   }
   Widget _buildQrView(BuildContext context) {
-    var scanArea = (MediaQuery.of(context).size.width < 400 ||
-            MediaQuery.of(context).size.height < 400)
-        ? 220.0
-        : 300.0;
     return QRView(
       key: qrKey,
       onQRViewCreated: _onQRViewCreated,
       overlay: QrScannerOverlayShape(
-        borderColor: const Color(0xFF00F2FE),
-        borderRadius: 24,
+        borderColor: context.accentPrimary,
+        borderRadius: AppDimensions.radiusPremiumCard,
         borderLength: 38,
-        borderWidth: 4,
-        cutOutSize: scanArea,
+        borderWidth: 3.0,
+        cutOutSize: 260.0,
+        overlayColor: const Color(0xFF03100D).withValues(alpha: 0.75),
       ),
       onPermissionSet: (ctrl, p) => _onPermissionSet(context, ctrl, p),
     );
@@ -203,29 +187,26 @@ class _QRScannerPageState extends State<QRScannerPage> {
               showDialog(
                 context: context,
                 barrierDismissible: false,
-                builder: (context) => const Dialog(
-                  backgroundColor: Color(0xFF131422),
+                builder: (context) => Dialog(
+                  backgroundColor: context.surfacePrimary,
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.all(Radius.circular(16)),
+                    borderRadius: BorderRadius.circular(AppDimensions.radiusPremiumCard),
+                    side: BorderSide(color: context.surfaceSecondary, width: 1.5),
                   ),
                   child: Padding(
-                    padding: EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+                    padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         CircularProgressIndicator(
-                          valueColor:
-                              AlwaysStoppedAnimation<Color>(Color(0xFF00F2FE)),
+                          valueColor: AlwaysStoppedAnimation<Color>(context.accentPrimary),
                         ),
-                        SizedBox(height: 16),
+                        const SizedBox(height: 16),
                         Text(
                           "Loading their card...",
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 14,
+                          style: context.bodyText.copyWith(
                             fontWeight: FontWeight.bold,
-                            fontFamily: 'Inter',
                           ),
                         ),
                       ],
@@ -306,7 +287,6 @@ class _QRScannerPageState extends State<QRScannerPage> {
 
   @override
   void dispose() {
-    controller?.dispose();
     super.dispose();
   }
 }
@@ -314,7 +294,7 @@ class _QRScannerPageState extends State<QRScannerPage> {
 class ProfileCard extends StatefulWidget {
   final Map<String, dynamic> profileData;
 
-  const ProfileCard({Key? key, required this.profileData}) : super(key: key);
+  const ProfileCard({super.key, required this.profileData});
 
   @override
   State<ProfileCard> createState() => _ProfileCardState();
@@ -363,32 +343,34 @@ class _ProfileCardState extends State<ProfileCard> {
     final String presenterSharedCard =
         widget.profileData['sharedCard'] ?? 'both';
 
+    final messenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context);
+    final themeSurfacePrimary = context.surfacePrimary;
+    final themeSurfaceSecondary = context.surfaceSecondary;
+    final themeAccentPrimary = context.accentPrimary;
+
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => const Dialog(
-        backgroundColor: Color(0xFF131422),
+      builder: (context) => Dialog(
+        backgroundColor: themeSurfacePrimary,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.all(Radius.circular(16)),
+          borderRadius: BorderRadius.circular(AppDimensions.radiusPremiumCard),
+          side: BorderSide(color: themeSurfaceSecondary, width: 1.5),
         ),
         child: Padding(
-          padding: EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+          padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF00F2FE)),
+                valueColor: AlwaysStoppedAnimation<Color>(themeAccentPrimary),
               ),
-              SizedBox(height: 16),
+              const SizedBox(height: 16),
               Text(
                 "Saving connection...",
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                  fontFamily: 'Inter',
-                ),
+                style: context.bodyText.copyWith(fontWeight: FontWeight.bold),
               ),
             ],
           ),
@@ -396,25 +378,24 @@ class _ProfileCardState extends State<ProfileCard> {
       ),
     );
 
-    connectionProvider
-        .connectUsers(
-      profileProvider.userId!,
-      scannedUserId,
-      sharedCardByPresenter: presenterSharedCard,
-      sharedCardByScanner: _shareBackType,
-    )
-        .then((v) {
-      if (!mounted) return;
-      Navigator.pop(context); // Dismiss progress dialog
+    try {
+      await connectionProvider.connectUsers(
+        profileProvider.userId!,
+        scannedUserId,
+        sharedCardByPresenter: presenterSharedCard,
+        sharedCardByScanner: _shareBackType,
+      );
+      navigator.pop(); // Dismiss progress dialog
 
-      ScaffoldMessenger.of(context).showSnackBar(
+      final otherName = widget.profileData['name'] ?? 'Connection';
+      messenger.showSnackBar(
         SnackBar(
           content: Row(
             children: [
-              const Icon(Icons.check_circle_rounded, color: Color(0xFF00F2FE)),
+              Icon(Icons.check_circle_rounded, color: themeAccentPrimary),
               const SizedBox(width: 10),
               Text(
-                "Connected with ${widget.profileData['name']}!",
+                "Connected with $otherName!",
                 style: const TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.bold,
@@ -423,22 +404,21 @@ class _ProfileCardState extends State<ProfileCard> {
               ),
             ],
           ),
-          backgroundColor: const Color(0xFF131422),
+          backgroundColor: themeSurfacePrimary,
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
-            side: const BorderSide(color: Color(0xFF26273C), width: 1),
+            borderRadius: BorderRadius.circular(AppDimensions.radiusComponent),
+            side: BorderSide(color: themeSurfaceSecondary, width: 1.5),
           ),
         ),
       );
-      Navigator.pop(context); // Pop back to scan screen / homepage
-    }).catchError((e) {
-      if (!mounted) return;
-      Navigator.pop(context); // Dismiss progress dialog
-      ScaffoldMessenger.of(context).showSnackBar(
+      navigator.pop(); // Pop back to scan screen / homepage
+    } catch (e) {
+      navigator.pop(); // Dismiss progress dialog
+      messenger.showSnackBar(
         SnackBar(content: Text("Error saving connection: $e")),
       );
-    });
+    }
   }
 
   Widget _buildProfileHeaderCard() {
@@ -447,7 +427,7 @@ class _ProfileCardState extends State<ProfileCard> {
         (widget.profileData['sharedCard'] ?? 'both').toString();
     final bool isCasual = sharedCard == 'casual';
     final Color accentColor =
-        isCasual ? const Color(0xFF8B5CF6) : const Color(0xFF00F2FE);
+        isCasual ? context.accentSecondary : context.accentPrimary;
 
     final String profession = ProfileFieldFilter.getVisibleValue(
         'profession',
@@ -474,11 +454,11 @@ class _ProfileCardState extends State<ProfileCard> {
                 ? [const Color(0xFF2C1E4D), const Color(0xFF0F0922)]
                 : [const Color(0xFF132A33), const Color(0xFF091316)],
           ),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: accentColor.withOpacity(0.35), width: 1.5),
+          borderRadius: BorderRadius.circular(AppDimensions.radiusPremiumCard),
+          border: Border.all(color: accentColor.withValues(alpha: 0.35), width: 1.5),
           boxShadow: [
             BoxShadow(
-              color: accentColor.withOpacity(0.08),
+              color: accentColor.withValues(alpha: 0.08),
               blurRadius: 20,
               spreadRadius: 2,
             ),
@@ -493,8 +473,8 @@ class _ProfileCardState extends State<ProfileCard> {
                 shape: BoxShape.circle,
                 gradient: LinearGradient(
                   colors: isCasual
-                      ? [const Color(0xFF8B5CF6), const Color(0xFFD8B4FE)]
-                      : [const Color(0xFF00F2FE), const Color(0xFF38BDF8)],
+                      ? [context.accentSecondary, context.accentSecondary.withValues(alpha: 0.5)]
+                      : [context.accentPrimary, context.accentPrimary.withValues(alpha: 0.5)],
                 ),
               ),
               padding: const EdgeInsets.all(1.5),
@@ -506,32 +486,24 @@ class _ProfileCardState extends State<ProfileCard> {
                         avatar,
                         fit: BoxFit.cover,
                         errorBuilder: (context, error, stackTrace) => Container(
-                          color: const Color(0xFF1B1C2A),
+                          color: context.surfaceSecondary,
                           alignment: Alignment.center,
                           child: Text(
                             name.isNotEmpty
                                 ? name.substring(0, 1).toUpperCase()
                                 : "?",
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                            ),
+                            style: context.cardTitle.copyWith(fontSize: 20, fontWeight: FontWeight.bold),
                           ),
                         ),
                       )
                     : Container(
-                        color: const Color(0xFF1B1C2A),
+                        color: context.surfaceSecondary,
                         alignment: Alignment.center,
                         child: Text(
                           name.isNotEmpty
                               ? name.substring(0, 1).toUpperCase()
                               : "?",
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                          ),
+                          style: context.cardTitle.copyWith(fontSize: 20, fontWeight: FontWeight.bold),
                         ),
                       ),
               ),
@@ -543,11 +515,9 @@ class _ProfileCardState extends State<ProfileCard> {
                 children: [
                   Text(
                     name,
-                    style: const TextStyle(
-                      color: Colors.white,
+                    style: context.cardTitle.copyWith(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
-                      fontFamily: 'Inter',
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -557,7 +527,7 @@ class _ProfileCardState extends State<ProfileCard> {
                     Text(
                       profession,
                       style: TextStyle(
-                        color: accentColor.withOpacity(0.9),
+                        color: accentColor.withValues(alpha: 0.9),
                         fontSize: 12,
                         fontWeight: FontWeight.w500,
                         fontFamily: 'Inter',
@@ -570,10 +540,8 @@ class _ProfileCardState extends State<ProfileCard> {
                     const SizedBox(height: 1),
                     Text(
                       company,
-                      style: const TextStyle(
-                        color: Color(0xFF8B8C9E),
-                        fontSize: 11,
-                        fontFamily: 'Inter',
+                      style: context.captionText.copyWith(
+                        color: context.textSecondary,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -593,7 +561,7 @@ class _ProfileCardState extends State<ProfileCard> {
         (widget.profileData['sharedCard'] ?? 'both').toString();
     final bool isCasual = sharedCard == 'casual';
     final Color accentColor =
-        isCasual ? const Color(0xFF8B5CF6) : const Color(0xFF00F2FE);
+        isCasual ? context.accentSecondary : context.accentPrimary;
 
     final String email = ProfileFieldFilter.getVisibleValue(
         'email',
@@ -643,32 +611,29 @@ class _ProfileCardState extends State<ProfileCard> {
         width: double.infinity,
         padding: const EdgeInsets.all(18),
         decoration: BoxDecoration(
-          color: const Color(0xFF131422),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: const Color(0xFF26273C), width: 1.2),
+          color: context.surfacePrimary,
+          borderRadius: BorderRadius.circular(AppDimensions.radiusPremiumCard),
+          border: Border.all(color: context.surfaceSecondary, width: 1.5),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             if (bio.isNotEmpty) ...[
-              const Text(
+              Text(
                 "ABOUT ME",
-                style: TextStyle(
-                  color: Color(0xFF8B8C9E),
-                  fontSize: 12,
+                style: context.captionText.copyWith(
+                  color: context.textSecondary,
                   fontWeight: FontWeight.bold,
                   letterSpacing: 1.5,
-                  fontFamily: 'Inter',
                 ),
               ),
               const SizedBox(height: 6),
               Text(
                 bio,
-                style: const TextStyle(
-                  color: Color(0xFFC0C1D0),
+                style: context.bodyText.copyWith(
+                  color: context.textSecondary,
                   fontSize: 12,
                   height: 1.4,
-                  fontFamily: 'Inter',
                 ),
               ),
               if (email.isNotEmpty ||
@@ -679,7 +644,7 @@ class _ProfileCardState extends State<ProfileCard> {
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 12),
                   child:
-                      Divider(color: accentColor.withOpacity(0.15), height: 1),
+                      Divider(color: accentColor.withValues(alpha: 0.15), height: 1),
                 ),
             ],
             if (email.isNotEmpty) ...[
@@ -691,10 +656,9 @@ class _ProfileCardState extends State<ProfileCard> {
                   Expanded(
                     child: Text(
                       email,
-                      style: const TextStyle(
-                        color: Color(0xFFC0C1D0),
+                      style: context.bodyText.copyWith(
+                        color: context.textSecondary,
                         fontSize: 12,
-                        fontFamily: 'Inter',
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -712,10 +676,9 @@ class _ProfileCardState extends State<ProfileCard> {
                   Expanded(
                     child: Text(
                       phone,
-                      style: const TextStyle(
-                        color: Color(0xFFC0C1D0),
+                      style: context.bodyText.copyWith(
+                        color: context.textSecondary,
                         fontSize: 12,
-                        fontFamily: 'Inter',
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -731,19 +694,17 @@ class _ProfileCardState extends State<ProfileCard> {
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 12),
                   child:
-                      Divider(color: accentColor.withOpacity(0.15), height: 1),
+                      Divider(color: accentColor.withValues(alpha: 0.15), height: 1),
                 ),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text(
+                  Text(
                     "SOCIALS",
-                    style: TextStyle(
-                      color: Color(0xFF8B8C9E),
-                      fontSize: 12,
+                    style: context.captionText.copyWith(
+                      color: context.textSecondary,
                       fontWeight: FontWeight.bold,
                       letterSpacing: 1.5,
-                      fontFamily: 'Inter',
                     ),
                   ),
                   Row(
@@ -778,21 +739,19 @@ class _ProfileCardState extends State<ProfileCard> {
       margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: const Color(0xFF131422),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFF26273C), width: 1.2),
+        color: context.surfacePrimary,
+        borderRadius: BorderRadius.circular(AppDimensions.radiusPremiumCard),
+        border: Border.all(color: context.surfaceSecondary, width: 1.5),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             "HOW DO YOU KNOW THEM?",
-            style: TextStyle(
-              color: Color(0xFF8B8C9E),
-              fontSize: 12,
+            style: context.captionText.copyWith(
+              color: context.textSecondary,
               fontWeight: FontWeight.bold,
               letterSpacing: 1.5,
-              fontFamily: 'Inter',
             ),
           ),
           const SizedBox(height: 6),
@@ -800,11 +759,9 @@ class _ProfileCardState extends State<ProfileCard> {
             _shareBackType == 'casual'
                 ? "You'll share your Casual card with them."
                 : "You'll share your Professional card with them.",
-            style: TextStyle(
-              color: Colors.white.withOpacity(0.6),
-              fontSize: 12,
+            style: context.captionText.copyWith(
+              color: context.textSecondary,
               height: 1.3,
-              fontFamily: 'Inter',
             ),
           ),
           const SizedBox(height: 16),
@@ -814,7 +771,7 @@ class _ProfileCardState extends State<ProfileCard> {
                 child: _buildShareBackOption(
                   type: 'casual',
                   label: "Casual",
-                  color: const Color(0xFF8B5CF6),
+                  color: context.accentSecondary,
                 ),
               ),
               const SizedBox(width: 8),
@@ -822,7 +779,7 @@ class _ProfileCardState extends State<ProfileCard> {
                 child: _buildShareBackOption(
                   type: 'professional',
                   label: "Professional",
-                  color: const Color(0xFF00F2FE),
+                  color: context.accentPrimary,
                 ),
               ),
             ],
@@ -852,16 +809,16 @@ class _ProfileCardState extends State<ProfileCard> {
         height: 52,
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: BoxDecoration(
-          color: isSelected ? color.withOpacity(0.08) : const Color(0xFF0A0A0F),
-          borderRadius: BorderRadius.circular(12),
+          color: isSelected ? color.withValues(alpha: 0.08) : context.canvasBackground,
+          borderRadius: BorderRadius.circular(AppDimensions.radiusComponent),
           border: Border.all(
-            color: isSelected ? color : const Color(0xFF26273C),
+            color: isSelected ? color : context.surfaceSecondary,
             width: isSelected ? 1.8 : 1.2,
           ),
           boxShadow: isSelected
               ? [
                   BoxShadow(
-                    color: color.withOpacity(0.12),
+                    color: color.withValues(alpha: 0.12),
                     blurRadius: 8,
                     spreadRadius: 0,
                   )
@@ -873,7 +830,7 @@ class _ProfileCardState extends State<ProfileCard> {
             label,
             textAlign: TextAlign.center,
             style: TextStyle(
-              color: isSelected ? Colors.white : const Color(0xFF8B8C9E),
+              color: isSelected ? Colors.white : context.textSecondary,
               fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
               fontSize: 12,
               fontFamily: 'Inter',
@@ -887,20 +844,19 @@ class _ProfileCardState extends State<ProfileCard> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF090A0F),
+      backgroundColor: context.canvasBackground,
       appBar: AppBar(
-        title: const Text(
+        title: Text(
           "Profile Preview",
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-            fontSize: 18,
-            fontFamily: 'Inter',
-          ),
+          style: context.screenHeading,
         ),
-        backgroundColor: const Color(0xFF090A0F),
+        backgroundColor: Colors.transparent,
         elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.white),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded,
+              color: Colors.white, size: 18),
+          onPressed: () => Navigator.pop(context),
+        ),
       ),
       body: Center(
         child: SingleChildScrollView(
@@ -922,16 +878,16 @@ class _ProfileCardState extends State<ProfileCard> {
                     borderRadius: BorderRadius.circular(16),
                     gradient: LinearGradient(
                       colors: _shareBackType == 'casual'
-                          ? const [Color(0xFF8B5CF6), Color(0xFF7C3AED)]
-                          : const [Color(0xFF00F2FE), Color(0xFF0284C7)],
+                          ? [context.accentSecondary, context.accentSecondary.withValues(alpha: 0.8)]
+                          : [context.accentPrimary, context.accentPrimary.withValues(alpha: 0.8)],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     ),
                     boxShadow: [
                       BoxShadow(
                         color: (_shareBackType == 'casual'
-                                ? const Color(0xFF8B5CF6)
-                                : const Color(0xFF00F2FE))
+                                ? context.accentSecondary
+                                : context.accentPrimary)
                             .withValues(alpha: 0.2),
                         blurRadius: 16,
                         offset: const Offset(0, 4),
@@ -951,8 +907,8 @@ class _ProfileCardState extends State<ProfileCard> {
                       _shareBackType == 'casual'
                           ? "Add to My Casual Network"
                           : "Add to My Professional Network",
-                      style: const TextStyle(
-                        color: Colors.white,
+                      style: TextStyle(
+                        color: _shareBackType == 'casual' ? Colors.white : Colors.black,
                         fontWeight: FontWeight.bold,
                         fontSize: 15,
                         fontFamily: 'Inter',
@@ -963,10 +919,10 @@ class _ProfileCardState extends State<ProfileCard> {
               ),
               TextButton(
                 onPressed: () => Navigator.pop(context),
-                child: const Text(
+                child: Text(
                   "Cancel",
                   style: TextStyle(
-                    color: Color(0xFF5C5E78),
+                    color: context.textMuted,
                     fontSize: 14,
                     fontWeight: FontWeight.w500,
                     fontFamily: 'Inter',

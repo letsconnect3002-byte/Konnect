@@ -1,3 +1,4 @@
+import 'package:connect/Config/app_theme.dart';
 import 'package:connect/Models/profile_card_type.dart';
 import 'package:connect/Providers/profile_provider.dart';
 import 'package:connect/Widgets/card_field_input.dart';
@@ -360,7 +361,7 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                     style: TextStyle(fontWeight: FontWeight.bold)),
               ],
             ),
-            backgroundColor: Color(0xFF8B5CF6),
+            backgroundColor: Color(0xFF7C3AED),
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -442,9 +443,10 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: const Color(0xFF13141F),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      backgroundColor: context.surfacePrimary,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(
+            top: Radius.circular(AppDimensions.radiusPremiumCard)),
       ),
       builder: (context) {
         bool isUploading = false;
@@ -456,8 +458,8 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
               physics: const BouncingScrollPhysics(),
               child: Padding(
                 padding: EdgeInsets.only(
-                  left: 24.0,
-                  right: 24.0,
+                  left: AppDimensions.marginStandard,
+                  right: AppDimensions.marginStandard,
                   top: 24.0,
                   bottom: 24.0 + MediaQuery.of(context).viewInsets.bottom,
                 ),
@@ -465,13 +467,9 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    const Text(
+                    Text(
                       "Profile Photo",
-                      style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          fontFamily: 'Inter'),
+                      style: context.screenHeading,
                       textAlign: TextAlign.center,
                     ),
                     const SizedBox(height: 24),
@@ -479,10 +477,13 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                       child: Container(
                         width: 120,
                         height: 120,
-                        decoration: const BoxDecoration(
+                        decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           gradient: LinearGradient(
-                            colors: [Color(0xFF00F2FE), Color(0xFF8B5CF6)],
+                            colors: [
+                              const Color(0xFF00F2FE),
+                              context.accentSecondary
+                            ],
                           ),
                         ),
                         padding: const EdgeInsets.all(3),
@@ -493,7 +494,7 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                                       'supabase.co/storage/v1/object/public/avatars/'))
                               ? NetworkImage(_avatarUrl)
                               : null,
-                          backgroundColor: const Color(0xFF1B1C2A),
+                          backgroundColor: context.surfaceSecondary,
                           child: (_avatarUrl.isNotEmpty &&
                                   _avatarUrl.contains(
                                       'supabase.co/storage/v1/object/public/avatars/'))
@@ -561,7 +562,7 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                                         fontFamily: 'Inter',
                                         fontWeight: FontWeight.bold),
                                   ),
-                                  backgroundColor: const Color(0xFF8B5CF6),
+                                  backgroundColor: context.accentSecondary,
                                   behavior: SnackBarBehavior.floating,
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(10),
@@ -588,11 +589,14 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                           ),
                         ),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF1C1D30),
+                          backgroundColor: context.surfaceSecondary,
                           foregroundColor: Colors.white,
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
-                            side: const BorderSide(color: Color(0xFF26273C)),
+                            borderRadius: BorderRadius.circular(
+                                AppDimensions.radiusComponent),
+                            side: BorderSide(
+                                color:
+                                    context.textMuted.withValues(alpha: 0.2)),
                           ),
                           padding: const EdgeInsets.symmetric(vertical: 14),
                         ),
@@ -613,13 +617,11 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                     const SizedBox(height: 16),
                     TextButton(
                       onPressed: () => Navigator.pop(context),
-                      child: const Text(
+                      child: Text(
                         "Cancel",
-                        style: TextStyle(
-                          color: Color(0xFF5C5E78),
-                          fontSize: 14,
+                        style: context.bodyText.copyWith(
+                          color: context.textMuted,
                           fontWeight: FontWeight.w500,
-                          fontFamily: 'Inter',
                         ),
                       ),
                     ),
@@ -639,11 +641,14 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
       return Skeletonizer(
         enabled: true,
         child: Scaffold(
-          backgroundColor: const Color(0xFF090A0F),
+          backgroundColor: context.canvasBackground,
           body: SafeArea(
             child: SingleChildScrollView(
               padding: const EdgeInsets.only(
-                  left: 24.0, right: 24.0, top: 16.0, bottom: 40.0),
+                  left: AppDimensions.marginStandard,
+                  right: AppDimensions.marginStandard,
+                  top: 16.0,
+                  bottom: 100.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -672,13 +677,16 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
         FocusScope.of(context).unfocus();
       },
       child: Scaffold(
-        backgroundColor: const Color(0xFF090A0F),
+        backgroundColor: context.canvasBackground,
         body: SafeArea(
           child: Stack(
             children: [
               SingleChildScrollView(
                 padding: const EdgeInsets.only(
-                    left: 24.0, right: 24.0, top: 16.0, bottom: 40.0),
+                    left: AppDimensions.marginStandard,
+                    right: AppDimensions.marginStandard,
+                    top: 16.0,
+                    bottom: 100.0),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
@@ -690,12 +698,11 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text(
+                        Text(
                           'YOUR CARDS',
-                          style: TextStyle(
-                            color: Color(0xFF8B8C9E),
+                          style: context.captionText.copyWith(
+                            color: context.textSecondary,
                             fontSize: 14.0,
-                            fontWeight: FontWeight.bold,
                             letterSpacing: 1.5,
                           ),
                         ),
@@ -713,13 +720,12 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                     // EDIT DETAILS Header
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
-                      children: const [
+                      children: [
                         Text(
                           'EDIT DETAILS',
-                          style: TextStyle(
-                            color: Color(0xFF8B8C9E),
+                          style: context.captionText.copyWith(
+                            color: context.textSecondary,
                             fontSize: 14.0,
-                            fontWeight: FontWeight.bold,
                             letterSpacing: 1.5,
                           ),
                         ),
@@ -742,10 +748,10 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
               if (_isSaving)
                 Container(
                   color: Colors.black.withValues(alpha: 0.5),
-                  child: const Center(
+                  child: Center(
                     child: CircularProgressIndicator(
-                      valueColor:
-                          AlwaysStoppedAnimation<Color>(Color(0xFF8B5CF6)),
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                          context.accentSecondary),
                     ),
                   ),
                 ),
@@ -804,15 +810,15 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Row(
-              children: const [
-                Icon(Icons.link_rounded, color: Color(0xFF8B5CF6), size: 18),
-                SizedBox(width: 8),
+              children: [
+                Icon(Icons.link_rounded,
+                    color: context.accentSecondary, size: 18),
+                const SizedBox(width: 8),
                 Text(
                   'SOCIAL LINKS',
-                  style: TextStyle(
-                    color: Color(0xFF8B8C9E),
+                  style: context.captionText.copyWith(
+                    color: context.textSecondary,
                     fontSize: 14.0,
-                    fontWeight: FontWeight.w900,
                     letterSpacing: 1.5,
                   ),
                 ),
@@ -880,9 +886,9 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF13141F),
+        color: context.surfacePrimary,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFF1F2030)),
+        border: Border.all(color: context.textMuted.withValues(alpha: 0.2)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -894,9 +900,8 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
               Expanded(
                 child: Text(
                   title,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 14,
+                  style: context.bodyText.copyWith(
+                    color: context.textPrimary,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -910,20 +915,18 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     color: assignment.casual
-                        ? const Color(0xFF8B5CF6)
-                        : const Color(0xFF1C1D2A),
+                        ? context.accentSecondary
+                        : context.surfaceSecondary,
                     border: Border.all(
                       color: assignment.casual
-                          ? const Color(0xFF8B5CF6)
-                          : Colors.white.withValues(alpha: 0.08),
+                          ? context.accentSecondary
+                          : context.textMuted.withValues(alpha: 0.2),
                     ),
                   ),
                   child: Icon(
                     Icons.person_outline_rounded,
                     size: 16,
-                    color: assignment.casual
-                        ? Colors.white
-                        : const Color(0xFF5C5E78),
+                    color: assignment.casual ? Colors.white : context.textMuted,
                   ),
                 ),
               ),
@@ -937,12 +940,12 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     color: assignment.professional
-                        ? const Color(0xFF8B5CF6)
-                        : const Color(0xFF1C1D2A),
+                        ? context.accentSecondary
+                        : context.surfaceSecondary,
                     border: Border.all(
                       color: assignment.professional
-                          ? const Color(0xFF8B5CF6)
-                          : Colors.white.withValues(alpha: 0.08),
+                          ? context.accentSecondary
+                          : context.textMuted.withValues(alpha: 0.2),
                     ),
                   ),
                   child: Icon(
@@ -950,7 +953,7 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                     size: 16,
                     color: assignment.professional
                         ? Colors.white
-                        : const Color(0xFF5C5E78),
+                        : context.textMuted,
                   ),
                 ),
               ),
@@ -962,10 +965,11 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
               decoration: BoxDecoration(
-                color: const Color(0xFF191A2A),
-                borderRadius: BorderRadius.circular(14),
+                color: context.surfaceSecondary,
+                borderRadius:
+                    BorderRadius.circular(AppDimensions.radiusComponent),
                 border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.04),
+                  color: context.textMuted.withValues(alpha: 0.2),
                 ),
               ),
               child: Row(
@@ -975,8 +979,8 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                       hasHandle ? handle : 'Tap to add $title',
                       style: TextStyle(
                         color: hasHandle
-                            ? const Color(0xFF8B5CF6)
-                            : Colors.white30,
+                            ? context.accentSecondary
+                            : context.textMuted,
                         fontSize: 14,
                         fontWeight:
                             hasHandle ? FontWeight.w600 : FontWeight.normal,
@@ -985,8 +989,8 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                  const Icon(Icons.edit_rounded,
-                      color: Color(0xFF8B8C9E), size: 18),
+                  Icon(Icons.edit_rounded,
+                      color: context.textSecondary, size: 18),
                 ],
               ),
             ),
@@ -1002,41 +1006,47 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
       context: context,
       builder: (context) {
         return AlertDialog(
-          backgroundColor: const Color(0xFF13141F),
+          backgroundColor: context.surfacePrimary,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-            side: const BorderSide(color: Color(0xFF1F2030), width: 1.0),
+            borderRadius:
+                BorderRadius.circular(AppDimensions.radiusPremiumCard),
+            side: BorderSide(
+                color: context.textMuted.withValues(alpha: 0.2), width: 1.0),
           ),
           title: Text(
             "Edit $title",
-            style: const TextStyle(
-                color: Colors.white, fontWeight: FontWeight.bold),
+            style: context.cardTitle.copyWith(
+              color: context.textPrimary,
+              fontWeight: FontWeight.bold,
+            ),
           ),
           content: TextField(
             controller: controller,
-            style: const TextStyle(color: Colors.white),
-            cursorColor: const Color(0xFF8B5CF6),
+            style: TextStyle(color: context.textPrimary),
+            cursorColor: context.accentPrimary,
             decoration: InputDecoration(
               hintText: "Enter your $title handle or link",
-              hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.3)),
+              hintStyle: TextStyle(color: context.textMuted),
               filled: true,
-              fillColor: const Color(0xFF191A2A),
+              fillColor: context.surfaceSecondary,
               focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide:
-                    const BorderSide(color: Color(0xFF8B5CF6), width: 1.5),
+                borderRadius:
+                    BorderRadius.circular(AppDimensions.radiusComponent),
+                borderSide: BorderSide(color: context.accentPrimary, width: 1),
               ),
               enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: Colors.white12),
+                borderRadius:
+                    BorderRadius.circular(AppDimensions.radiusComponent),
+                borderSide:
+                    BorderSide(color: context.textMuted.withValues(alpha: 0.2)),
               ),
             ),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child:
-                  const Text("Cancel", style: TextStyle(color: Colors.white54)),
+              child: Text("Cancel",
+                  style: TextStyle(color: context.textSecondary)),
             ),
             ElevatedButton(
               onPressed: () async {
@@ -1045,9 +1055,10 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                 if (context.mounted) Navigator.pop(context);
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF8B5CF6),
+                backgroundColor: context.accentSecondary,
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius:
+                      BorderRadius.circular(AppDimensions.radiusComponent),
                 ),
               ),
               child: const Text("Save",
@@ -1083,17 +1094,17 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(16),
         gradient: hasChanges
-            ? const LinearGradient(
-                colors: [Color(0xFF8B5CF6), Color(0xFFD946EF)],
+            ? LinearGradient(
+                colors: [context.accentPrimary, context.accentSecondary],
                 begin: Alignment.centerLeft,
                 end: Alignment.centerRight,
               )
             : null,
-        color: hasChanges ? null : const Color(0xFF1B1D30),
+        color: hasChanges ? null : context.surfaceSecondary,
         boxShadow: hasChanges
             ? [
                 BoxShadow(
-                  color: const Color(0xFF8B5CF6).withValues(alpha: 0.35),
+                  color: context.accentSecondary.withValues(alpha: 0.35),
                   blurRadius: 12,
                   offset: const Offset(0, 4),
                 )
@@ -1139,9 +1150,9 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
       height: 32,
       padding: const EdgeInsets.all(2),
       decoration: BoxDecoration(
-        color: const Color(0xFF13141F),
+        color: context.surfacePrimary,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFF1F2030)),
+        border: Border.all(color: context.textMuted.withValues(alpha: 0.2)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -1162,15 +1173,13 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
         decoration: BoxDecoration(
-          color: isActive ? const Color(0xFF8B5CF6) : Colors.transparent,
+          color: isActive ? context.accentSecondary : Colors.transparent,
           borderRadius: BorderRadius.circular(14),
         ),
         child: Text(
           label,
-          style: TextStyle(
-            color: isActive ? Colors.white : const Color(0xFF8B8C9E),
-            fontSize: 12,
-            fontWeight: FontWeight.bold,
+          style: context.captionText.copyWith(
+            color: isActive ? Colors.white : context.textSecondary,
           ),
         ),
       ),
@@ -1182,9 +1191,9 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
       height: 40,
       padding: const EdgeInsets.all(3),
       decoration: BoxDecoration(
-        color: const Color(0xFF13141F),
+        color: context.surfacePrimary,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFF1F2030)),
+        border: Border.all(color: context.textMuted.withValues(alpha: 0.2)),
       ),
       child: Row(
         children: [
@@ -1223,7 +1232,7 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
         duration: const Duration(milliseconds: 200),
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: isActive ? const Color(0xFF8B5CF6) : Colors.transparent,
+          color: isActive ? context.accentSecondary : Colors.transparent,
           borderRadius: BorderRadius.circular(17),
         ),
         child: Row(
@@ -1232,15 +1241,14 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
             Icon(
               icon,
               size: 16,
-              color: isActive ? Colors.white : const Color(0xFF8B8C9E),
+              color: isActive ? Colors.white : context.textSecondary,
             ),
             const SizedBox(width: 6),
             Text(
               label,
-              style: TextStyle(
-                color: isActive ? Colors.white : const Color(0xFF8B8C9E),
+              style: context.captionText.copyWith(
+                color: isActive ? Colors.white : context.textSecondary,
                 fontSize: 13,
-                fontWeight: FontWeight.bold,
               ),
             ),
           ],
@@ -1259,10 +1267,10 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 12.0, horizontal: 16.0),
       decoration: BoxDecoration(
-        color: const Color(0xFF13141F),
+        color: context.surfacePrimary,
         borderRadius: BorderRadius.circular(30.0),
         border: Border.all(
-          color: const Color(0xFF1F2030),
+          color: context.textMuted.withValues(alpha: 0.2),
           width: 1.0,
         ),
       ),
@@ -1296,40 +1304,38 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
           ),
           // Titles
           Column(
-            children: const [
+            children: [
               Text(
                 'My Profile',
-                style: TextStyle(
-                  color: Colors.white,
+                style: context.screenHeading.copyWith(
                   fontSize: 18.0,
-                  fontWeight: FontWeight.bold,
                   letterSpacing: 0.2,
                 ),
               ),
-              SizedBox(height: 2),
+              const SizedBox(height: 2),
               Text(
                 'Digital Card',
-                style: TextStyle(
-                  color: Color(0xFF8B8C9E),
-                  fontSize: 12.0,
-                  fontWeight: FontWeight.w500,
+                style: context.captionText.copyWith(
+                  color: context.textSecondary,
                 ),
               ),
             ],
           ),
           // Menu Button (Sign Out popup)
           PopupMenuButton<String>(
-            color: const Color(0xFF13141F),
+            color: context.surfacePrimary,
             offset: const Offset(0, 48),
             padding: EdgeInsets.zero,
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-              side: const BorderSide(color: Color(0xFF1F2030), width: 1.5),
+              borderRadius:
+                  BorderRadius.circular(AppDimensions.radiusComponent),
+              side: BorderSide(
+                  color: context.textMuted.withValues(alpha: 0.2), width: 1.5),
             ),
             child: Container(
               padding: const EdgeInsets.all(8),
-              decoration: const BoxDecoration(
-                color: Color(0xFF1C1D2A),
+              decoration: BoxDecoration(
+                color: context.surfaceSecondary,
                 shape: BoxShape.circle,
               ),
               child: const Icon(
@@ -1342,13 +1348,14 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
               if (value == 'sign_out') {
                 HapticFeedback.mediumImpact();
                 final messenger = ScaffoldMessenger.of(context);
+                final signOutAccentColor = context.accentSecondary;
                 try {
                   await Supabase.instance.client.auth.signOut();
                   provider.clearFields();
                   messenger.showSnackBar(
-                    const SnackBar(
-                      content: Text("Signed out successfully"),
-                      backgroundColor: Color(0xFF8B5CF6),
+                    SnackBar(
+                      content: const Text("Signed out successfully"),
+                      backgroundColor: signOutAccentColor,
                       behavior: SnackBarBehavior.floating,
                     ),
                   );
@@ -1411,12 +1418,12 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
           width: cardWidth,
           height: cardHeight,
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(24.0),
-            gradient: const LinearGradient(
+            borderRadius: BorderRadius.circular(context.radiusPremiumCard),
+            gradient: LinearGradient(
               colors: [
-                Color(0xFF00F2FE),
-                Color(0xFF8B5CF6),
-                Color(0xFFEC4899),
+                const Color(0xFF00F2FE),
+                context.accentSecondary,
+                const Color(0xFFEC4899),
               ],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
@@ -1431,7 +1438,8 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
           ),
           padding: const EdgeInsets.all(1.5),
           child: ClipRRect(
-            borderRadius: BorderRadius.circular(22.5),
+            borderRadius:
+                BorderRadius.circular(context.radiusPremiumCard - 1.5),
             child: AnimatedContainer(
               duration: _cardAnimDuration,
               curve: _cardAnimCurve,
@@ -1441,7 +1449,8 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                   end: Alignment.bottomRight,
                   colors: [Color(0xFF1B1B3A), Color(0xFF0C0C18)],
                 ),
-                borderRadius: BorderRadius.circular(22.5),
+                borderRadius:
+                    BorderRadius.circular(context.radiusPremiumCard - 1.5),
               ),
               child: Stack(
                 children: [
@@ -1540,9 +1549,9 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                 height: 44,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: const Color(0xFF151628),
+                  color: context.surfaceSecondary,
                   border: Border.all(
-                    color: const Color(0xFF8B5CF6).withValues(alpha: 0.3),
+                    color: context.accentSecondary.withValues(alpha: 0.3),
                     width: 1.5,
                   ),
                 ),
@@ -1593,9 +1602,9 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
         AnimatedPositioned(
           duration: _cardAnimDuration,
           curve: _cardAnimCurve,
-          left: 18,
+          left: 20,
           right: W * 0.4,
-          bottom: 14,
+          bottom: 16,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             mainAxisSize: MainAxisSize.min,
@@ -1632,8 +1641,8 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                   child: AnimatedDefaultTextStyle(
                     duration: _cardAnimDuration,
                     curve: _cardAnimCurve,
-                    style: const TextStyle(
-                      color: Color(0xFF8B5CF6),
+                    style: TextStyle(
+                      color: context.accentSecondary,
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
                       fontFamily: 'Inter',
@@ -1656,8 +1665,8 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
         AnimatedPositioned(
           duration: _cardAnimDuration,
           curve: _cardAnimCurve,
-          left: W - 113,
-          bottom: 14,
+          right: 20,
+          bottom: 16,
           width: 95,
           child: Container(
             padding: const EdgeInsets.symmetric(
@@ -1712,9 +1721,9 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
         AnimatedPositioned(
           duration: _cardAnimDuration,
           curve: _cardAnimCurve,
-          left: 16,
-          right: 16,
-          top: 12,
+          left: 20,
+          right: 20,
+          top: 16,
           height: 40,
           child: Row(
             children: [
@@ -1724,11 +1733,13 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                   curve: _cardAnimCurve,
                   width: 36,
                   height: 36,
-                  padding: const EdgeInsets.all(1.0),
-                  decoration: const BoxDecoration(
+                  decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     gradient: LinearGradient(
-                      colors: [Color(0xFF00F2FE), Color(0xFF8B5CF6)],
+                      colors: [
+                        const Color(0xFF00F2FE),
+                        context.accentSecondary
+                      ],
                     ),
                   ),
                   child: ClipOval(
@@ -1739,7 +1750,7 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                             _avatarUrl,
                             fit: BoxFit.cover,
                             errorBuilder: (_, __, ___) => Container(
-                              color: const Color(0xFF1B1C2A),
+                              color: context.surfaceSecondary,
                               alignment: Alignment.center,
                               child: Text(
                                 _nameController.text.isNotEmpty
@@ -1756,7 +1767,7 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                             ),
                           )
                         : Container(
-                            color: const Color(0xFF1B1C2A),
+                            color: context.surfaceSecondary,
                             alignment: Alignment.center,
                             child: Text(
                               _nameController.text.isNotEmpty
@@ -1814,8 +1825,8 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                         child: AnimatedDefaultTextStyle(
                           duration: _cardAnimDuration,
                           curve: _cardAnimCurve,
-                          style: const TextStyle(
-                            color: Color(0xFF8B5CF6),
+                          style: TextStyle(
+                            color: context.accentSecondary,
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
                             fontFamily: 'Inter',
@@ -1856,9 +1867,9 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
         AnimatedPositioned(
           duration: _cardAnimDuration,
           curve: _cardAnimCurve,
-          left: 16,
-          right: 16,
-          top: 60,
+          left: 20,
+          right: 20,
+          top: 68,
           height: 1,
           child: Container(
             color: Colors.white.withValues(alpha: 0.08),
@@ -1869,9 +1880,9 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
         AnimatedPositioned(
           duration: _cardAnimDuration,
           curve: _cardAnimCurve,
-          left: (W * 0.5) + 6,
-          right: 16,
-          top: 74,
+          left: (W * 0.5) + 10,
+          right: 20,
+          top: 80,
           height: 80,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -1934,9 +1945,9 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
         AnimatedPositioned(
           duration: _cardAnimDuration,
           curve: _cardAnimCurve,
-          left: 16,
-          right: (W * 0.5) + 6,
-          top: 74,
+          left: 20,
+          right: (W * 0.5) + 10,
+          top: 80,
           height: 60,
           child: _fieldVisible('bio')
               ? Text(
@@ -1963,15 +1974,15 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
         AnimatedPositioned(
           duration: _cardAnimDuration,
           curve: _cardAnimCurve,
-          left: 16,
-          right: W - 76,
-          top: 140,
+          left: 20,
+          right: W - 80,
+          top: 148,
           height: 2,
           child: Container(
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(1.5),
-              gradient: const LinearGradient(
-                colors: [Color(0xFF8B5CF6), Color(0xFF00F2FE)],
+              gradient: LinearGradient(
+                colors: [context.accentSecondary, const Color(0xFF00F2FE)],
               ),
             ),
           ),
@@ -2013,7 +2024,7 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
               duration: _cardAnimDuration,
               curve: _cardAnimCurve,
               style: TextStyle(
-                color: isCasual ? const Color(0xFF8B8C9E) : Colors.white70,
+                color: isCasual ? context.textSecondary : Colors.white70,
                 fontSize: 12,
                 fontWeight: FontWeight.w500,
                 fontFamily: 'Inter',
@@ -2038,24 +2049,23 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF13141F),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFF1F2030)),
+        color: context.surfacePrimary,
+        borderRadius: BorderRadius.circular(AppDimensions.radiusComponent),
+        border: Border.all(color: context.textMuted.withValues(alpha: 0.2)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Row(
             children: [
-              const Icon(Icons.image_outlined,
-                  color: Color(0xFF8B5CF6), size: 18),
+              Icon(Icons.image_outlined,
+                  color: context.accentSecondary, size: 18),
               const SizedBox(width: 8),
-              const Expanded(
+              Expanded(
                 child: Text(
                   'Profile Photo',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 14,
+                  style: context.bodyText.copyWith(
+                    color: context.textPrimary,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -2063,6 +2073,7 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
               _buildLocalCardToggle(
                 icon: Icons.person_outline_rounded,
                 isActive: assignment.casual,
+                activeColor: context.accentSecondary,
                 onTap: () => provider.toggleFieldOnCard(
                     'avatarUrl', ProfileCardType.casual),
               ),
@@ -2070,6 +2081,7 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
               _buildLocalCardToggle(
                 icon: Icons.work_outline_rounded,
                 isActive: assignment.professional,
+                activeColor: context.accentSecondary,
                 onTap: () => provider.toggleFieldOnCard(
                     'avatarUrl', ProfileCardType.professional),
               ),
@@ -2100,7 +2112,7 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                           errorBuilder: (_, __, ___) => Container(
                             width: 72,
                             height: 72,
-                            color: const Color(0xFF1B1C2A),
+                            color: context.surfaceSecondary,
                             alignment: Alignment.center,
                             child: Text(
                               _nameController.text.isNotEmpty
@@ -2119,7 +2131,7 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                       : Container(
                           width: 72,
                           height: 72,
-                          color: const Color(0xFF1B1C2A),
+                          color: context.surfaceSecondary,
                           alignment: Alignment.center,
                           child: Text(
                             _nameController.text.isNotEmpty
@@ -2144,10 +2156,11 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                     height: 52,
                     alignment: Alignment.center,
                     decoration: BoxDecoration(
-                      color: const Color(0xFF191A2A),
-                      borderRadius: BorderRadius.circular(16),
+                      color: context.surfaceSecondary,
+                      borderRadius:
+                          BorderRadius.circular(AppDimensions.radiusComponent),
                       border: Border.all(
-                        color: Colors.white.withValues(alpha: 0.04),
+                        color: context.textMuted.withValues(alpha: 0.2),
                       ),
                     ),
                     child: const Text(
@@ -2171,6 +2184,7 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
   Widget _buildLocalCardToggle({
     required IconData icon,
     required bool isActive,
+    required Color activeColor,
     required VoidCallback onTap,
   }) {
     return GestureDetector(
@@ -2180,17 +2194,17 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
         height: 32,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          color: isActive ? const Color(0xFF8B5CF6) : const Color(0xFF1C1D2A),
+          color: isActive ? activeColor : context.surfaceSecondary,
           border: Border.all(
             color: isActive
-                ? const Color(0xFF8B5CF6)
-                : Colors.white.withValues(alpha: 0.08),
+                ? activeColor
+                : context.textMuted.withValues(alpha: 0.2),
           ),
         ),
         child: Icon(
           icon,
           size: 16,
-          color: isActive ? Colors.white : const Color(0xFF5C5E78),
+          color: isActive ? Colors.white : context.textMuted,
         ),
       ),
     );
@@ -2280,9 +2294,10 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
     showModalBottomSheet<String>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: const Color(0xFF13141F),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      backgroundColor: context.surfacePrimary,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(
+            top: Radius.circular(context.radiusPremiumCard)),
       ),
       builder: (context) {
         return const _CountryCodePickerSheet();
@@ -2327,9 +2342,9 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF13141F),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFF1F2030)),
+        color: context.surfacePrimary,
+        borderRadius: BorderRadius.circular(AppDimensions.radiusComponent),
+        border: Border.all(color: context.textMuted.withValues(alpha: 0.2)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -2337,15 +2352,14 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
           // Header Row with Card Toggles
           Row(
             children: [
-              const Icon(Icons.email_outlined,
-                  color: Color(0xFF8B5CF6), size: 18),
+              Icon(Icons.email_outlined,
+                  color: context.accentSecondary, size: 18),
               const SizedBox(width: 8),
-              const Expanded(
+              Expanded(
                 child: Text(
                   'Email Address',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 14,
+                  style: context.bodyText.copyWith(
+                    color: context.textPrimary,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -2353,6 +2367,7 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
               _buildLocalCardToggle(
                 icon: Icons.person_outline_rounded,
                 isActive: assignment.casual,
+                activeColor: context.accentSecondary,
                 onTap: () =>
                     provider.toggleFieldOnCard('email', ProfileCardType.casual),
               ),
@@ -2360,6 +2375,7 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
               _buildLocalCardToggle(
                 icon: Icons.work_outline_rounded,
                 isActive: assignment.professional,
+                activeColor: context.accentSecondary,
                 onTap: () => provider.toggleFieldOnCard(
                     'email', ProfileCardType.professional),
               ),
@@ -2369,16 +2385,15 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
 
           // Casual Email Section Header
           Row(
-            children: const [
+            children: [
               Icon(Icons.person_outline_rounded,
-                  color: Color(0xFF8B5CF6), size: 16),
-              SizedBox(width: 6),
+                  color: context.accentPrimary, size: 16),
+              const SizedBox(width: 6),
               Text(
                 'Casual Email',
-                style: TextStyle(
-                  color: Color(0xFF8B8C9E),
+                style: context.captionText.copyWith(
+                  color: context.textSecondary,
                   fontSize: 12,
-                  fontWeight: FontWeight.bold,
                 ),
               ),
             ],
@@ -2389,13 +2404,12 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
             focusNode: _emailFocusNode,
             readOnly: casualReadOnly,
             keyboardType: TextInputType.emailAddress,
-            style: const TextStyle(color: Colors.white, fontSize: 14),
-            cursorColor: const Color(0xFF8B5CF6),
+            style: context.bodyText.copyWith(color: context.textPrimary),
+            cursorColor: context.accentPrimary,
             decoration: InputDecoration(
               hintText: 'jordan@designstudio.com',
-              hintStyle: TextStyle(
-                color: Colors.white.withValues(alpha: 0.25),
-                fontSize: 14,
+              hintStyle: context.bodyText.copyWith(
+                color: context.textMuted,
               ),
               suffixIcon: isCasualFilled
                   ? GestureDetector(
@@ -2413,33 +2427,36 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                             : Icons.edit_rounded,
                         color: isCasualEditing
                             ? const Color(0xFF10B981)
-                            : Colors.white24,
+                            : context.textMuted,
                         size: 18,
                       ),
                     )
-                  : const Icon(
+                  : Icon(
                       Icons.edit_rounded,
-                      color: Colors.white24,
+                      color: context.textMuted,
                       size: 16,
                     ),
               filled: true,
-              fillColor: const Color(0xFF191A2A),
+              fillColor: context.surfaceSecondary,
               contentPadding:
                   const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(14),
+                borderRadius:
+                    BorderRadius.circular(AppDimensions.radiusComponent),
                 borderSide: BorderSide.none,
               ),
               enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(14),
+                borderRadius:
+                    BorderRadius.circular(AppDimensions.radiusComponent),
                 borderSide: BorderSide(
-                  color: Colors.white.withValues(alpha: 0.04),
+                  color: context.textMuted.withValues(alpha: 0.1),
                 ),
               ),
               focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(14),
-                borderSide: const BorderSide(
-                  color: Color(0xFF8B5CF6),
+                borderRadius:
+                    BorderRadius.circular(AppDimensions.radiusComponent),
+                borderSide: BorderSide(
+                  color: context.accentPrimary,
                   width: 1,
                 ),
               ),
@@ -2449,16 +2466,15 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
 
           // Professional Email Section Header
           Row(
-            children: const [
+            children: [
               Icon(Icons.work_outline_rounded,
-                  color: Color(0xFF8B5CF6), size: 16),
-              SizedBox(width: 6),
+                  color: context.accentSecondary, size: 16),
+              const SizedBox(width: 6),
               Text(
                 'Professional Email',
-                style: TextStyle(
-                  color: Color(0xFF8B8C9E),
+                style: context.captionText.copyWith(
+                  color: context.textSecondary,
                   fontSize: 12,
-                  fontWeight: FontWeight.bold,
                 ),
               ),
             ],
@@ -2469,13 +2485,12 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
             focusNode: _professionalEmailFocusNode,
             readOnly: profReadOnly,
             keyboardType: TextInputType.emailAddress,
-            style: const TextStyle(color: Colors.white, fontSize: 14),
-            cursorColor: const Color(0xFF8B5CF6),
+            style: context.bodyText.copyWith(color: context.textPrimary),
+            cursorColor: context.accentPrimary,
             decoration: InputDecoration(
               hintText: 'jordan@company.com',
-              hintStyle: TextStyle(
-                color: Colors.white.withValues(alpha: 0.25),
-                fontSize: 14,
+              hintStyle: context.bodyText.copyWith(
+                color: context.textMuted,
               ),
               suffixIcon: isProfFilled
                   ? GestureDetector(
@@ -2493,33 +2508,36 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                             : Icons.edit_rounded,
                         color: isProfEditing
                             ? const Color(0xFF10B981)
-                            : Colors.white24,
+                            : context.textMuted,
                         size: 18,
                       ),
                     )
-                  : const Icon(
+                  : Icon(
                       Icons.edit_rounded,
-                      color: Colors.white24,
+                      color: context.textMuted,
                       size: 16,
                     ),
               filled: true,
-              fillColor: const Color(0xFF191A2A),
+              fillColor: context.surfaceSecondary,
               contentPadding:
                   const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(14),
+                borderRadius:
+                    BorderRadius.circular(AppDimensions.radiusComponent),
                 borderSide: BorderSide.none,
               ),
               enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(14),
+                borderRadius:
+                    BorderRadius.circular(AppDimensions.radiusComponent),
                 borderSide: BorderSide(
-                  color: Colors.white.withValues(alpha: 0.04),
+                  color: context.textMuted.withValues(alpha: 0.1),
                 ),
               ),
               focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(14),
-                borderSide: const BorderSide(
-                  color: Color(0xFF8B5CF6),
+                borderRadius:
+                    BorderRadius.circular(AppDimensions.radiusComponent),
+                borderSide: BorderSide(
+                  color: context.accentSecondary,
                   width: 1,
                 ),
               ),
@@ -2563,9 +2581,9 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF13141F),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFF1F2030)),
+        color: context.surfacePrimary,
+        borderRadius: BorderRadius.circular(AppDimensions.radiusComponent),
+        border: Border.all(color: context.textMuted.withValues(alpha: 0.2)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -2573,15 +2591,14 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
           // Header Row with Card Toggles
           Row(
             children: [
-              const Icon(Icons.phone_android_outlined,
-                  color: Color(0xFF8B5CF6), size: 18),
+              Icon(Icons.phone_android_outlined,
+                  color: context.accentSecondary, size: 18),
               const SizedBox(width: 8),
-              const Expanded(
+              Expanded(
                 child: Text(
                   'Phone Number',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 14,
+                  style: context.bodyText.copyWith(
+                    color: context.textPrimary,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -2589,6 +2606,7 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
               _buildLocalCardToggle(
                 icon: Icons.person_outline_rounded,
                 isActive: assignment.casual,
+                activeColor: context.accentSecondary,
                 onTap: () => provider.toggleFieldOnCard(
                     'phoneNumber', ProfileCardType.casual),
               ),
@@ -2596,6 +2614,7 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
               _buildLocalCardToggle(
                 icon: Icons.work_outline_rounded,
                 isActive: assignment.professional,
+                activeColor: context.accentSecondary,
                 onTap: () => provider.toggleFieldOnCard(
                     'phoneNumber', ProfileCardType.professional),
               ),
@@ -2605,16 +2624,15 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
 
           // Casual Phone Number Section Header
           Row(
-            children: const [
+            children: [
               Icon(Icons.person_outline_rounded,
-                  color: Color(0xFF8B5CF6), size: 16),
-              SizedBox(width: 6),
+                  color: context.accentPrimary, size: 16),
+              const SizedBox(width: 6),
               Text(
                 'Casual Phone Number',
-                style: TextStyle(
-                  color: Color(0xFF8B8C9E),
+                style: context.captionText.copyWith(
+                  color: context.textSecondary,
                   fontSize: 12,
-                  fontWeight: FontWeight.bold,
                 ),
               ),
             ],
@@ -2636,10 +2654,11 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                   height: 48,
                   padding: const EdgeInsets.symmetric(horizontal: 12),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF191A2A),
-                    borderRadius: BorderRadius.circular(14),
+                    color: context.surfaceSecondary,
+                    borderRadius:
+                        BorderRadius.circular(AppDimensions.radiusComponent),
                     border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.04),
+                      color: context.textMuted.withValues(alpha: 0.1),
                     ),
                   ),
                   child: Row(
@@ -2654,9 +2673,9 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                         ),
                       ),
                       const SizedBox(width: 4),
-                      const Icon(
+                      Icon(
                         Icons.keyboard_arrow_down_rounded,
-                        color: Colors.white70,
+                        color: context.textSecondary,
                         size: 18,
                       ),
                     ],
@@ -2670,13 +2689,12 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                   focusNode: _phoneFocusNode,
                   readOnly: casualReadOnly,
                   keyboardType: TextInputType.phone,
-                  style: const TextStyle(color: Colors.white, fontSize: 14),
-                  cursorColor: const Color(0xFF8B5CF6),
+                  style: context.bodyText.copyWith(color: context.textPrimary),
+                  cursorColor: context.accentPrimary,
                   decoration: InputDecoration(
                     hintText: '(555) 123-4567',
-                    hintStyle: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.25),
-                      fontSize: 14,
+                    hintStyle: context.bodyText.copyWith(
+                      color: context.textMuted,
                     ),
                     suffixIcon: isCasualFilled
                         ? GestureDetector(
@@ -2694,33 +2712,36 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                                   : Icons.edit_rounded,
                               color: isCasualEditing
                                   ? const Color(0xFF10B981)
-                                  : Colors.white24,
+                                  : context.textMuted,
                               size: 18,
                             ),
                           )
-                        : const Icon(
+                        : Icon(
                             Icons.edit_rounded,
-                            color: Colors.white24,
+                            color: context.textMuted,
                             size: 16,
                           ),
                     filled: true,
-                    fillColor: const Color(0xFF191A2A),
+                    fillColor: context.surfaceSecondary,
                     contentPadding: const EdgeInsets.symmetric(
                         horizontal: 16, vertical: 12),
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(14),
+                      borderRadius:
+                          BorderRadius.circular(AppDimensions.radiusComponent),
                       borderSide: BorderSide.none,
                     ),
                     enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(14),
+                      borderRadius:
+                          BorderRadius.circular(AppDimensions.radiusComponent),
                       borderSide: BorderSide(
-                        color: Colors.white.withValues(alpha: 0.04),
+                        color: context.textMuted.withValues(alpha: 0.1),
                       ),
                     ),
                     focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(14),
-                      borderSide: const BorderSide(
-                        color: Color(0xFF8B5CF6),
+                      borderRadius:
+                          BorderRadius.circular(AppDimensions.radiusComponent),
+                      borderSide: BorderSide(
+                        color: context.accentPrimary,
                         width: 1,
                       ),
                     ),
@@ -2733,16 +2754,15 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
 
           // Professional Phone Number Section Header
           Row(
-            children: const [
+            children: [
               Icon(Icons.work_outline_rounded,
-                  color: Color(0xFF8B5CF6), size: 16),
-              SizedBox(width: 6),
+                  color: context.accentSecondary, size: 16),
+              const SizedBox(width: 6),
               Text(
                 'Professional Phone Number',
-                style: TextStyle(
-                  color: Color(0xFF8B8C9E),
+                style: context.captionText.copyWith(
+                  color: context.textSecondary,
                   fontSize: 12,
-                  fontWeight: FontWeight.bold,
                 ),
               ),
             ],
@@ -2764,10 +2784,11 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                   height: 48,
                   padding: const EdgeInsets.symmetric(horizontal: 12),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF191A2A),
-                    borderRadius: BorderRadius.circular(14),
+                    color: context.surfaceSecondary,
+                    borderRadius:
+                        BorderRadius.circular(AppDimensions.radiusComponent),
                     border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.04),
+                      color: context.textMuted.withValues(alpha: 0.1),
                     ),
                   ),
                   child: Row(
@@ -2782,9 +2803,9 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                         ),
                       ),
                       const SizedBox(width: 4),
-                      const Icon(
+                      Icon(
                         Icons.keyboard_arrow_down_rounded,
-                        color: Colors.white70,
+                        color: context.textSecondary,
                         size: 18,
                       ),
                     ],
@@ -2798,13 +2819,12 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                   focusNode: _professionalPhoneFocusNode,
                   readOnly: profReadOnly,
                   keyboardType: TextInputType.phone,
-                  style: const TextStyle(color: Colors.white, fontSize: 14),
-                  cursorColor: const Color(0xFF8B5CF6),
+                  style: context.bodyText.copyWith(color: context.textPrimary),
+                  cursorColor: context.accentPrimary,
                   decoration: InputDecoration(
                     hintText: '(555) 987-6543',
-                    hintStyle: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.25),
-                      fontSize: 14,
+                    hintStyle: context.bodyText.copyWith(
+                      color: context.textMuted,
                     ),
                     suffixIcon: isProfFilled
                         ? GestureDetector(
@@ -2822,33 +2842,36 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                                   : Icons.edit_rounded,
                               color: isProfEditing
                                   ? const Color(0xFF10B981)
-                                  : Colors.white24,
+                                  : context.textMuted,
                               size: 18,
                             ),
                           )
-                        : const Icon(
+                        : Icon(
                             Icons.edit_rounded,
-                            color: Colors.white24,
+                            color: context.textMuted,
                             size: 16,
                           ),
                     filled: true,
-                    fillColor: const Color(0xFF191A2A),
+                    fillColor: context.surfaceSecondary,
                     contentPadding: const EdgeInsets.symmetric(
                         horizontal: 16, vertical: 12),
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(14),
+                      borderRadius:
+                          BorderRadius.circular(AppDimensions.radiusComponent),
                       borderSide: BorderSide.none,
                     ),
                     enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(14),
+                      borderRadius:
+                          BorderRadius.circular(AppDimensions.radiusComponent),
                       borderSide: BorderSide(
-                        color: Colors.white.withValues(alpha: 0.04),
+                        color: context.textMuted.withValues(alpha: 0.1),
                       ),
                     ),
                     focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(14),
-                      borderSide: const BorderSide(
-                        color: Color(0xFF8B5CF6),
+                      borderRadius:
+                          BorderRadius.circular(AppDimensions.radiusComponent),
+                      borderSide: BorderSide(
+                        color: context.accentSecondary,
                         width: 1,
                       ),
                     ),
@@ -2896,24 +2919,23 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF13141F),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFF1F2030)),
+        color: context.surfacePrimary,
+        borderRadius: BorderRadius.circular(AppDimensions.radiusComponent),
+        border: Border.all(color: context.textMuted.withValues(alpha: 0.2)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Row(
             children: [
-              const Icon(Icons.description_outlined,
-                  color: Color(0xFF8B5CF6), size: 18),
+              Icon(Icons.description_outlined,
+                  color: context.accentSecondary, size: 18),
               const SizedBox(width: 8),
-              const Expanded(
+              Expanded(
                 child: Text(
                   'Bio',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 14,
+                  style: context.bodyText.copyWith(
+                    color: context.textPrimary,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -2921,6 +2943,7 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
               _buildLocalCardToggle(
                 icon: Icons.person_outline_rounded,
                 isActive: assignment.casual,
+                activeColor: context.accentSecondary,
                 onTap: () =>
                     provider.toggleFieldOnCard('bio', ProfileCardType.casual),
               ),
@@ -2928,6 +2951,7 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
               _buildLocalCardToggle(
                 icon: Icons.work_outline_rounded,
                 isActive: assignment.professional,
+                activeColor: context.accentSecondary,
                 onTap: () => provider.toggleFieldOnCard(
                     'bio', ProfileCardType.professional),
               ),
@@ -2936,16 +2960,15 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
           const SizedBox(height: 16),
           // Casual Card Bio
           Row(
-            children: const [
+            children: [
               Icon(Icons.person_outline_rounded,
-                  color: Color(0xFF8B5CF6), size: 16),
-              SizedBox(width: 6),
+                  color: context.accentPrimary, size: 16),
+              const SizedBox(width: 6),
               Text(
                 'Casual Card Bio',
-                style: TextStyle(
-                  color: Color(0xFF8B8C9E),
+                style: context.captionText.copyWith(
+                  color: context.textSecondary,
                   fontSize: 12,
-                  fontWeight: FontWeight.bold,
                 ),
               ),
             ],
@@ -2956,14 +2979,13 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
             focusNode: _bioFocusNode,
             readOnly: bioReadOnly,
             maxLines: 3,
-            style: const TextStyle(color: Colors.white, fontSize: 14),
-            cursorColor: const Color(0xFF8B5CF6),
+            style: context.bodyText.copyWith(color: context.textPrimary),
+            cursorColor: context.accentPrimary,
             decoration: InputDecoration(
               hintText:
                   'Creating delightful user experiences through thoughtful design and innovation.',
-              hintStyle: TextStyle(
-                color: Colors.white.withValues(alpha: 0.25),
-                fontSize: 14,
+              hintStyle: context.bodyText.copyWith(
+                color: context.textMuted,
               ),
               suffixIcon: isBioFilled
                   ? GestureDetector(
@@ -2981,33 +3003,36 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                             : Icons.edit_rounded,
                         color: isBioEditing
                             ? const Color(0xFF10B981)
-                            : Colors.white24,
+                            : context.textMuted,
                         size: 18,
                       ),
                     )
-                  : const Icon(
+                  : Icon(
                       Icons.edit_rounded,
-                      color: Colors.white24,
+                      color: context.textMuted,
                       size: 16,
                     ),
               filled: true,
-              fillColor: const Color(0xFF191A2A),
+              fillColor: context.surfaceSecondary,
               contentPadding:
                   const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(14),
+                borderRadius:
+                    BorderRadius.circular(AppDimensions.radiusComponent),
                 borderSide: BorderSide.none,
               ),
               enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(14),
+                borderRadius:
+                    BorderRadius.circular(AppDimensions.radiusComponent),
                 borderSide: BorderSide(
-                  color: Colors.white.withValues(alpha: 0.04),
+                  color: context.textMuted.withValues(alpha: 0.1),
                 ),
               ),
               focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(14),
-                borderSide: const BorderSide(
-                  color: Color(0xFF8B5CF6),
+                borderRadius:
+                    BorderRadius.circular(AppDimensions.radiusComponent),
+                borderSide: BorderSide(
+                  color: context.accentPrimary,
                   width: 1,
                 ),
               ),
@@ -3016,16 +3041,15 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
           const SizedBox(height: 16),
           // Professional Card Bio
           Row(
-            children: const [
+            children: [
               Icon(Icons.work_outline_rounded,
-                  color: Color(0xFF8B5CF6), size: 16),
-              SizedBox(width: 6),
+                  color: context.accentSecondary, size: 16),
+              const SizedBox(width: 6),
               Text(
                 'Professional Card Bio',
-                style: TextStyle(
-                  color: Color(0xFF8B8C9E),
+                style: context.captionText.copyWith(
+                  color: context.textSecondary,
                   fontSize: 12,
-                  fontWeight: FontWeight.bold,
                 ),
               ),
             ],
@@ -3036,14 +3060,13 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
             focusNode: _professionalBioFocusNode,
             readOnly: profBioReadOnly,
             maxLines: 3,
-            style: const TextStyle(color: Colors.white, fontSize: 14),
-            cursorColor: const Color(0xFF8B5CF6),
+            style: context.bodyText.copyWith(color: context.textPrimary),
+            cursorColor: context.accentPrimary,
             decoration: InputDecoration(
               hintText:
                   'Senior Product Designer with 8+ years of experience crafting intuitive digital solutions.',
-              hintStyle: TextStyle(
-                color: Colors.white.withValues(alpha: 0.25),
-                fontSize: 14,
+              hintStyle: context.bodyText.copyWith(
+                color: context.textMuted,
               ),
               suffixIcon: isProfBioFilled
                   ? GestureDetector(
@@ -3061,33 +3084,36 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                             : Icons.edit_rounded,
                         color: isProfBioEditing
                             ? const Color(0xFF10B981)
-                            : Colors.white24,
+                            : context.textMuted,
                         size: 18,
                       ),
                     )
-                  : const Icon(
+                  : Icon(
                       Icons.edit_rounded,
-                      color: Colors.white24,
+                      color: context.textMuted,
                       size: 16,
                     ),
               filled: true,
-              fillColor: const Color(0xFF191A2A),
+              fillColor: context.surfaceSecondary,
               contentPadding:
                   const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(14),
+                borderRadius:
+                    BorderRadius.circular(AppDimensions.radiusComponent),
                 borderSide: BorderSide.none,
               ),
               enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(14),
+                borderRadius:
+                    BorderRadius.circular(AppDimensions.radiusComponent),
                 borderSide: BorderSide(
-                  color: Colors.white.withValues(alpha: 0.04),
+                  color: context.textMuted.withValues(alpha: 0.1),
                 ),
               ),
               focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(14),
-                borderSide: const BorderSide(
-                  color: Color(0xFF8B5CF6),
+                borderRadius:
+                    BorderRadius.circular(AppDimensions.radiusComponent),
+                borderSide: BorderSide(
+                  color: context.accentSecondary,
                   width: 1,
                 ),
               ),
@@ -3102,10 +3128,10 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 12.0, horizontal: 16.0),
       decoration: BoxDecoration(
-        color: const Color(0xFF13141F),
+        color: context.surfacePrimary,
         borderRadius: BorderRadius.circular(30.0),
         border: Border.all(
-          color: const Color(0xFF1F2030),
+          color: context.surfaceSecondary,
           width: 1.0,
         ),
       ),
@@ -3115,7 +3141,8 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
           Container(
             width: 32,
             height: 32,
-            decoration: const BoxDecoration(shape: BoxShape.circle, color: Colors.white10),
+            decoration: const BoxDecoration(
+                shape: BoxShape.circle, color: Colors.white10),
           ),
           Column(
             children: [
@@ -3131,7 +3158,7 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
               Text(
                 'Digital Card',
                 style: TextStyle(
-                  color: Color(0xFF8B8C9E),
+                  color: context.textSecondary,
                   fontSize: 12.0,
                 ),
               ),
@@ -3140,7 +3167,8 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
           Container(
             width: 32,
             height: 32,
-            decoration: const BoxDecoration(shape: BoxShape.circle, color: Colors.white10),
+            decoration: const BoxDecoration(
+                shape: BoxShape.circle, color: Colors.white10),
           ),
         ],
       ),
@@ -3154,24 +3182,39 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Text(
+            Text(
               'YOUR CARDS',
               style: TextStyle(
-                color: Color(0xFF8B8C9E),
+                color: context.textSecondary,
                 fontSize: 14.0,
                 fontWeight: FontWeight.bold,
                 letterSpacing: 1.5,
               ),
             ),
-            Container(width: 80, height: 24, decoration: BoxDecoration(borderRadius: BorderRadius.circular(12), color: Colors.white10)),
+            Container(
+                width: 80,
+                height: 24,
+                decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    color: Colors.white10)),
           ],
         ),
         const SizedBox(height: 12),
         Row(
           children: [
-            Expanded(child: Container(height: 36, decoration: BoxDecoration(borderRadius: BorderRadius.circular(10), color: Colors.white10))),
+            Expanded(
+                child: Container(
+                    height: 36,
+                    decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(10),
+                        color: Colors.white10))),
             const SizedBox(width: 12),
-            Expanded(child: Container(height: 36, decoration: BoxDecoration(borderRadius: BorderRadius.circular(10), color: Colors.white10))),
+            Expanded(
+                child: Container(
+                    height: 36,
+                    decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(10),
+                        color: Colors.white10))),
           ],
         ),
         const SizedBox(height: 16),
@@ -3179,7 +3222,7 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
           height: 180,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(24),
-            color: const Color(0xFF131422),
+            color: context.surfaceSecondary,
           ),
           padding: const EdgeInsets.all(24),
           child: Row(
@@ -3187,18 +3230,25 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
               Container(
                 width: 64,
                 height: 64,
-                decoration: const BoxDecoration(shape: BoxShape.circle, color: Colors.white10),
+                decoration: const BoxDecoration(
+                    shape: BoxShape.circle, color: Colors.white10),
               ),
               const SizedBox(width: 16),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Text("Jane Doe", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                  Text("Jane Doe",
+                      style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold)),
                   SizedBox(height: 6),
-                  Text("Software Engineer", style: TextStyle(color: Colors.white70, fontSize: 13)),
+                  Text("Software Engineer",
+                      style: TextStyle(color: Colors.white70, fontSize: 13)),
                   SizedBox(height: 6),
-                  Text("Tech Corp", style: TextStyle(color: Colors.white30, fontSize: 11)),
+                  Text("Tech Corp",
+                      style: TextStyle(color: Colors.white30, fontSize: 11)),
                 ],
               )
             ],
@@ -3212,10 +3262,10 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'EDIT DETAILS',
           style: TextStyle(
-            color: Color(0xFF8B8C9E),
+            color: context.textSecondary,
             fontSize: 14.0,
             fontWeight: FontWeight.bold,
             letterSpacing: 1.5,
@@ -3228,7 +3278,7 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
             margin: const EdgeInsets.only(bottom: 12),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(16),
-              color: const Color(0xFF13141F),
+              color: context.surfacePrimary,
             ),
           ),
       ],
@@ -3243,7 +3293,8 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
           Container(
             width: 44,
             height: 44,
-            decoration: const BoxDecoration(shape: BoxShape.circle, color: Color(0xFF13141F)),
+            decoration: BoxDecoration(
+                shape: BoxShape.circle, color: context.surfacePrimary),
           ),
       ],
     );
@@ -3254,7 +3305,7 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
       height: 54,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(16),
-        color: const Color(0xFF8B5CF6),
+        color: context.accentSecondary,
       ),
     );
   }
@@ -3357,8 +3408,9 @@ class _CountryCodePickerSheetState extends State<_CountryCodePickerSheet> {
     final double bottomPadding = MediaQuery.of(context).viewInsets.bottom;
 
     return Material(
-      color: const Color(0xFF13141F),
-      borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+      color: context.surfacePrimary,
+      borderRadius: BorderRadius.vertical(
+          top: Radius.circular(context.radiusPremiumCard)),
       clipBehavior: Clip.antiAlias,
       child: SizedBox(
         height: MediaQuery.of(context).size.height * 0.75,
@@ -3379,15 +3431,14 @@ class _CountryCodePickerSheetState extends State<_CountryCodePickerSheet> {
             ),
             const SizedBox(height: 16),
             // Header
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 24),
+            Padding(
+              padding: const EdgeInsets.symmetric(
+                  horizontal: AppDimensions.marginStandard),
               child: Text(
                 'Select Country',
-                style: TextStyle(
-                  color: Colors.white,
+                style: context.screenHeading.copyWith(
+                  color: context.textPrimary,
                   fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  fontFamily: 'Inter',
                 ),
               ),
             ),
@@ -3402,24 +3453,23 @@ class _CountryCodePickerSheetState extends State<_CountryCodePickerSheet> {
                     _searchQuery = val;
                   });
                 },
-                style: const TextStyle(color: Colors.white, fontSize: 15),
-                cursorColor: const Color(0xFF8B5CF6),
+                style: context.bodyText.copyWith(color: context.textPrimary),
+                cursorColor: context.accentSecondary,
                 decoration: InputDecoration(
                   hintText: 'Search country or code...',
-                  hintStyle: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.3),
-                    fontSize: 15,
+                  hintStyle: context.bodyText.copyWith(
+                    color: context.textMuted,
                   ),
                   prefixIcon: Icon(
                     Icons.search_rounded,
-                    color: Colors.white.withValues(alpha: 0.4),
+                    color: context.textMuted,
                     size: 20,
                   ),
                   suffixIcon: _searchQuery.isNotEmpty
                       ? IconButton(
                           icon: Icon(
                             Icons.close_rounded,
-                            color: Colors.white.withValues(alpha: 0.4),
+                            color: context.textMuted,
                             size: 20,
                           ),
                           onPressed: () {
@@ -3431,23 +3481,26 @@ class _CountryCodePickerSheetState extends State<_CountryCodePickerSheet> {
                         )
                       : null,
                   filled: true,
-                  fillColor: const Color(0xFF191A2A),
+                  fillColor: context.surfaceSecondary,
                   contentPadding:
                       const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
+                    borderRadius:
+                        BorderRadius.circular(AppDimensions.radiusComponent),
                     borderSide: BorderSide.none,
                   ),
                   enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
+                    borderRadius:
+                        BorderRadius.circular(AppDimensions.radiusComponent),
                     borderSide: BorderSide(
-                      color: Colors.white.withValues(alpha: 0.04),
+                      color: context.textMuted.withValues(alpha: 0.1),
                     ),
                   ),
                   focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
-                    borderSide: const BorderSide(
-                      color: Color(0xFF8B5CF6),
+                    borderRadius:
+                        BorderRadius.circular(AppDimensions.radiusComponent),
+                    borderSide: BorderSide(
+                      color: context.accentSecondary,
                       width: 1,
                     ),
                   ),
@@ -3458,13 +3511,11 @@ class _CountryCodePickerSheetState extends State<_CountryCodePickerSheet> {
             // Countries List
             Expanded(
               child: filtered.isEmpty
-                  ? const Center(
+                  ? Center(
                       child: Text(
                         'No countries found',
-                        style: TextStyle(
-                          color: Colors.white54,
-                          fontSize: 14,
-                          fontFamily: 'Inter',
+                        style: context.bodyText.copyWith(
+                          color: context.textSecondary,
                         ),
                       ),
                     )
@@ -3484,9 +3535,8 @@ class _CountryCodePickerSheetState extends State<_CountryCodePickerSheet> {
                                   left: 8, top: 16, bottom: 8),
                               child: Text(
                                 regionName.toUpperCase(),
-                                style: const TextStyle(
-                                  color: Color(0xFF8B5CF6),
-                                  fontWeight: FontWeight.bold,
+                                style: context.captionText.copyWith(
+                                  color: context.accentSecondary,
                                   fontSize: 12,
                                   letterSpacing: 1.2,
                                 ),
@@ -3495,16 +3545,17 @@ class _CountryCodePickerSheetState extends State<_CountryCodePickerSheet> {
                             ...countries.map((country) {
                               return Theme(
                                 data: Theme.of(context).copyWith(
-                                  splashColor: const Color(0xFF8B5CF6)
+                                  splashColor: context.accentSecondary
                                       .withValues(alpha: 0.1),
-                                  highlightColor: const Color(0xFF8B5CF6)
+                                  highlightColor: context.accentSecondary
                                       .withValues(alpha: 0.05),
                                 ),
                                 child: ListTile(
                                   contentPadding: const EdgeInsets.symmetric(
                                       horizontal: 12),
                                   shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
+                                    borderRadius: BorderRadius.circular(
+                                        AppDimensions.radiusComponent),
                                   ),
                                   leading: Text(
                                     country.flag,
@@ -3512,20 +3563,16 @@ class _CountryCodePickerSheetState extends State<_CountryCodePickerSheet> {
                                   ),
                                   title: Text(
                                     country.name,
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 15,
-                                      fontFamily: 'Inter',
+                                    style: context.bodyText.copyWith(
+                                      color: context.textPrimary,
                                       fontWeight: FontWeight.w500,
                                     ),
                                   ),
                                   trailing: Text(
                                     country.code,
-                                    style: const TextStyle(
-                                      color: Colors.white54,
-                                      fontSize: 14,
+                                    style: context.bodyText.copyWith(
+                                      color: context.textSecondary,
                                       fontWeight: FontWeight.w600,
-                                      fontFamily: 'Inter',
                                     ),
                                   ),
                                   onTap: () {

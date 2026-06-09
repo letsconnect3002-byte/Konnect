@@ -1,3 +1,4 @@
+import 'package:connect/Config/app_theme.dart';
 import 'package:connect/Models/profile_card_type.dart';
 import 'package:connect/Providers/profile_provider.dart';
 import 'package:flutter/material.dart';
@@ -60,7 +61,6 @@ class _CardFieldInputState extends State<CardFieldInput> {
 
   void _onFocusChange() {
     if (!_focusNode.hasFocus) {
-      // Lock field again if it has focus loss and contains data
       if (widget.isEditing) {
         widget.onEditingChanged(false);
       }
@@ -77,7 +77,6 @@ class _CardFieldInputState extends State<CardFieldInput> {
     final isFilled = (widget.controller?.text ?? '').isNotEmpty;
     final readOnly = isFilled && !isEditing;
 
-    // Autofocus when edit mode is toggled on
     if (isEditing && !_focusNode.hasFocus) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted && !_focusNode.hasFocus) {
@@ -90,23 +89,22 @@ class _CardFieldInputState extends State<CardFieldInput> {
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF13141F),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFF1F2030)),
+        color: context.surfacePrimary,
+        borderRadius: BorderRadius.circular(AppDimensions.radiusComponent),
+        border: Border.all(color: context.textMuted.withValues(alpha: 0.2)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Row(
             children: [
-              Icon(widget.icon, color: const Color(0xFF8B5CF6), size: 18),
+              Icon(widget.icon, color: context.accentSecondary, size: 18),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   widget.label,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 14,
+                  style: context.bodyText.copyWith(
+                    color: context.textPrimary,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -115,6 +113,7 @@ class _CardFieldInputState extends State<CardFieldInput> {
                 _CardToggle(
                   icon: Icons.person_outline_rounded,
                   isActive: assignment.casual,
+                  activeColor: context.accentSecondary,
                   onTap: () => provider.toggleFieldOnCard(
                       widget.fieldKey, ProfileCardType.casual),
                 ),
@@ -122,6 +121,7 @@ class _CardFieldInputState extends State<CardFieldInput> {
                 _CardToggle(
                   icon: Icons.work_outline_rounded,
                   isActive: assignment.professional,
+                  activeColor: context.accentSecondary,
                   onTap: () => provider.toggleFieldOnCard(
                       widget.fieldKey, ProfileCardType.professional),
                 ),
@@ -140,18 +140,17 @@ class _CardFieldInputState extends State<CardFieldInput> {
                         (widget.value ?? '').isNotEmpty
                             ? widget.value!
                             : widget.hint,
-                        style: TextStyle(
+                        style: context.bodyText.copyWith(
                           color: (widget.value ?? '').isNotEmpty
-                              ? Colors.white
-                              : Colors.white30,
-                          fontSize: 15,
+                              ? context.textPrimary
+                              : context.textMuted,
                         ),
                         maxLines: widget.maxLines,
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                    const Icon(Icons.chevron_right_rounded,
-                        color: Colors.white38, size: 20),
+                    Icon(Icons.chevron_right_rounded,
+                        color: context.textMuted, size: 20),
                   ],
                 ),
               ),
@@ -164,23 +163,20 @@ class _CardFieldInputState extends State<CardFieldInput> {
               onChanged: widget.onChanged,
               keyboardType: widget.keyboardType,
               maxLines: widget.maxLines,
-              style: const TextStyle(color: Colors.white, fontSize: 15),
-              cursorColor: const Color(0xFF8B5CF6),
+              style: context.bodyText.copyWith(color: context.textPrimary),
+              cursorColor: context.accentPrimary,
               decoration: InputDecoration(
                 hintText: widget.hint,
-                hintStyle: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.25),
-                  fontSize: 15,
+                hintStyle: context.bodyText.copyWith(
+                  color: context.textMuted,
                 ),
                 suffixIcon: isFilled
                     ? GestureDetector(
                         onTap: () {
                           if (isEditing) {
-                            // Stop editing (lock it)
                             widget.onEditingChanged(false);
                             _focusNode.unfocus();
                           } else {
-                            // Start editing
                             widget.onEditingChanged(true);
                           }
                         },
@@ -190,33 +186,36 @@ class _CardFieldInputState extends State<CardFieldInput> {
                               : Icons.edit_rounded,
                           color: isEditing
                               ? const Color(0xFF10B981)
-                              : Colors.white24,
+                              : context.textMuted,
                           size: 18,
                         ),
                       )
-                    : const Icon(
+                    : Icon(
                         Icons.edit_rounded,
-                        color: Colors.white24,
+                        color: context.textMuted,
                         size: 16,
                       ),
                 filled: true,
-                fillColor: const Color(0xFF191A2A),
+                fillColor: context.surfaceSecondary,
                 contentPadding:
                     const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(14),
+                  borderRadius:
+                      BorderRadius.circular(AppDimensions.radiusComponent),
                   borderSide: BorderSide.none,
                 ),
                 enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(14),
+                  borderRadius:
+                      BorderRadius.circular(AppDimensions.radiusComponent),
                   borderSide: BorderSide(
-                    color: Colors.white.withValues(alpha: 0.04),
+                    color: context.textMuted.withValues(alpha: 0.1),
                   ),
                 ),
                 focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(14),
-                  borderSide: const BorderSide(
-                    color: Color(0xFF8B5CF6),
+                  borderRadius:
+                      BorderRadius.circular(AppDimensions.radiusComponent),
+                  borderSide: BorderSide(
+                    color: context.accentSecondary,
                     width: 1,
                   ),
                 ),
@@ -238,9 +237,9 @@ class _InputShell extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
-        color: const Color(0xFF191A2A),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.04)),
+        color: context.surfaceSecondary,
+        borderRadius: BorderRadius.circular(AppDimensions.radiusComponent),
+        border: Border.all(color: context.textMuted.withValues(alpha: 0.2)),
       ),
       child: child,
     );
@@ -250,11 +249,13 @@ class _InputShell extends StatelessWidget {
 class _CardToggle extends StatelessWidget {
   final IconData icon;
   final bool isActive;
+  final Color activeColor;
   final VoidCallback onTap;
 
   const _CardToggle({
     required this.icon,
     required this.isActive,
+    required this.activeColor,
     required this.onTap,
   });
 
@@ -267,17 +268,17 @@ class _CardToggle extends StatelessWidget {
         height: 32,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          color: isActive ? const Color(0xFF8B5CF6) : const Color(0xFF1C1D2A),
+          color: isActive ? activeColor : context.surfaceSecondary,
           border: Border.all(
             color: isActive
-                ? const Color(0xFF8B5CF6)
-                : Colors.white.withValues(alpha: 0.08),
+                ? activeColor
+                : context.textMuted.withValues(alpha: 0.2),
           ),
         ),
         child: Icon(
           icon,
           size: 16,
-          color: isActive ? Colors.white : const Color(0xFF5C5E78),
+          color: isActive ? Colors.white : context.textMuted,
         ),
       ),
     );

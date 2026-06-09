@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:connect/Utils/profile_field_filter.dart';
 import 'package:skeletonizer/skeletonizer.dart';
+import 'package:connect/Config/app_theme.dart';
 
 class OtherProfilesPage extends StatefulWidget {
   const OtherProfilesPage({super.key});
@@ -45,26 +46,24 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
         return StatefulBuilder(
           builder: (context, setState) {
             return AlertDialog(
-              backgroundColor: const Color(0xFF131422),
+              backgroundColor: context.surfacePrimary,
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20),
-                side: const BorderSide(color: Color(0xFF26273C), width: 1.5),
+                borderRadius: BorderRadius.circular(AppDimensions.radiusPremiumCard),
+                side: BorderSide(color: context.surfaceSecondary, width: 1.5),
               ),
-              title: const Text(
+              title: Text(
                 "Redeem VIP Pass",
-                style: TextStyle(
-                  color: Colors.white,
+                style: context.screenHeading.copyWith(
                   fontWeight: FontWeight.bold,
-                  fontFamily: 'Inter',
                 ),
               ),
               content: isDialogLoading
-                  ? const SizedBox(
+                  ? SizedBox(
                       height: 150,
                       child: Center(
                         child: CircularProgressIndicator(
                           valueColor:
-                              AlwaysStoppedAnimation<Color>(Color(0xFF00F2FE)),
+                              AlwaysStoppedAnimation<Color>(context.accentPrimary),
                         ),
                       ),
                     )
@@ -72,47 +71,40 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
+                        Text(
                           "Enter the 6-character VIP code to connect immediately.",
-                          style: TextStyle(
-                            color: Color(0xFF8B8C9E),
+                          style: context.bodyText.copyWith(
+                            color: context.textSecondary,
                             fontSize: 12,
-                            fontFamily: 'Inter',
                           ),
                         ),
                         const SizedBox(height: 16),
                         TextField(
                           controller: controller,
                           textCapitalization: TextCapitalization.characters,
-                          style: const TextStyle(
-                              color: Colors.white, fontFamily: 'Inter'),
+                          style: context.bodyText,
                           decoration: InputDecoration(
                             hintText: "MNDL-XXXXXX",
-                            hintStyle: const TextStyle(
-                                color: Colors.white24, fontFamily: 'Inter'),
+                            hintStyle: context.bodyText.copyWith(color: context.textMuted),
                             filled: true,
-                            fillColor: const Color(0xFF0A0A0F),
+                            fillColor: context.canvasBackground,
                             enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide:
-                                  const BorderSide(color: Color(0xFF26273C)),
+                              borderRadius: BorderRadius.circular(AppDimensions.radiusComponent),
+                              borderSide: BorderSide(color: context.surfaceSecondary),
                             ),
                             focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide:
-                                  const BorderSide(color: Color(0xFF00F2FE)),
+                              borderRadius: BorderRadius.circular(AppDimensions.radiusComponent),
+                              borderSide: BorderSide(color: context.accentPrimary),
                             ),
                           ),
                         ),
                         const SizedBox(height: 20),
-                        const Text(
+                        Text(
                           "SHARE BACK YOUR CARD",
-                          style: TextStyle(
-                            color: Color(0xFF8B8C9E),
-                            fontSize: 10,
+                          style: context.captionText.copyWith(
+                            color: context.textSecondary,
                             fontWeight: FontWeight.bold,
                             letterSpacing: 1.5,
-                            fontFamily: 'Inter',
                           ),
                         ),
                         const SizedBox(height: 8),
@@ -130,23 +122,19 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
                                   alignment: Alignment.center,
                                   decoration: BoxDecoration(
                                     color: selectedType == 'casual'
-                                        ? const Color(0xFF8B5CF6)
-                                            .withOpacity(0.1)
-                                        : const Color(0xFF0A0A0F),
+                                        ? context.accentSecondary.withValues(alpha: 0.1)
+                                        : context.canvasBackground,
                                     borderRadius: BorderRadius.circular(10),
                                     border: Border.all(
                                       color: selectedType == 'casual'
-                                          ? const Color(0xFF8B5CF6)
-                                          : const Color(0xFF26273C),
+                                          ? context.accentSecondary
+                                          : context.surfaceSecondary,
                                     ),
                                   ),
-                                  child: const Text(
+                                  child: Text(
                                     "Casual",
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 13,
+                                    style: context.bodyText.copyWith(
                                       fontWeight: FontWeight.bold,
-                                      fontFamily: 'Inter',
                                     ),
                                   ),
                                 ),
@@ -165,23 +153,19 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
                                   alignment: Alignment.center,
                                   decoration: BoxDecoration(
                                     color: selectedType == 'professional'
-                                        ? const Color(0xFF00F2FE)
-                                            .withOpacity(0.1)
-                                        : const Color(0xFF0A0A0F),
+                                        ? context.accentPrimary.withValues(alpha: 0.1)
+                                        : context.canvasBackground,
                                     borderRadius: BorderRadius.circular(10),
                                     border: Border.all(
                                       color: selectedType == 'professional'
-                                          ? const Color(0xFF00F2FE)
-                                          : const Color(0xFF26273C),
+                                          ? context.accentPrimary
+                                          : context.surfaceSecondary,
                                     ),
                                   ),
-                                  child: const Text(
+                                  child: Text(
                                     "Professional",
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 13,
+                                    style: context.bodyText.copyWith(
                                       fontWeight: FontWeight.bold,
-                                      fontFamily: 'Inter',
                                     ),
                                   ),
                                 ),
@@ -196,10 +180,9 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
                   : [
                       TextButton(
                         onPressed: () => Navigator.pop(context),
-                        child: const Text(
+                        child: Text(
                           "Cancel",
-                          style: TextStyle(
-                              color: Colors.white54, fontFamily: 'Inter'),
+                          style: TextStyle(color: context.textSecondary),
                         ),
                       ),
                       ElevatedButton(
@@ -217,59 +200,63 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
                             isDialogLoading = true;
                           });
 
+                          final navigator = Navigator.of(context);
+                          final scaffoldMessenger = ScaffoldMessenger.of(context);
+                          final chatProvider = Provider.of<ChatProvider>(context, listen: false);
+                          final accentPrimaryColor = context.accentPrimary;
+                          final surfacePrimaryColor = context.surfacePrimary;
+                          final surfaceSecondaryColor = context.surfaceSecondary;
+
                           try {
                             await provider.redeemInviteCode(
                                 codeStr, selectedType);
                             // Refresh connection list
                             await provider.fetchConnections();
-                            if (context.mounted) {
-                              await Provider.of<ChatProvider>(context,
-                                      listen: false)
-                                  .updateUnreadCount();
-                            }
+                            
+                            await chatProvider.updateUnreadCount();
 
-                            if (context.mounted) {
-                              Navigator.pop(context); // Dismiss dialog
+                            navigator.pop(); // Dismiss dialog
 
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Row(
-                                    children: [
-                                      const Icon(Icons.check_circle_rounded,
-                                          color: Color(0xFF00F2FE)),
-                                      const SizedBox(width: 10),
-                                      const Expanded(
-                                        child: Text(
-                                          "Successfully connected with VIP Pass!",
-                                          style: TextStyle(
-                                            color: Colors.white,
-                                            fontWeight: FontWeight.bold,
-                                            fontFamily: 'Inter',
-                                          ),
+                            scaffoldMessenger.showSnackBar(
+                              SnackBar(
+                                content: Row(
+                                  children: [
+                                    Icon(Icons.check_circle_rounded,
+                                        color: accentPrimaryColor),
+                                    const SizedBox(width: 10),
+                                    const Expanded(
+                                      child: Text(
+                                        "Successfully connected with VIP Pass!",
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.bold,
+                                          fontFamily: 'Inter',
                                         ),
                                       ),
-                                    ],
-                                  ),
-                                  backgroundColor: const Color(0xFF131422),
-                                  behavior: SnackBarBehavior.floating,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(14),
-                                    side: const BorderSide(
-                                        color: Color(0xFF26273C), width: 1),
-                                  ),
+                                    ),
+                                  ],
                                 ),
-                              );
-                            }
+                                backgroundColor: surfacePrimaryColor,
+                                behavior: SnackBarBehavior.floating,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                  side: BorderSide(
+                                      color: surfaceSecondaryColor, width: 1),
+                                ),
+                              ),
+                            );
                           } catch (e) {
-                            setState(() {
-                              isDialogLoading = false;
-                            });
+                            if (mounted) {
+                              setState(() {
+                                isDialogLoading = false;
+                              });
+                            }
                             String errorMsg = e.toString();
                             if (errorMsg.contains("Exception:")) {
                               errorMsg =
                                   errorMsg.replaceAll("Exception:", "").trim();
                             }
-                            ScaffoldMessenger.of(context).showSnackBar(
+                            scaffoldMessenger.showSnackBar(
                               SnackBar(
                                 content: Text("Failed to redeem: $errorMsg"),
                                 backgroundColor: Colors.red,
@@ -278,16 +265,18 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
                           }
                         },
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF00F2FE),
+                          backgroundColor: context.accentPrimary,
                           foregroundColor: Colors.black,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(10),
                           ),
                         ),
-                        child: const Text(
+                        child: Text(
                           "Redeem",
-                          style: TextStyle(
-                              fontWeight: FontWeight.bold, fontFamily: 'Inter'),
+                          style: context.bodyText.copyWith(
+                            color: Colors.black,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
                     ],
@@ -332,43 +321,43 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
       context: context,
       builder: (BuildContext dialogContext) {
         return AlertDialog(
-          backgroundColor: const Color(0xFF13141F),
+          backgroundColor: context.surfacePrimary,
           shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: const Text(
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppDimensions.radiusPremiumCard), side: BorderSide(color: context.surfaceSecondary, width: 1.5)),
+          title: Text(
             "Delete Connection",
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+            style: context.screenHeading.copyWith(fontWeight: FontWeight.bold),
           ),
           content: Text(
             "Are you sure you want to remove $name from your connections? This will permanently delete this connection and clear all chat history and text messages.",
-            style: const TextStyle(color: Colors.white70),
+            style: context.bodyText.copyWith(color: context.textSecondary),
           ),
           actions: [
             TextButton(
-              child: const Text("Cancel", style: TextStyle(color: Colors.grey)),
+              child: Text("Cancel", style: TextStyle(color: context.textSecondary)),
               onPressed: () => Navigator.pop(dialogContext),
             ),
             TextButton(
               child: const Text("Delete",
-                  style: TextStyle(color: Colors.redAccent)),
+                  style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
               onPressed: () async {
-                Navigator.pop(dialogContext);
+                final navigator = Navigator.of(dialogContext);
+                final scaffoldMessenger = ScaffoldMessenger.of(context);
+                navigator.pop();
                 try {
                   await _deleteProfileLocally(profileIdStr, provider);
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text("Connection and chat history deleted"),
-                        backgroundColor: Colors.redAccent,
-                      ),
-                    );
-                  }
+                  if (!mounted) return;
+                  scaffoldMessenger.showSnackBar(
+                    const SnackBar(
+                      content: Text("Connection and chat history deleted"),
+                      backgroundColor: Colors.redAccent,
+                    ),
+                  );
                 } catch (e) {
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text("Error deleting connection: $e")),
-                    );
-                  }
+                  if (!mounted) return;
+                  scaffoldMessenger.showSnackBar(
+                    SnackBar(content: Text("Error deleting connection: $e")),
+                  );
                 }
               },
             ),
@@ -427,39 +416,25 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
   Widget _buildCardTypeBadges(Map<String, dynamic> profile) {
     final types = _getCardTypesForProfile(profile);
 
-    return Row(
-      mainAxisSize: MainAxisSize.min,
+    return Wrap(
+      spacing: 8.0,
+      runSpacing: 8.0,
       children: [
-        for (final type in types) ...[
+        for (final type in types)
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
             decoration: BoxDecoration(
-              color: type == 'casual'
-                  ? const Color(0xFF8B5CF6).withValues(alpha: 0.12)
-                  : const Color(0xFF00F2FE).withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(5),
-              border: Border.all(
-                color: type == 'casual'
-                    ? const Color(0xFF8B5CF6).withValues(alpha: 0.35)
-                    : const Color(0xFF00F2FE).withValues(alpha: 0.3),
-                width: 0.8,
-              ),
+              color: context.surfaceSecondary,
+              borderRadius: BorderRadius.circular(AppDimensions.radiusPill),
             ),
             child: Text(
-              type == 'casual' ? 'CASUAL' : 'PROFESSIONAL',
-              style: TextStyle(
-                color: type == 'casual'
-                    ? const Color(0xFF8B5CF6)
-                    : const Color(0xFF00F2FE),
-                fontSize: 11,
+              type.toUpperCase(),
+              style: context.captionText.copyWith(
+                color: context.textSecondary,
                 fontWeight: FontWeight.bold,
-                letterSpacing: 0.5,
-                fontFamily: 'Inter',
               ),
             ),
           ),
-          const SizedBox(width: 4),
-        ],
       ],
     );
   }
@@ -475,8 +450,8 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
         height: 44,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          color: const Color(0xFF161726),
-          border: Border.all(color: const Color(0xFF26273F), width: 1),
+          color: context.surfacePrimary,
+          border: Border.all(color: context.surfaceSecondary, width: 1),
         ),
         child: Icon(
           icon,
@@ -489,26 +464,24 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
 
   Widget _buildToggleRow() {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: AppDimensions.marginStandard, vertical: 12),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          const Text(
+          Text(
             "ALL CARDS",
-            style: TextStyle(
-              color: Color(0xFF5C5E78),
-              fontSize: 12,
+            style: context.captionText.copyWith(
+              color: context.textSecondary,
               fontWeight: FontWeight.bold,
               letterSpacing: 1.5,
-              fontFamily: 'Inter',
             ),
           ),
           Container(
             height: 38,
             decoration: BoxDecoration(
-              color: const Color(0xFF10111F),
+              color: context.surfacePrimary,
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: const Color(0xFF202138), width: 1),
+              border: Border.all(color: context.surfaceSecondary, width: 1),
             ),
             padding: const EdgeInsets.all(2),
             child: Row(
@@ -525,7 +498,7 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
                     height: 34,
                     decoration: BoxDecoration(
                       color: _isGridView
-                          ? const Color(0xFF8B5CF6)
+                          ? context.accentSecondary
                           : Colors.transparent,
                       borderRadius: BorderRadius.circular(8),
                     ),
@@ -533,7 +506,7 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
                       Icons.grid_view_rounded,
                       size: 18,
                       color:
-                          _isGridView ? Colors.white : const Color(0xFF5C5E78),
+                          _isGridView ? Colors.white : context.textSecondary,
                     ),
                   ),
                 ),
@@ -549,7 +522,7 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
                     height: 34,
                     decoration: BoxDecoration(
                       color: !_isGridView
-                          ? const Color(0xFF8B5CF6)
+                          ? context.accentSecondary
                           : Colors.transparent,
                       borderRadius: BorderRadius.circular(8),
                     ),
@@ -557,7 +530,7 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
                       Icons.view_list_rounded,
                       size: 18,
                       color:
-                          !_isGridView ? Colors.white : const Color(0xFF5C5E78),
+                          !_isGridView ? Colors.white : context.textSecondary,
                     ),
                   ),
                 ),
@@ -565,6 +538,23 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildFallbackAvatar(String name, double fontSize) {
+    final monogram = name.isNotEmpty
+        ? name.substring(0, 1).toUpperCase()
+        : "?";
+    return Center(
+      child: Text(
+        monogram,
+        style: TextStyle(
+          color: Colors.white,
+          fontSize: fontSize,
+          fontWeight: FontWeight.bold,
+          fontFamily: 'Inter',
+        ),
       ),
     );
   }
@@ -602,89 +592,56 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
         );
       },
       child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+        margin: const EdgeInsets.symmetric(horizontal: AppDimensions.marginStandard, vertical: 8),
         decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Color(0xFF1B1B3A),
-              Color(0xFF0C0C18),
-            ],
-          ),
-          borderRadius: BorderRadius.circular(24),
+          color: context.surfacePrimary,
+          borderRadius: BorderRadius.circular(AppDimensions.radiusPremiumCard),
           border: Border.all(
-            color: const Color(0xFF26273F),
+            color: context.surfaceSecondary.withValues(alpha: 0.5),
             width: 1.0,
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.4),
+              color: Colors.black.withValues(alpha: 0.3),
               blurRadius: 16,
               offset: const Offset(0, 8),
             ),
           ],
         ),
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Row(
               children: [
+                // Avatar with refined Volt Green ring
                 Container(
                   width: 58,
                   height: 58,
-                  decoration: const BoxDecoration(
+                  decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    gradient: LinearGradient(
-                      colors: [Color(0xFF00F2FE), Color(0xFF8B5CF6)],
+                    border: Border.all(
+                      color: context.accentPrimary.withValues(alpha: 0.35),
+                      width: 1.5,
                     ),
                   ),
-                  padding: const EdgeInsets.all(2),
+                  padding: const EdgeInsets.all(1.5),
                   child: Container(
-                    decoration: const BoxDecoration(
+                    decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: Color(0xFF090A0F),
+                      color: context.surfaceSecondary,
                     ),
-                    padding: const EdgeInsets.all(2),
-                    child: ClipOval(
-                      child: (avatarUrl.isNotEmpty &&
-                              avatarUrl.contains(
-                                  'supabase.co/storage/v1/object/public/avatars/'))
-                          ? Image.network(
-                              avatarUrl,
-                              fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) =>
-                                  Container(
-                                color: const Color(0xFF1B1C2A),
-                                alignment: Alignment.center,
-                                child: Text(
-                                  name.isNotEmpty
-                                      ? name.substring(0, 1).toUpperCase()
-                                      : "?",
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 22,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                            )
-                          : Container(
-                              color: const Color(0xFF1B1C2A),
-                              alignment: Alignment.center,
-                              child: Text(
-                                name.isNotEmpty
-                                    ? name.substring(0, 1).toUpperCase()
-                                    : "?",
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 22,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: (avatarUrl.isNotEmpty &&
+                            avatarUrl.contains(
+                                'supabase.co/storage/v1/object/public/avatars/'))
+                        ? Image.network(
+                            avatarUrl,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) =>
+                                _buildFallbackAvatar(name, 22),
+                          )
+                        : _buildFallbackAvatar(name, 22),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -694,23 +651,14 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
                     children: [
                       Text(
                         name,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          fontFamily: 'Inter',
-                        ),
+                        style: context.cardTitle.copyWith(fontWeight: FontWeight.bold),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
                       const SizedBox(height: 2),
                       Text(
                         profession,
-                        style: const TextStyle(
-                          color: Color(0xFF8B8C9E),
-                          fontSize: 13,
-                          fontFamily: 'Inter',
-                        ),
+                        style: context.bodyText.copyWith(color: context.textSecondary),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -719,39 +667,33 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
                     ],
                   ),
                 ),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    PopupMenuButton<int>(
-                      padding: EdgeInsets.zero,
-                      icon: const Icon(Icons.more_vert_rounded,
-                          color: Color(0xFF5C5E78)),
-                      color: const Color(0xFF10111F),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        side: const BorderSide(color: Color(0xFF202138)),
+                PopupMenuButton<int>(
+                  padding: EdgeInsets.zero,
+                  icon: Icon(Icons.more_vert_rounded,
+                      color: context.textSecondary),
+                  color: context.surfaceSecondary,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    side: BorderSide(color: context.surfaceSecondary),
+                  ),
+                  onSelected: (val) {
+                    if (val == 1) {
+                      _showDeleteConfirmation(
+                          context, profileData, provider);
+                    }
+                  },
+                  itemBuilder: (context) => [
+                    PopupMenuItem(
+                      value: 1,
+                      child: Row(
+                        children: [
+                          const Icon(Icons.delete_outline_rounded,
+                              color: Colors.redAccent, size: 18),
+                          const SizedBox(width: 8),
+                          Text("Delete",
+                              style: context.bodyText.copyWith(color: Colors.white)),
+                        ],
                       ),
-                      onSelected: (val) {
-                        if (val == 1) {
-                          _showDeleteConfirmation(
-                              context, profileData, provider);
-                        }
-                      },
-                      itemBuilder: (context) => [
-                        const PopupMenuItem(
-                          value: 1,
-                          child: Row(
-                            children: [
-                              Icon(Icons.delete_outline_rounded,
-                                  color: Colors.redAccent, size: 18),
-                              SizedBox(width: 8),
-                              Text("Delete",
-                                  style: TextStyle(
-                                      color: Colors.white, fontSize: 14)),
-                            ],
-                          ),
-                        ),
-                      ],
                     ),
                   ],
                 ),
@@ -760,7 +702,7 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
             const SizedBox(height: 12),
             Container(
               height: 1,
-              color: const Color(0xFF1F2032),
+              color: context.surfaceSecondary.withValues(alpha: 0.5),
             ),
             const SizedBox(height: 12),
             Column(
@@ -769,16 +711,12 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
                 if (company.isNotEmpty) ...[
                   Row(
                     children: [
-                      const Icon(Icons.business_center_rounded,
-                          color: Color(0xFF5C5E78), size: 14),
+                      Icon(Icons.business_center_rounded,
+                          color: context.textSecondary, size: 14),
                       const SizedBox(width: 8),
                       Text(
                         company,
-                        style: const TextStyle(
-                          color: Color(0xFFC0C1D0),
-                          fontSize: 13,
-                          fontFamily: 'Inter',
-                        ),
+                        style: context.bodyText.copyWith(color: context.textSecondary),
                       ),
                     ],
                   ),
@@ -787,16 +725,12 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
                 if (email.isNotEmpty)
                   Row(
                     children: [
-                      const Icon(Icons.alternate_email_rounded,
-                          color: Color(0xFF5C5E78), size: 14),
+                      Icon(Icons.alternate_email_rounded,
+                          color: context.textSecondary, size: 14),
                       const SizedBox(width: 8),
                       Text(
                         email,
-                        style: const TextStyle(
-                          color: Color(0xFFC0C1D0),
-                          fontSize: 13,
-                          fontFamily: 'Inter',
-                        ),
+                        style: context.bodyText.copyWith(color: context.textSecondary),
                       ),
                     ],
                   ),
@@ -806,7 +740,7 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
             Row(
               children: [
                 Expanded(
-                  child: ElevatedButton.icon(
+                  child: ElevatedButton(
                     onPressed: () {
                       Navigator.push(
                         context,
@@ -817,24 +751,19 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
                         ),
                       );
                     },
-                    icon: const Icon(Icons.chat_bubble_outline_rounded,
-                        size: 16, color: Colors.white),
-                    label: const Text(
-                      "Message",
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 13,
-                        fontFamily: 'Inter',
-                      ),
-                    ),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF8B5CF6),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
+                      backgroundColor: context.accentPrimary,
+                      foregroundColor: Colors.black,
+                      shape: const StadiumBorder(),
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       elevation: 0,
+                    ),
+                    child: Text(
+                      "Message",
+                      style: context.bodyText.copyWith(
+                        color: Colors.black,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                 ),
@@ -873,69 +802,43 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
         );
       },
       child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 6),
+        margin: const EdgeInsets.symmetric(horizontal: AppDimensions.marginStandard, vertical: 6),
         decoration: BoxDecoration(
-          color: const Color(0xFF10111F),
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: const Color(0xFF1F2035), width: 1),
+          color: context.surfacePrimary,
+          borderRadius: BorderRadius.circular(AppDimensions.radiusPremiumCard),
+          border: Border.all(color: context.surfaceSecondary.withValues(alpha: 0.5), width: 1),
         ),
         padding: const EdgeInsets.all(12),
         child: Row(
           children: [
+            // Avatar with refined Volt Green ring
             Container(
               width: 46,
               height: 46,
-              decoration: const BoxDecoration(
+              decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                gradient: LinearGradient(
-                  colors: [Color(0xFF00F2FE), Color(0xFF8B5CF6)],
+                border: Border.all(
+                  color: context.accentPrimary.withValues(alpha: 0.35),
+                  width: 1.5,
                 ),
               ),
-              padding: const EdgeInsets.all(1.5),
+              padding: const EdgeInsets.all(1.0),
               child: Container(
-                decoration: const BoxDecoration(
+                decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: Color(0xFF090A0F),
+                  color: context.surfaceSecondary,
                 ),
-                padding: const EdgeInsets.all(1.5),
-                child: ClipOval(
-                  child: (avatarUrl.isNotEmpty &&
-                          avatarUrl.contains(
-                              'supabase.co/storage/v1/object/public/avatars/'))
-                      ? Image.network(
-                          avatarUrl,
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) =>
-                              Container(
-                            color: const Color(0xFF1B1C2A),
-                            alignment: Alignment.center,
-                            child: Text(
-                              name.isNotEmpty
-                                  ? name.substring(0, 1).toUpperCase()
-                                  : "?",
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                        )
-                      : Container(
-                          color: const Color(0xFF1B1C2A),
-                          alignment: Alignment.center,
-                          child: Text(
-                            name.isNotEmpty
-                                ? name.substring(0, 1).toUpperCase()
-                                : "?",
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                ),
+                clipBehavior: Clip.antiAlias,
+                child: (avatarUrl.isNotEmpty &&
+                        avatarUrl.contains(
+                            'supabase.co/storage/v1/object/public/avatars/'))
+                    ? Image.network(
+                        avatarUrl,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) =>
+                            _buildFallbackAvatar(name, 16),
+                      )
+                    : _buildFallbackAvatar(name, 16),
               ),
             ),
             const SizedBox(width: 12),
@@ -945,12 +848,7 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
                 children: [
                   Text(
                     name,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 15,
-                      fontWeight: FontWeight.bold,
-                      fontFamily: 'Inter',
-                    ),
+                    style: context.bodyText.copyWith(fontWeight: FontWeight.bold),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -959,11 +857,7 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
                     profession.isNotEmpty && company.isNotEmpty
                         ? "$profession  •  $company"
                         : (profession.isNotEmpty ? profession : company),
-                    style: const TextStyle(
-                      color: Color(0xFF8B8C9E),
-                      fontSize: 12,
-                      fontFamily: 'Inter',
-                    ),
+                    style: context.captionText.copyWith(color: context.textSecondary),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -974,12 +868,12 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
             ),
             PopupMenuButton<int>(
               padding: EdgeInsets.zero,
-              icon: const Icon(Icons.more_vert_rounded,
-                  color: Color(0xFF5C5E78), size: 20),
-              color: const Color(0xFF10111F),
+              icon: Icon(Icons.more_vert_rounded,
+                  color: context.textSecondary, size: 20),
+              color: context.surfaceSecondary,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
-                side: const BorderSide(color: Color(0xFF202138)),
+                side: BorderSide(color: context.surfaceSecondary),
               ),
               onSelected: (val) {
                 if (val == 1) {
@@ -987,15 +881,15 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
                 }
               },
               itemBuilder: (context) => [
-                const PopupMenuItem(
+                PopupMenuItem(
                   value: 1,
                   child: Row(
                     children: [
-                      Icon(Icons.delete_outline_rounded,
+                      const Icon(Icons.delete_outline_rounded,
                           color: Colors.redAccent, size: 18),
-                      SizedBox(width: 8),
+                      const SizedBox(width: 8),
                       Text("Delete",
-                          style: TextStyle(color: Colors.white, fontSize: 14)),
+                          style: context.bodyText.copyWith(color: Colors.white)),
                     ],
                   ),
                 ),
@@ -1014,36 +908,29 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
     final count = allProfiles.length;
 
     return Scaffold(
-      backgroundColor: const Color(0xFF090A0F),
+      backgroundColor: context.canvasBackground,
       body: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             // Premium Header
             Padding(
-              padding: const EdgeInsets.fromLTRB(24, 24, 24, 8),
+              padding: const EdgeInsets.fromLTRB(AppDimensions.marginStandard, 24, AppDimensions.marginStandard, 8),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
+                      Text(
                         "Konnections",
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 32,
-                          fontWeight: FontWeight.bold,
-                          fontFamily: 'Inter',
-                        ),
+                        style: context.displayHeader,
                       ),
                       const SizedBox(height: 4),
                       Text(
                         "$count ${count == 1 ? 'connection' : 'connections'}",
-                        style: const TextStyle(
-                          color: Color(0xFF8B8C9E),
-                          fontSize: 14,
-                          fontFamily: 'Inter',
+                        style: context.bodyText.copyWith(
+                          color: context.textSecondary,
                         ),
                       ),
                     ],
@@ -1086,23 +973,21 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
                         child: _buildSkeletonConnectionList(),
                       )
                     : allProfiles.isEmpty
-                        ? const Center(
-                            key: ValueKey<String>('empty_state'),
+                        ? Center(
+                            key: const ValueKey<String>('empty_state'),
                             child: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
                                 Icon(
                                   Icons.people_outline_rounded,
-                                  color: Color(0xFF5C5E78),
+                                  color: context.textMuted,
                                   size: 48,
                                 ),
-                                SizedBox(height: 16),
+                                const SizedBox(height: 16),
                                 Text(
                                   "No profiles available.",
-                                  style: TextStyle(
-                                    color: Color(0xFF8B8C9E),
-                                    fontSize: 15,
-                                    fontFamily: 'Inter',
+                                  style: context.bodyText.copyWith(
+                                    color: context.textSecondary,
                                   ),
                                 ),
                               ],
@@ -1112,7 +997,7 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
                             key: ValueKey<bool>(_isGridView),
                             itemCount: allProfiles.length,
                             physics: const BouncingScrollPhysics(),
-                            padding: const EdgeInsets.only(bottom: 24),
+                            padding: const EdgeInsets.only(bottom: 100),
                             itemBuilder: (context, index) {
                               final item = allProfiles[index];
                               return _isGridView
@@ -1136,11 +1021,11 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
       itemBuilder: (context, index) {
         if (_isGridView) {
           return Container(
-            margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+            margin: const EdgeInsets.symmetric(horizontal: AppDimensions.marginStandard, vertical: 8),
             decoration: BoxDecoration(
-              color: const Color(0xFF13141F),
-              borderRadius: BorderRadius.circular(24),
-              border: Border.all(color: const Color(0xFF26273F)),
+              color: context.surfacePrimary,
+              borderRadius: BorderRadius.circular(AppDimensions.radiusPremiumCard),
+              border: Border.all(color: context.surfaceSecondary),
             ),
             padding: const EdgeInsets.all(20),
             child: Column(
@@ -1178,11 +1063,12 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
           );
         } else {
           return Container(
-            margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 6),
+            margin: const EdgeInsets.symmetric(horizontal: AppDimensions.marginStandard, vertical: 6),
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
-              color: const Color(0xFF13141F),
-              borderRadius: BorderRadius.circular(16),
+              color: context.surfacePrimary,
+              borderRadius: BorderRadius.circular(AppDimensions.radiusPremiumCard),
+              border: Border.all(color: context.surfaceSecondary),
             ),
             child: Row(
               children: [

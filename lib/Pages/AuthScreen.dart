@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:connect/Config/app_theme.dart';
 
 class AuthScreen extends StatefulWidget {
   const AuthScreen({super.key});
@@ -376,7 +377,7 @@ class _AuthScreenState extends State<AuthScreen> {
     final size = MediaQuery.of(context).size;
 
     return Scaffold(
-      backgroundColor: const Color(0xFF090A0F),
+      backgroundColor: Colors.black,
       body: Stack(
         children: [
           // Background decorative gradient circles
@@ -388,7 +389,7 @@ class _AuthScreenState extends State<AuthScreen> {
               height: size.width * 0.8,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: const Color(0xFF8B5CF6).withValues(alpha: 0.15),
+                color: context.accentPrimary.withValues(alpha: 0.04),
               ),
             ),
           ),
@@ -400,7 +401,7 @@ class _AuthScreenState extends State<AuthScreen> {
               height: size.width * 0.9,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: const Color(0xFF00F2FE).withValues(alpha: 0.1),
+                color: context.accentSecondary.withValues(alpha: 0.04),
               ),
             ),
           ),
@@ -411,34 +412,35 @@ class _AuthScreenState extends State<AuthScreen> {
               child: SingleChildScrollView(
                 physics: const BouncingScrollPhysics(),
                 padding: const EdgeInsets.symmetric(
-                    horizontal: 28.0, vertical: 24.0),
+                    horizontal: 16.0, vertical: 24.0),
                 child: Form(
                   key: _formKey,
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      // App Icon/Brand Header
-                      Center(
+                      // App Icon/Brand Header (Left-aligned)
+                      Align(
+                        alignment: Alignment.centerLeft,
                         child: Hero(
                           tag: 'app_logo',
                           child: Container(
-                            height: 80,
-                            width: 80,
-                            padding: const EdgeInsets.all(12),
+                            height: 64,
+                            width: 64,
+                            padding: const EdgeInsets.all(10),
                             decoration: BoxDecoration(
-                              color: const Color(0xFF13141F),
+                              color: context.surfacePrimary,
                               shape: BoxShape.circle,
                               border: Border.all(
-                                color: const Color(0xFF1F2030),
-                                width: 1.5,
+                                color: Colors.white.withValues(alpha: 0.04),
+                                width: 1.0,
                               ),
                               boxShadow: [
                                 BoxShadow(
-                                  color: const Color(0xFF8B5CF6)
-                                      .withValues(alpha: 0.2),
-                                  blurRadius: 15,
-                                  spreadRadius: 2,
+                                  color: context.accentPrimary
+                                      .withValues(alpha: 0.1),
+                                  blurRadius: 12,
+                                  spreadRadius: 1,
                                 ),
                               ],
                             ),
@@ -451,54 +453,24 @@ class _AuthScreenState extends State<AuthScreen> {
                       ),
                       const SizedBox(height: 24),
 
-                      // Text Headers
-                      const Text(
-                        "Mandala",
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 32,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 1.0,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      if (!_isOtpMode && !_isRecoveryMode && !_isRecoveryOtpMode)
-                        Text(
-                          _isSignIn
-                              ? "Your close circle, not your contacts list."
-                              : "Create an account to build your cards & sync contacts",
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            color: Color(0xFF8B8C9E),
-                            fontSize: 14,
-                          ),
-                        ),
-                      const SizedBox(height: 40),
-
                       if (_isOtpMode) ...[
-                        const Text(
+                        Text(
                           "Verify Your Email",
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 22,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 0.5,
-                          ),
+                          textAlign: TextAlign.left,
+                          style: context.displayHeader,
                         ),
                         const SizedBox(height: 12),
                         Text(
-                          "We've sent a 6-digit confirmation code to\n${_emailController.text.trim()}",
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            color: Color(0xFF8B8C9E),
-                            fontSize: 14,
-                            height: 1.4,
-                          ),
+                          "We've sent a 6-digit confirmation code to ${_emailController.text.trim()}",
+                          textAlign: TextAlign.left,
+                          style: context.bodyText
+                              .copyWith(color: context.textSecondary),
                         ),
-                        const SizedBox(height: 32),
+                        const SizedBox(
+                            height:
+                                24), // Vertical spacer of 24 between subtitle and input form
                         _buildInputField(
+                          context,
                           controller: _otpController,
                           hint: "6-Digit Verification Code",
                           icon: Icons.pin_rounded,
@@ -513,9 +485,9 @@ class _AuthScreenState extends State<AuthScreen> {
                             return null;
                           },
                         ),
-                        const SizedBox(height: 32),
-                        _buildOtpSubmitButton(),
-                        const SizedBox(height: 18),
+                        const SizedBox(height: 24),
+                        _buildOtpSubmitButton(context),
+                        const SizedBox(height: 16),
                         TextButton(
                           onPressed: () {
                             setState(() {
@@ -523,38 +495,32 @@ class _AuthScreenState extends State<AuthScreen> {
                               _otpController.clear();
                             });
                           },
-                          child: const Text(
+                          child: Text(
                             "Back to Sign Up",
                             style: TextStyle(
-                              color: Color(0xFF8B5CF6),
+                              color: context.accentPrimary,
                               fontSize: 14,
                               fontWeight: FontWeight.bold,
+                              fontFamily: 'Inter',
                             ),
                           ),
                         ),
                       ] else if (_isRecoveryOtpMode) ...[
-                        const Text(
+                        Text(
                           "Verify Recovery Code",
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 22,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 0.5,
-                          ),
+                          textAlign: TextAlign.left,
+                          style: context.displayHeader,
                         ),
                         const SizedBox(height: 12),
                         Text(
-                          "We've sent a 6-digit recovery code to\n${_emailController.text.trim()}",
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            color: Color(0xFF8B8C9E),
-                            fontSize: 14,
-                            height: 1.4,
-                          ),
+                          "We've sent a 6-digit recovery code to ${_emailController.text.trim()}",
+                          textAlign: TextAlign.left,
+                          style: context.bodyText
+                              .copyWith(color: context.textSecondary),
                         ),
-                        const SizedBox(height: 32),
+                        const SizedBox(height: 24),
                         _buildInputField(
+                          context,
                           controller: _otpController,
                           hint: "6-Digit Recovery Code",
                           icon: Icons.pin_rounded,
@@ -569,9 +535,9 @@ class _AuthScreenState extends State<AuthScreen> {
                             return null;
                           },
                         ),
-                        const SizedBox(height: 32),
-                        _buildRecoveryOtpSubmitButton(),
-                        const SizedBox(height: 18),
+                        const SizedBox(height: 24),
+                        _buildRecoveryOtpSubmitButton(context),
+                        const SizedBox(height: 16),
                         TextButton(
                           onPressed: () {
                             setState(() {
@@ -580,38 +546,32 @@ class _AuthScreenState extends State<AuthScreen> {
                               _otpController.clear();
                             });
                           },
-                          child: const Text(
+                          child: Text(
                             "Back to Sign In",
                             style: TextStyle(
-                              color: Color(0xFF8B5CF6),
+                              color: context.accentPrimary,
                               fontSize: 14,
                               fontWeight: FontWeight.bold,
+                              fontFamily: 'Inter',
                             ),
                           ),
                         ),
                       ] else if (_isRecoveryMode) ...[
-                        const Text(
+                        Text(
                           "Reset Password",
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 22,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 0.5,
-                          ),
+                          textAlign: TextAlign.left,
+                          style: context.displayHeader,
                         ),
                         const SizedBox(height: 12),
-                        const Text(
+                        Text(
                           "Enter your email address to receive a 6-digit recovery code.",
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            color: Color(0xFF8B8C9E),
-                            fontSize: 14,
-                            height: 1.4,
-                          ),
+                          textAlign: TextAlign.left,
+                          style: context.bodyText
+                              .copyWith(color: context.textSecondary),
                         ),
-                        const SizedBox(height: 32),
+                        const SizedBox(height: 24),
                         _buildInputField(
+                          context,
                           controller: _emailController,
                           hint: "Email Address",
                           icon: Icons.email_rounded,
@@ -629,9 +589,9 @@ class _AuthScreenState extends State<AuthScreen> {
                             return null;
                           },
                         ),
-                        const SizedBox(height: 32),
-                        _buildSendRecoveryCodeButton(),
-                        const SizedBox(height: 18),
+                        const SizedBox(height: 24),
+                        _buildSendRecoveryCodeButton(context),
+                        const SizedBox(height: 16),
                         TextButton(
                           onPressed: () {
                             setState(() {
@@ -639,22 +599,43 @@ class _AuthScreenState extends State<AuthScreen> {
                               _isSignIn = true;
                             });
                           },
-                          child: const Text(
+                          child: Text(
                             "Back to Sign In",
                             style: TextStyle(
-                              color: Color(0xFF8B5CF6),
+                              color: context.accentPrimary,
                               fontSize: 14,
                               fontWeight: FontWeight.bold,
+                              fontFamily: 'Inter',
                             ),
                           ),
                         ),
                       ] else ...[
+                        // Main Welcome Headers (Left-aligned)
+                        Text(
+                          _isSignIn ? "Hey, Emily" : "Let's earn stamps!",
+                          textAlign: TextAlign.left,
+                          style: context.displayHeader,
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          _isSignIn
+                              ? "Your close circle, not your contacts list."
+                              : "Create an account to build your cards & sync contacts.",
+                          textAlign: TextAlign.left,
+                          style: context.bodyText
+                              .copyWith(color: context.textSecondary),
+                        ),
+                        const SizedBox(
+                            height:
+                                24), // Vertical spacer of 24 between subtitle and inputs
+
                         // Sliding Tab Switcher
-                        _buildAuthToggle(),
-                        const SizedBox(height: 28),
+                        _buildAuthToggle(context),
+                        const SizedBox(height: 24),
 
                         // Email Field
                         _buildInputField(
+                          context,
                           controller: _emailController,
                           hint: "Email Address",
                           icon: Icons.email_rounded,
@@ -672,10 +653,11 @@ class _AuthScreenState extends State<AuthScreen> {
                             return null;
                           },
                         ),
-                        const SizedBox(height: 18),
+                        const SizedBox(height: 16),
 
                         // Password Field
                         _buildInputField(
+                          context,
                           controller: _passwordController,
                           hint: "Password",
                           icon: Icons.lock_rounded,
@@ -685,7 +667,7 @@ class _AuthScreenState extends State<AuthScreen> {
                               _obscurePassword
                                   ? Icons.visibility_off_rounded
                                   : Icons.visibility_rounded,
-                              color: const Color(0xFF5C5E78),
+                              color: context.textMuted,
                               size: 20,
                             ),
                             onPressed: () {
@@ -703,8 +685,9 @@ class _AuthScreenState extends State<AuthScreen> {
                             return null;
                           },
                         ),
+
                         if (_isSignIn) ...[
-                          const SizedBox(height: 12),
+                          const SizedBox(height: 8),
                           Align(
                             alignment: Alignment.centerRight,
                             child: TextButton(
@@ -714,10 +697,10 @@ class _AuthScreenState extends State<AuthScreen> {
                                 minimumSize: Size.zero,
                                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                               ),
-                              child: const Text(
+                              child: Text(
                                 "Forgot Password?",
                                 style: TextStyle(
-                                  color: Color(0xFF00F2FE),
+                                  color: context.accentPrimary,
                                   fontSize: 14,
                                   fontWeight: FontWeight.bold,
                                   fontFamily: 'Inter',
@@ -728,16 +711,17 @@ class _AuthScreenState extends State<AuthScreen> {
                         ],
 
                         if (!_isSignIn) ...[
-                          const SizedBox(height: 18),
+                          const SizedBox(height: 16),
                           // Confirm Password Field
                           _buildInputField(
+                            context,
                             controller: _confirmPasswordController,
                             hint: "Confirm Password",
                             icon: Icons.lock_outline_rounded,
                             obscureText: _obscurePassword,
                             validator: (value) {
                               if (value == null || value.trim().isEmpty) {
-                                            return "Please confirm your password";
+                                return "Please confirm your password";
                               }
                               if (value.trim() !=
                                   _passwordController.text.trim()) {
@@ -746,24 +730,24 @@ class _AuthScreenState extends State<AuthScreen> {
                               return null;
                             },
                           ),
-                          const SizedBox(height: 18),
+                          const SizedBox(height: 16),
                           // Gender Selection Field
-                          _buildGenderDropdown(),
+                          _buildGenderDropdown(context),
                         ],
 
                         const SizedBox(height: 32),
 
                         // Submit Button
-                        _buildSubmitButton(),
+                        _buildSubmitButton(context),
                         const SizedBox(height: 24),
 
                         // Divider "OR"
                         Row(
                           children: [
-                            const Expanded(
+                            Expanded(
                               child: Divider(
-                                color: Color(0xFF1F2030),
-                                thickness: 1.5,
+                                color: Colors.white.withValues(alpha: 0.06),
+                                thickness: 1.0,
                               ),
                             ),
                             Padding(
@@ -771,18 +755,17 @@ class _AuthScreenState extends State<AuthScreen> {
                                   const EdgeInsets.symmetric(horizontal: 16.0),
                               child: Text(
                                 "OR CONTINUE WITH",
-                                style: TextStyle(
-                                  color: const Color(0xFF5C5E78),
-                                  fontSize: 11,
+                                style: context.captionText.copyWith(
+                                  color: context.textMuted,
                                   fontWeight: FontWeight.bold,
                                   letterSpacing: 1.0,
                                 ),
                               ),
                             ),
-                            const Expanded(
+                            Expanded(
                               child: Divider(
-                                color: Color(0xFF1F2030),
-                                thickness: 1.5,
+                                color: Colors.white.withValues(alpha: 0.06),
+                                thickness: 1.0,
                               ),
                             ),
                           ],
@@ -790,7 +773,7 @@ class _AuthScreenState extends State<AuthScreen> {
                         const SizedBox(height: 24),
 
                         // Google Sign In Button
-                        _buildGoogleButton(),
+                        _buildGoogleButton(context),
                       ],
                     ],
                   ),
@@ -803,9 +786,10 @@ class _AuthScreenState extends State<AuthScreen> {
           if (_isLoading)
             Container(
               color: Colors.black.withValues(alpha: 0.7),
-              child: const Center(
+              child: Center(
                 child: CircularProgressIndicator(
-                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF00F2FE)),
+                  valueColor:
+                      AlwaysStoppedAnimation<Color>(context.accentPrimary),
                 ),
               ),
             ),
@@ -814,15 +798,15 @@ class _AuthScreenState extends State<AuthScreen> {
     );
   }
 
-  Widget _buildAuthToggle() {
+  Widget _buildAuthToggle(BuildContext context) {
     return Container(
       height: 48,
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        color: const Color(0xFF13141F),
-        borderRadius: BorderRadius.circular(24),
+        color: context.surfacePrimary,
+        borderRadius: BorderRadius.circular(AppDimensions.radiusComponent),
         border: Border.all(
-          color: const Color(0xFF1F2030),
+          color: Colors.white.withValues(alpha: 0.04),
           width: 1.0,
         ),
       ),
@@ -843,16 +827,18 @@ class _AuthScreenState extends State<AuthScreen> {
                 duration: const Duration(milliseconds: 200),
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(20),
+                  borderRadius: BorderRadius.circular(AppDimensions.radiusComponent - 4),
                   color:
-                      _isSignIn ? const Color(0xFF1C1D2A) : Colors.transparent,
+                      _isSignIn ? context.surfaceSecondary : Colors.transparent,
                 ),
                 child: Text(
                   "Sign In",
                   style: TextStyle(
-                    color: _isSignIn ? Colors.white : const Color(0xFF8B8C9E),
+                    color:
+                        _isSignIn ? context.textPrimary : context.textSecondary,
                     fontSize: 14,
                     fontWeight: FontWeight.bold,
+                    fontFamily: 'Inter',
                   ),
                 ),
               ),
@@ -873,16 +859,20 @@ class _AuthScreenState extends State<AuthScreen> {
                 duration: const Duration(milliseconds: 200),
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(20),
-                  color:
-                      !_isSignIn ? const Color(0xFF1C1D2A) : Colors.transparent,
+                  borderRadius: BorderRadius.circular(AppDimensions.radiusComponent - 4),
+                  color: !_isSignIn
+                      ? context.surfaceSecondary
+                      : Colors.transparent,
                 ),
                 child: Text(
                   "Sign Up",
                   style: TextStyle(
-                    color: !_isSignIn ? Colors.white : const Color(0xFF8B8C9E),
+                    color: !_isSignIn
+                        ? context.textPrimary
+                        : context.textSecondary,
                     fontSize: 14,
                     fontWeight: FontWeight.bold,
+                    fontFamily: 'Inter',
                   ),
                 ),
               ),
@@ -893,7 +883,8 @@ class _AuthScreenState extends State<AuthScreen> {
     );
   }
 
-  Widget _buildInputField({
+  Widget _buildInputField(
+    BuildContext context, {
     required TextEditingController controller,
     required String hint,
     required IconData icon,
@@ -906,69 +897,78 @@ class _AuthScreenState extends State<AuthScreen> {
       controller: controller,
       obscureText: obscureText,
       keyboardType: keyboardType,
-      style: const TextStyle(color: Colors.white, fontSize: 15),
-      cursorColor: const Color(0xFF8B5CF6),
+      style: context.bodyText,
+      cursorColor: context.accentPrimary,
       decoration: InputDecoration(
-        prefixIcon: Icon(icon, color: const Color(0xFF5C5E78), size: 22),
+        prefixIcon: Icon(icon, color: context.textMuted, size: 20),
         suffixIcon: suffixIcon,
         hintText: hint,
-        hintStyle: const TextStyle(color: Color(0xFF5C5E78), fontSize: 14),
+        hintStyle: context.bodyText.copyWith(color: context.textMuted),
         filled: true,
-        fillColor: const Color(0xFF13141F),
+        fillColor: context.surfaceSecondary,
         errorStyle: const TextStyle(color: Colors.redAccent, fontSize: 12),
         contentPadding:
-            const EdgeInsets.symmetric(vertical: 16.0, horizontal: 20.0),
+            const EdgeInsets.symmetric(vertical: 14.0, horizontal: 16.0),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
-          borderSide: const BorderSide(color: Color(0xFF1F2030), width: 1.5),
+          borderRadius: BorderRadius.circular(AppDimensions.radiusComponent),
+          borderSide: BorderSide.none,
+        ),
+        disabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(AppDimensions.radiusComponent),
+          borderSide: BorderSide.none,
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
-          borderSide: const BorderSide(color: Color(0xFF8B5CF6), width: 1.5),
+          borderRadius: BorderRadius.circular(AppDimensions.radiusComponent),
+          borderSide: BorderSide(color: context.accentPrimary, width: 1.0),
         ),
         errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
-          borderSide: const BorderSide(color: Colors.redAccent, width: 1.5),
+          borderRadius: BorderRadius.circular(AppDimensions.radiusComponent),
+          borderSide: const BorderSide(color: Colors.redAccent, width: 1.0),
         ),
         focusedErrorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
-          borderSide: const BorderSide(color: Colors.redAccent, width: 1.5),
+          borderRadius: BorderRadius.circular(AppDimensions.radiusComponent),
+          borderSide: const BorderSide(color: Colors.redAccent, width: 1.0),
         ),
       ),
       validator: validator,
     );
   }
 
-  Widget _buildGenderDropdown() {
+  Widget _buildGenderDropdown(BuildContext context) {
     return DropdownButtonFormField<String>(
-      value: _selectedGender,
-      dropdownColor: const Color(0xFF13141F),
-      style: const TextStyle(color: Colors.white, fontSize: 15),
-      icon: const Icon(Icons.arrow_drop_down_rounded, color: Color(0xFF5C5E78), size: 28),
+      initialValue: _selectedGender,
+      dropdownColor: context.surfaceSecondary,
+      style: context.bodyText,
+      icon: Icon(Icons.arrow_drop_down_rounded,
+          color: context.textMuted, size: 28),
       decoration: InputDecoration(
-        prefixIcon: const Icon(Icons.wc_rounded, color: Color(0xFF5C5E78), size: 22),
+        prefixIcon: Icon(Icons.wc_rounded, color: context.textMuted, size: 20),
         hintText: "Select Gender",
-        hintStyle: const TextStyle(color: Color(0xFF5C5E78), fontSize: 14),
+        hintStyle: context.bodyText.copyWith(color: context.textMuted),
         filled: true,
-        fillColor: const Color(0xFF13141F),
+        fillColor: context.surfaceSecondary,
         errorStyle: const TextStyle(color: Colors.redAccent, fontSize: 12),
         contentPadding:
-            const EdgeInsets.symmetric(vertical: 16.0, horizontal: 20.0),
+            const EdgeInsets.symmetric(vertical: 14.0, horizontal: 16.0),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
-          borderSide: const BorderSide(color: Color(0xFF1F2030), width: 1.5),
+          borderRadius: BorderRadius.circular(AppDimensions.radiusComponent),
+          borderSide: BorderSide.none,
+        ),
+        disabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(AppDimensions.radiusComponent),
+          borderSide: BorderSide.none,
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
-          borderSide: const BorderSide(color: Color(0xFF8B5CF6), width: 1.5),
+          borderRadius: BorderRadius.circular(AppDimensions.radiusComponent),
+          borderSide: BorderSide(color: context.accentPrimary, width: 1.0),
         ),
         errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
-          borderSide: const BorderSide(color: Colors.redAccent, width: 1.5),
+          borderRadius: BorderRadius.circular(AppDimensions.radiusComponent),
+          borderSide: const BorderSide(color: Colors.redAccent, width: 1.0),
         ),
         focusedErrorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
-          borderSide: const BorderSide(color: Colors.redAccent, width: 1.5),
+          borderRadius: BorderRadius.circular(AppDimensions.radiusComponent),
+          borderSide: const BorderSide(color: Colors.redAccent, width: 1.0),
         ),
       ),
       items: const [
@@ -990,22 +990,14 @@ class _AuthScreenState extends State<AuthScreen> {
     );
   }
 
-  Widget _buildSubmitButton() {
+  Widget _buildSubmitButton(BuildContext context) {
     return Container(
       height: 52,
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        gradient: const LinearGradient(
-          colors: [
-            Color(0xFF00F2FE),
-            Color(0xFF8B5CF6),
-          ],
-          begin: Alignment.centerLeft,
-          end: Alignment.centerRight,
-        ),
+        borderRadius: BorderRadius.circular(AppDimensions.radiusPill),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF8B5CF6).withValues(alpha: 0.3),
+            color: context.accentPrimary.withValues(alpha: 0.15),
             blurRadius: 16,
             offset: const Offset(0, 4),
           ),
@@ -1013,44 +1005,41 @@ class _AuthScreenState extends State<AuthScreen> {
       ),
       child: ElevatedButton(
         style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.transparent,
-          shadowColor: Colors.transparent,
+          backgroundColor: context.accentPrimary,
+          foregroundColor: Colors.black,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(AppDimensions.radiusPill),
           ),
         ),
         onPressed: _submit,
         child: Text(
           _isSignIn ? "Sign In" : "Sign Up",
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 16,
+          style: context.cardTitle.copyWith(
+            color: Colors.black,
             fontWeight: FontWeight.bold,
-            letterSpacing: 0.5,
           ),
         ),
       ),
     );
   }
 
-  Widget _buildGoogleButton() {
+  Widget _buildGoogleButton(BuildContext context) {
     return Container(
       height: 52,
       decoration: BoxDecoration(
-        color: const Color(0xFF13141F),
-        borderRadius: BorderRadius.circular(16),
+        color: context.surfacePrimary,
+        borderRadius: BorderRadius.circular(AppDimensions.radiusPill),
         border: Border.all(
-          color: const Color(0xFF1F2030),
-          width: 1.5,
+          color: Colors.white.withValues(alpha: 0.04),
+          width: 1.0,
         ),
       ),
       child: InkWell(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(AppDimensions.radiusPill),
         onTap: _signInWithGoogle,
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // Styled Custom Google Icon representation
             Container(
               padding: const EdgeInsets.all(2),
               decoration: const BoxDecoration(
@@ -1064,13 +1053,9 @@ class _AuthScreenState extends State<AuthScreen> {
               ),
             ),
             const SizedBox(width: 12),
-            const Text(
+            Text(
               "Continue with Google",
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
-              ),
+              style: context.cardTitle,
             ),
           ],
         ),
@@ -1078,22 +1063,14 @@ class _AuthScreenState extends State<AuthScreen> {
     );
   }
 
-  Widget _buildOtpSubmitButton() {
+  Widget _buildOtpSubmitButton(BuildContext context) {
     return Container(
       height: 52,
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        gradient: const LinearGradient(
-          colors: [
-            Color(0xFF00F2FE),
-            Color(0xFF8B5CF6),
-          ],
-          begin: Alignment.centerLeft,
-          end: Alignment.centerRight,
-        ),
+        borderRadius: BorderRadius.circular(AppDimensions.radiusPill),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF8B5CF6).withValues(alpha: 0.3),
+            color: context.accentPrimary.withValues(alpha: 0.15),
             blurRadius: 16,
             offset: const Offset(0, 4),
           ),
@@ -1101,10 +1078,10 @@ class _AuthScreenState extends State<AuthScreen> {
       ),
       child: ElevatedButton(
         style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.transparent,
-          shadowColor: Colors.transparent,
+          backgroundColor: context.accentPrimary,
+          foregroundColor: Colors.black,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(AppDimensions.radiusPill),
           ),
         ),
         onPressed: () {
@@ -1112,35 +1089,25 @@ class _AuthScreenState extends State<AuthScreen> {
             _verifyOtp();
           }
         },
-        child: const Text(
+        child: Text(
           "Verify Code",
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 16,
+          style: context.cardTitle.copyWith(
+            color: Colors.black,
             fontWeight: FontWeight.bold,
-            letterSpacing: 0.5,
           ),
         ),
       ),
     );
   }
 
-  Widget _buildRecoveryOtpSubmitButton() {
+  Widget _buildRecoveryOtpSubmitButton(BuildContext context) {
     return Container(
       height: 52,
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        gradient: const LinearGradient(
-          colors: [
-            Color(0xFF00F2FE),
-            Color(0xFF8B5CF6),
-          ],
-          begin: Alignment.centerLeft,
-          end: Alignment.centerRight,
-        ),
+        borderRadius: BorderRadius.circular(AppDimensions.radiusPill),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF8B5CF6).withValues(alpha: 0.3),
+            color: context.accentPrimary.withValues(alpha: 0.15),
             blurRadius: 16,
             offset: const Offset(0, 4),
           ),
@@ -1148,10 +1115,10 @@ class _AuthScreenState extends State<AuthScreen> {
       ),
       child: ElevatedButton(
         style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.transparent,
-          shadowColor: Colors.transparent,
+          backgroundColor: context.accentPrimary,
+          foregroundColor: Colors.black,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(AppDimensions.radiusPill),
           ),
         ),
         onPressed: () {
@@ -1159,35 +1126,25 @@ class _AuthScreenState extends State<AuthScreen> {
             _verifyRecoveryOtp();
           }
         },
-        child: const Text(
+        child: Text(
           "Verify Code",
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 16,
+          style: context.cardTitle.copyWith(
+            color: Colors.black,
             fontWeight: FontWeight.bold,
-            letterSpacing: 0.5,
           ),
         ),
       ),
     );
   }
 
-  Widget _buildSendRecoveryCodeButton() {
+  Widget _buildSendRecoveryCodeButton(BuildContext context) {
     return Container(
       height: 52,
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        gradient: const LinearGradient(
-          colors: [
-            Color(0xFF00F2FE),
-            Color(0xFF8B5CF6),
-          ],
-          begin: Alignment.centerLeft,
-          end: Alignment.centerRight,
-        ),
+        borderRadius: BorderRadius.circular(AppDimensions.radiusPill),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF8B5CF6).withValues(alpha: 0.3),
+            color: context.accentPrimary.withValues(alpha: 0.15),
             blurRadius: 16,
             offset: const Offset(0, 4),
           ),
@@ -1195,10 +1152,10 @@ class _AuthScreenState extends State<AuthScreen> {
       ),
       child: ElevatedButton(
         style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.transparent,
-          shadowColor: Colors.transparent,
+          backgroundColor: context.accentPrimary,
+          foregroundColor: Colors.black,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(AppDimensions.radiusPill),
           ),
         ),
         onPressed: () {
@@ -1206,13 +1163,11 @@ class _AuthScreenState extends State<AuthScreen> {
             _sendRecoveryCode();
           }
         },
-        child: const Text(
+        child: Text(
           "Send Recovery Code",
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 16,
+          style: context.cardTitle.copyWith(
+            color: Colors.black,
             fontWeight: FontWeight.bold,
-            letterSpacing: 0.5,
           ),
         ),
       ),

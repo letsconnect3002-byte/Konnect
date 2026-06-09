@@ -1,3 +1,4 @@
+import 'package:connect/Config/app_theme.dart';
 import 'package:connect/Pages/ConnectionProfilePage.dart';
 import 'package:connect/Pages/IndividualChatPage.dart';
 import 'package:connect/Providers/notification_provider.dart';
@@ -77,7 +78,7 @@ class _NotificationPageState extends State<NotificationPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF090A0F),
+      backgroundColor: context.canvasBackground,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,

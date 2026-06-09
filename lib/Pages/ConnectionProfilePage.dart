@@ -4,9 +4,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:connect/Providers/profile_provider.dart';
 import 'package:connect/Providers/connection_provider.dart';
+import 'package:connect/Providers/chat_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:connect/Utils/profile_field_filter.dart';
 import 'package:skeletonizer/skeletonizer.dart';
+import 'package:connect/Config/app_theme.dart';
 
 class ConnectionProfilePage extends StatefulWidget {
   final Map<String, dynamic> profileData;
@@ -71,7 +73,6 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
         Provider.of<ConnectionProvider>(context, listen: false);
     _loadProfileData();
   }
-
 
   Future<void> _loadProfileData() async {
     final data = widget.profileData;
@@ -244,86 +245,156 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
     return bioText;
   }
 
-  Widget _buildHeader(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 12.0, horizontal: 16.0),
-      decoration: BoxDecoration(
-        color: const Color(0xFF13141F),
-        borderRadius: BorderRadius.circular(30.0),
-        border: Border.all(
-          color: const Color(0xFF1F2030),
-          width: 1.0,
+  Widget _buildFallbackAvatar() {
+    final monogram = _name.isNotEmpty
+        ? _name.substring(0, 1).toUpperCase()
+        : "?";
+    return Center(
+      child: Text(
+        monogram,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 32,
+          fontWeight: FontWeight.bold,
+          fontFamily: 'Inter',
         ),
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    );
+  }
+
+  Widget _buildTag(String text) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 5.0),
+      decoration: BoxDecoration(
+        color: context.surfaceSecondary,
+        borderRadius: BorderRadius.circular(AppDimensions.radiusPill),
+      ),
+      child: Text(
+        text,
+        style: context.captionText.copyWith(
+          color: context.textSecondary,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHeroSection(BuildContext context) {
+    return SizedBox(
+      height: 220,
+      child: Stack(
+        clipBehavior: Clip.none,
         children: [
-          GestureDetector(
-            onTap: () {
-              if (Navigator.canPop(context)) {
-                Navigator.pop(context);
-              }
-            },
+          // 1. Banner Cover Background
+          Positioned(
+            left: 0,
+            right: 0,
+            top: 0,
+            height: 180,
             child: Container(
-              padding: const EdgeInsets.all(8),
-              decoration: const BoxDecoration(
-                color: Color(0xFF1C1D2A),
-                shape: BoxShape.circle,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    context.surfacePrimary,
+                    context.surfaceSecondary,
+                  ],
+                ),
               ),
-              child: const Icon(
-                Icons.arrow_back_ios_new_rounded,
-                color: Colors.white,
-                size: 16,
+              child: Stack(
+                children: [
+                  Positioned.fill(
+                    child: CustomPaint(
+                      painter: CardPatternPainter(
+                        color: context.accentPrimary.withValues(alpha: 0.04),
+                      ),
+                    ),
+                  ),
+                  Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.transparent,
+                          context.canvasBackground,
+                        ],
+                        stops: const [0.35, 1.0],
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
-          Column(
-            children: const [
-              Text(
-                'Card Preview',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 18.0,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 0.2,
-                  fontFamily: 'Inter',
-                ),
-              ),
-              SizedBox(height: 2),
-              Text(
-                'Digital Card',
-                style: TextStyle(
-                  color: Color(0xFF8B8C9E),
-                  fontSize: 11.0,
-                  fontWeight: FontWeight.w500,
-                  fontFamily: 'Inter',
-                ),
-              ),
-            ],
-          ),
-          // Message Button to start/view chat with this connection
-          GestureDetector(
-            onTap: () {
-              HapticFeedback.mediumImpact();
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => IndividualChatPage(
-                    connectionData: widget.profileData,
+
+          // 2. Back Button Overlay
+          Positioned(
+            left: AppDimensions.marginStandard,
+            top: 48,
+            child: GestureDetector(
+              onTap: () {
+                if (Navigator.canPop(context)) {
+                  Navigator.pop(context);
+                }
+              },
+              child: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: context.surfacePrimary.withValues(alpha: 0.8),
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: context.surfaceSecondary,
+                    width: 1.0,
                   ),
                 ),
-              );
-            },
-            child: Container(
-              padding: const EdgeInsets.all(8),
-              decoration: const BoxDecoration(
-                color: Color(0xFF1C1D2A),
-                shape: BoxShape.circle,
+                child: const Icon(
+                  Icons.arrow_back_ios_new_rounded,
+                  color: Colors.white,
+                  size: 16,
+                ),
               ),
-              child: const Icon(
-                Icons.chat_bubble_outline_rounded,
-                color: Color(0xFF00F2FE),
-                size: 16,
+            ),
+          ),
+
+          // 3. Avatar Placement
+          Positioned(
+            left: AppDimensions.marginStandard,
+            top: 110,
+            child: Container(
+              width: 90,
+              height: 90,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: context.accentPrimary.withValues(alpha: 0.35),
+                  width: 1.5,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.4),
+                    blurRadius: 8,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              padding: const EdgeInsets.all(1.5),
+              child: Container(
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: context.surfaceSecondary,
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: (_avatarUrl.isNotEmpty &&
+                        _avatarUrl.contains(
+                            'supabase.co/storage/v1/object/public/avatars/'))
+                    ? Image.network(
+                        _avatarUrl,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => _buildFallbackAvatar(),
+                      )
+                    : _buildFallbackAvatar(),
               ),
             ),
           ),
@@ -336,9 +407,9 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
     return Container(
       height: 32,
       decoration: BoxDecoration(
-        color: const Color(0xFF161726),
+        color: context.surfaceSecondary,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFF26273F)),
+        border: Border.all(color: context.surfaceSecondary),
       ),
       padding: const EdgeInsets.all(2),
       child: Row(
@@ -351,14 +422,14 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
               padding: const EdgeInsets.symmetric(horizontal: 12),
               decoration: BoxDecoration(
                 color:
-                    _showFront ? const Color(0xFF8B5CF6) : Colors.transparent,
+                    _showFront ? context.accentSecondary : Colors.transparent,
                 borderRadius: BorderRadius.circular(6),
               ),
               alignment: Alignment.center,
               child: Text(
                 'FRONT',
                 style: TextStyle(
-                  color: _showFront ? Colors.white : const Color(0xFF5C5E78),
+                  color: _showFront ? Colors.white : context.textSecondary,
                   fontSize: 12,
                   fontWeight: FontWeight.bold,
                   fontFamily: 'Inter',
@@ -373,14 +444,14 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
               padding: const EdgeInsets.symmetric(horizontal: 12),
               decoration: BoxDecoration(
                 color:
-                    !_showFront ? const Color(0xFF8B5CF6) : Colors.transparent,
+                    !_showFront ? context.accentSecondary : Colors.transparent,
                 borderRadius: BorderRadius.circular(6),
               ),
               alignment: Alignment.center,
               child: Text(
                 'BACK',
                 style: TextStyle(
-                  color: !_showFront ? Colors.white : const Color(0xFF5C5E78),
+                  color: !_showFront ? Colors.white : context.textSecondary,
                   fontSize: 12,
                   fontWeight: FontWeight.bold,
                   fontFamily: 'Inter',
@@ -394,7 +465,6 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
   }
 
   Widget _buildDigitalCard() {
-
     return LayoutBuilder(
       builder: (context, constraints) {
         final cardWidth = constraints.maxWidth;
@@ -414,12 +484,12 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
             width: cardWidth,
             height: cardHeight,
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(24.0),
-              gradient: const LinearGradient(
+              borderRadius: BorderRadius.circular(AppDimensions.radiusPremiumCard),
+              gradient: LinearGradient(
                 colors: [
-                  Color(0xFF00F2FE),
-                  Color(0xFF8B5CF6),
-                  Color(0xFFEC4899),
+                  const Color(0xFF00F2FE),
+                  context.accentSecondary,
+                  const Color(0xFFEC4899),
                 ],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
@@ -464,8 +534,11 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
                         return FadeTransition(
                           opacity: animation,
                           child: ScaleTransition(
-                            scale: Tween<double>(begin: 0.96, end: 1.0)
-                                .animate(animation),
+                            scale: ScaleTransition(
+                              scale: Tween<double>(begin: 0.96, end: 1.0)
+                                  .animate(animation),
+                              child: child,
+                            ).scale,
                             child: child,
                           ),
                         );
@@ -550,7 +623,7 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
                   shape: BoxShape.circle,
                   color: const Color(0xFF151628),
                   border: Border.all(
-                    color: const Color(0xFF8B5CF6).withValues(alpha: 0.3),
+                    color: context.accentSecondary.withValues(alpha: 0.3),
                     width: 1.5,
                   ),
                 ),
@@ -720,10 +793,10 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
                 width: 36,
                 height: 36,
                 padding: const EdgeInsets.all(1.0),
-                decoration: const BoxDecoration(
+                decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   gradient: LinearGradient(
-                    colors: [Color(0xFF00F2FE), Color(0xFF8B5CF6)],
+                    colors: [const Color(0xFF00F2FE), context.accentSecondary],
                   ),
                 ),
                 child: ClipOval(
@@ -913,8 +986,8 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
           child: Container(
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(1.5),
-              gradient: const LinearGradient(
-                colors: [Color(0xFF8B5CF6), Color(0xFF00F2FE)],
+              gradient: LinearGradient(
+                colors: [context.accentSecondary, const Color(0xFF00F2FE)],
               ),
             ),
           ),
@@ -986,15 +1059,15 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
     if (value.trim().isEmpty) return const SizedBox.shrink();
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       decoration: BoxDecoration(
-        color: const Color(0xFF13141F),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFF1F2030)),
+        color: context.surfacePrimary,
+        borderRadius: BorderRadius.circular(AppDimensions.radiusPremiumCard),
+        border: Border.all(color: context.surfaceSecondary.withValues(alpha: 0.5)),
       ),
       child: Row(
         children: [
-          Icon(icon, color: const Color(0xFF8B5CF6), size: 20),
+          Icon(icon, color: context.accentPrimary, size: 20),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -1002,34 +1075,27 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
               children: [
                 Text(
                   label,
-                  style: const TextStyle(
-                    color: Color(0xFF8B8C9E),
-                    fontSize: 12,
-                    fontFamily: 'Inter',
-                  ),
+                  style: context.captionText,
                 ),
                 const SizedBox(height: 4),
                 Text(
                   value,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    fontFamily: 'Inter',
-                  ),
+                  style: context.bodyText.copyWith(fontWeight: FontWeight.bold),
                 ),
               ],
             ),
           ),
           IconButton(
-            icon: const Icon(Icons.content_copy_rounded,
-                color: Color(0xFF5C5E78), size: 18),
+            icon: Icon(Icons.content_copy_rounded,
+                color: context.textSecondary, size: 18),
             onPressed: () {
+              final scaffoldMessenger = ScaffoldMessenger.of(context);
+              final surfaceSecondaryColor = context.surfaceSecondary;
               Clipboard.setData(ClipboardData(text: value)).then((_) {
-                ScaffoldMessenger.of(context).showSnackBar(
+                scaffoldMessenger.showSnackBar(
                   SnackBar(
                     content: Text("Copied $label to clipboard!"),
-                    backgroundColor: const Color(0xFF8B5CF6),
+                    backgroundColor: surfaceSecondaryColor,
                     behavior: SnackBarBehavior.floating,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(10),
@@ -1052,11 +1118,11 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
     if (handle.trim().isEmpty) return const SizedBox.shrink();
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       decoration: BoxDecoration(
-        color: const Color(0xFF13141F),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFF1F2030)),
+        color: context.surfacePrimary,
+        borderRadius: BorderRadius.circular(AppDimensions.radiusPremiumCard),
+        border: Border.all(color: context.surfaceSecondary.withValues(alpha: 0.5)),
       ),
       child: Row(
         children: [
@@ -1068,34 +1134,27 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
               children: [
                 Text(
                   title,
-                  style: const TextStyle(
-                    color: Color(0xFF8B8C9E),
-                    fontSize: 11,
-                    fontFamily: 'Inter',
-                  ),
+                  style: context.captionText,
                 ),
-                const SizedBox(height: 3),
+                const SizedBox(height: 4),
                 Text(
                   handle,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    fontFamily: 'Inter',
-                  ),
+                  style: context.bodyText.copyWith(fontWeight: FontWeight.bold),
                 ),
               ],
             ),
           ),
           IconButton(
-            icon: const Icon(Icons.content_copy_rounded,
-                color: Color(0xFF5C5E78), size: 18),
+            icon: Icon(Icons.content_copy_rounded,
+                color: context.textSecondary, size: 18),
             onPressed: () {
+              final scaffoldMessenger = ScaffoldMessenger.of(context);
+              final surfaceSecondaryColor = context.surfaceSecondary;
               Clipboard.setData(ClipboardData(text: handle)).then((_) {
-                ScaffoldMessenger.of(context).showSnackBar(
+                scaffoldMessenger.showSnackBar(
                   SnackBar(
                     content: Text("Copied $title handle to clipboard!"),
-                    backgroundColor: const Color(0xFF8B5CF6),
+                    backgroundColor: surfaceSecondaryColor,
                     behavior: SnackBarBehavior.floating,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(10),
@@ -1143,135 +1202,251 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
       child:
           const Icon(Icons.camera_alt_rounded, color: Colors.white, size: 18),
     );
+
     return Scaffold(
-      backgroundColor: const Color(0xFF090A0F),
+      backgroundColor: context.canvasBackground,
       body: SafeArea(
+        top: false,
         child: Skeletonizer(
           enabled: _isLoading,
           child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(
-                horizontal: 24.0, vertical: 16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    _buildHeader(context),
-                    const SizedBox(height: 16),
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: _buildFrontBackToggle(),
-                    ),
-                    const SizedBox(height: 16),
+            physics: const BouncingScrollPhysics(),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // 1. Premium Hero Banner & Avatar Overlay
+                _buildHeroSection(context),
 
-                    if (_sharedCardPermission == 'both') ...[
-                      _buildPreviewTabSelector(),
+                // 2. Profile Details Left-aligned
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: AppDimensions.marginStandard),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _name,
+                        style: context.displayHeader,
+                      ),
+                      const SizedBox(height: 4),
+                      if (_profession.isNotEmpty || _company.isNotEmpty) ...[
+                        Text(
+                          _company.isNotEmpty ? "$_profession at $_company" : _profession,
+                          style: context.bodyText.copyWith(color: context.textSecondary),
+                        ),
+                        const SizedBox(height: 8),
+                      ],
+                      // Category tag Wrap
+                      Wrap(
+                        spacing: 8.0,
+                        runSpacing: 8.0,
+                        children: [
+                          _buildTag("Konnection"),
+                          if (_sharedCardPermission != 'both')
+                            _buildTag(_sharedCardPermission.toUpperCase())
+                          else ...[
+                            _buildTag("CASUAL"),
+                            _buildTag("PROFESSIONAL"),
+                          ],
+                        ],
+                      ),
+                      const SizedBox(height: 24),
+                    ],
+                  ),
+                ),
+
+                // 3. Digital Cards Preview and Permissions Details
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: AppDimensions.marginStandard),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: _buildFrontBackToggle(),
+                      ),
                       const SizedBox(height: 16),
-                    ],
-                    // Business card graphic
-                    _buildDigitalCard(),
-                    const SizedBox(height: 24),
-                    _buildAccessControlSection(),
-                    const SizedBox(height: 32),
 
-                    // DETAILS DISPLAY HEADER
-                    const Text(
-                      'CONNECTION DETAILS',
-                      style: TextStyle(
-                        color: Color(0xFF8B8C9E),
-                        fontSize: 14.0,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 1.5,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Read-only Details (filtered by shared card permission)
-                    _buildReadOnlyField(
-                      label: 'Full Name',
-                      value: _name,
-                      icon: Icons.person_outline_rounded,
-                    ),
-                    // Profession & Company are professional details — only show
-                    // when the professional or both card is shared.
-                    if (_sharedCardPermission == 'professional' ||
-                        _sharedCardPermission == 'both') ...[
-                      _buildReadOnlyField(
-                        label: 'Profession',
-                        value: _profession,
-                        icon: Icons.work_outline_rounded,
-                      ),
-                      _buildReadOnlyField(
-                        label: 'Company',
-                        value: _company,
-                        icon: Icons.apartment_rounded,
-                      ),
-                    ],
-                    // When 'both', show casual & professional variants separately
-                    // but only if the values actually differ; otherwise show one.
-                    if (_sharedCardPermission == 'both')
-                      ..._buildBothFields(
-                        casualFields: _casualFields,
-                        professionalFields: _professionalFields,
-                        linkedinLogo: linkedinLogo,
-                        twitterLogo: twitterLogo,
-                        instagramLogo: instagramLogo,
-                      )
-                    else ...[
-                      _buildReadOnlyField(
-                        label: 'Email Address',
-                        value: _activeFields['email'] ?? '',
-                        icon: Icons.email_outlined,
-                      ),
-                      _buildReadOnlyField(
-                        label: 'Phone Number',
-                        value: _activeFields['phoneNumber'] ?? '',
-                        icon: Icons.phone_android_outlined,
-                      ),
-                      _buildReadOnlyField(
-                        label: 'Bio',
-                        value: _activeFields['bio'] ?? '',
-                        icon: Icons.description_outlined,
-                      ),
-
-                      // Social media block — only show if at least one handle exists
-                      if ([
-                        _activeFields['linkedin'] ?? '',
-                        _activeFields['twitter'] ?? '',
-                        _activeFields['instagram'] ?? '',
-                      ].any((v) => v.trim().isNotEmpty)) ...[
+                      if (_sharedCardPermission == 'both') ...[
+                        _buildPreviewTabSelector(),
                         const SizedBox(height: 16),
-                        const Text(
-                          'SOCIAL HANDLES',
-                          style: TextStyle(
-                            color: Color(0xFF8B8C9E),
-                            fontSize: 14.0,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 1.5,
-                          ),
+                      ],
+                      // Business card graphic
+                      _buildDigitalCard(),
+                      const SizedBox(height: 24),
+                      _buildAccessControlSection(),
+                      const SizedBox(height: 32),
+
+                      // DETAILS DISPLAY HEADER
+                      Text(
+                        'CONNECTION DETAILS',
+                        style: context.captionText.copyWith(
+                          color: context.textSecondary,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 1.5,
                         ),
-                        const SizedBox(height: 16),
-                        _buildSocialCard(
-                          title: 'LinkedIn',
-                          handle: _activeFields['linkedin'] ?? '',
-                          logo: linkedinLogo,
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Read-only Details (filtered by shared card permission)
+                      _buildReadOnlyField(
+                        label: 'Full Name',
+                        value: _name,
+                        icon: Icons.person_outline_rounded,
+                      ),
+                      // Profession & Company are professional details
+                      if (_sharedCardPermission == 'professional' ||
+                          _sharedCardPermission == 'both') ...[
+                        _buildReadOnlyField(
+                          label: 'Profession',
+                          value: _profession,
+                          icon: Icons.work_outline_rounded,
                         ),
-                        _buildSocialCard(
-                          title: 'Twitter',
-                          handle: _activeFields['twitter'] ?? '',
-                          logo: twitterLogo,
-                        ),
-                        _buildSocialCard(
-                          title: 'Instagram',
-                          handle: _activeFields['instagram'] ?? '',
-                          logo: instagramLogo,
+                        _buildReadOnlyField(
+                          label: 'Company',
+                          value: _company,
+                          icon: Icons.apartment_rounded,
                         ),
                       ],
-                    ]
-                  ],
+                      // When 'both', show casual & professional variants separately
+                      if (_sharedCardPermission == 'both')
+                        ..._buildBothFields(
+                          casualFields: _casualFields,
+                          professionalFields: _professionalFields,
+                          linkedinLogo: linkedinLogo,
+                          twitterLogo: twitterLogo,
+                          instagramLogo: instagramLogo,
+                        )
+                      else ...[
+                        _buildReadOnlyField(
+                          label: 'Email Address',
+                          value: _activeFields['email'] ?? '',
+                          icon: Icons.email_outlined,
+                        ),
+                        _buildReadOnlyField(
+                          label: 'Phone Number',
+                          value: _activeFields['phoneNumber'] ?? '',
+                          icon: Icons.phone_android_outlined,
+                        ),
+                        _buildReadOnlyField(
+                          label: 'Bio',
+                          value: _activeFields['bio'] ?? '',
+                          icon: Icons.description_outlined,
+                        ),
+
+                        // Social media block — only show if at least one handle exists
+                        if ([
+                          _activeFields['linkedin'] ?? '',
+                          _activeFields['twitter'] ?? '',
+                          _activeFields['instagram'] ?? '',
+                        ].any((v) => v.trim().isNotEmpty)) ...[
+                          const SizedBox(height: 16),
+                          Text(
+                            'SOCIAL HANDLES',
+                            style: context.captionText.copyWith(
+                              color: context.textSecondary,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 1.5,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          _buildSocialCard(
+                            title: 'LinkedIn',
+                            handle: _activeFields['linkedin'] ?? '',
+                            logo: linkedinLogo,
+                          ),
+                          _buildSocialCard(
+                            title: 'Twitter',
+                            handle: _activeFields['twitter'] ?? '',
+                            logo: twitterLogo,
+                          ),
+                          _buildSocialCard(
+                            title: 'Instagram',
+                            handle: _activeFields['instagram'] ?? '',
+                            logo: instagramLogo,
+                          ),
+                        ],
+                      ],
+                      const SizedBox(height: 32),
+                    ],
+                  ),
                 ),
+              ],
+            ),
+          ),
+        ),
+      ),
+      bottomNavigationBar: SafeArea(
+        top: false,
+        child: Container(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppDimensions.marginStandard,
+            vertical: 12.0,
+          ),
+          decoration: BoxDecoration(
+            color: context.canvasBackground,
+            border: Border(
+              top: BorderSide(
+                color: context.surfaceSecondary,
+                width: 1.0,
               ),
             ),
           ),
-        );
+          child: Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () {
+                    _showDeleteConfirmation(context, widget.profileData, connectionProvider);
+                  },
+                  style: OutlinedButton.styleFrom(
+                    side: BorderSide(color: context.surfaceSecondary, width: 1.0),
+                    shape: const StadiumBorder(),
+                    padding: const EdgeInsets.symmetric(vertical: 16.0),
+                  ),
+                  child: Text(
+                    "Remove Connection",
+                    style: context.bodyText.copyWith(
+                      color: context.textSecondary,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12.0),
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: () {
+                    HapticFeedback.mediumImpact();
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => IndividualChatPage(
+                          connectionData: widget.profileData,
+                        ),
+                      ),
+                    );
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: context.accentPrimary,
+                    foregroundColor: Colors.black,
+                    shape: const StadiumBorder(),
+                    padding: const EdgeInsets.symmetric(vertical: 16.0),
+                    elevation: 0,
+                  ),
+                  child: Text(
+                    "Message",
+                    style: context.bodyText.copyWith(
+                      color: Colors.black,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   /// Builds the detail + social widgets when the shared card permission is
@@ -1358,11 +1533,10 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
 
     if (hasAnySocial) {
       widgets.add(const SizedBox(height: 16));
-      widgets.add(const Text(
+      widgets.add(Text(
         'SOCIAL HANDLES',
-        style: TextStyle(
-          color: Color(0xFF8B8C9E),
-          fontSize: 14.0,
+        style: context.captionText.copyWith(
+          color: context.textSecondary,
           fontWeight: FontWeight.bold,
           letterSpacing: 1.5,
         ),
@@ -1381,9 +1555,9 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
       height: 40,
       padding: const EdgeInsets.all(3),
       decoration: BoxDecoration(
-        color: const Color(0xFF13141F),
+        color: context.surfacePrimary,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFF1F2030)),
+        border: Border.all(color: context.surfaceSecondary),
       ),
       child: Row(
         children: [
@@ -1421,7 +1595,7 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
         duration: const Duration(milliseconds: 200),
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: isActive ? const Color(0xFF8B5CF6) : Colors.transparent,
+          color: isActive ? context.accentSecondary : Colors.transparent,
           borderRadius: BorderRadius.circular(17),
         ),
         child: Row(
@@ -1430,13 +1604,13 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
             Icon(
               icon,
               size: 16,
-              color: isActive ? Colors.white : const Color(0xFF8B8C9E),
+              color: isActive ? Colors.white : context.textSecondary,
             ),
             const SizedBox(width: 6),
             Text(
               label,
               style: TextStyle(
-                color: isActive ? Colors.white : const Color(0xFF8B8C9E),
+                color: isActive ? Colors.white : context.textSecondary,
                 fontSize: 13,
                 fontWeight: FontWeight.bold,
               ),
@@ -1451,36 +1625,33 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF131422),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFF26273F)),
+        color: context.surfacePrimary,
+        borderRadius: BorderRadius.circular(AppDimensions.radiusPremiumCard),
+        border: Border.all(color: context.surfaceSecondary.withValues(alpha: 0.5)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            children: const [
-              Icon(Icons.security_rounded, color: Color(0xFF00F2FE), size: 18),
-              SizedBox(width: 8),
+            children: [
+              Icon(Icons.security_rounded, color: context.accentPrimary, size: 18),
+              const SizedBox(width: 8),
               Text(
                 "ACCESS PERMISSIONS",
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 12,
+                style: context.captionText.copyWith(
+                  color: context.textPrimary,
                   fontWeight: FontWeight.bold,
                   letterSpacing: 1.0,
-                  fontFamily: 'Inter',
                 ),
               ),
             ],
           ),
           const SizedBox(height: 10),
-          const Text(
+          Text(
             "Configure which digital card of yours this contact can see:",
-            style: TextStyle(
-              color: Color(0xFF8B8C9E),
-              fontSize: 11.5,
-              fontFamily: 'Inter',
+            style: context.bodyText.copyWith(
+              color: context.textSecondary,
+              fontSize: 12,
             ),
           ),
           const SizedBox(height: 16),
@@ -1494,9 +1665,9 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
     return Container(
       height: 38,
       decoration: BoxDecoration(
-        color: const Color(0xFF0C0D16),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: const Color(0xFF1F2030)),
+        color: context.canvasBackground,
+        borderRadius: BorderRadius.circular(AppDimensions.radiusComponent),
+        border: Border.all(color: context.surfaceSecondary),
       ),
       padding: const EdgeInsets.all(3),
       child: Row(
@@ -1517,14 +1688,14 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
           decoration: BoxDecoration(
-            color: isSelected ? const Color(0xFF8B5CF6) : Colors.transparent,
+            color: isSelected ? context.accentPrimary : Colors.transparent,
             borderRadius: BorderRadius.circular(8),
           ),
           alignment: Alignment.center,
           child: Text(
             label,
             style: TextStyle(
-              color: isSelected ? Colors.white : const Color(0xFF5C5E78),
+              color: isSelected ? Colors.black : context.textSecondary,
               fontWeight: FontWeight.bold,
               fontSize: 11,
               fontFamily: 'Inter',
@@ -1555,11 +1726,83 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
         SnackBar(
           content:
               Text("Sharing settings updated to ${accessType.toUpperCase()}"),
-          backgroundColor: const Color(0xFF8B5CF6),
+          backgroundColor: context.surfaceSecondary,
           duration: const Duration(milliseconds: 1500),
         ),
       );
     }
+  }
+
+  Future<void> _deleteProfileLocally(
+      String id, ConnectionProvider provider) async {
+    try {
+      final intId = int.tryParse(id) ?? 0;
+      await provider.deleteProfile(intId,
+          onRoomCleanup: (profileId, roomId) async {
+        await Provider.of<ChatProvider>(context, listen: false)
+            .handleRoomCleanup(profileId, roomId);
+      });
+    } catch (e) {
+      print("Error deleting profile locally: $e");
+    }
+  }
+
+  Future<void> _showDeleteConfirmation(BuildContext context,
+      Map<String, dynamic> connection, ConnectionProvider provider) async {
+    final name = connection['name'] ?? 'this contact';
+    final profileIdStr = (connection['id'] ?? connection['connection_profile_id'] ?? '').toString();
+
+    return showDialog(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          backgroundColor: context.surfacePrimary,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppDimensions.radiusPremiumCard),
+            side: BorderSide(color: context.surfaceSecondary, width: 1.5),
+          ),
+          title: Text(
+            "Delete Connection",
+            style: context.screenHeading.copyWith(fontWeight: FontWeight.bold),
+          ),
+          content: Text(
+            "Are you sure you want to remove $name from your connections? This will permanently delete this connection and clear all chat history and text messages.",
+            style: context.bodyText.copyWith(color: context.textSecondary),
+          ),
+          actions: [
+            TextButton(
+              child: Text("Cancel", style: TextStyle(color: context.textSecondary)),
+              onPressed: () => Navigator.pop(dialogContext),
+            ),
+            TextButton(
+              child: const Text("Delete",
+                  style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
+              onPressed: () async {
+                final navigator = Navigator.of(context);
+                final scaffoldMessenger = ScaffoldMessenger.of(context);
+                Navigator.pop(dialogContext);
+                try {
+                  await _deleteProfileLocally(profileIdStr, provider);
+                  if (!mounted) return;
+                  navigator.pop(); // Pop profile detail screen since it's deleted
+                  scaffoldMessenger.showSnackBar(
+                    const SnackBar(
+                      content: Text("Connection and chat history deleted"),
+                      backgroundColor: Colors.redAccent,
+                    ),
+                  );
+                } catch (e) {
+                  if (!mounted) return;
+                  scaffoldMessenger.showSnackBar(
+                    SnackBar(content: Text("Error deleting connection: $e")),
+                  );
+                }
+              },
+            ),
+          ],
+        );
+      },
+    );
   }
 }
 

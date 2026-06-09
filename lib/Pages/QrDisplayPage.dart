@@ -127,14 +127,15 @@
 
 import 'package:flutter/material.dart';
 import 'package:pretty_qr_code/pretty_qr_code.dart';
+import 'package:connect/Config/app_theme.dart';
 
 class QrDisplayPage extends StatefulWidget {
   final String data;
 
-  QrDisplayPage({required this.data});
+  const QrDisplayPage({super.key, required this.data});
 
   @override
-  _QrDisplayPageState createState() => _QrDisplayPageState();
+  State<QrDisplayPage> createState() => _QrDisplayPageState();
 }
 
 class _QrDisplayPageState extends State<QrDisplayPage> {
@@ -149,7 +150,6 @@ class _QrDisplayPageState extends State<QrDisplayPage> {
       14: 1624, // Version 14
       15: 1812, // Version 15
       16: 2032, // Version 16
-      // Add more versions if needed
     };
 
     for (var entry in capacities.entries) {
@@ -185,44 +185,71 @@ class _QrDisplayPageState extends State<QrDisplayPage> {
     }
   }
 
-
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
-          "Custom QR Code Display",
-          style: TextStyle(color: Colors.white),
+        title: Text(
+          "Identity QR Code",
+          style: context.screenHeading,
         ),
-        backgroundColor: Colors.black,
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded,
+              color: Colors.white, size: 18),
+          onPressed: () => Navigator.pop(context),
+        ),
       ),
-      backgroundColor: Colors.black,
+      backgroundColor: context.canvasBackground,
       body: Center(
-        child: Column(
-          children: [
-            if (hasError)
-              Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Text(
-                  'Error generating QR code: $errorMessage',
-                  style: TextStyle(color: Colors.red),
-                ),
-              )
-            else
-              Column(
-                children: [
-                  SizedBox(
-                    height: size.width / 1.1,
-                    width: size.width / 1.1,
-                    child: Card(
-                      color: Colors.white,
-                      elevation: 4,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+        child: SingleChildScrollView(
+          physics: const BouncingScrollPhysics(),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              if (hasError)
+                Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Text(
+                    'Error generating QR code: $errorMessage',
+                    style: const TextStyle(color: Colors.redAccent),
+                  ),
+                )
+              else
+                Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: size.width / 1.25,
+                      height: size.width / 1.25,
+                      constraints: const BoxConstraints(
+                        maxWidth: 320,
+                        maxHeight: 320,
                       ),
-                      child: Padding(
-                        padding: const EdgeInsets.all(16.0),
+                      decoration: BoxDecoration(
+                        color: context.surfacePrimary,
+                        borderRadius: BorderRadius.circular(AppDimensions.radiusPremiumCard),
+                        border: Border.all(
+                          color: context.surfaceSecondary,
+                          width: 1.5,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.3),
+                            blurRadius: 20,
+                            offset: const Offset(0, 8),
+                          ),
+                        ],
+                      ),
+                      child: Container(
+                        margin: const EdgeInsets.all(16.0),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        padding: const EdgeInsets.all(24.0), // interior safety field padding of 24.0 pixels on all sides
                         child: PrettyQrView(
                           qrImage: qrImage,
                           decoration: const PrettyQrDecoration(
@@ -231,15 +258,19 @@ class _QrDisplayPageState extends State<QrDisplayPage> {
                         ),
                       ),
                     ),
-                  ),
-                  SizedBox(height: 20),
-                  // ElevatedButton(
-                  //   onPressed: _saveQrCodeImage,
-                  //   child: Text("Save QR Code"),
-                  // ),
-                ],
-              ),
-          ],
+                    const SizedBox(height: 16.0),
+                    Text(
+                      "Show this code to complete connection",
+                      style: context.captionText.copyWith(
+                        color: context.textSecondary,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+            ],
+          ),
         ),
       ),
     );

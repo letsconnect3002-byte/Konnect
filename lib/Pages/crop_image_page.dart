@@ -153,10 +153,11 @@ class _CropImagePageState extends State<CropImagePage> {
 
   @override
   Widget build(BuildContext context) {
+    final scaffoldBg = Theme.of(context).scaffoldBackgroundColor;
     return Scaffold(
-      backgroundColor: const Color(0xFF090A0F),
+      backgroundColor: scaffoldBg,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF090A0F),
+        backgroundColor: scaffoldBg,
         elevation: 0,
         leading: IconButton(
           icon:

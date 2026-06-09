@@ -1,3 +1,4 @@
+import 'package:connect/Config/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -81,7 +82,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
     final size = MediaQuery.of(context).size;
 
     return Scaffold(
-      backgroundColor: const Color(0xFF090A0F),
+      backgroundColor: context.canvasBackground,
       body: Stack(
         children: [
           // Background decorative gradient circles
@@ -322,7 +323,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
         ),
         suffixIcon: suffixIcon,
         filled: true,
-        fillColor: const Color(0xFF131420),
+        fillColor: context.surfaceSecondary,
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
         border: OutlineInputBorder(

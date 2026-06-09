@@ -9,6 +9,7 @@ import 'package:pretty_qr_code/pretty_qr_code.dart';
 import 'package:connect/Providers/notification_provider.dart';
 import 'package:connect/Pages/NotificationPage.dart';
 import 'package:skeletonizer/skeletonizer.dart';
+import 'package:connect/Config/app_theme.dart';
 
 class ProfilePage extends StatefulWidget {
   final VoidCallback? onSetUpProfile;
@@ -119,29 +120,26 @@ class _ProfilePageState extends State<ProfilePage> {
       showDialog(
         context: context,
         barrierDismissible: false,
-        builder: (context) => const Dialog(
-          backgroundColor: Color(0xFF131422),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.all(Radius.circular(16)),
+        builder: (context) => Dialog(
+          backgroundColor: context.surfacePrimary,
+          shape: const RoundedRectangleBorder(
+            borderRadius: BorderRadius.all(
+                Radius.circular(AppDimensions.radiusPremiumCard)),
           ),
           child: Padding(
-            padding: EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+            padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 CircularProgressIndicator(
-                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF00F2FE)),
+                  valueColor:
+                      AlwaysStoppedAnimation<Color>(context.accentPrimary),
                 ),
-                SizedBox(height: 16),
+                const SizedBox(height: 16),
                 Text(
                   "Generating VIP Pass...",
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    fontFamily: 'Inter',
-                  ),
+                  style: context.cardTitle,
                 ),
               ],
             ),
@@ -158,7 +156,7 @@ class _ProfilePageState extends State<ProfilePage> {
       }
 
       final shareMessage =
-          "Hey,I'm inviting you to my private circle on Mandala. Download the app here: joinmandala.in and use my single-use VIP code to connect: *$code*.";
+          "Hey, I'm inviting you to my private circle on Mandala. Download the app here: joinmandala.in and use my single-use VIP code to connect: *$code*.";
 
       await SharePlus.instance.share(ShareParams(text: shareMessage));
     } catch (e) {
@@ -200,7 +198,7 @@ class _ProfilePageState extends State<ProfilePage> {
     }
 
     return Scaffold(
-      backgroundColor: const Color(0xFF090A0F),
+      backgroundColor: context.canvasBackground,
       body: SafeArea(
         child: _isLoading
             ? Skeletonizer(
@@ -209,48 +207,40 @@ class _ProfilePageState extends State<ProfilePage> {
               )
             : RefreshIndicator(
                 onRefresh: _refreshData,
-                color: const Color(0xFF00F2FE),
-                backgroundColor: const Color(0xFF13141F),
+                color: context.accentPrimary,
+                backgroundColor: context.surfacePrimary,
                 child: SingleChildScrollView(
                   physics: const AlwaysScrollableScrollPhysics(),
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 20.0, vertical: 16.0),
+                  padding: const EdgeInsets.only(
+                      left: AppDimensions.marginStandard,
+                      right: AppDimensions.marginStandard,
+                      top: 16.0,
+                      bottom: 100.0),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      // Top Header Bar
+                      // Top Personalized Profile Header
                       _buildTopHeader(context, profileProvider),
-                      const SizedBox(height: 32),
+                      const SizedBox(height: 28),
 
-                      // Title
-                      const Text(
-                        "My Card",
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 32,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: -0.8,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 32),
-
-                      // QR Code / Setup Container
+                      // QR Code / Setup Card Container
                       Center(
                         child: _buildQRFrame(context, qrImage, profileProvider),
                       ),
+
+                      // Active sharing type chip/card below QR code
                       if (hasBasicDetails && _qrGenerated) ...[
                         const SizedBox(height: 20),
                         Center(
                           child: Container(
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 16, vertical: 10),
+                                horizontal: 16, vertical: 12),
                             decoration: BoxDecoration(
-                              color: const Color(0xFF13141F),
-                              borderRadius: BorderRadius.circular(20),
+                              color: context.surfacePrimary,
+                              borderRadius: BorderRadius.circular(
+                                  AppDimensions.radiusPremiumCard),
                               border: Border.all(
-                                color: const Color(0xFF8B5CF6)
-                                    .withValues(alpha: 0.15),
+                                color: Colors.white.withValues(alpha: 0.04),
                               ),
                             ),
                             child: Row(
@@ -260,20 +250,24 @@ class _ProfilePageState extends State<ProfilePage> {
                                 Container(
                                   width: 8,
                                   height: 8,
-                                  decoration: const BoxDecoration(
-                                    color: Color(0xFF00F2FE),
+                                  decoration: BoxDecoration(
+                                    color: context.accentPrimary,
                                     shape: BoxShape.circle,
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: context.accentPrimary
+                                            .withValues(alpha: 0.4),
+                                        blurRadius: 6,
+                                        spreadRadius: 2,
+                                      ),
+                                    ],
                                   ),
                                 ),
                                 const SizedBox(width: 8),
                                 Text(
                                   "Sharing: ${_selectedShareType.toUpperCase()}",
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w600,
-                                    fontFamily: 'Inter',
-                                  ),
+                                  style: context.bodyText
+                                      .copyWith(fontWeight: FontWeight.w600),
                                 ),
                                 const SizedBox(width: 12),
                                 // Vertical divider
@@ -287,10 +281,10 @@ class _ProfilePageState extends State<ProfilePage> {
                                 GestureDetector(
                                   onTap: () =>
                                       _showQrOptionsBottomSheet(context),
-                                  child: const Text(
+                                  child: Text(
                                     "Change",
                                     style: TextStyle(
-                                      color: Color(0xFF8B5CF6),
+                                      color: context.accentPrimary,
                                       fontSize: 13,
                                       fontWeight: FontWeight.bold,
                                       fontFamily: 'Inter',
@@ -303,10 +297,10 @@ class _ProfilePageState extends State<ProfilePage> {
                           ),
                         ),
                       ],
-                      const SizedBox(height: 36),
+                      const SizedBox(height: 28),
 
-                      // Quick Action Buttons
-                      _buildActionButtons(context, profileProvider),
+                      // Premium Asymmetric Dashboard Grid
+                      _buildDashboardGrid(context, profileProvider),
                     ],
                   ),
                 ),
@@ -315,143 +309,154 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-  // Header bar matching the user mockup
+  // Header bar containing Name, Bio, and Avatar
   Widget _buildTopHeader(
       BuildContext context, ProfileProvider profileProvider) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        color: const Color(0xFF13141F),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.04)),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          // Infinity link logo inside circle
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: const Color(0xFF1B1C2A),
-              shape: BoxShape.circle,
-              border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
-            ),
-            child: Image.asset(
-              'assets/icons/Mandala Icon 1.png',
-              width: 22,
-              height: 22,
-              color: const Color(0xFF00F2FE), // Teal color link logo
-            ),
-          ),
-          // const SizedBox(width: 12),
-          // Brand Title and Subtitle
-          const Column(
+    final hasAvatar = profileProvider.avatarUrl.isNotEmpty &&
+        profileProvider.avatarUrl
+            .contains('supabase.co/storage/v1/object/public/avatars/');
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        // Name and Bio aligned perfectly to left margin grid line
+        Expanded(
+          child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                "Mandala",
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: -0.3,
-                ),
+                profileProvider.name.trim().isEmpty
+                    ? "Welcome!"
+                    : profileProvider.name,
+                style: context.displayHeader,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
+              const SizedBox(height: 4),
               Text(
-                "Your Circle",
-                style: TextStyle(
-                  color: Colors.white30,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w400,
-                ),
+                profileProvider.profession.trim().isEmpty
+                    ? "Create your digital card below"
+                    : profileProvider.profession,
+                style: context.bodyText.copyWith(color: context.textSecondary),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
             ],
           ),
-          // const Spacer(),
-          // Notifications Bell button
-          Consumer<NotificationProvider>(
-            builder: (context, notifProvider, child) {
-              final unread = notifProvider.unreadCount;
-              return GestureDetector(
-                onTap: () {
-                  HapticFeedback.lightImpact();
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const NotificationPage(),
-                    ),
-                  );
-                },
-                child: Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF1B1C2A),
-                    shape: BoxShape.circle,
-                    border:
-                        Border.all(color: Colors.white.withValues(alpha: 0.06)),
-                  ),
-                  child: Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      const Icon(
-                        Icons.notifications_rounded,
-                        color: Colors.white70,
-                        size: 20,
+        ),
+        const SizedBox(width: 16),
+        // Notifications and Avatar Row on the right
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Notifications Bell button
+            Consumer<NotificationProvider>(
+              builder: (context, notifProvider, child) {
+                final unread = notifProvider.unreadCount;
+                return GestureDetector(
+                  onTap: () {
+                    HapticFeedback.lightImpact();
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const NotificationPage(),
                       ),
-                      if (unread > 0)
-                        Positioned(
-                          right: -2,
-                          top: -2,
-                          child: Container(
-                            padding: const EdgeInsets.all(2),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFEF4444), // Vibrant Red
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                  color: const Color(0xFF1B1C2A), width: 1.5),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: const Color(0xFFEF4444)
-                                      .withValues(alpha: 0.4),
-                                  blurRadius: 4,
-                                  spreadRadius: 1,
-                                ),
-                              ],
-                            ),
-                            constraints: const BoxConstraints(
-                              minWidth: 8,
-                              minHeight: 8,
+                    );
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: context.surfacePrimary,
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.04)),
+                    ),
+                    child: Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        Icon(
+                          Icons.notifications_rounded,
+                          color: context.textSecondary,
+                          size: 20,
+                        ),
+                        if (unread > 0)
+                          Positioned(
+                            right: -2,
+                            top: -2,
+                            child: Container(
+                              padding: const EdgeInsets.all(2),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFEF4444), // Vibrant Red
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                    color: context.surfacePrimary, width: 1.5),
+                              ),
+                              constraints: const BoxConstraints(
+                                minWidth: 8,
+                                minHeight: 8,
+                              ),
                             ),
                           ),
-                        ),
-                    ],
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+            const SizedBox(width: 12),
+            // Circular avatar with minimal soft volt ring accent
+            GestureDetector(
+              onTap: () {
+                widget.onSetUpProfile?.call();
+              },
+              child: Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: context.accentPrimary.withValues(alpha: 0.35),
+                    width: 1.5,
                   ),
                 ),
-              );
-            },
-          ),
-          // const SizedBox(width: 8),
-          // Settings button
-          // GestureDetector(
-          //   onTap: () {
-          //     widget.onSetUpProfile?.call();
-          //   },
-          //   child: Container(
-          //     padding: const EdgeInsets.all(10),
-          //     decoration: BoxDecoration(
-          //       color: const Color(0xFF1B1C2A),
-          //       shape: BoxShape.circle,
-          //       border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
-          //     ),
-          //     child: const Icon(
-          //       Icons.settings_rounded,
-          //       color: Colors.white60,
-          //       size: 20,
-          //     ),
-          //   ),
-          // ),
-        ],
+                padding: const EdgeInsets.all(2.0),
+                child: Container(
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: context.surfaceSecondary,
+                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: hasAvatar
+                      ? Image.network(
+                          profileProvider.avatarUrl,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) =>
+                              _buildFallbackAvatar(profileProvider),
+                        )
+                      : _buildFallbackAvatar(profileProvider),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildFallbackAvatar(ProfileProvider profileProvider) {
+    final monogram = profileProvider.name.trim().isNotEmpty
+        ? profileProvider.name.trim().substring(0, 1).toUpperCase()
+        : "?";
+    return Center(
+      child: Text(
+        monogram,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 16,
+          fontWeight: FontWeight.bold,
+          fontFamily: 'Inter',
+        ),
       ),
     );
   }
@@ -462,185 +467,182 @@ class _ProfilePageState extends State<ProfilePage> {
     const double outerSize = 280.0;
     final hasBasicDetails = profileProvider.name.trim().isNotEmpty &&
         profileProvider.profession.trim().isNotEmpty &&
-        profileProvider.phoneNumber.trim().isNotEmpty;
+        (profileProvider.phoneNumber.trim().isNotEmpty ||
+            profileProvider.professionalPhoneNumber.trim().isNotEmpty);
 
     return Container(
       width: outerSize,
       height: outerSize,
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(36),
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            const Color(0xFF2A2C42),
-            const Color(0xFF3D3560).withValues(alpha: 0.5),
-            const Color(0xFF2A2C42),
-          ],
+        color: context.surfacePrimary,
+        borderRadius: BorderRadius.circular(AppDimensions.radiusPremiumCard),
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.04),
+          width: 1.0,
         ),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF8B5CF6).withValues(alpha: 0.06),
-            blurRadius: 10,
-            spreadRadius: 0,
-            offset: const Offset(0, 2),
+            color: Colors.black.withValues(alpha: 0.25),
+            blurRadius: 20,
+            spreadRadius: 2,
+            offset: const Offset(0, 8),
           ),
         ],
       ),
-      padding: const EdgeInsets.all(1.5), // Border width
-      child: Container(
-        decoration: BoxDecoration(
-          color: const Color(0xFF0A0B10),
-          borderRadius: BorderRadius.circular(34),
-        ),
-        child: Stack(
-          children: [
-            // Four L-Brackets in the corners
-            Positioned(
-              top: 24,
-              left: 24,
-              child: _buildCornerBracket(top: true, left: true),
-            ),
-            Positioned(
-              top: 24,
-              right: 24,
-              child: _buildCornerBracket(top: true, left: false),
-            ),
-            Positioned(
-              bottom: 24,
-              left: 24,
-              child: _buildCornerBracket(top: false, left: true),
-            ),
-            Positioned(
-              bottom: 24,
-              right: 24,
-              child: _buildCornerBracket(top: false, left: false),
-            ),
+      padding: const EdgeInsets.all(
+          AppDimensions.marginStandard), // explicit padding
+      child: Stack(
+        children: [
+          // Four L-Brackets in the corners using Volt Green (accentPrimary)
+          Positioned(
+            top: 0,
+            left: 0,
+            child: _buildCornerBracket(
+                top: true, left: true, color: context.accentPrimary),
+          ),
+          Positioned(
+            top: 0,
+            right: 0,
+            child: _buildCornerBracket(
+                top: true, left: false, color: context.accentPrimary),
+          ),
+          Positioned(
+            bottom: 0,
+            left: 0,
+            child: _buildCornerBracket(
+                top: false, left: true, color: context.accentPrimary),
+          ),
+          Positioned(
+            bottom: 0,
+            right: 0,
+            child: _buildCornerBracket(
+                top: false, left: false, color: context.accentPrimary),
+          ),
 
-            // Inside Content: QR code, option setup, or profile setup CTA
-            Center(
-              child: !hasBasicDetails
-                  ? Padding(
-                      padding: const EdgeInsets.all(24.0),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Icon(
-                            Icons.contact_page_outlined,
-                            color: Colors.white30,
-                            size: 48,
+          // Inside Content: QR code, option setup, or profile setup CTA
+          Center(
+            child: !hasBasicDetails
+                ? Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.contact_page_outlined,
+                          color: context.textMuted,
+                          size: 44,
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          "No Profile Setup",
+                          style: TextStyle(
+                            color: context.textPrimary,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
                           ),
-                          const SizedBox(height: 12),
-                          const Text(
-                            "No Profile Setup",
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          "Create your card to generate a QR",
+                          style: TextStyle(
+                            color: context.textSecondary,
+                            fontSize: 12,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 16),
+                        ElevatedButton(
+                          onPressed: () {
+                            widget.onSetUpProfile?.call();
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: context.accentPrimary,
+                            foregroundColor: Colors.black,
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 8),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(
+                                  AppDimensions.radiusComponent),
                             ),
                           ),
-                          const SizedBox(height: 6),
-                          Text(
-                            "Create your card to generate a QR",
+                          child: const Text(
+                            "Set Up Profile",
                             style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.4),
-                              fontSize: 12,
-                            ),
-                            textAlign: TextAlign.center,
+                                fontWeight: FontWeight.bold, fontSize: 13),
                           ),
-                          const SizedBox(height: 16),
-                          ElevatedButton(
-                            onPressed: () {
-                              widget.onSetUpProfile?.call();
-                            },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF00F2FE),
-                              foregroundColor: Colors.black,
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 16, vertical: 8),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(16),
+                        ),
+                      ],
+                    ),
+                  )
+                : (qrImage != null && _qrGenerated
+                    ? Center(
+                        child: SizedBox(
+                          width: 180,
+                          height: 180,
+                          child: PrettyQrView(
+                            qrImage: qrImage,
+                            decoration: PrettyQrDecoration(
+                              shape: PrettyQrSmoothSymbol(
+                                color: context.textPrimary,
                               ),
                             ),
-                            child: const Text(
-                              "Set Up Profile",
+                          ),
+                        ),
+                      )
+                    : Padding(
+                        padding: const EdgeInsets.all(8.0),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.qr_code_2_rounded,
+                              color: context.textMuted,
+                              size: 44,
+                            ),
+                            const SizedBox(height: 12),
+                            Text(
+                              "Ready to Connect",
                               style: TextStyle(
-                                  fontWeight: FontWeight.bold, fontSize: 13),
-                            ),
-                          ),
-                        ],
-                      ),
-                    )
-                  : (qrImage != null && _qrGenerated
-                      ? Center(
-                          child: SizedBox(
-                            width: 200,
-                            height: 200,
-                            child: PrettyQrView(
-                              qrImage: qrImage,
-                              decoration: const PrettyQrDecoration(
-                                shape: PrettyQrSmoothSymbol(
-                                  color: Colors.white,
-                                ),
+                                color: context.textPrimary,
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
                               ),
                             ),
-                          ),
-                        )
-                      : Padding(
-                          padding: const EdgeInsets.all(24.0),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              const Icon(
-                                Icons.qr_code_2_rounded,
-                                color: Colors.white30,
-                                size: 48,
+                            const SizedBox(height: 6),
+                            Text(
+                              "Choose what you want to share before scanning",
+                              style: TextStyle(
+                                color: context.textSecondary,
+                                fontSize: 12,
                               ),
-                              const SizedBox(height: 12),
-                              const Text(
-                                "Ready to Connect",
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 16),
+                            ElevatedButton(
+                              onPressed: () {
+                                _showQrOptionsBottomSheet(context);
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: context.accentPrimary,
+                                foregroundColor: Colors.black,
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 16, vertical: 8),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(
+                                      AppDimensions.radiusComponent),
+                                ),
+                              ),
+                              child: const Text(
+                                "Generate QR",
                                 style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                ),
+                                    fontWeight: FontWeight.bold, fontSize: 13),
                               ),
-                              const SizedBox(height: 6),
-                              Text(
-                                "Choose what you want to share before scanning",
-                                style: TextStyle(
-                                  color: Colors.white.withValues(alpha: 0.4),
-                                  fontSize: 12,
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
-                              const SizedBox(height: 16),
-                              ElevatedButton(
-                                onPressed: () {
-                                  _showQrOptionsBottomSheet(context);
-                                },
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFF00F2FE),
-                                  foregroundColor: Colors.black,
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 16, vertical: 8),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(16),
-                                  ),
-                                ),
-                                child: const Text(
-                                  "Generate QR",
-                                  style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 13),
-                                ),
-                              ),
-                            ],
-                          ),
-                        )),
-            ),
-          ],
-        ),
+                            ),
+                          ],
+                        ),
+                      )),
+          ),
+        ],
       ),
     );
   }
@@ -654,11 +656,13 @@ class _ProfilePageState extends State<ProfilePage> {
         return StatefulBuilder(
           builder: (context, setModalState) {
             return Container(
-              decoration: const BoxDecoration(
-                color: Color(0xFF0F1020),
-                borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+              decoration: BoxDecoration(
+                color: context.surfacePrimary,
+                borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(AppDimensions.radiusPremiumCard)),
                 border: Border(
-                  top: BorderSide(color: Color(0xFF26273F), width: 1),
+                  top: BorderSide(
+                      color: Colors.white.withValues(alpha: 0.04), width: 1),
                 ),
               ),
               padding: EdgeInsets.only(
@@ -678,26 +682,26 @@ class _ProfilePageState extends State<ProfilePage> {
                           width: 40,
                           height: 4,
                           decoration: BoxDecoration(
-                            color: const Color(0xFF26273F),
+                            color: context.surfaceSecondary,
                             borderRadius: BorderRadius.circular(2),
                           ),
                         ),
                       ),
                       const SizedBox(height: 20),
-                      const Text(
+                      Text(
                         "Share Identity Options",
                         style: TextStyle(
-                          color: Colors.white,
+                          color: context.textPrimary,
                           fontSize: 20,
                           fontWeight: FontWeight.bold,
                           fontFamily: 'Inter',
                         ),
                       ),
                       const SizedBox(height: 8),
-                      const Text(
+                      Text(
                         "Select which digital card you want to share with this QR Code scan:",
                         style: TextStyle(
-                          color: Color(0xFF8B8C9E),
+                          color: context.textSecondary,
                           fontSize: 13,
                           fontFamily: 'Inter',
                         ),
@@ -749,16 +753,17 @@ class _ProfilePageState extends State<ProfilePage> {
                           Navigator.pop(context);
                         },
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF8B5CF6),
+                          backgroundColor: context.accentPrimary,
+                          foregroundColor: Colors.black,
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
+                            borderRadius: BorderRadius.circular(
+                                AppDimensions.radiusComponent),
                           ),
                           padding: const EdgeInsets.symmetric(vertical: 14),
                         ),
                         child: const Text(
                           "Generate QR Code",
                           style: TextStyle(
-                            color: Colors.white,
                             fontWeight: FontWeight.bold,
                             fontSize: 14,
                             fontFamily: 'Inter',
@@ -786,11 +791,13 @@ class _ProfilePageState extends State<ProfilePage> {
         return StatefulBuilder(
           builder: (context, setModalState) {
             return Container(
-              decoration: const BoxDecoration(
-                color: Color(0xFF0F1020),
-                borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+              decoration: BoxDecoration(
+                color: context.surfacePrimary,
+                borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(AppDimensions.radiusPremiumCard)),
                 border: Border(
-                  top: BorderSide(color: Color(0xFF26273F), width: 1),
+                  top: BorderSide(
+                      color: Colors.white.withValues(alpha: 0.04), width: 1),
                 ),
               ),
               padding: EdgeInsets.only(
@@ -810,26 +817,26 @@ class _ProfilePageState extends State<ProfilePage> {
                           width: 40,
                           height: 4,
                           decoration: BoxDecoration(
-                            color: const Color(0xFF26273F),
+                            color: context.surfaceSecondary,
                             borderRadius: BorderRadius.circular(2),
                           ),
                         ),
                       ),
                       const SizedBox(height: 20),
-                      const Text(
+                      Text(
                         "Share VIP Pass Options",
                         style: TextStyle(
-                          color: Colors.white,
+                          color: context.textPrimary,
                           fontSize: 20,
                           fontWeight: FontWeight.bold,
                           fontFamily: 'Inter',
                         ),
                       ),
                       const SizedBox(height: 8),
-                      const Text(
+                      Text(
                         "Select which digital card you want to share with this VIP Pass code:",
                         style: TextStyle(
-                          color: Color(0xFF8B8C9E),
+                          color: context.textSecondary,
                           fontSize: 13,
                           fontFamily: 'Inter',
                         ),
@@ -879,10 +886,11 @@ class _ProfilePageState extends State<ProfilePage> {
                           _shareProfile(profileProvider);
                         },
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF00F2FE),
+                          backgroundColor: context.accentPrimary,
                           foregroundColor: Colors.black,
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
+                            borderRadius: BorderRadius.circular(
+                                AppDimensions.radiusComponent),
                           ),
                           padding: const EdgeInsets.symmetric(vertical: 14),
                         ),
@@ -919,11 +927,12 @@ class _ProfilePageState extends State<ProfilePage> {
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFF1B1C38) : const Color(0xFF131422),
-          borderRadius: BorderRadius.circular(14),
+          color: isSelected ? context.surfaceSecondary : context.surfacePrimary,
+          borderRadius: BorderRadius.circular(AppDimensions.radiusComponent),
           border: Border.all(
-            color:
-                isSelected ? const Color(0xFF8B5CF6) : const Color(0xFF26273F),
+            color: isSelected
+                ? context.accentPrimary
+                : Colors.white.withValues(alpha: 0.04),
             width: isSelected ? 1.5 : 1.0,
           ),
         ),
@@ -935,8 +944,8 @@ class _ProfilePageState extends State<ProfilePage> {
                 children: [
                   Text(
                     title,
-                    style: const TextStyle(
-                      color: Colors.white,
+                    style: TextStyle(
+                      color: context.textPrimary,
                       fontSize: 14,
                       fontWeight: FontWeight.bold,
                       fontFamily: 'Inter',
@@ -945,8 +954,8 @@ class _ProfilePageState extends State<ProfilePage> {
                   const SizedBox(height: 4),
                   Text(
                     subtitle,
-                    style: const TextStyle(
-                      color: Color(0xFF8B8C9E),
+                    style: TextStyle(
+                      color: context.textSecondary,
                       fontSize: 11,
                       fontFamily: 'Inter',
                     ),
@@ -960,18 +969,16 @@ class _ProfilePageState extends State<ProfilePage> {
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 border: Border.all(
-                  color: isSelected
-                      ? const Color(0xFF8B5CF6)
-                      : const Color(0xFF5C5E78),
+                  color: isSelected ? context.accentPrimary : context.textMuted,
                   width: 2.0,
                 ),
               ),
               padding: const EdgeInsets.all(3.0),
               child: isSelected
                   ? Container(
-                      decoration: const BoxDecoration(
+                      decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: Color(0xFF8B5CF6),
+                        color: context.accentPrimary,
                       ),
                     )
                   : null,
@@ -983,10 +990,10 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   // Widget to build single L-Corner bracket
-  Widget _buildCornerBracket({required bool top, required bool left}) {
+  Widget _buildCornerBracket(
+      {required bool top, required bool left, required Color color}) {
     const double lineSize = 18.0;
     const double thickness = 3.0;
-    const Color neonColor = Color(0xFF4A4C6A);
 
     return SizedBox(
       width: lineSize,
@@ -1003,7 +1010,7 @@ class _ProfilePageState extends State<ProfilePage> {
               width: lineSize,
               height: thickness,
               decoration: BoxDecoration(
-                color: neonColor,
+                color: color,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -1018,7 +1025,7 @@ class _ProfilePageState extends State<ProfilePage> {
               width: thickness,
               height: lineSize,
               decoration: BoxDecoration(
-                color: neonColor,
+                color: color,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -1028,97 +1035,217 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-  // Row of quick action buttons
-  Widget _buildActionButtons(
+  // ─── Premium Asymmetric Dashboard Grid ───────────────────────────────────
+  Widget _buildDashboardGrid(
       BuildContext context, ProfileProvider profileProvider) {
     final hasProfile = profileProvider.userId != null &&
         profileProvider.name.trim().isNotEmpty;
 
-    return Row(
-      children: [
-        // Scan QR Action
-        Expanded(
+    const double gap = 12.0;
+    const double radius = AppDimensions.radiusPremiumCard;
+
+    // ── Shared helpers ──────────────────────────────────────────────────
+    BoxDecoration darkCard() => BoxDecoration(
+          color: context.surfacePrimary,
+          borderRadius: BorderRadius.circular(radius),
+          border: Border.all(color: context.borderMuted, width: 1.0),
+        );
+
+    // ── Arrow icon widget ────────────────────────────────────────────────
+    Widget arrowIcon({Color color = Colors.white}) => Text(
+          '↗',
+          style: TextStyle(
+            color: color.withValues(alpha: 0.5),
+            fontSize: 14,
+            fontFamily: 'Inter',
+            fontWeight: FontWeight.w600,
+          ),
+        );
+
+    // ── LEFT COLUMN ─────────────────────────────────────────────────────
+
+    // Card 1 – Edit Profile (premium hero card)
+    // final editProfileCard = GestureDetector(
+    //   onTap: () => widget.onSetUpProfile?.call(),
+    //   child: Container(
+    //     height: 120,
+    //     decoration: darkCard(),
+    //     padding: cardPad,
+    //     child: Column(
+    //       crossAxisAlignment: CrossAxisAlignment.start,
+    //       children: [
+    //         Row(
+    //           mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    //           crossAxisAlignment: CrossAxisAlignment.start,
+    //           children: [
+    //             Container(
+    //               padding: const EdgeInsets.all(9),
+    //               decoration: BoxDecoration(
+    //                 color: context.surfaceSecondary,
+    //                 shape: BoxShape.circle,
+    //               ),
+    //               child: Icon(
+    //                 Icons.edit_rounded,
+    //                 color: context.accentPrimary,
+    //                 size: 16,
+    //               ),
+    //             ),
+    //             Column(
+    //               children: [
+    //                 Text(
+    //                   'Edit Profile',
+    //                   style: context.cardTitle,
+    //                   maxLines: 1,
+    //                   overflow: TextOverflow.ellipsis,
+    //                 ),
+    //                 const SizedBox(height: 4),
+    //                 Text(
+    //                   'Update name, bio & socials',
+    //                   style: context.captionText.copyWith(
+    //                     color: context.textSecondary,
+    //                     fontWeight: FontWeight.w400,
+    //                   ),
+    //                   maxLines: 1,
+    //                   overflow: TextOverflow.ellipsis,
+    //                 ),
+    //               ],
+    //             ),
+    //             arrowIcon(),
+    //           ],
+    //         ),
+    //         // const Spacer(),
+    //         // Text(
+    //         //   'Edit Profile',
+    //         //   style: context.cardTitle,
+    //         //   maxLines: 1,
+    //         //   overflow: TextOverflow.ellipsis,
+    //         // ),
+    //         // const SizedBox(height: 4),
+    //         // Text(
+    //         //   'Update name, bio & socials',
+    //         //   style: context.captionText.copyWith(
+    //         //     color: context.textSecondary,
+    //         //     fontWeight: FontWeight.w400,
+    //         //   ),
+    //         //   maxLines: 1,
+    //         //   overflow: TextOverflow.ellipsis,
+    //         // ),
+    //       ],
+    //     ),
+    //   ),
+    // );
+
+    // Shared compact card builder (premium horizontal list tile style)
+    Widget compactCard({
+      required IconData icon,
+      required String label,
+      required String subtitle,
+      required VoidCallback? onTap,
+      bool disabled = false,
+      Color? iconColor,
+    }) =>
+        Opacity(
+          opacity: disabled ? 0.4 : 1.0,
           child: GestureDetector(
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const QRScannerPage()),
-              ).then((_) => _refreshData());
-            },
+            onTap: disabled ? null : onTap,
             child: Container(
-              height: 56,
-              decoration: BoxDecoration(
-                color: const Color(0xFF13141F),
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.04)),
-              ),
-              child: const Row(
-                mainAxisAlignment: MainAxisAlignment.center,
+              height: 76,
+              decoration: darkCard(),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+              child: Row(
                 children: [
-                  Icon(
-                    Icons.camera_alt_rounded,
-                    color: Color(0xFF00F2FE),
-                    size: 20,
-                  ),
-                  SizedBox(width: 8),
-                  Text(
-                    "Scan QR",
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: context.surfaceSecondary,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      icon,
+                      color: iconColor ?? context.accentPrimary,
+                      size: 20,
                     ),
                   ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          label,
+                          style: context.cardTitle.copyWith(fontSize: 14),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          subtitle,
+                          style: context.captionText.copyWith(
+                            color: context.textMuted,
+                            fontWeight: FontWeight.w400,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  arrowIcon(),
                 ],
               ),
             ),
           ),
-        ),
-        const SizedBox(width: 16),
-        // Share Link Action
-        Expanded(
-          child: GestureDetector(
-            onTap: hasProfile
-                ? () => _showShareOptionsBottomSheet(context, profileProvider)
-                : null,
-            child: Opacity(
-              opacity: hasProfile ? 1.0 : 0.4,
-              child: Container(
-                height: 56,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(24),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.white.withValues(alpha: 0.03),
-                      blurRadius: 6,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.share_rounded,
-                      color: hasProfile ? Colors.black : Colors.black45,
-                      size: 20,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      "Share Link",
-                      style: TextStyle(
-                        color: hasProfile ? Colors.black : Colors.black45,
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
+        );
+
+    final scanCard = compactCard(
+      icon: Icons.camera_alt_rounded,
+      label: 'Scan QR',
+      subtitle: 'Read a contact code',
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => const QRScannerPage()),
+        ).then((_) => _refreshData());
+      },
+    );
+
+    final editProfileCard = compactCard(
+      icon: Icons.edit_rounded,
+      label: 'Edit Profile',
+      subtitle: 'Update name, bio & socials',
+      onTap: () => widget.onSetUpProfile?.call(),
+    );
+
+    final shareCard = compactCard(
+      icon: Icons.share_rounded,
+      label: 'Share Link',
+      subtitle: 'Send your VIP pass',
+      disabled: !hasProfile,
+      onTap: () => _showShareOptionsBottomSheet(context, profileProvider),
+    );
+
+    // final qrSettingsCard = compactCard(
+    //   icon: Icons.qr_code_scanner_rounded,
+    //   label: 'QR Settings',
+    //   subtitle: 'Choose shared fields',
+    //   iconColor: context.textSecondary,
+    //   onTap: () => _showQrOptionsBottomSheet(context),
+    // );
+
+    // ── Assemble Column ──────────────────────────────────────────────────
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        editProfileCard,
+        const SizedBox(height: gap),
+        scanCard,
+        const SizedBox(height: gap),
+        shareCard,
+        const SizedBox(height: gap),
+        // qrSettingsCard,
       ],
     );
   }
@@ -1130,103 +1257,103 @@ class _ProfilePageState extends State<ProfilePage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Top Header Bar
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: BoxDecoration(
-              color: const Color(0xFF13141F),
-              borderRadius: BorderRadius.circular(24),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.04)),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Container(
-                  width: 38,
-                  height: 38,
-                  decoration: const BoxDecoration(
-                    color: Color(0xFF1B1C2A),
-                    shape: BoxShape.circle,
+          // Header Bar Skeleton
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(width: 140, height: 28, color: Colors.white),
+                  const SizedBox(height: 6),
+                  Container(width: 180, height: 14, color: Colors.white),
+                ],
+              ),
+              Row(
+                children: [
+                  Container(
+                    width: 38,
+                    height: 38,
+                    decoration: const BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                    ),
                   ),
-                ),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(width: 80, height: 14, color: Colors.white),
-                    const SizedBox(height: 6),
-                    Container(width: 50, height: 10, color: Colors.white),
-                  ],
-                ),
-                Container(
-                  width: 40,
-                  height: 40,
-                  decoration: const BoxDecoration(
-                    color: Color(0xFF1B1C2A),
-                    shape: BoxShape.circle,
+                  const SizedBox(width: 12),
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: const BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                    ),
                   ),
-                ),
-              ],
-            ),
+                ],
+              ),
+            ],
           ),
           const SizedBox(height: 32),
 
-          // Title
-          const Text(
-            "My Card",
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 32,
-              fontWeight: FontWeight.bold,
-              letterSpacing: -0.8,
-            ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 32),
-
-          // QR Code / Setup Container
+          // QR Code Container Skeleton
           Center(
             child: Container(
               width: 280,
               height: 280,
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(36),
-                color: const Color(0xFF13141F),
+                borderRadius:
+                    BorderRadius.circular(AppDimensions.radiusPremiumCard),
+                color: Colors.white,
               ),
               child: Center(
                 child: Container(
-                  width: 200,
-                  height: 200,
+                  width: 180,
+                  height: 180,
                   decoration: BoxDecoration(
-                    color: Colors.white10,
+                    color: Colors.white12,
                     borderRadius: BorderRadius.circular(24),
                   ),
                 ),
               ),
             ),
           ),
-          const SizedBox(height: 56),
+          const SizedBox(height: 28),
 
-          // Quick Action Buttons
-          Row(
+          // Dashboard Grid Skeleton
+          Column(
             children: [
-              Expanded(
-                child: Container(
-                  height: 56,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF13141F),
-                    borderRadius: BorderRadius.circular(24),
-                  ),
+              Container(
+                height: 120,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius:
+                      BorderRadius.circular(AppDimensions.radiusPremiumCard),
                 ),
               ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Container(
-                  height: 56,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF13141F),
-                    borderRadius: BorderRadius.circular(24),
-                  ),
+              const SizedBox(height: 12),
+              Container(
+                height: 76,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius:
+                      BorderRadius.circular(AppDimensions.radiusPremiumCard),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Container(
+                height: 76,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius:
+                      BorderRadius.circular(AppDimensions.radiusPremiumCard),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Container(
+                height: 76,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius:
+                      BorderRadius.circular(AppDimensions.radiusPremiumCard),
                 ),
               ),
             ],

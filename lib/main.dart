@@ -1,5 +1,5 @@
-import 'dart:ui';
 import 'dart:convert';
+import 'dart:ui';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -20,11 +20,11 @@ import 'package:connect/Repositories/chat_repository.dart';
 import 'package:connect/Providers/notification_provider.dart';
 import 'package:connect/Repositories/notification_repository.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'package:connect/Config/app_theme.dart';
 import 'package:connect/Pages/AuthScreen.dart';
 import 'package:connect/Pages/ResetPasswordScreen.dart';
 
@@ -104,8 +104,7 @@ Future<void> handleLocalNotificationClickPayload(String payload) async {
       if (senderId != null) {
         final context = navigatorKey.currentContext;
         if (context != null) {
-          final provider =
-              Provider.of<ProfileProvider>(context, listen: false);
+          final provider = Provider.of<ProfileProvider>(context, listen: false);
           // Use fetchProfileDataOnly to avoid mutating the logged-in user's profile state
           final profile = await provider.fetchProfileDataOnly(senderId);
           if (profile.isNotEmpty) {
@@ -215,9 +214,9 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
         }
 
         // 3. Acknowledge delivery to Supabase safely.
-        // NOTE: This background handler runs in a separate background isolate. 
+        // NOTE: This background handler runs in a separate background isolate.
         // The main application state and initialized Supabase singleton are not shared or accessible here.
-        // Therefore, we must instantiate a fresh, dedicated SupabaseClient using raw config keys 
+        // Therefore, we must instantiate a fresh, dedicated SupabaseClient using raw config keys
         // to perform database mutations within the background isolate context.
         try {
           final client = SupabaseClient(
@@ -347,7 +346,8 @@ class MyApp extends StatelessWidget {
             return notificationProvider;
           },
         ),
-        ChangeNotifierProxyProvider2<ProfileProvider, ConnectionProvider, ChatProvider>(
+        ChangeNotifierProxyProvider2<ProfileProvider, ConnectionProvider,
+            ChatProvider>(
           create: (_) => ChatProvider(
             chatRepository: SupabaseChatRepository(
               localDb: LocalDatabaseHelper.instance,
@@ -365,22 +365,7 @@ class MyApp extends StatelessWidget {
       child: MaterialApp(
         navigatorKey: navigatorKey,
         debugShowCheckedModeBanner: false,
-        theme: ThemeData(
-          brightness: Brightness.dark,
-          scaffoldBackgroundColor: const Color(0xFF090A0F),
-          canvasColor: const Color(0xFF090A0F),
-          colorScheme: const ColorScheme.dark(
-            primary: Color(0xFF8B5CF6),
-            surface: Color(0xFF13141F),
-            error: Colors.redAccent,
-          ),
-          pageTransitionsTheme: const PageTransitionsTheme(
-            builders: {
-              TargetPlatform.android: ZoomPageTransitionsBuilder(),
-              TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
-            },
-          ),
-        ),
+        theme: AppTheme.darkTheme,
         home: const AuthGate(),
       ),
     );
@@ -396,11 +381,12 @@ class AuthGate extends StatelessWidget {
       stream: Supabase.instance.client.auth.onAuthStateChange,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Scaffold(
-            backgroundColor: Color(0xFF090A0F),
+          return Scaffold(
+            backgroundColor: context.canvasBackground,
             body: Center(
               child: CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF00F2FE)),
+                valueColor:
+                    AlwaysStoppedAnimation<Color>(context.accentPrimary),
               ),
             ),
           );
@@ -564,7 +550,8 @@ class _AppShellGateState extends State<AppShellGate> {
 
                 // 2. Acknowledge delivery
                 try {
-                  await provider.acknowledgeDelivery(messageId, isActiveInChat: isCurrentRoom);
+                  await provider.acknowledgeDelivery(messageId,
+                      isActiveInChat: isCurrentRoom);
                   print(
                       "PushNotifications: Foreground message delivery status updated in Supabase via provider.");
                 } catch (e) {
@@ -652,11 +639,11 @@ class _AppShellGateState extends State<AppShellGate> {
   @override
   Widget build(BuildContext context) {
     if (!_initialized) {
-      return const Scaffold(
-        backgroundColor: Color(0xFF090A0F),
+      return Scaffold(
+        backgroundColor: context.canvasBackground,
         body: Center(
           child: CircularProgressIndicator(
-            valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF00F2FE)),
+            valueColor: AlwaysStoppedAnimation<Color>(context.accentPrimary),
           ),
         ),
       );
@@ -715,7 +702,8 @@ class _AppShellState extends State<_AppShell> with WidgetsBindingObserver {
     if (state == AppLifecycleState.resumed) {
       // App came to foreground — catch any status changes that happened
       // while the app was backgrounded or the Realtime socket was sleeping
-      final profileProvider = Provider.of<ProfileProvider>(context, listen: false);
+      final profileProvider =
+          Provider.of<ProfileProvider>(context, listen: false);
       final chatProvider = Provider.of<ChatProvider>(context, listen: false);
       if (profileProvider.userId != null) {
         chatProvider.syncOutgoingMessageStatuses();
@@ -785,50 +773,69 @@ class _AppShellState extends State<_AppShell> with WidgetsBindingObserver {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF090A0F),
-      body: IndexedStack(
-        index: _currentIndex,
-        children: _screens,
+      backgroundColor: context.canvasBackground,
+      body: Stack(
+        children: [
+          IndexedStack(
+            index: _currentIndex,
+            children: _screens,
+          ),
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: _buildFloatingNavBar(),
+          ),
+        ],
       ),
-      bottomNavigationBar: _buildFloatingNavBar(),
     );
   }
 
   Widget _buildFloatingNavBar() {
-    return ClipRRect(
-      borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 6, sigmaY: 6),
+    final isKeyboardOpen = MediaQuery.of(context).viewInsets.bottom > 0;
+    if (isKeyboardOpen) return const SizedBox.shrink();
+
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.only(left: 24.0, right: 24.0, bottom: 16.0),
         child: Container(
+          // Parent container holds the shadow so that ClipRRect does not clip it
           decoration: BoxDecoration(
-            color: const Color(0xFF0F101A).withValues(alpha: 0.94),
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-            border: Border(
-              top: BorderSide(color: Colors.white.withValues(alpha: 0.03)),
-            ),
+            borderRadius: BorderRadius.circular(99),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.5),
+                blurRadius: 20,
+                spreadRadius: 1,
+                offset: const Offset(0, 8),
+              ),
+            ],
           ),
-          child: SafeArea(
-            top: false,
-            child: SizedBox(
-              height: 65,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  _buildNavItem(
-                      index: 0, icon: Icons.home_rounded, isImageIcon: false),
-                  _buildNavItem(
-                      index: 1,
-                      icon: Icons.chat_bubble_rounded,
-                      isImageIcon: false),
-                  _buildNavItem(
-                      index: 2,
-                      icon: Icons.chat_bubble_rounded,
-                      isImageIcon: true),
-                  _buildNavItem(
-                      index: 3,
-                      icon: Icons.contact_mail_rounded,
-                      isImageIcon: false),
-                ],
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(99),
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 15.0, sigmaY: 15.0),
+              child: Container(
+                height: 58,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF121316).withValues(alpha: 0.65),
+                  borderRadius: BorderRadius.circular(99),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.08),
+                    width: 1.0,
+                  ),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    _buildNavItem(index: 0, icon: Icons.home_outlined),
+                    _buildNavItem(
+                        index: 1, icon: Icons.chat_bubble_outline_rounded),
+                    _buildNavItem(index: 2, icon: Icons.search_rounded),
+                    _buildNavItem(index: 3, icon: Icons.person_outline_rounded),
+                  ],
+                ),
               ),
             ),
           ),
@@ -840,24 +847,16 @@ class _AppShellState extends State<_AppShell> with WidgetsBindingObserver {
   Widget _buildNavItem({
     required int index,
     required IconData icon,
-    required bool isImageIcon,
   }) {
-    final bool isActive = _currentIndex == index;
-    final String label = const ["Home", "Chat", "Mandal", "My Card"][index];
-    final Color itemColor = isActive ? Colors.white : const Color(0xFF5C5E78);
+    final bool isActive = (_currentIndex == index);
+    final Color itemColor = isActive ? Colors.white : const Color(0xFF8FA39E);
     final provider = Provider.of<ChatProvider>(context);
 
-    Widget iconWidget = isImageIcon
-        ? ImageIcon(
-            const AssetImage("assets/icons/Mandala Icon 1.png"),
-            size: 24,
-            color: itemColor,
-          )
-        : Icon(
-            icon,
-            size: 24,
-            color: itemColor,
-          );
+    Widget iconWidget = Icon(
+      icon,
+      size: 24,
+      color: itemColor,
+    );
 
     // If it's the Chats tab (index 1) and there are unread messages, overlay a red dot badge
     if (index == 1 && provider.totalUnreadCount > 0) {
@@ -887,46 +886,22 @@ class _AppShellState extends State<_AppShell> with WidgetsBindingObserver {
         setState(() => _currentIndex = index);
       },
       behavior: HitTestBehavior.opaque,
-      child: SizedBox(
-        width: 72,
-        height: 64,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 250),
-              curve: Curves.easeOutCubic,
-              width: 36,
-              height: 36,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: isActive ? const Color(0xFF1A1B2E) : Colors.transparent,
-                boxShadow: isActive
-                    ? [
-                        BoxShadow(
-                          color:
-                              const Color(0xFF8B5CF6).withValues(alpha: 0.12),
-                          blurRadius: 8,
-                          spreadRadius: 0,
-                        ),
-                      ]
-                    : null,
-              ),
-              child: iconWidget,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          iconWidget,
+          const SizedBox(height: 4),
+          // Active state indicator dot
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            width: 4,
+            height: 4,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: isActive ? const Color(0xFFCEF143) : Colors.transparent,
             ),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.bold,
-                color: itemColor,
-                fontFamily: 'Inter',
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
