@@ -54,6 +54,7 @@ class ProfileProvider with ChangeNotifier {
 
   int? get userId => _state is ProfileLoaded ? (_state as ProfileLoaded).userId : null;
   bool get isCreated => _state is ProfileLoaded ? (_state as ProfileLoaded).isCreated : false;
+  bool get hasData => userId != null && name.isNotEmpty;
   AppError? get lastError => _state is ProfileError ? (_state as ProfileError).error : null;
 
   void _setError(Object e) {
@@ -414,8 +415,13 @@ class ProfileProvider with ChangeNotifier {
       "showProfileToConnections": true
     };
     try {
-      _state = ProfileLoading();
-      notifyListeners();
+      // Only transition to ProfileLoading if we don't already have data.
+      // This prevents userId from briefly becoming null during a background
+      // refresh, which was causing buttons to flicker their enabled/disabled state.
+      if (_state is! ProfileLoaded) {
+        _state = ProfileLoading();
+        notifyListeners();
+      }
 
       final response = await _repository.loadProfile(id);
 

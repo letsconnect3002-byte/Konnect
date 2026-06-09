@@ -442,24 +442,40 @@ class _AppShellGateState extends State<AppShellGate> {
   }
 
   Future<void> _initUser() async {
-    final profileProvider = Provider.of<ProfileProvider>(context, listen: false);
+    final profileProvider =
+        Provider.of<ProfileProvider>(context, listen: false);
     final chatProvider = Provider.of<ChatProvider>(context, listen: false);
+
     try {
+      // Step 1: Ensure a profile row exists (creates default if brand new user).
+      // This also sets profileProvider.userId internally — no second call needed.
       await profileProvider.ensureProfileExists();
-      final userId = await profileProvider.fetchAndSetUserId2(true);
+
+      final userId = profileProvider.userId;
+
       if (userId != null) {
+        // Step 2: Load full profile fields (name, email, phone, etc.)
         await profileProvider.loadProfile(userId);
-        await chatProvider.loadChatRooms();
-        await _setupPushNotifications(chatProvider);
-        await chatProvider.updateUnreadCount();
+      }
+
+      // ── Show the UI immediately after profile data is ready ──
+      // Chat rooms, push tokens, and unread counts load in the background.
+      if (mounted) setState(() => _initialized = true);
+
+      // Step 3 (background): Load chat + notifications without blocking the UI.
+      if (userId != null) {
+        Future.microtask(() async {
+          await chatProvider.loadChatRooms();
+          if (mounted) await _setupPushNotifications(chatProvider);
+          await chatProvider.updateUnreadCount();
+        });
       }
     } catch (e) {
       print("Error in AppShellGate initialization: $e");
     } finally {
-      if (mounted) {
-        setState(() {
-          _initialized = true;
-        });
+      // Safety net: always show the UI even if something threw.
+      if (mounted && !_initialized) {
+        setState(() => _initialized = true);
       }
     }
   }

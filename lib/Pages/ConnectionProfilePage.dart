@@ -6,6 +6,7 @@ import 'package:connect/Providers/profile_provider.dart';
 import 'package:connect/Providers/connection_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:connect/Utils/profile_field_filter.dart';
+import 'package:skeletonizer/skeletonizer.dart';
 
 class ConnectionProfilePage extends StatefulWidget {
   final Map<String, dynamic> profileData;
@@ -91,6 +92,20 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
     _instagram = data['instagram'] ?? '';
     _linkedin = data['linkedin'] ?? '';
     _twitter = data['twitter'] ?? '';
+
+    // Fallbacks for skeleton loading shapes
+    if (_name.isEmpty) _name = "Jane Doe";
+    if (_profession.isEmpty) _profession = "Software Engineer";
+    if (_company.isEmpty) _company = "Tech Corporation";
+    if (_email.isEmpty) _email = "jane.doe@example.com";
+    if (_professionalEmail.isEmpty) _professionalEmail = "jane.doe@work.com";
+    if (_phoneNumber.isEmpty) _phoneNumber = "+91 98765 43210";
+    if (_professionalPhoneNumber.isEmpty) _professionalPhoneNumber = "+91 98765 00000";
+    if (_bio.isEmpty) _bio = "Passionate developer building modern apps and exploring design systems.";
+    if (_professionalBio.isEmpty) _professionalBio = "Experienced software engineer leading web and mobile products.";
+    if (_instagram.isEmpty) _instagram = "instagram_handle";
+    if (_linkedin.isEmpty) _linkedin = "linkedin_handle";
+    if (_twitter.isEmpty) _twitter = "twitter_handle";
 
     final String initialProfEmail = _professionalEmail;
     final String initialProfPhone = _professionalPhoneNumber;
@@ -1131,15 +1146,11 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
     return Scaffold(
       backgroundColor: const Color(0xFF090A0F),
       body: SafeArea(
-        child: _isLoading
-            ? const Center(
-                child: CircularProgressIndicator(
-                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF00F2FE)),
-                ),
-              )
-            : SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 24.0, vertical: 16.0),
+        child: Skeletonizer(
+          enabled: _isLoading,
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(
+                horizontal: 24.0, vertical: 16.0),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
@@ -1258,8 +1269,9 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
                   ],
                 ),
               ),
-      ),
-    );
+            ),
+          ),
+        );
   }
 
   /// Builds the detail + social widgets when the shared card permission is

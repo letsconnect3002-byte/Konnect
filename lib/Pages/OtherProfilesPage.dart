@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:connect/Utils/profile_field_filter.dart';
+import 'package:skeletonizer/skeletonizer.dart';
 
 class OtherProfilesPage extends StatefulWidget {
   const OtherProfilesPage({super.key});
@@ -1078,46 +1079,137 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
             Expanded(
               child: AnimatedSwitcher(
                 duration: const Duration(milliseconds: 300),
-                child: allProfiles.isEmpty
-                    ? const Center(
-                        key: ValueKey<String>('empty_state'),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.people_outline_rounded,
-                              color: Color(0xFF5C5E78),
-                              size: 48,
-                            ),
-                            SizedBox(height: 16),
-                            Text(
-                              "No profiles available.",
-                              style: TextStyle(
-                                color: Color(0xFF8B8C9E),
-                                fontSize: 15,
-                                fontFamily: 'Inter',
-                              ),
-                            ),
-                          ],
-                        ),
+                child: (provider.state is UserConnectionLoading)
+                    ? Skeletonizer(
+                        key: const ValueKey<String>('loading_state'),
+                        enabled: true,
+                        child: _buildSkeletonConnectionList(),
                       )
-                    : ListView.builder(
-                        key: ValueKey<bool>(_isGridView),
-                        itemCount: allProfiles.length,
-                        physics: const BouncingScrollPhysics(),
-                        padding: const EdgeInsets.only(bottom: 24),
-                        itemBuilder: (context, index) {
-                          final item = allProfiles[index];
-                          return _isGridView
-                              ? _buildCardItem(item, provider)
-                              : _buildListItem(item, provider);
-                        },
-                      ),
+                    : allProfiles.isEmpty
+                        ? const Center(
+                            key: ValueKey<String>('empty_state'),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.people_outline_rounded,
+                                  color: Color(0xFF5C5E78),
+                                  size: 48,
+                                ),
+                                SizedBox(height: 16),
+                                Text(
+                                  "No profiles available.",
+                                  style: TextStyle(
+                                    color: Color(0xFF8B8C9E),
+                                    fontSize: 15,
+                                    fontFamily: 'Inter',
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )
+                        : ListView.builder(
+                            key: ValueKey<bool>(_isGridView),
+                            itemCount: allProfiles.length,
+                            physics: const BouncingScrollPhysics(),
+                            padding: const EdgeInsets.only(bottom: 24),
+                            itemBuilder: (context, index) {
+                              final item = allProfiles[index];
+                              return _isGridView
+                                  ? _buildCardItem(item, provider)
+                                  : _buildListItem(item, provider);
+                            },
+                          ),
               ),
             ),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildSkeletonConnectionList() {
+    return ListView.builder(
+      physics: const NeverScrollableScrollPhysics(),
+      padding: const EdgeInsets.only(bottom: 24),
+      itemCount: _isGridView ? 3 : 5,
+      itemBuilder: (context, index) {
+        if (_isGridView) {
+          return Container(
+            margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+            decoration: BoxDecoration(
+              color: const Color(0xFF13141F),
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: const Color(0xFF26273F)),
+            ),
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 58,
+                      height: 58,
+                      decoration: const BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.white10,
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(width: 120, height: 16, color: Colors.white),
+                          const SizedBox(height: 6),
+                          Container(width: 80, height: 12, color: Colors.white),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Container(width: double.infinity, height: 14, color: Colors.white10),
+                const SizedBox(height: 6),
+                Container(width: 180, height: 14, color: Colors.white10),
+              ],
+            ),
+          );
+        } else {
+          return Container(
+            margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: const Color(0xFF13141F),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: const BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white10,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(width: 100, height: 14, color: Colors.white),
+                      const SizedBox(height: 6),
+                      Container(width: 60, height: 10, color: Colors.white),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+      },
     );
   }
 }

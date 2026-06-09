@@ -8,6 +8,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:connect/services/image_upload_service.dart';
 import 'package:connect/Pages/crop_image_page.dart';
+import 'package:skeletonizer/skeletonizer.dart';
 
 class YetToBeBuiltProfilePage extends StatefulWidget {
   const YetToBeBuiltProfilePage({super.key});
@@ -71,8 +72,8 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
     super.initState();
     final provider = Provider.of<ProfileProvider>(context, listen: false);
 
-    // If profile is already loaded, we do not need to show the loading screen initially
-    _isLoading = provider.userId == null;
+    // If profile is already loaded in memory, start without a loading spinner
+    _isLoading = !provider.hasData;
 
     _nameController = TextEditingController(text: provider.name);
     _professionController = TextEditingController(text: provider.profession);
@@ -265,11 +266,18 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
 
   Future<void> _loadInitialData() async {
     if (!mounted) return;
-
     final provider = Provider.of<ProfileProvider>(context, listen: false);
 
-    // Only show full loading spinner if we don't have user ID or details loaded yet
-    if (provider.userId == null) {
+    // Fast path: provider already has data (loaded by AppShellGate).
+    // Populate controllers from memory and skip the network call entirely.
+    if (provider.hasData) {
+      _populateControllers(provider);
+      if (mounted) setState(() => _isLoading = false);
+      return;
+    }
+
+    // Slow path: genuine first load or cleared state.
+    if (mounted && provider.userId == null) {
       setState(() => _isLoading = true);
     }
 
@@ -278,12 +286,9 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
       if (userid != null) {
         await provider.loadProfile(userid);
       }
-
-      if (mounted) {
-        _populateControllers(provider);
-      }
+      if (mounted) _populateControllers(provider);
     } catch (e) {
-      print("Error loading initial data in profile tab: $e");
+      debugPrint("Error loading profile page data: $e");
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
@@ -418,7 +423,8 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
       // Re-trigger loading state in bottom sheet UI
       setModalState(() {});
 
-      final compressedBytes = await ImageUploadService.compressImageTo10Kb(croppedBytes);
+      final compressedBytes =
+          await ImageUploadService.compressImageTo10Kb(croppedBytes);
 
       final String publicUrl = await ImageUploadService.uploadAvatarImage(
         provider.userId,
@@ -630,11 +636,29 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return const Scaffold(
-        backgroundColor: Color(0xFF090A0F),
-        body: Center(
-          child: CircularProgressIndicator(
-            valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF8B5CF6)),
+      return Skeletonizer(
+        enabled: true,
+        child: Scaffold(
+          backgroundColor: const Color(0xFF090A0F),
+          body: SafeArea(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.only(
+                  left: 24.0, right: 24.0, top: 16.0, bottom: 40.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _buildSkeletonHeader(),
+                  const SizedBox(height: 28),
+                  _buildSkeletonCardSection(),
+                  const SizedBox(height: 32),
+                  _buildSkeletonEditorForm(),
+                  const SizedBox(height: 32),
+                  _buildSkeletonSocialLinks(),
+                  const SizedBox(height: 16),
+                  _buildSkeletonSaveButton(),
+                ],
+              ),
+            ),
           ),
         ),
       );
@@ -3070,6 +3094,167 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildSkeletonHeader() {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 12.0, horizontal: 16.0),
+      decoration: BoxDecoration(
+        color: const Color(0xFF13141F),
+        borderRadius: BorderRadius.circular(30.0),
+        border: Border.all(
+          color: const Color(0xFF1F2030),
+          width: 1.0,
+        ),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Container(
+            width: 32,
+            height: 32,
+            decoration: const BoxDecoration(shape: BoxShape.circle, color: Colors.white10),
+          ),
+          Column(
+            children: [
+              Text(
+                'My Profile',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 18.0,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              SizedBox(height: 2),
+              Text(
+                'Digital Card',
+                style: TextStyle(
+                  color: Color(0xFF8B8C9E),
+                  fontSize: 12.0,
+                ),
+              ),
+            ],
+          ),
+          Container(
+            width: 32,
+            height: 32,
+            decoration: const BoxDecoration(shape: BoxShape.circle, color: Colors.white10),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSkeletonCardSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text(
+              'YOUR CARDS',
+              style: TextStyle(
+                color: Color(0xFF8B8C9E),
+                fontSize: 14.0,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 1.5,
+              ),
+            ),
+            Container(width: 80, height: 24, decoration: BoxDecoration(borderRadius: BorderRadius.circular(12), color: Colors.white10)),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(child: Container(height: 36, decoration: BoxDecoration(borderRadius: BorderRadius.circular(10), color: Colors.white10))),
+            const SizedBox(width: 12),
+            Expanded(child: Container(height: 36, decoration: BoxDecoration(borderRadius: BorderRadius.circular(10), color: Colors.white10))),
+          ],
+        ),
+        const SizedBox(height: 16),
+        Container(
+          height: 180,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(24),
+            color: const Color(0xFF131422),
+          ),
+          padding: const EdgeInsets.all(24),
+          child: Row(
+            children: [
+              Container(
+                width: 64,
+                height: 64,
+                decoration: const BoxDecoration(shape: BoxShape.circle, color: Colors.white10),
+              ),
+              const SizedBox(width: 16),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text("Jane Doe", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                  SizedBox(height: 6),
+                  Text("Software Engineer", style: TextStyle(color: Colors.white70, fontSize: 13)),
+                  SizedBox(height: 6),
+                  Text("Tech Corp", style: TextStyle(color: Colors.white30, fontSize: 11)),
+                ],
+              )
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSkeletonEditorForm() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'EDIT DETAILS',
+          style: TextStyle(
+            color: Color(0xFF8B8C9E),
+            fontSize: 14.0,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 1.5,
+          ),
+        ),
+        const SizedBox(height: 16),
+        for (int i = 0; i < 4; i++)
+          Container(
+            height: 56,
+            margin: const EdgeInsets.only(bottom: 12),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              color: const Color(0xFF13141F),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildSkeletonSocialLinks() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+      children: [
+        for (int i = 0; i < 3; i++)
+          Container(
+            width: 44,
+            height: 44,
+            decoration: const BoxDecoration(shape: BoxShape.circle, color: Color(0xFF13141F)),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildSkeletonSaveButton() {
+    return Container(
+      height: 54,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        color: const Color(0xFF8B5CF6),
       ),
     );
   }

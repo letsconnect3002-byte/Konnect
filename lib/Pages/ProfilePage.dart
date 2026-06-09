@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 import 'package:pretty_qr_code/pretty_qr_code.dart';
 import 'package:connect/Providers/notification_provider.dart';
 import 'package:connect/Pages/NotificationPage.dart';
+import 'package:skeletonizer/skeletonizer.dart';
 
 class ProfilePage extends StatefulWidget {
   final VoidCallback? onSetUpProfile;
@@ -19,41 +20,67 @@ class ProfilePage extends StatefulWidget {
 }
 
 class _ProfilePageState extends State<ProfilePage> {
-  bool _isLoading = true;
+  bool _isLoading = false; // set properly in initState based on data presence
   bool _qrGenerated = false;
   String _selectedShareType = 'casual';
 
   @override
   void initState() {
     super.initState();
+    final profileProvider =
+        Provider.of<ProfileProvider>(context, listen: false);
+
+    // Synchronous check — if AppShellGate already loaded data, start with
+    // _isLoading = false so the first build renders content, not a spinner.
+    _isLoading = !profileProvider.hasData;
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final profileProvider =
-          Provider.of<ProfileProvider>(context, listen: false);
-      _initializeData(profileProvider);
+      if (!mounted) return;
+      if (profileProvider.hasData) {
+        // Data is in memory — refresh quietly without blocking the UI.
+        _refreshSilently(profileProvider);
+      } else {
+        // Genuinely no data yet (first launch, cleared state, etc.)
+        _initializeData(profileProvider);
+      }
     });
   }
 
+  /// Full blocking load — only used when there is no profile data at all.
   Future<void> _initializeData(ProfileProvider profileProvider) async {
+    if (!mounted) return;
     setState(() => _isLoading = true);
-
     try {
       final userid = await profileProvider.fetchAndSetUserId2(true);
       if (userid != null) {
         await profileProvider.loadProfile(userid);
       }
     } catch (e) {
-      print("Error initializing data: $e");
+      debugPrint("Error initializing profile data: $e");
     } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
+  /// Silent background refresh — keeps the UI visible and just updates
+  /// provider fields when the server responds.
+  Future<void> _refreshSilently(ProfileProvider profileProvider) async {
+    try {
+      final userId = profileProvider.userId;
+      if (userId != null) {
+        await profileProvider.loadProfile(userId);
+      }
+    } catch (e) {
+      debugPrint("Silent profile refresh error: $e");
+    }
+  }
+
+  /// Called by the pull-to-refresh indicator. Updates content in place
+  /// without blanking the screen.
   Future<void> _refreshData() async {
     final profileProvider =
         Provider.of<ProfileProvider>(context, listen: false);
-    await _initializeData(profileProvider);
+    await _refreshSilently(profileProvider);
   }
 
   QrImage? _generateQrImage(String data, int userId) {
@@ -176,10 +203,9 @@ class _ProfilePageState extends State<ProfilePage> {
       backgroundColor: const Color(0xFF090A0F),
       body: SafeArea(
         child: _isLoading
-            ? const Center(
-                child: CircularProgressIndicator(
-                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF00F2FE)),
-                ),
+            ? Skeletonizer(
+                enabled: true,
+                child: _buildSkeletonBody(context),
               )
             : RefreshIndicator(
                 onRefresh: _refreshData,
@@ -1094,6 +1120,119 @@ class _ProfilePageState extends State<ProfilePage> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildSkeletonBody(BuildContext context) {
+    return SingleChildScrollView(
+      physics: const NeverScrollableScrollPhysics(),
+      padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Top Header Bar
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: const Color(0xFF13141F),
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.04)),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Container(
+                  width: 38,
+                  height: 38,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFF1B1C2A),
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(width: 80, height: 14, color: Colors.white),
+                    const SizedBox(height: 6),
+                    Container(width: 50, height: 10, color: Colors.white),
+                  ],
+                ),
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFF1B1C2A),
+                    shape: BoxShape.circle,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 32),
+
+          // Title
+          const Text(
+            "My Card",
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 32,
+              fontWeight: FontWeight.bold,
+              letterSpacing: -0.8,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 32),
+
+          // QR Code / Setup Container
+          Center(
+            child: Container(
+              width: 280,
+              height: 280,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(36),
+                color: const Color(0xFF13141F),
+              ),
+              child: Center(
+                child: Container(
+                  width: 200,
+                  height: 200,
+                  decoration: BoxDecoration(
+                    color: Colors.white10,
+                    borderRadius: BorderRadius.circular(24),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 56),
+
+          // Quick Action Buttons
+          Row(
+            children: [
+              Expanded(
+                child: Container(
+                  height: 56,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF13141F),
+                    borderRadius: BorderRadius.circular(24),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Container(
+                  height: 56,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF13141F),
+                    borderRadius: BorderRadius.circular(24),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 }

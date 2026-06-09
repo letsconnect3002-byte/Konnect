@@ -8,6 +8,7 @@ import 'package:connect/Pages/NotificationPage.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:skeletonizer/skeletonizer.dart';
 
 class DirectMessagesHubPage extends StatefulWidget {
   const DirectMessagesHubPage({super.key});
@@ -137,6 +138,8 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
     final connectionProvider = Provider.of<ConnectionProvider>(context);
     final chatProvider = Provider.of<ChatProvider>(context);
     
+    final bool isMessagesLoading = connectionProvider.state is UserConnectionLoading ||
+        chatProvider.state is ChatLoading;
     final connections = connectionProvider.connections;
     final myUserId = profileProvider.userId;
 
@@ -446,29 +449,34 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
           const SizedBox(height: 8),
 
           Expanded(
-            child: filteredConnections.isEmpty
-                ? Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(
-                          Icons.chat_bubble_outline_rounded,
-                          color: Color(0xFF5C5E78),
-                          size: 40,
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          _searchQuery.isEmpty ? "No active conversations yet" : "No results match your search",
-                          style: const TextStyle(
-                            color: Color(0xFF8B8C9E),
-                            fontSize: 14,
-                            fontFamily: 'Inter',
-                          ),
-                        ),
-                      ],
-                    ),
+            child: isMessagesLoading
+                ? Skeletonizer(
+                    enabled: true,
+                    child: _buildSkeletonChatRooms(),
                   )
-                : ListView.builder(
+                : filteredConnections.isEmpty
+                    ? Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(
+                              Icons.chat_bubble_outline_rounded,
+                              color: Color(0xFF5C5E78),
+                              size: 40,
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              _searchQuery.isEmpty ? "No active conversations yet" : "No results match your search",
+                              style: const TextStyle(
+                                color: Color(0xFF8B8C9E),
+                                fontSize: 14,
+                                fontFamily: 'Inter',
+                              ),
+                            ),
+                          ],
+                        ),
+                      )
+                    : ListView.builder(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     itemCount: filteredConnections.length,
                     itemBuilder: (context, index) {
@@ -606,6 +614,46 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildSkeletonChatRooms() {
+    return ListView.builder(
+      physics: const NeverScrollableScrollPhysics(),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      itemCount: 5,
+      itemBuilder: (context, index) {
+        return Container(
+          margin: const EdgeInsets.only(bottom: 8),
+          decoration: BoxDecoration(
+            color: const Color(0xFF13141F).withValues(alpha: 0.4),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.02)),
+          ),
+          child: ListTile(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+            leading: Container(
+              width: 44,
+              height: 44,
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white10,
+              ),
+            ),
+            title: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Container(width: 100, height: 14, color: Colors.white),
+                Container(width: 40, height: 10, color: Colors.white),
+              ],
+            ),
+            subtitle: Padding(
+              padding: const EdgeInsets.only(top: 4.0),
+              child: Container(width: double.infinity, height: 12, color: Colors.white10),
+            ),
+          ),
+        );
+      },
     );
   }
 }

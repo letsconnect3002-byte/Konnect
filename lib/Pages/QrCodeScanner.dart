@@ -2,7 +2,6 @@ import 'dart:convert';
 import 'dart:developer';
 import 'dart:io';
 
-
 import 'package:connect/Providers/profile_provider.dart';
 import 'package:connect/Providers/connection_provider.dart';
 import 'package:flutter/material.dart';
@@ -196,7 +195,8 @@ class _QRScannerPageState extends State<QRScannerPage> {
 
           if (decodedData.containsKey('userId')) {
             final userIdVal = decodedData['userId'];
-            final int idToFetch = userIdVal is int ? userIdVal : int.parse(userIdVal.toString());
+            final int idToFetch =
+                userIdVal is int ? userIdVal : int.parse(userIdVal.toString());
 
             // Show a progress dialog while fetching profile
             if (mounted) {
@@ -215,7 +215,8 @@ class _QRScannerPageState extends State<QRScannerPage> {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         CircularProgressIndicator(
-                          valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF00F2FE)),
+                          valueColor:
+                              AlwaysStoppedAnimation<Color>(Color(0xFF00F2FE)),
                         ),
                         SizedBox(height: 16),
                         Text(
@@ -235,8 +236,10 @@ class _QRScannerPageState extends State<QRScannerPage> {
             }
 
             if (!mounted) return;
-            final profileProvider = Provider.of<ProfileProvider>(context, listen: false);
-            final fetchedData = await profileProvider.fetchProfileDataOnly(idToFetch);
+            final profileProvider =
+                Provider.of<ProfileProvider>(context, listen: false);
+            final fetchedData =
+                await profileProvider.fetchProfileDataOnly(idToFetch);
             if (fetchedData.isNotEmpty) {
               fetchedData['sharedCard'] = decodedData['sharedCard'] ?? 'both';
             }
@@ -245,7 +248,8 @@ class _QRScannerPageState extends State<QRScannerPage> {
               Navigator.pop(context); // Dismiss progress dialog
             }
 
-            if (fetchedData.isNotEmpty && fetchedData['name'].toString().isNotEmpty) {
+            if (fetchedData.isNotEmpty &&
+                fetchedData['name'].toString().isNotEmpty) {
               if (mounted) {
                 Navigator.push(
                   context,
@@ -325,7 +329,8 @@ class _ProfileCardState extends State<ProfileCard> {
   void initState() {
     super.initState();
     profileProvider = Provider.of<ProfileProvider>(context, listen: false);
-    connectionProvider = Provider.of<ConnectionProvider>(context, listen: false);
+    connectionProvider =
+        Provider.of<ConnectionProvider>(context, listen: false);
   }
 
   String _getAvatarUrl(String name, String? existingUrl) {
@@ -351,9 +356,12 @@ class _ProfileCardState extends State<ProfileCard> {
       );
       return;
     }
-    final int scannedUserId = otherUserIdVal is int ? otherUserIdVal : int.parse(otherUserIdVal.toString());
+    final int scannedUserId = otherUserIdVal is int
+        ? otherUserIdVal
+        : int.parse(otherUserIdVal.toString());
 
-    final String presenterSharedCard = widget.profileData['sharedCard'] ?? 'both';
+    final String presenterSharedCard =
+        widget.profileData['sharedCard'] ?? 'both';
 
     showDialog(
       context: context,
@@ -388,12 +396,14 @@ class _ProfileCardState extends State<ProfileCard> {
       ),
     );
 
-    connectionProvider.connectUsers(
-      profileProvider.userId!, 
-      scannedUserId, 
+    connectionProvider
+        .connectUsers(
+      profileProvider.userId!,
+      scannedUserId,
       sharedCardByPresenter: presenterSharedCard,
       sharedCardByScanner: _shareBackType,
-    ).then((v) {
+    )
+        .then((v) {
       if (!mounted) return;
       Navigator.pop(context); // Dismiss progress dialog
 
@@ -433,12 +443,22 @@ class _ProfileCardState extends State<ProfileCard> {
 
   Widget _buildProfileHeaderCard() {
     final String name = widget.profileData['name'] ?? 'Unknown';
-    final String sharedCard = (widget.profileData['sharedCard'] ?? 'both').toString();
+    final String sharedCard =
+        (widget.profileData['sharedCard'] ?? 'both').toString();
     final bool isCasual = sharedCard == 'casual';
-    final Color accentColor = isCasual ? const Color(0xFF8B5CF6) : const Color(0xFF00F2FE);
+    final Color accentColor =
+        isCasual ? const Color(0xFF8B5CF6) : const Color(0xFF00F2FE);
 
-    final String profession = ProfileFieldFilter.getVisibleValue('profession', widget.profileData['profession'] ?? '', sharedCard, widget.profileData['field_assignments']);
-    final String company = ProfileFieldFilter.getVisibleValue('company', widget.profileData['company'] ?? '', sharedCard, widget.profileData['field_assignments']);
+    final String profession = ProfileFieldFilter.getVisibleValue(
+        'profession',
+        widget.profileData['profession'] ?? '',
+        sharedCard,
+        widget.profileData['field_assignments']);
+    final String company = ProfileFieldFilter.getVisibleValue(
+        'company',
+        widget.profileData['company'] ?? '',
+        sharedCard,
+        widget.profileData['field_assignments']);
     final String avatar = _getAvatarUrl(name, widget.profileData['avatarUrl']);
 
     return Padding(
@@ -480,7 +500,8 @@ class _ProfileCardState extends State<ProfileCard> {
               padding: const EdgeInsets.all(1.5),
               child: ClipOval(
                 child: (avatar.isNotEmpty &&
-                        avatar.contains('supabase.co/storage/v1/object/public/avatars/'))
+                        avatar.contains(
+                            'supabase.co/storage/v1/object/public/avatars/'))
                     ? Image.network(
                         avatar,
                         fit: BoxFit.cover,
@@ -568,16 +589,44 @@ class _ProfileCardState extends State<ProfileCard> {
   }
 
   Widget _buildProfileDetailsSection() {
-    final String sharedCard = (widget.profileData['sharedCard'] ?? 'both').toString();
+    final String sharedCard =
+        (widget.profileData['sharedCard'] ?? 'both').toString();
     final bool isCasual = sharedCard == 'casual';
-    final Color accentColor = isCasual ? const Color(0xFF8B5CF6) : const Color(0xFF00F2FE);
+    final Color accentColor =
+        isCasual ? const Color(0xFF8B5CF6) : const Color(0xFF00F2FE);
 
-    final String email = ProfileFieldFilter.getVisibleValue('email', widget.profileData['email'] ?? '', sharedCard, widget.profileData['field_assignments']);
-    final String phone = ProfileFieldFilter.getVisibleValue('phoneNumber', widget.profileData['phoneNumber'] ?? widget.profileData['phone_number'] ?? '', sharedCard, widget.profileData['field_assignments']);
-    final String bio = ProfileFieldFilter.getVisibleValue('bio', widget.profileData['bio'] ?? '', sharedCard, widget.profileData['field_assignments']);
-    final String instagram = ProfileFieldFilter.getVisibleValue('instagram', widget.profileData['instagram'] ?? '', sharedCard, widget.profileData['field_assignments']);
-    final String linkedin = ProfileFieldFilter.getVisibleValue('linkedin', widget.profileData['linkedin'] ?? '', sharedCard, widget.profileData['field_assignments']);
-    final String twitter = ProfileFieldFilter.getVisibleValue('twitter', widget.profileData['twitter'] ?? '', sharedCard, widget.profileData['field_assignments']);
+    final String email = ProfileFieldFilter.getVisibleValue(
+        'email',
+        widget.profileData['email'] ?? '',
+        sharedCard,
+        widget.profileData['field_assignments']);
+    final String phone = ProfileFieldFilter.getVisibleValue(
+        'phoneNumber',
+        widget.profileData['phoneNumber'] ??
+            widget.profileData['phone_number'] ??
+            '',
+        sharedCard,
+        widget.profileData['field_assignments']);
+    final String bio = ProfileFieldFilter.getVisibleValue(
+        'bio',
+        widget.profileData['bio'] ?? '',
+        sharedCard,
+        widget.profileData['field_assignments']);
+    final String instagram = ProfileFieldFilter.getVisibleValue(
+        'instagram',
+        widget.profileData['instagram'] ?? '',
+        sharedCard,
+        widget.profileData['field_assignments']);
+    final String linkedin = ProfileFieldFilter.getVisibleValue(
+        'linkedin',
+        widget.profileData['linkedin'] ?? '',
+        sharedCard,
+        widget.profileData['field_assignments']);
+    final String twitter = ProfileFieldFilter.getVisibleValue(
+        'twitter',
+        widget.profileData['twitter'] ?? '',
+        sharedCard,
+        widget.profileData['field_assignments']);
 
     if (email.isEmpty &&
         phone.isEmpty &&
@@ -622,16 +671,22 @@ class _ProfileCardState extends State<ProfileCard> {
                   fontFamily: 'Inter',
                 ),
               ),
-              if (email.isNotEmpty || phone.isNotEmpty || instagram.isNotEmpty || linkedin.isNotEmpty || twitter.isNotEmpty)
+              if (email.isNotEmpty ||
+                  phone.isNotEmpty ||
+                  instagram.isNotEmpty ||
+                  linkedin.isNotEmpty ||
+                  twitter.isNotEmpty)
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 12),
-                  child: Divider(color: accentColor.withOpacity(0.15), height: 1),
+                  child:
+                      Divider(color: accentColor.withOpacity(0.15), height: 1),
                 ),
             ],
             if (email.isNotEmpty) ...[
               Row(
                 children: [
-                  Icon(Icons.alternate_email_rounded, color: accentColor, size: 14),
+                  Icon(Icons.alternate_email_rounded,
+                      color: accentColor, size: 14),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
@@ -669,11 +724,14 @@ class _ProfileCardState extends State<ProfileCard> {
                 ],
               ),
             ],
-            if (instagram.isNotEmpty || linkedin.isNotEmpty || twitter.isNotEmpty) ...[
+            if (instagram.isNotEmpty ||
+                linkedin.isNotEmpty ||
+                twitter.isNotEmpty) ...[
               if (email.isNotEmpty || phone.isNotEmpty)
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 12),
-                  child: Divider(color: accentColor.withOpacity(0.15), height: 1),
+                  child:
+                      Divider(color: accentColor.withOpacity(0.15), height: 1),
                 ),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -692,7 +750,8 @@ class _ProfileCardState extends State<ProfileCard> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       if (instagram.isNotEmpty) ...[
-                        Icon(Icons.camera_alt_outlined, color: accentColor, size: 16),
+                        Icon(Icons.camera_alt_outlined,
+                            color: accentColor, size: 16),
                         const SizedBox(width: 10),
                       ],
                       if (linkedin.isNotEmpty) ...[
@@ -700,7 +759,8 @@ class _ProfileCardState extends State<ProfileCard> {
                         const SizedBox(width: 10),
                       ],
                       if (twitter.isNotEmpty) ...[
-                        Icon(Icons.chat_bubble_outline_rounded, color: accentColor, size: 16),
+                        Icon(Icons.chat_bubble_outline_rounded,
+                            color: accentColor, size: 16),
                       ],
                     ],
                   ),
@@ -753,7 +813,7 @@ class _ProfileCardState extends State<ProfileCard> {
               Expanded(
                 child: _buildShareBackOption(
                   type: 'casual',
-                  label: "From my personal life",
+                  label: "Casual",
                   color: const Color(0xFF8B5CF6),
                 ),
               ),
@@ -761,7 +821,7 @@ class _ProfileCardState extends State<ProfileCard> {
               Expanded(
                 child: _buildShareBackOption(
                   type: 'professional',
-                  label: "From work",
+                  label: "Professional",
                   color: const Color(0xFF00F2FE),
                 ),
               ),
@@ -853,7 +913,8 @@ class _ProfileCardState extends State<ProfileCard> {
               _buildProfileDetailsSection(),
               _buildShareBackSelector(),
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
                 child: Container(
                   width: double.infinity,
                   height: 52,
@@ -888,8 +949,8 @@ class _ProfileCardState extends State<ProfileCard> {
                     ),
                     child: Text(
                       _shareBackType == 'casual'
-                          ? "Add to My Circle"
-                          : "Add to My Network",
+                          ? "Add to My Casual Network"
+                          : "Add to My Professional Network",
                       style: const TextStyle(
                         color: Colors.white,
                         fontWeight: FontWeight.bold,
