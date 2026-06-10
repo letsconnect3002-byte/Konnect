@@ -48,7 +48,8 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
             return AlertDialog(
               backgroundColor: context.surfacePrimary,
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(AppDimensions.radiusPremiumCard),
+                borderRadius:
+                    BorderRadius.circular(AppDimensions.radiusPremiumCard),
                 side: BorderSide(color: context.surfaceSecondary, width: 1.5),
               ),
               title: Text(
@@ -62,8 +63,8 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
                       height: 150,
                       child: Center(
                         child: CircularProgressIndicator(
-                          valueColor:
-                              AlwaysStoppedAnimation<Color>(context.accentPrimary),
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                              context.accentPrimary),
                         ),
                       ),
                     )
@@ -85,16 +86,21 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
                           style: context.bodyText,
                           decoration: InputDecoration(
                             hintText: "MNDL-XXXXXX",
-                            hintStyle: context.bodyText.copyWith(color: context.textMuted),
+                            hintStyle: context.bodyText
+                                .copyWith(color: context.textMuted),
                             filled: true,
                             fillColor: context.canvasBackground,
                             enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(AppDimensions.radiusComponent),
-                              borderSide: BorderSide(color: context.surfaceSecondary),
+                              borderRadius: BorderRadius.circular(
+                                  AppDimensions.radiusComponent),
+                              borderSide:
+                                  BorderSide(color: context.surfaceSecondary),
                             ),
                             focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(AppDimensions.radiusComponent),
-                              borderSide: BorderSide(color: context.accentPrimary),
+                              borderRadius: BorderRadius.circular(
+                                  AppDimensions.radiusComponent),
+                              borderSide:
+                                  BorderSide(color: context.accentPrimary),
                             ),
                           ),
                         ),
@@ -122,7 +128,8 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
                                   alignment: Alignment.center,
                                   decoration: BoxDecoration(
                                     color: selectedType == 'casual'
-                                        ? context.accentSecondary.withValues(alpha: 0.1)
+                                        ? context.accentSecondary
+                                            .withValues(alpha: 0.1)
                                         : context.canvasBackground,
                                     borderRadius: BorderRadius.circular(10),
                                     border: Border.all(
@@ -153,7 +160,8 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
                                   alignment: Alignment.center,
                                   decoration: BoxDecoration(
                                     color: selectedType == 'professional'
-                                        ? context.accentPrimary.withValues(alpha: 0.1)
+                                        ? context.accentPrimary
+                                            .withValues(alpha: 0.1)
                                         : context.canvasBackground,
                                     borderRadius: BorderRadius.circular(10),
                                     border: Border.all(
@@ -201,18 +209,21 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
                           });
 
                           final navigator = Navigator.of(context);
-                          final scaffoldMessenger = ScaffoldMessenger.of(context);
-                          final chatProvider = Provider.of<ChatProvider>(context, listen: false);
+                          final scaffoldMessenger =
+                              ScaffoldMessenger.of(context);
+                          final chatProvider =
+                              Provider.of<ChatProvider>(context, listen: false);
                           final accentPrimaryColor = context.accentPrimary;
                           final surfacePrimaryColor = context.surfacePrimary;
-                          final surfaceSecondaryColor = context.surfaceSecondary;
+                          final surfaceSecondaryColor =
+                              context.surfaceSecondary;
 
                           try {
                             await provider.redeemInviteCode(
                                 codeStr, selectedType);
                             // Refresh connection list
                             await provider.fetchConnections();
-                            
+
                             await chatProvider.updateUnreadCount();
 
                             navigator.pop(); // Dismiss dialog
@@ -322,8 +333,10 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
       builder: (BuildContext dialogContext) {
         return AlertDialog(
           backgroundColor: context.surfacePrimary,
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppDimensions.radiusPremiumCard), side: BorderSide(color: context.surfaceSecondary, width: 1.5)),
+          shape: RoundedRectangleBorder(
+              borderRadius:
+                  BorderRadius.circular(AppDimensions.radiusPremiumCard),
+              side: BorderSide(color: context.surfaceSecondary, width: 1.5)),
           title: Text(
             "Delete Connection",
             style: context.screenHeading.copyWith(fontWeight: FontWeight.bold),
@@ -334,12 +347,14 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
           ),
           actions: [
             TextButton(
-              child: Text("Cancel", style: TextStyle(color: context.textSecondary)),
+              child: Text("Cancel",
+                  style: TextStyle(color: context.textSecondary)),
               onPressed: () => Navigator.pop(dialogContext),
             ),
             TextButton(
               child: const Text("Delete",
-                  style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
+                  style: TextStyle(
+                      color: Colors.redAccent, fontWeight: FontWeight.bold)),
               onPressed: () async {
                 final navigator = Navigator.of(dialogContext);
                 final scaffoldMessenger = ScaffoldMessenger.of(context);
@@ -464,7 +479,8 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
 
   Widget _buildToggleRow() {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: AppDimensions.marginStandard, vertical: 12),
+      padding: const EdgeInsets.symmetric(
+          horizontal: AppDimensions.marginStandard, vertical: 12),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
@@ -505,8 +521,7 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
                     child: Icon(
                       Icons.grid_view_rounded,
                       size: 18,
-                      color:
-                          _isGridView ? Colors.white : context.textSecondary,
+                      color: _isGridView ? Colors.white : context.textSecondary,
                     ),
                   ),
                 ),
@@ -543,9 +558,7 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
   }
 
   Widget _buildFallbackAvatar(String name, double fontSize) {
-    final monogram = name.isNotEmpty
-        ? name.substring(0, 1).toUpperCase()
-        : "?";
+    final monogram = name.isNotEmpty ? name.substring(0, 1).toUpperCase() : "?";
     return Center(
       child: Text(
         monogram,
@@ -592,7 +605,8 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
         );
       },
       child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: AppDimensions.marginStandard, vertical: 8),
+        margin: const EdgeInsets.symmetric(
+            horizontal: AppDimensions.marginStandard, vertical: 8),
         decoration: BoxDecoration(
           color: context.surfacePrimary,
           borderRadius: BorderRadius.circular(AppDimensions.radiusPremiumCard),
@@ -651,14 +665,16 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
                     children: [
                       Text(
                         name,
-                        style: context.cardTitle.copyWith(fontWeight: FontWeight.bold),
+                        style: context.cardTitle
+                            .copyWith(fontWeight: FontWeight.bold),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
                       const SizedBox(height: 2),
                       Text(
                         profession,
-                        style: context.bodyText.copyWith(color: context.textSecondary),
+                        style: context.bodyText
+                            .copyWith(color: context.textSecondary),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -678,8 +694,7 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
                   ),
                   onSelected: (val) {
                     if (val == 1) {
-                      _showDeleteConfirmation(
-                          context, profileData, provider);
+                      _showDeleteConfirmation(context, profileData, provider);
                     }
                   },
                   itemBuilder: (context) => [
@@ -691,7 +706,8 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
                               color: Colors.redAccent, size: 18),
                           const SizedBox(width: 8),
                           Text("Delete",
-                              style: context.bodyText.copyWith(color: Colors.white)),
+                              style: context.bodyText
+                                  .copyWith(color: Colors.white)),
                         ],
                       ),
                     ),
@@ -716,7 +732,8 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
                       const SizedBox(width: 8),
                       Text(
                         company,
-                        style: context.bodyText.copyWith(color: context.textSecondary),
+                        style: context.bodyText
+                            .copyWith(color: context.textSecondary),
                       ),
                     ],
                   ),
@@ -730,7 +747,8 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
                       const SizedBox(width: 8),
                       Text(
                         email,
-                        style: context.bodyText.copyWith(color: context.textSecondary),
+                        style: context.bodyText
+                            .copyWith(color: context.textSecondary),
                       ),
                     ],
                   ),
@@ -802,11 +820,13 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
         );
       },
       child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: AppDimensions.marginStandard, vertical: 6),
+        margin: const EdgeInsets.symmetric(
+            horizontal: AppDimensions.marginStandard, vertical: 6),
         decoration: BoxDecoration(
           color: context.surfacePrimary,
           borderRadius: BorderRadius.circular(AppDimensions.radiusPremiumCard),
-          border: Border.all(color: context.surfaceSecondary.withValues(alpha: 0.5), width: 1),
+          border: Border.all(
+              color: context.surfaceSecondary.withValues(alpha: 0.5), width: 1),
         ),
         padding: const EdgeInsets.all(12),
         child: Row(
@@ -848,7 +868,8 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
                 children: [
                   Text(
                     name,
-                    style: context.bodyText.copyWith(fontWeight: FontWeight.bold),
+                    style:
+                        context.bodyText.copyWith(fontWeight: FontWeight.bold),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -857,7 +878,8 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
                     profession.isNotEmpty && company.isNotEmpty
                         ? "$profession  •  $company"
                         : (profession.isNotEmpty ? profession : company),
-                    style: context.captionText.copyWith(color: context.textSecondary),
+                    style: context.captionText
+                        .copyWith(color: context.textSecondary),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -889,7 +911,8 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
                           color: Colors.redAccent, size: 18),
                       const SizedBox(width: 8),
                       Text("Delete",
-                          style: context.bodyText.copyWith(color: Colors.white)),
+                          style:
+                              context.bodyText.copyWith(color: Colors.white)),
                     ],
                   ),
                 ),
@@ -915,7 +938,8 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
           children: [
             // Premium Header
             Padding(
-              padding: const EdgeInsets.fromLTRB(AppDimensions.marginStandard, 24, AppDimensions.marginStandard, 8),
+              padding: const EdgeInsets.fromLTRB(AppDimensions.marginStandard,
+                  24, AppDimensions.marginStandard, 8),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -923,7 +947,7 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        "Konnections",
+                        "Mandal",
                         style: context.displayHeader,
                       ),
                       const SizedBox(height: 4),
@@ -1021,10 +1045,12 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
       itemBuilder: (context, index) {
         if (_isGridView) {
           return Container(
-            margin: const EdgeInsets.symmetric(horizontal: AppDimensions.marginStandard, vertical: 8),
+            margin: const EdgeInsets.symmetric(
+                horizontal: AppDimensions.marginStandard, vertical: 8),
             decoration: BoxDecoration(
               color: context.surfacePrimary,
-              borderRadius: BorderRadius.circular(AppDimensions.radiusPremiumCard),
+              borderRadius:
+                  BorderRadius.circular(AppDimensions.radiusPremiumCard),
               border: Border.all(color: context.surfaceSecondary),
             ),
             padding: const EdgeInsets.all(20),
@@ -1046,7 +1072,8 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Container(width: 120, height: 16, color: Colors.white),
+                          Container(
+                              width: 120, height: 16, color: Colors.white),
                           const SizedBox(height: 6),
                           Container(width: 80, height: 12, color: Colors.white),
                         ],
@@ -1055,7 +1082,8 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
                   ],
                 ),
                 const SizedBox(height: 16),
-                Container(width: double.infinity, height: 14, color: Colors.white10),
+                Container(
+                    width: double.infinity, height: 14, color: Colors.white10),
                 const SizedBox(height: 6),
                 Container(width: 180, height: 14, color: Colors.white10),
               ],
@@ -1063,11 +1091,13 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
           );
         } else {
           return Container(
-            margin: const EdgeInsets.symmetric(horizontal: AppDimensions.marginStandard, vertical: 6),
+            margin: const EdgeInsets.symmetric(
+                horizontal: AppDimensions.marginStandard, vertical: 6),
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
               color: context.surfacePrimary,
-              borderRadius: BorderRadius.circular(AppDimensions.radiusPremiumCard),
+              borderRadius:
+                  BorderRadius.circular(AppDimensions.radiusPremiumCard),
               border: Border.all(color: context.surfaceSecondary),
             ),
             child: Row(

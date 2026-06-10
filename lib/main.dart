@@ -826,7 +826,7 @@ class _AppShellState extends State<_AppShell> with WidgetsBindingObserver {
     return SafeArea(
       top: false,
       child: Padding(
-        padding: const EdgeInsets.only(left: 24.0, right: 24.0, bottom: 10.0),
+        padding: const EdgeInsets.only(left: 20.0, right: 20.0, bottom: 10.0),
         child: Container(
           // Parent container holds the shadow so that ClipRRect does not clip it
           decoration: BoxDecoration(

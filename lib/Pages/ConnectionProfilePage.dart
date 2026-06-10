@@ -101,9 +101,14 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
     if (_email.isEmpty) _email = "jane.doe@example.com";
     if (_professionalEmail.isEmpty) _professionalEmail = "jane.doe@work.com";
     if (_phoneNumber.isEmpty) _phoneNumber = "+91 98765 43210";
-    if (_professionalPhoneNumber.isEmpty) _professionalPhoneNumber = "+91 98765 00000";
-    if (_bio.isEmpty) _bio = "Passionate developer building modern apps and exploring design systems.";
-    if (_professionalBio.isEmpty) _professionalBio = "Experienced software engineer leading web and mobile products.";
+    if (_professionalPhoneNumber.isEmpty)
+      _professionalPhoneNumber = "+91 98765 00000";
+    if (_bio.isEmpty)
+      _bio =
+          "Passionate developer building modern apps and exploring design systems.";
+    if (_professionalBio.isEmpty)
+      _professionalBio =
+          "Experienced software engineer leading web and mobile products.";
     if (_instagram.isEmpty) _instagram = "instagram_handle";
     if (_linkedin.isEmpty) _linkedin = "linkedin_handle";
     if (_twitter.isEmpty) _twitter = "twitter_handle";
@@ -156,25 +161,56 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
             _avatarUrl = response['avatar_url'] ?? '';
             _profession = response['profession'] ?? '';
             _company = response['company'] ?? '';
-            _email = ProfileFieldFilter.getVisibleValue('email', response['email'] ?? '', _sharedCardPermission, fieldAssignments);
-            _professionalEmail = ProfileFieldFilter.getVisibleValue('professionalEmail', response['professional_email'] ?? '', _sharedCardPermission, fieldAssignments);
-            _phoneNumber = ProfileFieldFilter.getVisibleValue('phoneNumber', response['phone_number'] ?? '', _sharedCardPermission, fieldAssignments);
-            _professionalPhoneNumber = ProfileFieldFilter.getVisibleValue('professionalPhoneNumber', response['professional_phone_number'] ?? '', _sharedCardPermission, fieldAssignments);
-            _instagram = ProfileFieldFilter.getVisibleValue('instagram', response['instagram'] ?? '', _sharedCardPermission, fieldAssignments);
-            _linkedin = ProfileFieldFilter.getVisibleValue('linkedin', response['linkedin'] ?? '', _sharedCardPermission, fieldAssignments);
-            _twitter = ProfileFieldFilter.getVisibleValue('twitter', response['twitter'] ?? '', _sharedCardPermission, fieldAssignments);
-            _bio = ProfileFieldFilter.getVisibleValue('bio', response['bio'] ?? '', _sharedCardPermission, fieldAssignments);
+            _email = ProfileFieldFilter.getVisibleValue(
+                'email',
+                response['email'] ?? '',
+                _sharedCardPermission,
+                fieldAssignments);
+            _professionalEmail = ProfileFieldFilter.getVisibleValue(
+                'professionalEmail',
+                response['professional_email'] ?? '',
+                _sharedCardPermission,
+                fieldAssignments);
+            _phoneNumber = ProfileFieldFilter.getVisibleValue(
+                'phoneNumber',
+                response['phone_number'] ?? '',
+                _sharedCardPermission,
+                fieldAssignments);
+            _professionalPhoneNumber = ProfileFieldFilter.getVisibleValue(
+                'professionalPhoneNumber',
+                response['professional_phone_number'] ?? '',
+                _sharedCardPermission,
+                fieldAssignments);
+            _instagram = ProfileFieldFilter.getVisibleValue(
+                'instagram',
+                response['instagram'] ?? '',
+                _sharedCardPermission,
+                fieldAssignments);
+            _linkedin = ProfileFieldFilter.getVisibleValue(
+                'linkedin',
+                response['linkedin'] ?? '',
+                _sharedCardPermission,
+                fieldAssignments);
+            _twitter = ProfileFieldFilter.getVisibleValue(
+                'twitter',
+                response['twitter'] ?? '',
+                _sharedCardPermission,
+                fieldAssignments);
+            _bio = ProfileFieldFilter.getVisibleValue('bio',
+                response['bio'] ?? '', _sharedCardPermission, fieldAssignments);
           });
 
           // Build per-card filtered field sets
           final Map<String, dynamic>? fa = fieldAssignments;
 
           String filterField(String field, String rawValue) {
-            return ProfileFieldFilter.getVisibleValue(field, rawValue, 'casual', fa);
+            return ProfileFieldFilter.getVisibleValue(
+                field, rawValue, 'casual', fa);
           }
 
           String filterFieldPro(String field, String rawValue) {
-            return ProfileFieldFilter.getVisibleValue(field, rawValue, 'professional', fa);
+            return ProfileFieldFilter.getVisibleValue(
+                field, rawValue, 'professional', fa);
           }
 
           setState(() {
@@ -205,7 +241,11 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
             };
 
             final String rawProfBio = response['professional_bio'] ?? '';
-            _professionalBio = ProfileFieldFilter.getVisibleValue('professionalBio', rawProfBio, _sharedCardPermission, fieldAssignments);
+            _professionalBio = ProfileFieldFilter.getVisibleValue(
+                'professionalBio',
+                rawProfBio,
+                _sharedCardPermission,
+                fieldAssignments);
 
             _professionalFields = {
               'email': filterProfEmail,
@@ -246,9 +286,8 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
   }
 
   Widget _buildFallbackAvatar() {
-    final monogram = _name.isNotEmpty
-        ? _name.substring(0, 1).toUpperCase()
-        : "?";
+    final monogram =
+        _name.isNotEmpty ? _name.substring(0, 1).toUpperCase() : "?";
     return Center(
       child: Text(
         monogram,
@@ -262,23 +301,29 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
     );
   }
 
+  // ignore: unused_element
   Widget _buildTag(String text) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 5.0),
       decoration: BoxDecoration(
         color: context.surfaceSecondary,
-        borderRadius: BorderRadius.circular(AppDimensions.radiusPill),
+        borderRadius: BorderRadius.circular(15.0),
+        border: Border.all(
+          color: context.surfaceSecondary.withValues(alpha: 0.8),
+          width: 1.0,
+        ),
       ),
       child: Text(
         text,
         style: context.captionText.copyWith(
-          color: context.textSecondary,
+          color: context.accentPrimary,
           fontWeight: FontWeight.bold,
         ),
       ),
     );
   }
 
+  // ignore: unused_element
   Widget _buildHeroSection(BuildContext context) {
     return SizedBox(
       height: 220,
@@ -484,7 +529,8 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
             width: cardWidth,
             height: cardHeight,
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(AppDimensions.radiusPremiumCard),
+              borderRadius:
+                  BorderRadius.circular(AppDimensions.radiusPremiumCard),
               gradient: LinearGradient(
                 colors: [
                   const Color(0xFF00F2FE),
@@ -1063,7 +1109,8 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
       decoration: BoxDecoration(
         color: context.surfacePrimary,
         borderRadius: BorderRadius.circular(AppDimensions.radiusPremiumCard),
-        border: Border.all(color: context.surfaceSecondary.withValues(alpha: 0.5)),
+        border:
+            Border.all(color: context.surfaceSecondary.withValues(alpha: 0.5)),
       ),
       child: Row(
         children: [
@@ -1122,7 +1169,8 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
       decoration: BoxDecoration(
         color: context.surfacePrimary,
         borderRadius: BorderRadius.circular(AppDimensions.radiusPremiumCard),
-        border: Border.all(color: context.surfaceSecondary.withValues(alpha: 0.5)),
+        border:
+            Border.all(color: context.surfaceSecondary.withValues(alpha: 0.5)),
       ),
       child: Row(
         children: [
@@ -1163,6 +1211,76 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
                 );
               });
             },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSkeletonHeader() {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 12.0, horizontal: 16.0),
+      decoration: BoxDecoration(
+        color: context.surfacePrimary,
+        borderRadius: BorderRadius.circular(30.0),
+        border: Border.all(
+          color: context.surfaceSecondary,
+          width: 1.0,
+        ),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          GestureDetector(
+            onTap: () {
+              if (Navigator.canPop(context)) {
+                Navigator.pop(context);
+              }
+            },
+            child: Container(
+              width: 32,
+              height: 32,
+              decoration: const BoxDecoration(
+                  shape: BoxShape.circle, color: Colors.white10),
+              child: const Icon(
+                Icons.arrow_back_ios_new_rounded,
+                color: Colors.white,
+                size: 14,
+              ),
+            ),
+          ),
+          Column(
+            children: [
+              Text(
+                _name,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 18.0,
+                  fontWeight: FontWeight.bold,
+                  fontFamily: 'Inter',
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                'Digital Card',
+                style: TextStyle(
+                  color: context.textSecondary,
+                  fontSize: 12.0,
+                  fontFamily: 'Inter',
+                ),
+              ),
+            ],
+          ),
+          SizedBox(
+            width: 32,
+            height: 32,
+            // decoration: const BoxDecoration(
+            //     shape: BoxShape.circle, color: Colors.white10),
+            // child: const Icon(
+            //   Icons.badge_outlined,
+            //   color: Colors.white54,
+            //   size: 14,
+            // ),
           ),
         ],
       ),
@@ -1215,48 +1333,60 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 // 1. Premium Hero Banner & Avatar Overlay
-                _buildHeroSection(context),
+                // _buildHeroSection(context),
 
                 // 2. Profile Details Left-aligned
+                // Padding(
+                //   padding: const EdgeInsets.symmetric(horizontal: AppDimensions.marginStandard),
+                //   child: Column(
+                //     crossAxisAlignment: CrossAxisAlignment.start,
+                //     children: [
+                //       Text(
+                //         _name,
+                //         style: context.displayHeader,
+                //       ),
+                //       const SizedBox(height: 4),
+                //       if (_profession.isNotEmpty || _company.isNotEmpty) ...[
+                //         Text(
+                //           _company.isNotEmpty ? "$_profession at $_company" : _profession,
+                //           style: context.bodyText.copyWith(color: context.textSecondary),
+                //         ),
+                //         const SizedBox(height: 8),
+                //       ],
+                //       // Category tag Wrap
+                //       Wrap(
+                //         spacing: 8.0,
+                //         runSpacing: 8.0,
+                //         children: [
+                //           _buildTag("Konnection"),
+                //           if (_sharedCardPermission != 'both')
+                //             _buildTag(_sharedCardPermission.toUpperCase())
+                //           else ...[
+                //             _buildTag("CASUAL"),
+                //             _buildTag("PROFESSIONAL"),
+                //           ],
+                //         ],
+                //       ),
+                //       const SizedBox(height: 24),
+                //     ],
+                //   ),
+                // ),
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: AppDimensions.marginStandard),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        _name,
-                        style: context.displayHeader,
-                      ),
-                      const SizedBox(height: 4),
-                      if (_profession.isNotEmpty || _company.isNotEmpty) ...[
-                        Text(
-                          _company.isNotEmpty ? "$_profession at $_company" : _profession,
-                          style: context.bodyText.copyWith(color: context.textSecondary),
-                        ),
-                        const SizedBox(height: 8),
-                      ],
-                      // Category tag Wrap
-                      Wrap(
-                        spacing: 8.0,
-                        runSpacing: 8.0,
-                        children: [
-                          _buildTag("Konnection"),
-                          if (_sharedCardPermission != 'both')
-                            _buildTag(_sharedCardPermission.toUpperCase())
-                          else ...[
-                            _buildTag("CASUAL"),
-                            _buildTag("PROFESSIONAL"),
-                          ],
-                        ],
-                      ),
-                      const SizedBox(height: 24),
-                    ],
+                  padding: const EdgeInsets.only(
+                    left: AppDimensions.marginStandard,
+                    right: AppDimensions.marginStandard,
+                    top: 56.0,
                   ),
+                  child: _buildSkeletonHeader(),
+                ),
+                const SizedBox(
+                  height: 24,
                 ),
 
                 // 3. Digital Cards Preview and Permissions Details
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: AppDimensions.marginStandard),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: AppDimensions.marginStandard),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
@@ -1396,10 +1526,12 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
               Expanded(
                 child: OutlinedButton(
                   onPressed: () {
-                    _showDeleteConfirmation(context, widget.profileData, connectionProvider);
+                    _showDeleteConfirmation(
+                        context, widget.profileData, connectionProvider);
                   },
                   style: OutlinedButton.styleFrom(
-                    side: BorderSide(color: context.surfaceSecondary, width: 1.0),
+                    side:
+                        BorderSide(color: context.surfaceSecondary, width: 1.0),
                     shape: const StadiumBorder(),
                     padding: const EdgeInsets.symmetric(vertical: 16.0),
                   ),
@@ -1627,14 +1759,16 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
       decoration: BoxDecoration(
         color: context.surfacePrimary,
         borderRadius: BorderRadius.circular(AppDimensions.radiusPremiumCard),
-        border: Border.all(color: context.surfaceSecondary.withValues(alpha: 0.5)),
+        border:
+            Border.all(color: context.surfaceSecondary.withValues(alpha: 0.5)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(Icons.security_rounded, color: context.accentPrimary, size: 18),
+              Icon(Icons.security_rounded,
+                  color: context.accentPrimary, size: 18),
               const SizedBox(width: 8),
               Text(
                 "ACCESS PERMISSIONS",
@@ -1750,7 +1884,9 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
   Future<void> _showDeleteConfirmation(BuildContext context,
       Map<String, dynamic> connection, ConnectionProvider provider) async {
     final name = connection['name'] ?? 'this contact';
-    final profileIdStr = (connection['id'] ?? connection['connection_profile_id'] ?? '').toString();
+    final profileIdStr =
+        (connection['id'] ?? connection['connection_profile_id'] ?? '')
+            .toString();
 
     return showDialog(
       context: context,
@@ -1758,7 +1894,8 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
         return AlertDialog(
           backgroundColor: context.surfacePrimary,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppDimensions.radiusPremiumCard),
+            borderRadius:
+                BorderRadius.circular(AppDimensions.radiusPremiumCard),
             side: BorderSide(color: context.surfaceSecondary, width: 1.5),
           ),
           title: Text(
@@ -1771,12 +1908,14 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
           ),
           actions: [
             TextButton(
-              child: Text("Cancel", style: TextStyle(color: context.textSecondary)),
+              child: Text("Cancel",
+                  style: TextStyle(color: context.textSecondary)),
               onPressed: () => Navigator.pop(dialogContext),
             ),
             TextButton(
               child: const Text("Delete",
-                  style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
+                  style: TextStyle(
+                      color: Colors.redAccent, fontWeight: FontWeight.bold)),
               onPressed: () async {
                 final navigator = Navigator.of(context);
                 final scaffoldMessenger = ScaffoldMessenger.of(context);
@@ -1784,7 +1923,8 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
                 try {
                   await _deleteProfileLocally(profileIdStr, provider);
                   if (!mounted) return;
-                  navigator.pop(); // Pop profile detail screen since it's deleted
+                  navigator
+                      .pop(); // Pop profile detail screen since it's deleted
                   scaffoldMessenger.showSnackBar(
                     const SnackBar(
                       content: Text("Connection and chat history deleted"),
