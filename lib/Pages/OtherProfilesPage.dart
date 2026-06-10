@@ -53,7 +53,7 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
                 side: BorderSide(color: context.surfaceSecondary, width: 1.5),
               ),
               title: Text(
-                "Redeem VIP Pass",
+                "Redeem Private Key",
                 style: context.screenHeading.copyWith(
                   fontWeight: FontWeight.bold,
                 ),
@@ -237,7 +237,7 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
                                     const SizedBox(width: 10),
                                     const Expanded(
                                       child: Text(
-                                        "Successfully connected with VIP Pass!",
+                                        "Successfully connected with Private Key!",
                                         style: TextStyle(
                                           color: Colors.white,
                                           fontWeight: FontWeight.bold,
@@ -647,8 +647,7 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
                     ),
                     clipBehavior: Clip.antiAlias,
                     child: (avatarUrl.isNotEmpty &&
-                            avatarUrl.contains(
-                                'supabase.co/storage/v1/object/public/avatars/'))
+                            avatarUrl.startsWith('http'))
                         ? Image.network(
                             avatarUrl,
                             fit: BoxFit.cover,
@@ -662,6 +661,9 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: profession.isNotEmpty
+                        ? MainAxisAlignment.start
+                        : MainAxisAlignment.center,
                     children: [
                       Text(
                         name,
@@ -670,14 +672,16 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
-                      const SizedBox(height: 2),
-                      Text(
-                        profession,
-                        style: context.bodyText
-                            .copyWith(color: context.textSecondary),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
+                      if (profession.isNotEmpty) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          profession,
+                          style: context.bodyText
+                              .copyWith(color: context.textSecondary),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
                       const SizedBox(height: 6),
                       _buildCardTypeBadges(profileData),
                     ],
@@ -850,8 +854,7 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
                 ),
                 clipBehavior: Clip.antiAlias,
                 child: (avatarUrl.isNotEmpty &&
-                        avatarUrl.contains(
-                            'supabase.co/storage/v1/object/public/avatars/'))
+                        avatarUrl.startsWith('http'))
                     ? Image.network(
                         avatarUrl,
                         fit: BoxFit.cover,
@@ -863,30 +866,40 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
             ),
             const SizedBox(width: 12),
             Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    name,
-                    style:
-                        context.bodyText.copyWith(fontWeight: FontWeight.bold),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    profession.isNotEmpty && company.isNotEmpty
-                        ? "$profession  •  $company"
-                        : (profession.isNotEmpty ? profession : company),
-                    style: context.captionText
-                        .copyWith(color: context.textSecondary),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 5),
-                  _buildCardTypeBadges(profileData),
-                ],
-              ),
+              child: () {
+                final subtitleText = profession.isNotEmpty && company.isNotEmpty
+                    ? "$profession  •  $company"
+                    : (profession.isNotEmpty ? profession : company);
+                final hasSubtitle = subtitleText.isNotEmpty;
+
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: hasSubtitle
+                      ? MainAxisAlignment.start
+                      : MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      name,
+                      style: context.bodyText
+                          .copyWith(fontWeight: FontWeight.bold),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    if (hasSubtitle) ...[
+                      const SizedBox(height: 3),
+                      Text(
+                        subtitleText,
+                        style: context.captionText
+                            .copyWith(color: context.textSecondary),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                    const SizedBox(height: 5),
+                    _buildCardTypeBadges(profileData),
+                  ],
+                );
+              }(),
             ),
             PopupMenuButton<int>(
               padding: EdgeInsets.zero,

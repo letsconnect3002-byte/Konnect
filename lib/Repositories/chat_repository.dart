@@ -32,6 +32,7 @@ abstract class ChatRepository {
   Future<void> upsertMessageToSupabase(Map<String, dynamic> messageData);
   Future<void> deleteMessageInSupabase(String messageId);
   Future<void> updateMessageStatusInSupabase(String messageId, String status);
+  Future<List<Map<String, dynamic>>> fetchMessagesFromSupabase(String roomId);
   Future<List<Map<String, dynamic>>> fetchPendingMessagesFromSupabase(List<String> roomIds, int myUserId);
   Future<List<Map<String, dynamic>>> fetchDeliveredMessagesFromSupabase(String roomId, int myUserId);
   Future<List<Map<String, dynamic>>> fetchSupabaseMessageStatuses(List<String> messageIds);
@@ -210,6 +211,16 @@ class SupabaseChatRepository implements ChatRepository {
   @override
   Future<void> updateMessageStatusInSupabase(String messageId, String status) async {
     await _client.from('messages').update({'status': status}).eq('id', messageId);
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> fetchMessagesFromSupabase(String roomId) async {
+    final response = await _client
+        .from('messages')
+        .select()
+        .eq('room_id', roomId)
+        .order('created_at', ascending: true);
+    return List<Map<String, dynamic>>.from(response as List);
   }
 
   @override

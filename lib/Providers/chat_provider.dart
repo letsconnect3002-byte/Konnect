@@ -497,6 +497,61 @@ class ChatProvider with ChangeNotifier {
     }
   }
 
+  Future<void> syncRoomHistory(String roomId) async {
+    final myUserId = _userId;
+    if (myUserId == null) return;
+    try {
+      final messages = await _repository.fetchMessagesFromSupabase(roomId);
+      for (final msg in messages) {
+        final msgId = msg['id'] as String;
+        final senderId = msg['sender_id'] as int;
+        final serverStatus = msg['status'] as String? ?? 'sent';
+
+        final localMsg = await _repository.getMessageByIdLocally(msgId);
+        if (localMsg == null) {
+          final String localStatus;
+          if (senderId != myUserId && activeRoomId == roomId) {
+            localStatus = 'read';
+          } else {
+            localStatus = serverStatus;
+          }
+
+          await _repository.insertMessageLocally(
+            msgId,
+            roomId,
+            senderId,
+            msg['payload'] as String,
+            status: localStatus,
+            createdAt: msg['created_at'] as String?,
+            replyToMessageId: msg['reply_to_message_id'] as String?,
+            replyToMessagePayload: msg['reply_to_message_payload'] as String?,
+            replyToMessageSenderName:
+                msg['reply_to_message_sender_name'] as String?,
+          );
+
+          if (senderId != myUserId && localStatus == 'read') {
+            await acknowledgeDelivery(msgId, isActiveInChat: true);
+          } else if (senderId != myUserId && serverStatus == 'sent') {
+            await acknowledgeDelivery(msgId, isActiveInChat: false);
+            await _repository.updateMessageStatusLocally(msgId, 'delivered');
+          }
+        } else {
+          final localStatus = localMsg['status'] as String? ?? 'sent';
+          if (_statusRank(serverStatus) > _statusRank(localStatus)) {
+            await _repository.updateMessageStatusLocally(msgId, serverStatus);
+          }
+        }
+      }
+
+      if (activeRoomId == roomId) {
+        await refreshActiveRoomMessages();
+      }
+      await updateUnreadCount();
+    } catch (e) {
+      print("Error syncing room history: $e");
+    }
+  }
+
   Future<void> refreshActiveRoomMessages() async {
     if (activeRoomId == null) return;
     _activeRoomMessages = List<Map<String, dynamic>>.from(
@@ -622,11 +677,15 @@ class ChatProvider with ChangeNotifier {
   void setActiveRoom(String? roomId) {
     activeRoomId = roomId;
     if (roomId != null) {
-      _markDeliveredMessagesAsRead(roomId);
-      markRoomMessagesAsReadLocally(roomId).then((_) {
-        updateUnreadCount();
+      // Refresh local messages first (fast local DB read), then notify once.
+      refreshActiveRoomMessages().then((_) {
+        // Heavy network I/O (mark delivered → read, update unread counts)
+        // runs in the background AFTER the UI has painted the message list.
+        _markDeliveredMessagesAsRead(roomId);
+        markRoomMessagesAsReadLocally(roomId).then((_) {
+          updateUnreadCount();
+        });
       });
-      refreshActiveRoomMessages();
     } else {
       _activeRoomMessages = [];
       WidgetsBinding.instance.addPostFrameCallback((_) {

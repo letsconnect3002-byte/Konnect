@@ -491,14 +491,12 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                         child: CircleAvatar(
                           radius: 57,
                           backgroundImage: (_avatarUrl.isNotEmpty &&
-                                  _avatarUrl.contains(
-                                      'supabase.co/storage/v1/object/public/avatars/'))
+                                  _avatarUrl.startsWith('http'))
                               ? NetworkImage(_avatarUrl)
                               : null,
                           backgroundColor: context.surfaceSecondary,
                           child: (_avatarUrl.isNotEmpty &&
-                                  _avatarUrl.contains(
-                                      'supabase.co/storage/v1/object/public/avatars/'))
+                                  _avatarUrl.startsWith('http'))
                               ? null
                               : Text(
                                   _nameController.text.isNotEmpty
@@ -1757,8 +1755,7 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                   ),
                   child: ClipOval(
                     child: (_avatarUrl.isNotEmpty &&
-                            _avatarUrl.contains(
-                                'supabase.co/storage/v1/object/public/avatars/'))
+                            _avatarUrl.startsWith('http'))
                         ? Image.network(
                             _avatarUrl,
                             fit: BoxFit.cover,
@@ -2115,8 +2112,7 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                 ),
                 child: ClipOval(
                   child: (_avatarUrl.isNotEmpty &&
-                          _avatarUrl.contains(
-                              'supabase.co/storage/v1/object/public/avatars/'))
+                          _avatarUrl.startsWith('http'))
                       ? Image.network(
                           _avatarUrl,
                           width: 72,

@@ -156,7 +156,7 @@ class _ProfilePageState extends State<ProfilePage> {
       }
 
       final shareMessage =
-          "Hey, I'm inviting you to my private circle on Mandala. Download the app here: joinmandala.in and use my single-use VIP code to connect: *$code*.";
+          "Hey, I'm inviting you to my private circle on Mandala. Download the app here: joinmandala.in and use my single-use Private code to connect: *$code*.";
 
       await SharePlus.instance.share(ShareParams(text: shareMessage));
     } catch (e) {
@@ -313,8 +313,7 @@ class _ProfilePageState extends State<ProfilePage> {
   Widget _buildTopHeader(
       BuildContext context, ProfileProvider profileProvider) {
     final hasAvatar = profileProvider.avatarUrl.isNotEmpty &&
-        profileProvider.avatarUrl
-            .contains('supabase.co/storage/v1/object/public/avatars/');
+        profileProvider.avatarUrl.startsWith('http');
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
@@ -1318,8 +1317,8 @@ class _ProfilePageState extends State<ProfilePage> {
         scanCard,
         const SizedBox(height: gap),
         shareCard,
-        const SizedBox(height: gap),
-        blurCard,
+        // const SizedBox(height: gap),
+        // blurCard,
       ],
     );
   }

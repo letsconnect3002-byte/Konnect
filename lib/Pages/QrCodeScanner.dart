@@ -480,8 +480,7 @@ class _ProfileCardState extends State<ProfileCard> {
               padding: const EdgeInsets.all(1.5),
               child: ClipOval(
                 child: (avatar.isNotEmpty &&
-                        avatar.contains(
-                            'supabase.co/storage/v1/object/public/avatars/'))
+                        avatar.startsWith('http'))
                     ? Image.network(
                         avatar,
                         fit: BoxFit.cover,

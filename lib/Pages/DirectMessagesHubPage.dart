@@ -29,7 +29,8 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
   }
 
   List<String> _getCardTypesForConnection(Map<String, dynamic> connection) {
-    final sharedCard = (connection['my_shared_card'] ?? 'both').toString().toLowerCase();
+    final sharedCard =
+        (connection['my_shared_card'] ?? 'both').toString().toLowerCase();
     if (sharedCard == 'casual') {
       return ['casual'];
     } else if (sharedCard == 'professional') {
@@ -39,7 +40,8 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
     }
   }
 
-  Future<Map<String, dynamic>?> _getLastMessage(String? roomId, ChatProvider chatProvider) async {
+  Future<Map<String, dynamic>?> _getLastMessage(
+      String? roomId, ChatProvider chatProvider) async {
     if (roomId == null) return null;
     return await chatProvider.getLastMessageForRoom(roomId);
   }
@@ -56,17 +58,23 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
       final dateTime = DateTime.parse(isoString).toLocal();
       final now = DateTime.now();
 
-      final hour = dateTime.hour > 12 ? dateTime.hour - 12 : (dateTime.hour == 0 ? 12 : dateTime.hour);
+      final hour = dateTime.hour > 12
+          ? dateTime.hour - 12
+          : (dateTime.hour == 0 ? 12 : dateTime.hour);
       final minute = dateTime.minute.toString().padLeft(2, '0');
       final period = dateTime.hour >= 12 ? 'PM' : 'AM';
       final timeStr = "$hour:$minute $period";
 
-      if (dateTime.year == now.year && dateTime.month == now.month && dateTime.day == now.day) {
+      if (dateTime.year == now.year &&
+          dateTime.month == now.month &&
+          dateTime.day == now.day) {
         return timeStr;
       }
 
       final yesterday = DateTime(now.year, now.month, now.day - 1);
-      if (dateTime.year == yesterday.year && dateTime.month == yesterday.month && dateTime.day == yesterday.day) {
+      if (dateTime.year == yesterday.year &&
+          dateTime.month == yesterday.month &&
+          dateTime.day == yesterday.day) {
         return "Yesterday";
       }
 
@@ -77,7 +85,9 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
   }
 
   String _getAvatarUrl(String name, String? existingUrl) {
-    if (existingUrl != null && existingUrl.isNotEmpty && existingUrl.startsWith('http')) {
+    if (existingUrl != null &&
+        existingUrl.isNotEmpty &&
+        existingUrl.startsWith('http')) {
       return existingUrl;
     }
     return '';
@@ -94,7 +104,8 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
         return AlertDialog(
           backgroundColor: context.surfacePrimary,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppDimensions.radiusPremiumCard),
+            borderRadius:
+                BorderRadius.circular(AppDimensions.radiusPremiumCard),
             side: BorderSide(color: context.surfaceSecondary, width: 1.5),
           ),
           title: Text(
@@ -107,16 +118,19 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
           ),
           actions: [
             TextButton(
-              child: Text("Cancel", style: TextStyle(color: context.textSecondary)),
+              child: Text("Cancel",
+                  style: TextStyle(color: context.textSecondary)),
               onPressed: () => Navigator.pop(dialogContext),
             ),
             TextButton(
               child: const Text("Delete",
-                  style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
+                  style: TextStyle(
+                      color: Colors.redAccent, fontWeight: FontWeight.bold)),
               onPressed: () async {
                 Navigator.pop(dialogContext);
                 try {
-                  await provider.deleteProfile(connection['id'], onRoomCleanup: (profileId, roomId) async {
+                  await provider.deleteProfile(connection['id'],
+                      onRoomCleanup: (profileId, roomId) async {
                     await chatProvider.handleRoomCleanup(profileId, roomId);
                   });
                   scaffoldMessenger.showSnackBar(
@@ -141,9 +155,10 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
     final profileProvider = Provider.of<ProfileProvider>(context);
     final connectionProvider = Provider.of<ConnectionProvider>(context);
     final chatProvider = Provider.of<ChatProvider>(context);
-    
-    final bool isMessagesLoading = connectionProvider.state is UserConnectionLoading ||
-        chatProvider.state is ChatLoading;
+
+    final bool isMessagesLoading =
+        connectionProvider.state is UserConnectionLoading ||
+            chatProvider.state is ChatLoading;
     final connections = connectionProvider.connections;
     final myUserId = profileProvider.userId;
 
@@ -190,7 +205,8 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
         elevation: 0,
         leading: Navigator.canPop(context)
             ? IconButton(
-                icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 18),
+                icon: const Icon(Icons.arrow_back_ios_new_rounded,
+                    color: Colors.white, size: 18),
                 onPressed: () => Navigator.pop(context),
               )
             : null,
@@ -220,7 +236,8 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
                       decoration: BoxDecoration(
                         color: context.surfacePrimary,
                         shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white.withValues(alpha: 0.04)),
+                        border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.04)),
                       ),
                       child: Stack(
                         clipBehavior: Clip.none,
@@ -239,10 +256,13 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
                                 decoration: BoxDecoration(
                                   color: const Color(0xFFEF4444), // Vibrant Red
                                   shape: BoxShape.circle,
-                                  border: Border.all(color: context.surfacePrimary, width: 1.5),
+                                  border: Border.all(
+                                      color: context.surfacePrimary,
+                                      width: 1.5),
                                   boxShadow: [
                                     BoxShadow(
-                                      color: const Color(0xFFEF4444).withValues(alpha: 0.4),
+                                      color: const Color(0xFFEF4444)
+                                          .withValues(alpha: 0.4),
                                       blurRadius: 4,
                                       spreadRadius: 1,
                                     ),
@@ -300,7 +320,8 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
                           boxShadow: _selectedTab == 'casual'
                               ? [
                                   BoxShadow(
-                                    color: context.accentSecondary.withValues(alpha: 0.3),
+                                    color: context.accentSecondary
+                                        .withValues(alpha: 0.3),
                                     blurRadius: 8,
                                     offset: const Offset(0, 2),
                                   ),
@@ -315,13 +336,15 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
                             Text(
                               "Casual",
                               style: TextStyle(
-                                color: _selectedTab == 'casual' ? Colors.white : context.textSecondary,
+                                color: _selectedTab == 'casual'
+                                    ? Colors.white
+                                    : context.textSecondary,
                                 fontWeight: FontWeight.bold,
                                 fontSize: 14,
                                 fontFamily: 'Inter',
                               ),
                             ),
-                             if (chatProvider.casualUnreadCount > 0) ...[
+                            if (chatProvider.casualUnreadCount > 0) ...[
                               const SizedBox(width: 6),
                               Container(
                                 width: 6,
@@ -356,7 +379,8 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
                           boxShadow: _selectedTab == 'professional'
                               ? [
                                   BoxShadow(
-                                    color: context.accentPrimary.withValues(alpha: 0.3),
+                                    color: context.accentPrimary
+                                        .withValues(alpha: 0.3),
                                     blurRadius: 8,
                                     offset: const Offset(0, 2),
                                   ),
@@ -371,13 +395,15 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
                             Text(
                               "Professional",
                               style: TextStyle(
-                                color: _selectedTab == 'professional' ? Colors.black : context.textSecondary,
+                                color: _selectedTab == 'professional'
+                                    ? Colors.black
+                                    : context.textSecondary,
                                 fontWeight: FontWeight.bold,
                                 fontSize: 14,
                                 fontFamily: 'Inter',
                               ),
                             ),
-                             if (chatProvider.professionalUnreadCount > 0) ...[
+                            if (chatProvider.professionalUnreadCount > 0) ...[
                               const SizedBox(width: 6),
                               Container(
                                 width: 6,
@@ -404,23 +430,30 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
         children: [
           // 1. Search Box
           Padding(
-            padding: const EdgeInsets.only(left: AppDimensions.marginStandard, right: AppDimensions.marginStandard, top: 12, bottom: 8),
+            padding: const EdgeInsets.only(
+                left: AppDimensions.marginStandard,
+                right: AppDimensions.marginStandard,
+                top: 12,
+                bottom: 8),
             child: Container(
               height: 44,
               decoration: BoxDecoration(
                 color: context.surfaceSecondary,
-                borderRadius: BorderRadius.circular(AppDimensions.radiusComponent),
+                borderRadius:
+                    BorderRadius.circular(AppDimensions.radiusComponent),
                 border: Border.all(color: context.surfaceSecondary),
               ),
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Row(
                 children: [
-                  Icon(Icons.search_rounded, color: context.textMuted, size: 18),
+                  Icon(Icons.search_rounded,
+                      color: context.textMuted, size: 18),
                   const SizedBox(width: 10),
                   Expanded(
                     child: TextField(
                       controller: _searchController,
-                      style: context.bodyText.copyWith(color: context.textPrimary),
+                      style:
+                          context.bodyText.copyWith(color: context.textPrimary),
                       cursorColor: context.accentSecondary,
                       decoration: InputDecoration(
                         hintText: 'Search connections...',
@@ -460,7 +493,9 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
                             ),
                             const SizedBox(height: 16),
                             Text(
-                              _searchQuery.isEmpty ? "No active conversations yet" : "No results match your search",
+                              _searchQuery.isEmpty
+                                  ? "No active conversations yet"
+                                  : "No results match your search",
                               style: context.bodyText.copyWith(
                                 color: context.textSecondary,
                               ),
@@ -469,142 +504,201 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
                         ),
                       )
                     : ListView.separated(
-                    padding: const EdgeInsets.only(
-                        left: AppDimensions.marginStandard,
-                        right: AppDimensions.marginStandard,
-                        top: 8,
-                        bottom: 100),
-                    itemCount: filteredConnections.length,
-                    separatorBuilder: (context, index) => const SizedBox(height: 12.0),
-                    itemBuilder: (context, index) {
-                      final connection = filteredConnections[index];
-                      final name = connection['name'] ?? 'Unknown';
-                      final avatar = _getAvatarUrl(name, connection['avatarUrl'] ?? connection['avatar_url']);
+                        padding: const EdgeInsets.only(
+                            left: AppDimensions.marginStandard,
+                            right: AppDimensions.marginStandard,
+                            top: 8,
+                            bottom: 100),
+                        itemCount: filteredConnections.length,
+                        separatorBuilder: (context, index) =>
+                            const SizedBox(height: 12.0),
+                        itemBuilder: (context, index) {
+                          final connection = filteredConnections[index];
+                          final name = connection['name'] ?? 'Unknown';
+                          final avatar = _getAvatarUrl(
+                              name,
+                              connection['avatarUrl'] ??
+                                  connection['avatar_url']);
 
-                      final roomId = chatProvider.connectionRooms[connection['id']];
+                          final roomId =
+                              chatProvider.connectionRooms[connection['id']];
 
-                      return Container(
-                        decoration: BoxDecoration(
-                          color: context.surfacePrimary,
-                          borderRadius: BorderRadius.circular(AppDimensions.radiusPremiumCard),
-                          border: Border.all(
-                            color: context.surfaceSecondary.withValues(alpha: 0.5),
-                            width: 1.0,
-                          ),
-                        ),
-                        child: Material(
-                          color: Colors.transparent,
-                          clipBehavior: Clip.antiAlias,
-                          borderRadius: BorderRadius.circular(AppDimensions.radiusPremiumCard),
-                          child: FutureBuilder<Map<String, dynamic>?>(
-                            future: _getLastMessage(roomId, chatProvider),
-                            builder: (context, snapshot) {
-                              final lastMsg = snapshot.data;
+                          return Container(
+                            decoration: BoxDecoration(
+                              color: context.surfacePrimary,
+                              borderRadius: BorderRadius.circular(
+                                  AppDimensions.radiusPremiumCard / 1.5),
+                              border: Border.all(
+                                color: context.surfaceSecondary
+                                    .withValues(alpha: 0.5),
+                                width: 1.0,
+                              ),
+                            ),
+                            child: Material(
+                              color: Colors.transparent,
+                              clipBehavior: Clip.antiAlias,
+                              borderRadius: BorderRadius.circular(
+                                  AppDimensions.radiusPremiumCard),
+                              child: FutureBuilder<Map<String, dynamic>?>(
+                                future: _getLastMessage(roomId, chatProvider),
+                                builder: (context, snapshot) {
+                                  final lastMsg = snapshot.data;
 
-                              final String lastMessageText = lastMsg != null
-                                  ? lastMsg['payload'] ?? ''
-                                  : '';
+                                  final String lastMessageText = lastMsg != null
+                                      ? lastMsg['payload'] ?? ''
+                                      : '';
 
-                              final String msgTime = lastMsg != null
-                                  ? _formatMessageTime(lastMsg['created_at'] as String?)
-                                  : '';
+                                  final String msgTime = lastMsg != null
+                                      ? _formatMessageTime(
+                                          lastMsg['created_at'] as String?)
+                                      : '';
 
-                              final bool isUnread = lastMsg != null &&
-                                  lastMsg['sender_id'] != myUserId &&
-                                  lastMsg['status'] != 'read';
+                                  final bool isUnread = lastMsg != null &&
+                                      lastMsg['sender_id'] != myUserId &&
+                                      lastMsg['status'] != 'read';
 
-                              return ListTile(
-                                onTap: () {
-                                  HapticFeedback.lightImpact();
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) => IndividualChatPage(connectionData: connection),
+                                  return ListTile(
+                                    onTap: () {
+                                      HapticFeedback.lightImpact();
+                                      Navigator.push(
+                                        context,
+                                        PageRouteBuilder(
+                                          pageBuilder: (context, animation,
+                                                  secondaryAnimation) =>
+                                              IndividualChatPage(
+                                                  connectionData: connection),
+                                          transitionsBuilder: (context,
+                                              animation,
+                                              secondaryAnimation,
+                                              child) {
+                                            return SlideTransition(
+                                              position: Tween<Offset>(
+                                                begin: const Offset(1.0, 0.0),
+                                                end: Offset.zero,
+                                              ).animate(CurvedAnimation(
+                                                parent: animation,
+                                                curve: Curves.easeOutCubic,
+                                              )),
+                                              child: child,
+                                            );
+                                          },
+                                          transitionDuration:
+                                              const Duration(milliseconds: 300),
+                                          reverseTransitionDuration:
+                                              const Duration(milliseconds: 250),
+                                        ),
+                                      );
+                                    },
+                                    onLongPress: () {
+                                      HapticFeedback.mediumImpact();
+                                      _showDeleteConfirmation(context,
+                                          connection, connectionProvider);
+                                    },
+                                    contentPadding: const EdgeInsets.symmetric(
+                                        horizontal: 14, vertical: 6),
+                                    leading: Container(
+                                      width: 44,
+                                      height: 44,
+                                      decoration: const BoxDecoration(
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: ClipOval(
+                                        child: avatar.isNotEmpty
+                                            ? Image.network(avatar,
+                                                fit: BoxFit.cover)
+                                            : Container(
+                                                color: context.surfaceSecondary,
+                                                alignment: Alignment.center,
+                                                child: Text(
+                                                  name.isNotEmpty
+                                                      ? name
+                                                          .substring(0, 1)
+                                                          .toUpperCase()
+                                                      : "?",
+                                                  style: TextStyle(
+                                                      color:
+                                                          context.textPrimary,
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                      fontSize: 15),
+                                                ),
+                                              ),
+                                      ),
                                     ),
-                                  );
-                                },
-                                onLongPress: () {
-                                  HapticFeedback.mediumImpact();
-                                  _showDeleteConfirmation(context, connection, connectionProvider);
-                                },
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                                leading: Container(
-                                  width: 44,
-                                  height: 44,
-                                  decoration: const BoxDecoration(
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: ClipOval(
-                                    child: avatar.isNotEmpty
-                                        ? Image.network(avatar, fit: BoxFit.cover)
-                                        : Container(
-                                            color: context.surfaceSecondary,
-                                            alignment: Alignment.center,
-                                            child: Text(
-                                              name.isNotEmpty ? name.substring(0, 1).toUpperCase() : "?",
-                                              style: TextStyle(color: context.textPrimary, fontWeight: FontWeight.bold, fontSize: 15),
+                                    title: Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Text(
+                                          name,
+                                          style: context.cardTitle.copyWith(
+                                            fontWeight: FontWeight.bold,
+                                            color: context.textPrimary,
+                                          ),
+                                        ),
+                                        if (msgTime.isNotEmpty)
+                                          Text(
+                                            msgTime,
+                                            style: context.captionText.copyWith(
+                                              color: isUnread
+                                                  ? context.accentSecondary
+                                                  : context.textMuted,
+                                              fontWeight: isUnread
+                                                  ? FontWeight.bold
+                                                  : FontWeight.normal,
                                             ),
                                           ),
-                                  ),
-                                ),
-                                title: Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Text(
-                                      name,
-                                      style: context.cardTitle.copyWith(
-                                        fontWeight: FontWeight.bold,
-                                        color: context.textPrimary,
-                                      ),
+                                      ],
                                     ),
-                                    if (msgTime.isNotEmpty)
-                                      Text(
-                                        msgTime,
-                                        style: context.captionText.copyWith(
-                                          color: isUnread ? context.accentSecondary : context.textMuted,
-                                          fontWeight: isUnread ? FontWeight.bold : FontWeight.normal,
-                                        ),
-                                      ),
-                                  ],
-                                ),
-                                subtitle: lastMessageText.isEmpty
-                                    ? null
-                                    : Padding(
-                                        padding: const EdgeInsets.only(top: 4.0),
-                                        child: Row(
-                                          children: [
-                                            Expanded(
-                                              child: Text(
-                                                lastMessageText,
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
-                                                style: context.bodyText.copyWith(
-                                                  color: isUnread ? context.textPrimary : context.textSecondary,
-                                                  fontSize: 12.5,
-                                                  fontWeight: isUnread ? FontWeight.w600 : FontWeight.normal,
+                                    subtitle: lastMessageText.isEmpty
+                                        ? null
+                                        : Padding(
+                                            padding:
+                                                const EdgeInsets.only(top: 4.0),
+                                            child: Row(
+                                              children: [
+                                                Expanded(
+                                                  child: Text(
+                                                    lastMessageText,
+                                                    maxLines: 1,
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
+                                                    style: context.bodyText
+                                                        .copyWith(
+                                                      color: isUnread
+                                                          ? context.textPrimary
+                                                          : context
+                                                              .textSecondary,
+                                                      fontSize: 12.5,
+                                                      fontWeight: isUnread
+                                                          ? FontWeight.w600
+                                                          : FontWeight.normal,
+                                                    ),
+                                                  ),
                                                 ),
-                                              ),
+                                                if (isUnread)
+                                                  Container(
+                                                    margin:
+                                                        const EdgeInsets.only(
+                                                            left: 8),
+                                                    width: 8,
+                                                    height: 8,
+                                                    decoration: BoxDecoration(
+                                                      color: context
+                                                          .accentSecondary,
+                                                      shape: BoxShape.circle,
+                                                    ),
+                                                  ),
+                                              ],
                                             ),
-                                            if (isUnread)
-                                              Container(
-                                                margin: const EdgeInsets.only(left: 8),
-                                                width: 8,
-                                                height: 8,
-                                                decoration: BoxDecoration(
-                                                  color: context.accentSecondary,
-                                                  shape: BoxShape.circle,
-                                                ),
-                                              ),
-                                          ],
-                                        ),
-                                      ),
-                              );
-                            },
-                          ),
-                        ),
-                      );
-                    },
-                  ),
+                                          ),
+                                  );
+                                },
+                              ),
+                            ),
+                          );
+                        },
+                      ),
           ),
         ],
       ),
@@ -614,18 +708,22 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
   Widget _buildSkeletonChatRooms() {
     return ListView.separated(
       physics: const NeverScrollableScrollPhysics(),
-      padding: const EdgeInsets.symmetric(horizontal: AppDimensions.marginStandard, vertical: 8),
+      padding: const EdgeInsets.symmetric(
+          horizontal: AppDimensions.marginStandard, vertical: 8),
       itemCount: 5,
       separatorBuilder: (context, index) => const SizedBox(height: 12.0),
       itemBuilder: (context, index) {
         return Container(
           decoration: BoxDecoration(
             color: context.surfacePrimary,
-            borderRadius: BorderRadius.circular(AppDimensions.radiusPremiumCard),
-            border: Border.all(color: context.surfaceSecondary.withValues(alpha: 0.5)),
+            borderRadius:
+                BorderRadius.circular(AppDimensions.radiusPremiumCard),
+            border: Border.all(
+                color: context.surfaceSecondary.withValues(alpha: 0.5)),
           ),
           child: ListTile(
-            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
             leading: Container(
               width: 44,
               height: 44,
@@ -643,7 +741,8 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
             ),
             subtitle: Padding(
               padding: const EdgeInsets.only(top: 4.0),
-              child: Container(width: double.infinity, height: 12, color: Colors.white10),
+              child: Container(
+                  width: double.infinity, height: 12, color: Colors.white10),
             ),
           ),
         );

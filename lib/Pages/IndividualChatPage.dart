@@ -50,21 +50,54 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
     _provider = Provider.of<ChatProvider>(context, listen: false);
     _myUserId = Provider.of<ProfileProvider>(context, listen: false).userId;
     _scrollController.addListener(_onScroll);
-    _initChatRoom();
+
+    // Start chat room init after the very first frame so the page shell
+    // (app bar, background, loading spinner) renders instantly.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _initChatRoom();
+      }
+    });
   }
 
   Future<void> _initChatRoom() async {
     try {
+      // Wait for the slide transition to finish so the animation stays
+      // smooth. The page shows an empty chat background during the slide.
+      final route = ModalRoute.of(context);
+      if (route != null && route.animation != null) {
+        final animation = route.animation!;
+        if (!animation.isCompleted) {
+          final completer = Completer<void>();
+          void statusListener(AnimationStatus status) {
+            if (status == AnimationStatus.completed) {
+              animation.removeStatusListener(statusListener);
+              completer.complete();
+            }
+          }
+          animation.addStatusListener(statusListener);
+          await completer.future;
+        }
+      }
+
+      if (!mounted) return;
+
       final otherUserId = widget.connectionData['id'] as int;
       final roomId = await _provider.getOrCreateDirectRoom(otherUserId);
-      if (mounted) {
-        setState(() {
-          _roomId = roomId;
-          _isRoomLoading = false;
-        });
-        _provider.setActiveRoom(roomId);
-        WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
-      }
+
+      if (!mounted) return;
+
+      // Show messages from local cache immediately, then sync in background
+      _provider.setActiveRoom(roomId);
+      await _provider.refreshActiveRoomMessages();
+
+      if (!mounted) return;
+
+      setState(() {
+        _roomId = roomId;
+        _isRoomLoading = false;
+      });
+      WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
     } catch (e) {
       print("Error initializing room in IndividualChatPage: $e");
       if (mounted) {
@@ -78,8 +111,9 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
   void _onScroll() {
     if (!_scrollController.hasClients) return;
     final pos = _scrollController.position;
-    // Show the button when user is scrolled more than 100px from bottom
-    final isScrolledUp = pos.maxScrollExtent - pos.pixels > 100;
+    // In a reversed list, pos.pixels is the scroll distance from the bottom.
+    // Show the button when user is scrolled up (distance from bottom > 100)
+    final isScrolledUp = pos.pixels > 100;
     if (isScrolledUp != _showScrollToBottom) {
       setState(() {
         _showScrollToBottom = isScrolledUp;
@@ -90,7 +124,8 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
   bool get _isNearBottom {
     if (!_scrollController.hasClients) return true;
     final pos = _scrollController.position;
-    return pos.maxScrollExtent - pos.pixels < 100;
+    // In a reversed list, pos.pixels is the scroll distance from the bottom.
+    return pos.pixels < 100;
   }
 
   @override
@@ -104,23 +139,16 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
 
   Future<void> _scrollToBottom() async {
     if (!_scrollController.hasClients) return;
-    // Wait a frame so the layout (especially tall reply-quote bubbles) settles
+    // Wait a frame so the layout settles
     await Future.delayed(const Duration(milliseconds: 50));
     if (!_scrollController.hasClients || !mounted) return;
 
-    await _scrollController.animateTo(
-      _scrollController.position.maxScrollExtent,
-      duration: const Duration(milliseconds: 300),
-      curve: Curves.easeOut,
-    );
-
-    // If maxScrollExtent grew during the animation (e.g. images loaded,
-    // new messages arrived), snap to the true bottom.
-    if (_scrollController.hasClients) {
-      final trueMax = _scrollController.position.maxScrollExtent;
-      if (_scrollController.offset < trueMax - 1) {
-        _scrollController.jumpTo(trueMax);
-      }
+    if (_scrollController.offset > 0.0) {
+      await _scrollController.animateTo(
+        0.0,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOut,
+      );
     }
   }
 
@@ -241,6 +269,7 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
     );
   }
 
+
   String _getAvatarUrl(String name, String? existingUrl) {
     if (existingUrl != null &&
         existingUrl.isNotEmpty &&
@@ -358,25 +387,25 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
         children: [
           Expanded(
             child: _isRoomLoading
-                ? Center(
-                    child: CircularProgressIndicator(
-                      valueColor:
-                          AlwaysStoppedAnimation<Color>(context.accentPrimary),
-                    ),
-                  )
+                ? const SizedBox.shrink()
                 : Stack(
                     children: [
                       ListView.builder(
                         controller: _scrollController,
+                        reverse: true,
                         padding: const EdgeInsets.symmetric(
                             horizontal: 16, vertical: 20),
                         itemCount: messages.length + (_isTyping ? 1 : 0),
                         itemBuilder: (context, index) {
-                          if (index == messages.length) {
+                          if (_isTyping && index == 0) {
                             return _buildTypingIndicator();
                           }
 
-                          final msg = messages[index];
+                          final int msgIndex = _isTyping
+                              ? messages.length - index
+                              : messages.length - 1 - index;
+
+                          final msg = messages[msgIndex];
                           final msgId = msg['id'] as String;
                           final key = _messageKeys.putIfAbsent(
                               msgId, () => GlobalKey());
@@ -394,13 +423,13 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
 
                           Offset tapPosition = Offset.zero;
 
-                          final prevCreatedAt = index > 0
-                              ? (messages[index - 1]['created_at'] as String? ??
+                          final prevCreatedAt = msgIndex > 0
+                              ? (messages[msgIndex - 1]['created_at'] as String? ??
                                   '')
                               : '';
                           final currentCreatedAt =
                               msg['created_at'] as String? ?? '';
-                          final showDateHeader = index == 0 ||
+                          final showDateHeader = msgIndex == 0 ||
                               _isDifferentDay(prevCreatedAt, currentCreatedAt);
 
                           final bubbleWidget = SwipeToReply(
@@ -817,7 +846,9 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
     // ── Step 1: Jump close to the target so ListView builds it ──
     final totalMessages = messages.length;
     final scrollExtent = _scrollController.position.maxScrollExtent;
-    final double fraction = targetIndex / totalMessages;
+    // In a reversed list, the oldest message (index 0) is at the top (maxScrollExtent)
+    // and the newest message (index totalMessages - 1) is at the bottom (0.0).
+    final double fraction = 1.0 - (targetIndex / totalMessages);
     final double estimatedOffset =
         (fraction * scrollExtent).clamp(0.0, scrollExtent);
 

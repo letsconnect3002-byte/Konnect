@@ -460,8 +460,7 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
                 ),
                 clipBehavior: Clip.antiAlias,
                 child: (_avatarUrl.isNotEmpty &&
-                        _avatarUrl.contains(
-                            'supabase.co/storage/v1/object/public/avatars/'))
+                        _avatarUrl.startsWith('http'))
                     ? Image.network(
                         _avatarUrl,
                         fit: BoxFit.cover,
@@ -875,8 +874,7 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
                 ),
                 child: ClipOval(
                   child: (avatar.isNotEmpty &&
-                          avatar.contains(
-                              'supabase.co/storage/v1/object/public/avatars/'))
+                          avatar.startsWith('http'))
                       ? Image.network(
                           avatar,
                           fit: BoxFit.cover,
