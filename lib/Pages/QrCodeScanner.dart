@@ -44,7 +44,8 @@ class _QRScannerPageState extends State<QRScannerPage> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 18),
+          icon: const Icon(Icons.arrow_back_ios_new_rounded,
+              color: Colors.white, size: 18),
           onPressed: () => Navigator.pop(context),
         ),
       ),
@@ -190,17 +191,21 @@ class _QRScannerPageState extends State<QRScannerPage> {
                 builder: (context) => Dialog(
                   backgroundColor: context.surfacePrimary,
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(AppDimensions.radiusPremiumCard),
-                    side: BorderSide(color: context.surfaceSecondary, width: 1.5),
+                    borderRadius:
+                        BorderRadius.circular(AppDimensions.radiusPremiumCard),
+                    side:
+                        BorderSide(color: context.surfaceSecondary, width: 1.5),
                   ),
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+                    padding: const EdgeInsets.symmetric(
+                        vertical: 24, horizontal: 16),
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         CircularProgressIndicator(
-                          valueColor: AlwaysStoppedAnimation<Color>(context.accentPrimary),
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                              context.accentPrimary),
                         ),
                         const SizedBox(height: 16),
                         Text(
@@ -455,7 +460,8 @@ class _ProfileCardState extends State<ProfileCard> {
                 : [const Color(0xFF132A33), const Color(0xFF091316)],
           ),
           borderRadius: BorderRadius.circular(AppDimensions.radiusPremiumCard),
-          border: Border.all(color: accentColor.withValues(alpha: 0.35), width: 1.5),
+          border: Border.all(
+              color: accentColor.withValues(alpha: 0.35), width: 1.5),
           boxShadow: [
             BoxShadow(
               color: accentColor.withValues(alpha: 0.08),
@@ -473,14 +479,19 @@ class _ProfileCardState extends State<ProfileCard> {
                 shape: BoxShape.circle,
                 gradient: LinearGradient(
                   colors: isCasual
-                      ? [context.accentSecondary, context.accentSecondary.withValues(alpha: 0.5)]
-                      : [context.accentPrimary, context.accentPrimary.withValues(alpha: 0.5)],
+                      ? [
+                          context.accentSecondary,
+                          context.accentSecondary.withValues(alpha: 0.5)
+                        ]
+                      : [
+                          context.accentPrimary,
+                          context.accentPrimary.withValues(alpha: 0.5)
+                        ],
                 ),
               ),
               padding: const EdgeInsets.all(1.5),
               child: ClipOval(
-                child: (avatar.isNotEmpty &&
-                        avatar.startsWith('http'))
+                child: (avatar.isNotEmpty && avatar.startsWith('http'))
                     ? Image.network(
                         avatar,
                         fit: BoxFit.cover,
@@ -491,7 +502,8 @@ class _ProfileCardState extends State<ProfileCard> {
                             name.isNotEmpty
                                 ? name.substring(0, 1).toUpperCase()
                                 : "?",
-                            style: context.cardTitle.copyWith(fontSize: 20, fontWeight: FontWeight.bold),
+                            style: context.cardTitle.copyWith(
+                                fontSize: 20, fontWeight: FontWeight.bold),
                           ),
                         ),
                       )
@@ -502,7 +514,8 @@ class _ProfileCardState extends State<ProfileCard> {
                           name.isNotEmpty
                               ? name.substring(0, 1).toUpperCase()
                               : "?",
-                          style: context.cardTitle.copyWith(fontSize: 20, fontWeight: FontWeight.bold),
+                          style: context.cardTitle.copyWith(
+                              fontSize: 20, fontWeight: FontWeight.bold),
                         ),
                       ),
               ),
@@ -642,8 +655,8 @@ class _ProfileCardState extends State<ProfileCard> {
                   twitter.isNotEmpty)
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 12),
-                  child:
-                      Divider(color: accentColor.withValues(alpha: 0.15), height: 1),
+                  child: Divider(
+                      color: accentColor.withValues(alpha: 0.15), height: 1),
                 ),
             ],
             if (email.isNotEmpty) ...[
@@ -692,8 +705,8 @@ class _ProfileCardState extends State<ProfileCard> {
               if (email.isNotEmpty || phone.isNotEmpty)
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 12),
-                  child:
-                      Divider(color: accentColor.withValues(alpha: 0.15), height: 1),
+                  child: Divider(
+                      color: accentColor.withValues(alpha: 0.15), height: 1),
                 ),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -808,7 +821,9 @@ class _ProfileCardState extends State<ProfileCard> {
         height: 52,
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: BoxDecoration(
-          color: isSelected ? color.withValues(alpha: 0.08) : context.canvasBackground,
+          color: isSelected
+              ? color.withValues(alpha: 0.08)
+              : context.canvasBackground,
           borderRadius: BorderRadius.circular(AppDimensions.radiusComponent),
           border: Border.all(
             color: isSelected ? color : context.surfaceSecondary,
@@ -877,8 +892,14 @@ class _ProfileCardState extends State<ProfileCard> {
                     borderRadius: BorderRadius.circular(16),
                     gradient: LinearGradient(
                       colors: _shareBackType == 'casual'
-                          ? [context.accentSecondary, context.accentSecondary.withValues(alpha: 0.8)]
-                          : [context.accentPrimary, context.accentPrimary.withValues(alpha: 0.8)],
+                          ? [
+                              context.accentSecondary,
+                              context.accentSecondary.withValues(alpha: 0.8)
+                            ]
+                          : [
+                              context.accentPrimary,
+                              context.accentPrimary.withValues(alpha: 0.8)
+                            ],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     ),
@@ -907,7 +928,9 @@ class _ProfileCardState extends State<ProfileCard> {
                           ? "Add to My Casual Network"
                           : "Add to My Professional Network",
                       style: TextStyle(
-                        color: _shareBackType == 'casual' ? Colors.white : Colors.black,
+                        color: _shareBackType == 'casual'
+                            ? Colors.white
+                            : Colors.black,
                         fontWeight: FontWeight.bold,
                         fontSize: 15,
                         fontFamily: 'Inter',

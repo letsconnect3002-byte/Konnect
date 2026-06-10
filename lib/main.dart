@@ -180,25 +180,7 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
         payload != null) {
       final senderId = int.tryParse(senderIdStr);
       if (senderId != null) {
-        // 1. Show notification FIRST to guarantee delivery regardless of DB/Network outcomes
-        try {
-          await showLocalNotification(
-            messageId,
-            senderName,
-            payload,
-            {
-              'sender_id': senderIdStr,
-              'room_id': roomId,
-            },
-          );
-          print(
-              "PushNotifications: Background notification displayed successfully.");
-        } catch (e) {
-          print(
-              "PushNotifications: Error displaying background notification: $e");
-        }
-
-        // 2. Save to local SQLite safely
+        // 1. Save to local SQLite safely
         try {
           await LocalDatabaseHelper.instance.insertMessage(
             messageId,
@@ -231,6 +213,24 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
         } catch (e) {
           print(
               "PushNotifications: Error acknowledging delivery in background: $e");
+        }
+
+        // 4. Show local notification via flutter_local_notifications
+        try {
+          await showLocalNotification(
+            messageId,
+            senderName,
+            payload,
+            {
+              'sender_id': senderIdStr,
+              'room_id': roomId,
+            },
+          );
+          print(
+              "PushNotifications: Background local notification displayed successfully.");
+        } catch (e) {
+          print(
+              "PushNotifications: Error displaying background notification: $e");
         }
       }
     }

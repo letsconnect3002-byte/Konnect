@@ -76,7 +76,6 @@ serve(async (req) => {
       const body = {
         message: {
           token: fcmToken,
-          // NO 'notification' block — the Flutter app will display via flutter_local_notifications
           data: {
             action: "new_message",
             message_id: messageId,

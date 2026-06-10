@@ -22,6 +22,7 @@ class IndividualChatPage extends StatefulWidget {
 class _IndividualChatPageState extends State<IndividualChatPage> {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+  final FocusNode _messageFocusNode = FocusNode();
 
   final bool _isTyping = false; // Keep final since it is not set dynamically yet
   late String _name;
@@ -134,6 +135,7 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
     _scrollController.removeListener(_onScroll);
     _messageController.dispose();
     _scrollController.dispose();
+    _messageFocusNode.dispose();
     super.dispose();
   }
 
@@ -436,12 +438,14 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
                             key: key,
                             onReply: () {
                               _setReplyMessage(msg, isMe);
+                              _messageFocusNode.requestFocus();
                             },
                             child: GestureDetector(
                               onTapDown: (details) {
                                 tapPosition = details.globalPosition;
                               },
                               onLongPress: () {
+                                _messageFocusNode.unfocus();
                                 _showContextMenu(
                                     context, tapPosition, msg, isMe);
                               },
@@ -735,6 +739,7 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
             Expanded(
               child: TextField(
                 controller: _messageController,
+                focusNode: _messageFocusNode,
                 style: context.bodyText.copyWith(color: context.textPrimary),
                 cursorColor: context.accentPrimary,
                 decoration: InputDecoration(
@@ -975,6 +980,9 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
 
   void _showContextMenu(BuildContext context, Offset tapPosition,
       Map<String, dynamic> message, bool isMe) {
+    // Unfocus the input field before showing the menu to prevent keyboard refocusing issues
+    _messageFocusNode.unfocus();
+
     final RenderBox overlay =
         Navigator.of(context).overlay!.context.findRenderObject() as RenderBox;
     final surfaceSecondaryColor = context.surfaceSecondary;
@@ -1018,6 +1026,7 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
     ).then((value) {
       if (value == 'reply') {
         _setReplyMessage(message, isMe);
+        _messageFocusNode.requestFocus();
       } else if (value == 'delete') {
         _handleDeleteMessage(message, isMe);
       }
