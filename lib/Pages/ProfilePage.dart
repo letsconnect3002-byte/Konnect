@@ -1318,8 +1318,8 @@ class _ProfilePageState extends State<ProfilePage> {
         scanCard,
         const SizedBox(height: gap),
         shareCard,
-        // const SizedBox(height: gap),
-        // blurCard,
+        const SizedBox(height: gap),
+        blurCard,
       ],
     );
   }

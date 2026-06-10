@@ -3,6 +3,7 @@ import 'dart:math';
 
 import 'package:connect/Models/profile_card_type.dart';
 import 'package:connect/Models/app_error.dart';
+import 'package:connect/Models/custom_link.dart';
 import 'package:connect/Repositories/profile_repository.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -58,6 +59,8 @@ class ProfileProvider with ChangeNotifier {
   String professionalBio = '';
   String avatarUrl = '';
   String gender = '';
+  String spotify = '';
+  List<CustomLink> customLinks = [];
   bool showProfileToConnections = true;
 
   String? _ownerId;
@@ -102,11 +105,13 @@ class ProfileProvider with ChangeNotifier {
     instagram = '';
     linkedin = '';
     twitter = '';
+    spotify = '';
     company = '';
     bio = '';
     professionalBio = '';
     avatarUrl = '';
     gender = '';
+    customLinks = [];
   }
 
   // Which card(s) each field appears on (Casual / Professional).
@@ -130,6 +135,9 @@ class ProfileProvider with ChangeNotifier {
   }
 
   bool isFieldOnCard(String field, ProfileCardType card) {
+    _ensureDefaultFieldAssignments();
+    fieldAssignments.putIfAbsent(
+        field, () => FieldCardAssignment(casual: false, professional: true));
     final assignment = fieldAssignments[field];
     if (assignment == null) return card == ProfileCardType.professional;
     return card == ProfileCardType.casual
@@ -139,6 +147,8 @@ class ProfileProvider with ChangeNotifier {
 
   Future<void> toggleFieldOnCard(String field, ProfileCardType card) async {
     _ensureDefaultFieldAssignments();
+    fieldAssignments.putIfAbsent(
+        field, () => FieldCardAssignment(casual: false, professional: true));
     final current = fieldAssignments[field]!;
     if (card == ProfileCardType.casual) {
       fieldAssignments[field] = current.copyWith(casual: !current.casual);
@@ -164,6 +174,8 @@ class ProfileProvider with ChangeNotifier {
   Future<void> setFieldOnCard(
       String field, ProfileCardType card, bool enabled) async {
     _ensureDefaultFieldAssignments();
+    fieldAssignments.putIfAbsent(
+        field, () => FieldCardAssignment(casual: false, professional: true));
     final current = fieldAssignments[field]!;
     if (card == ProfileCardType.casual) {
       fieldAssignments[field] = current.copyWith(casual: enabled);
@@ -213,6 +225,8 @@ class ProfileProvider with ChangeNotifier {
         return twitter;
       case 'instagram':
         return instagram;
+      case 'spotify':
+        return spotify;
       default:
         return null;
     }
@@ -311,6 +325,9 @@ class ProfileProvider with ChangeNotifier {
       case 'gender':
         gender = value;
         break;
+      case 'spotify':
+        spotify = value;
+        break;
     }
     notifyListeners();
   }
@@ -341,6 +358,40 @@ class ProfileProvider with ChangeNotifier {
     }
 
     notifyListeners();
+  }
+
+  Future<void> addCustomLink(String name, String url, int? profileId) async {
+    final newLink = CustomLink(
+      id: 'custom_link_${DateTime.now().millisecondsSinceEpoch}',
+      name: name,
+      url: url,
+    );
+    customLinks.add(newLink);
+    fieldAssignments[newLink.id] = FieldCardAssignment(casual: false, professional: true);
+    notifyListeners();
+    if (profileId != null) {
+      await saveOrUpdateProfile();
+    }
+  }
+
+  Future<void> editCustomLink(String id, String name, String url, int? profileId) async {
+    final idx = customLinks.indexWhere((l) => l.id == id);
+    if (idx != -1) {
+      customLinks[idx] = customLinks[idx].copyWith(name: name, url: url);
+      notifyListeners();
+      if (profileId != null) {
+        await saveOrUpdateProfile();
+      }
+    }
+  }
+
+  Future<void> removeCustomLink(String id, int? profileId) async {
+    customLinks.removeWhere((l) => l.id == id);
+    fieldAssignments.remove(id);
+    notifyListeners();
+    if (profileId != null) {
+      await saveOrUpdateProfile();
+    }
   }
 
   Future<void> setShowProfileToConnections(bool value) async {
@@ -422,11 +473,12 @@ class ProfileProvider with ChangeNotifier {
       "instagram": "",
       "linkedin": "",
       "twitter": "",
-      "company": "",
+      "spotify": "",
       "bio": "",
       "professionalBio": "",
       "avatarUrl": "",
       "gender": "",
+      "custom_links": [],
       "showProfileToConnections": true
     };
     try {
@@ -450,6 +502,7 @@ class ProfileProvider with ChangeNotifier {
         instagram = response['instagram'] ?? '';
         linkedin = response['linkedin'] ?? '';
         twitter = response['twitter'] ?? '';
+        spotify = response['spotify'] ?? '';
         company = response['company'] ?? '';
         bio = response['bio'] ?? '';
         professionalBio = response['professional_bio'] ?? '';
@@ -457,6 +510,18 @@ class ProfileProvider with ChangeNotifier {
         gender = response['gender'] ?? '';
         showProfileToConnections =
             response['show_profile_to_connections'] == true;
+
+        customLinks = [];
+        if (response['custom_links'] != null) {
+          try {
+            final List<dynamic> decoded = response['custom_links'] is String
+                ? jsonDecode(response['custom_links'] as String) as List<dynamic>
+                : response['custom_links'] as List<dynamic>;
+            customLinks = decoded.map((item) => CustomLink.fromJson(item as Map<String, dynamic>)).toList();
+          } catch (e) {
+            print("Error parsing custom_links: $e");
+          }
+        }
 
         profileData["name"] = name;
         profileData["profession"] = profession;
@@ -467,11 +532,13 @@ class ProfileProvider with ChangeNotifier {
         profileData["instagram"] = instagram;
         profileData["linkedin"] = linkedin;
         profileData["twitter"] = twitter;
+        profileData["spotify"] = spotify;
         profileData["company"] = company;
         profileData["bio"] = bio;
         profileData["professionalBio"] = professionalBio;
         profileData["avatarUrl"] = avatarUrl;
         profileData["gender"] = gender;
+        profileData["custom_links"] = customLinks.map((l) => l.toJson()).toList();
         profileData["showProfileToConnections"] = showProfileToConnections;
 
         _setLoadedState(id, true);
@@ -528,6 +595,7 @@ class ProfileProvider with ChangeNotifier {
           'instagram': instagram,
           'linkedin': linkedin,
           'twitter': twitter,
+          'spotify': spotify,
           'is_my_profile': isMyProfile,
           'company': company,
           'bio': bio,
@@ -536,6 +604,7 @@ class ProfileProvider with ChangeNotifier {
           'gender': gender,
           'show_profile_to_connections': showProfileToConnections,
           'field_assignments': assignmentsMap,
+          'custom_links': customLinks.map((l) => l.toJson()).toList(),
         });
 
         _setLoadedState(insertedId, true);
@@ -564,12 +633,14 @@ class ProfileProvider with ChangeNotifier {
       'instagram': instagram,
       'linkedin': linkedin,
       'twitter': twitter,
+      'spotify': spotify,
       'company': company,
       'bio': bio,
       'professional_bio': professionalBio,
       'avatar_url': avatarUrl,
       'show_profile_to_connections': showProfileToConnections,
       'field_assignments': assignmentsMap,
+      'custom_links': customLinks.map((l) => l.toJson()).toList(),
     };
 
     try {
@@ -604,6 +675,8 @@ class ProfileProvider with ChangeNotifier {
     instagram = '';
     linkedin = '';
     twitter = '';
+    spotify = '';
+    customLinks = [];
     company = '';
     bio = '';
     professionalBio = '';
@@ -628,6 +701,7 @@ class ProfileProvider with ChangeNotifier {
           'instagram': response['instagram'] ?? '',
           'linkedin': response['linkedin'] ?? '',
           'twitter': response['twitter'] ?? '',
+          'spotify': response['spotify'] ?? '',
           'isMyProfile': response['is_my_profile'] == true,
           'created_at': response['created_at'],
           'company': response['company'] ?? '',
@@ -641,6 +715,11 @@ class ProfileProvider with ChangeNotifier {
               : <String>[],
           'connection_profile_id': response['id'],
           'field_assignments': response['field_assignments'],
+          'custom_links': response['custom_links'] != null
+              ? (response['custom_links'] is String
+                  ? jsonDecode(response['custom_links'] as String) as List<dynamic>
+                  : response['custom_links'] as List<dynamic>)
+              : <dynamic>[],
         };
       }
     } catch (e) {

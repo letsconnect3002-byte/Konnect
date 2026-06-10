@@ -1,5 +1,6 @@
 import 'package:connect/Config/app_theme.dart';
 import 'package:connect/Models/profile_card_type.dart';
+import 'package:connect/Models/custom_link.dart';
 import 'package:connect/Providers/profile_provider.dart';
 import 'package:connect/Widgets/card_field_input.dart';
 import 'package:flutter/material.dart';
@@ -738,6 +739,9 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                     const SizedBox(height: 32),
 
                     _buildSocialLinksSection(),
+                    const SizedBox(height: 32),
+
+                    _buildCustomLinksSection(),
                     const SizedBox(height: 16),
 
                     _buildSaveButton(),
@@ -769,20 +773,14 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
     final linkedinLogo = Container(
       width: 36,
       height: 36,
-      decoration: const BoxDecoration(
-        color: Color(0xFFD946EF),
+      decoration: BoxDecoration(
+        color: Colors.white,
         shape: BoxShape.circle,
       ),
-      child: const Center(
-        child: Text(
-          "in",
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.w900,
-            fontSize: 16,
-            fontFamily: "Inter",
-          ),
-        ),
+      // padding: const EdgeInsets.all(8),
+      child: Image.asset(
+        'assets/icons/linkedin.png',
+        fit: BoxFit.contain,
       ),
     );
 
@@ -790,16 +788,14 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
     final twitterLogo = Container(
       width: 36,
       height: 36,
-      decoration: const BoxDecoration(
-        color: Color(0xFF1DA1F2),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.08),
         shape: BoxShape.circle,
       ),
-      child: const Center(
-        child: Icon(
-          Icons.flutter_dash_rounded,
-          color: Colors.white,
-          size: 20,
-        ),
+      // padding: const EdgeInsets.all(8),
+      child: Image.asset(
+        'assets/icons/twitter.png',
+        fit: BoxFit.contain,
       ),
     );
 
@@ -837,7 +833,7 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
         ),
         _buildSocialCard(
           fieldKey: 'twitter',
-          title: 'Twitter',
+          title: 'X (Former Twitter)',
           handle: provider.twitter,
           logo: twitterLogo,
           onEdit: () =>
@@ -850,21 +846,38 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
           logo: Container(
             width: 36,
             height: 36,
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  Color(0xFFF58529),
-                  Color(0xFFDD2A7B),
-                  Color(0xFF8134AF)
-                ],
-              ),
+            decoration: BoxDecoration(
+              color: Colors.white,
               shape: BoxShape.circle,
             ),
-            child: const Icon(Icons.camera_alt_rounded,
-                color: Colors.white, size: 18),
+            // padding: const EdgeInsets.all(8),
+            child: Image.asset(
+              'assets/icons/instagram.png',
+              fit: BoxFit.contain,
+            ),
           ),
           onEdit: () => _showEditSocialDialog(
               'Instagram', 'instagram', provider.instagram),
+        ),
+        _buildSocialCard(
+          fieldKey: 'spotify',
+          title: 'Spotify',
+          handle: provider.spotify,
+          logo: Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              shape: BoxShape.circle,
+            ),
+            // padding: const EdgeInsets.all(8),
+            child: Image.asset(
+              'assets/icons/spotify.png',
+              fit: BoxFit.contain,
+            ),
+          ),
+          onEdit: () =>
+              _showEditSocialDialog('Spotify', 'spotify', provider.spotify),
         ),
       ],
     );
@@ -3309,6 +3322,223 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
       ),
     );
   }
+
+  Widget _buildCustomLinksSection() {
+    final provider = Provider.of<ProfileProvider>(context);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.add_link_rounded,
+                    color: context.accentSecondary, size: 18),
+                const SizedBox(width: 8),
+                Text(
+                  'CUSTOM LINKS',
+                  style: context.captionText.copyWith(
+                    color: context.textSecondary,
+                    fontSize: 14.0,
+                    letterSpacing: 1.5,
+                  ),
+                ),
+              ],
+            ),
+            TextButton.icon(
+              onPressed: () => _showCustomLinkDialog(),
+              icon: Icon(Icons.add_circle_outline_rounded,
+                  color: context.accentSecondary, size: 18),
+              label: Text(
+                "Add New",
+                style: TextStyle(
+                  color: context.accentSecondary,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        if (provider.customLinks.isEmpty)
+          Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: context.surfacePrimary,
+              borderRadius: BorderRadius.circular(16),
+              border:
+                  Border.all(color: context.textMuted.withValues(alpha: 0.2)),
+            ),
+            child: Center(
+              child: Text(
+                "No custom links added yet. Tap 'Add New' to share websites, portfolios, or other links.",
+                textAlign: TextAlign.center,
+                style: context.bodyText.copyWith(
+                  color: context.textMuted,
+                  fontSize: 13,
+                ),
+              ),
+            ),
+          )
+        else
+          ...provider.customLinks.map((link) {
+            final globeLogo = Container(
+              width: 36,
+              height: 36,
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.language_rounded,
+                color: context.accentSecondary,
+                size: 20,
+              ),
+            );
+
+            return _buildSocialCard(
+              fieldKey: link.id,
+              title: link.name,
+              handle: link.url,
+              logo: globeLogo,
+              onEdit: () => _showCustomLinkDialog(existingLink: link),
+            );
+          }),
+      ],
+    );
+  }
+
+  void _showCustomLinkDialog({CustomLink? existingLink}) {
+    final nameController =
+        TextEditingController(text: existingLink?.name ?? '');
+    final urlController = TextEditingController(text: existingLink?.url ?? '');
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor: context.surfacePrimary,
+          shape: RoundedRectangleBorder(
+            borderRadius:
+                BorderRadius.circular(AppDimensions.radiusPremiumCard),
+            side: BorderSide(
+              color: context.textMuted.withValues(alpha: 0.2),
+              width: 1.0,
+            ),
+          ),
+          title: Text(
+            existingLink == null ? "Add Custom Link" : "Edit Custom Link",
+            style: context.cardTitle.copyWith(
+              color: context.textPrimary,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: nameController,
+                style: TextStyle(color: context.textPrimary),
+                cursorColor: context.accentPrimary,
+                decoration: InputDecoration(
+                  hintText: "Link Name (e.g., Portfolio, Website)",
+                  hintStyle: TextStyle(color: context.textMuted),
+                  filled: true,
+                  fillColor: context.surfaceSecondary,
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius:
+                        BorderRadius.circular(AppDimensions.radiusComponent),
+                    borderSide:
+                        BorderSide(color: context.accentPrimary, width: 1),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius:
+                        BorderRadius.circular(AppDimensions.radiusComponent),
+                    borderSide: BorderSide(
+                        color: context.textMuted.withValues(alpha: 0.2)),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: urlController,
+                style: TextStyle(color: context.textPrimary),
+                cursorColor: context.accentPrimary,
+                decoration: InputDecoration(
+                  hintText: "URL (e.g., https://mywebsite.com)",
+                  hintStyle: TextStyle(color: context.textMuted),
+                  filled: true,
+                  fillColor: context.surfaceSecondary,
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius:
+                        BorderRadius.circular(AppDimensions.radiusComponent),
+                    borderSide:
+                        BorderSide(color: context.accentPrimary, width: 1),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius:
+                        BorderRadius.circular(AppDimensions.radiusComponent),
+                    borderSide: BorderSide(
+                        color: context.textMuted.withValues(alpha: 0.2)),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            if (existingLink != null)
+              TextButton(
+                onPressed: () async {
+                  final provider =
+                      Provider.of<ProfileProvider>(context, listen: false);
+                  await provider.removeCustomLink(
+                      existingLink.id, provider.userId);
+                  if (context.mounted) Navigator.pop(context);
+                },
+                child: const Text("Delete",
+                    style: TextStyle(color: Colors.redAccent)),
+              ),
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text("Cancel",
+                  style: TextStyle(color: context.textSecondary)),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                final nameVal = nameController.text.trim();
+                final urlVal = urlController.text.trim();
+                if (nameVal.isEmpty || urlVal.isEmpty) return;
+
+                final provider =
+                    Provider.of<ProfileProvider>(context, listen: false);
+                if (existingLink == null) {
+                  await provider.addCustomLink(
+                      nameVal, urlVal, provider.userId);
+                } else {
+                  await provider.editCustomLink(
+                      existingLink.id, nameVal, urlVal, provider.userId);
+                }
+                if (context.mounted) Navigator.pop(context);
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: context.accentSecondary,
+                shape: RoundedRectangleBorder(
+                  borderRadius:
+                      BorderRadius.circular(AppDimensions.radiusComponent),
+                ),
+              ),
+              child: const Text("Save",
+                  style: TextStyle(
+                      color: Colors.white, fontWeight: FontWeight.bold)),
+            ),
+          ],
+        );
+      },
+    );
+  }
 }
 
 class CountryInfo {
@@ -3621,3 +3851,32 @@ class CardPatternPainter extends CustomPainter {
   bool shouldRepaint(covariant CardPatternPainter oldDelegate) =>
       oldDelegate.color != color;
 }
+
+// class CardPatternPainter extends CustomPainter {
+//   final Color color;
+//   CardPatternPainter({required this.color});
+
+//   @override
+//   void paint(Canvas canvas, Size size) {
+//     final paint = Paint()
+//       ..color = color
+//       ..style = PaintingStyle.stroke
+//       ..strokeWidth = 1.0;
+
+//     // Draw concentric circles in the top right corner
+//     final centerTR = Offset(size.width, 0);
+//     for (double r = 40.0; r <= 220.0; r += 16.0) {
+//       canvas.drawCircle(centerTR, r, paint);
+//     }
+
+//     // Draw concentric circles in the bottom left corner
+//     final centerBL = Offset(0, size.height);
+//     for (double r = 40.0; r <= 220.0; r += 16.0) {
+//       canvas.drawCircle(centerBL, r, paint);
+//     }
+//   }
+
+//   @override
+//   bool shouldRepaint(covariant CardPatternPainter oldDelegate) =>
+//       oldDelegate.color != color;
+// }

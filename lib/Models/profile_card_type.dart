@@ -35,4 +35,5 @@ const List<String> assignableProfileFields = [
   'linkedin',
   'twitter',
   'instagram',
+  'spotify',
 ];

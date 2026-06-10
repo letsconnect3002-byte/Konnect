@@ -1,0 +1,1057 @@
+﻿diff --git a/lib/Models/profile_card_type.dart b/lib/Models/profile_card_type.dart
+index 8191910..bb42837 100644
+--- a/lib/Models/profile_card_type.dart
++++ b/lib/Models/profile_card_type.dart
+@@ -35,4 +35,5 @@ const List<String> assignableProfileFields = [
+   'linkedin',
+   'twitter',
+   'instagram',
++  'spotify',
+ ];
+diff --git a/lib/Pages/AuthScreen.dart b/lib/Pages/AuthScreen.dart
+index 34320c6..40de49d 100644
+--- a/lib/Pages/AuthScreen.dart
++++ b/lib/Pages/AuthScreen.dart
+@@ -612,15 +612,15 @@ class _AuthScreenState extends State<AuthScreen> {
+                       ] else ...[
+                         // Main Welcome Headers (Left-aligned)
+                         Text(
+-                          _isSignIn ? "Hey, Emily" : "Let's earn stamps!",
++                          _isSignIn ? "Hey, pull up." : "We're letting you in.",
+                           textAlign: TextAlign.left,
+                           style: context.displayHeader,
+                         ),
+                         const SizedBox(height: 12),
+                         Text(
+                           _isSignIn
+-                              ? "Your close circle, not your contacts list."
+-                              : "Create an account to build your cards & sync contacts.",
++                              ? "back with the real ones."
++                              : "no randoms, no noise. just the people you actually see IRL.",
+                           textAlign: TextAlign.left,
+                           style: context.bodyText
+                               .copyWith(color: context.textSecondary),
+@@ -827,12 +827,13 @@ class _AuthScreenState extends State<AuthScreen> {
+                 duration: const Duration(milliseconds: 200),
+                 alignment: Alignment.center,
+                 decoration: BoxDecoration(
+-                  borderRadius: BorderRadius.circular(AppDimensions.radiusComponent - 4),
++                  borderRadius:
++                      BorderRadius.circular(AppDimensions.radiusComponent - 4),
+                   color:
+                       _isSignIn ? context.surfaceSecondary : Colors.transparent,
+                 ),
+                 child: Text(
+-                  "Sign In",
++                  "I'm in",
+                   style: TextStyle(
+                     color:
+                         _isSignIn ? context.textPrimary : context.textSecondary,
+@@ -859,7 +860,8 @@ class _AuthScreenState extends State<AuthScreen> {
+                 duration: const Duration(milliseconds: 200),
+                 alignment: Alignment.center,
+                 decoration: BoxDecoration(
+-                  borderRadius: BorderRadius.circular(AppDimensions.radiusComponent - 4),
++                  borderRadius:
++                      BorderRadius.circular(AppDimensions.radiusComponent - 4),
+                   color: !_isSignIn
+                       ? context.surfaceSecondary
+                       : Colors.transparent,
+@@ -1013,7 +1015,7 @@ class _AuthScreenState extends State<AuthScreen> {
+         ),
+         onPressed: _submit,
+         child: Text(
+-          _isSignIn ? "Sign In" : "Sign Up",
++          _isSignIn ? "I'm in" : "I'm in",
+           style: context.cardTitle.copyWith(
+             color: Colors.black,
+             fontWeight: FontWeight.bold,
+@@ -1040,17 +1042,11 @@ class _AuthScreenState extends State<AuthScreen> {
+         child: Row(
+           mainAxisAlignment: MainAxisAlignment.center,
+           children: [
+-            Container(
+-              padding: const EdgeInsets.all(2),
+-              decoration: const BoxDecoration(
+-                color: Colors.white,
+-                shape: BoxShape.circle,
+-              ),
+-              child: const Icon(
+-                Icons.g_mobiledata_rounded,
+-                color: Colors.black,
+-                size: 20,
+-              ),
++            Image.asset(
++              'assets/icons/Google-Sign-in.png',
++              width: 22,
++              height: 22,
++              fit: BoxFit.contain,
+             ),
+             const SizedBox(width: 12),
+             Text(
+diff --git a/lib/Pages/ConnectionProfilePage.dart b/lib/Pages/ConnectionProfilePage.dart
+index a22a96a..60d4a7e 100644
+--- a/lib/Pages/ConnectionProfilePage.dart
++++ b/lib/Pages/ConnectionProfilePage.dart
+@@ -24,6 +24,7 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
+ 
+   bool _showFront = true;
+   bool _isLoading = false;
++  Map<String, dynamic>? _fieldAssignments;
+ 
+   late String _name;
+   late String _profession;
+@@ -38,6 +39,8 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
+   late String _instagram;
+   late String _linkedin;
+   late String _twitter;
++  late String _spotify;
++  List<dynamic> _customLinks = [];
+   Map<String, String> _casualFields = {};
+   Map<String, String> _professionalFields = {};
+ 
+@@ -76,6 +79,11 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
+ 
+   Future<void> _loadProfileData() async {
+     final data = widget.profileData;
++    _fieldAssignments = data['field_assignments'] is Map<String, dynamic>
++        ? data['field_assignments'] as Map<String, dynamic>
++        : (data['field_assignments'] is String
++            ? jsonDecode(data['field_assignments'] as String) as Map<String, dynamic>
++            : null);
+     _name = data['name'] ?? '';
+     _profession = data['profession'] ?? '';
+     _company = data['company'] ?? '';
+@@ -93,6 +101,10 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
+     _instagram = data['instagram'] ?? '';
+     _linkedin = data['linkedin'] ?? '';
+     _twitter = data['twitter'] ?? '';
++    _spotify = data['spotify'] ?? '';
++    _customLinks = data['custom_links'] != null
++        ? List<dynamic>.from(data['custom_links'] as List)
++        : [];
+ 
+     // Fallbacks for skeleton loading shapes
+     if (_name.isEmpty) _name = "Jane Doe";
+@@ -112,6 +124,7 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
+     if (_instagram.isEmpty) _instagram = "instagram_handle";
+     if (_linkedin.isEmpty) _linkedin = "linkedin_handle";
+     if (_twitter.isEmpty) _twitter = "twitter_handle";
++    if (_spotify.isEmpty) _spotify = "";
+ 
+     final String initialProfEmail = _professionalEmail;
+     final String initialProfPhone = _professionalPhoneNumber;
+@@ -122,6 +135,7 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
+       'instagram': _instagram,
+       'linkedin': _linkedin,
+       'twitter': _twitter,
++      'spotify': _spotify,
+       'bio': _bio,
+     };
+     _professionalFields = {
+@@ -130,6 +144,7 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
+       'instagram': _instagram,
+       'linkedin': _linkedin,
+       'twitter': _twitter,
++      'spotify': _spotify,
+       'bio': _professionalBio,
+     };
+ 
+@@ -157,6 +172,7 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
+                       : null);
+ 
+           setState(() {
++            _fieldAssignments = fieldAssignments;
+             _name = response['name'] ?? '';
+             _avatarUrl = response['avatar_url'] ?? '';
+             _profession = response['profession'] ?? '';
+@@ -196,8 +212,18 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
+                 response['twitter'] ?? '',
+                 _sharedCardPermission,
+                 fieldAssignments);
++            _spotify = ProfileFieldFilter.getVisibleValue(
++                'spotify',
++                response['spotify'] ?? '',
++                _sharedCardPermission,
++                fieldAssignments);
+             _bio = ProfileFieldFilter.getVisibleValue('bio',
+                 response['bio'] ?? '', _sharedCardPermission, fieldAssignments);
++            _customLinks = response['custom_links'] != null
++                ? List<dynamic>.from(response['custom_links'] is String
++                    ? jsonDecode(response['custom_links'] as String) as List<dynamic>
++                    : response['custom_links'] as List<dynamic>)
++                : [];
+           });
+ 
+           // Build per-card filtered field sets
+@@ -237,6 +263,7 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
+                   filterField('instagram', response['instagram'] ?? ''),
+               'linkedin': filterField('linkedin', response['linkedin'] ?? ''),
+               'twitter': filterField('twitter', response['twitter'] ?? ''),
++              'spotify': filterField('spotify', response['spotify'] ?? ''),
+               'bio': filterField('bio', response['bio'] ?? ''),
+             };
+ 
+@@ -255,6 +282,7 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
+               'linkedin':
+                   filterFieldPro('linkedin', response['linkedin'] ?? ''),
+               'twitter': filterFieldPro('twitter', response['twitter'] ?? ''),
++              'spotify': filterFieldPro('spotify', response['spotify'] ?? ''),
+               'bio': filterFieldPro('professionalBio', rawProfBio),
+             };
+           });
+@@ -1293,32 +1321,54 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
+     final linkedinLogo = Container(
+       width: 36,
+       height: 36,
+-      decoration: const BoxDecoration(
+-        color: Color(0xFF0077B5),
++      decoration: BoxDecoration(
++        color: Colors.white.withValues(alpha: 0.08),
+         shape: BoxShape.circle,
+       ),
+-      child: const Icon(Icons.link_rounded, color: Colors.white, size: 18),
++      // padding: const EdgeInsets.all(8),
++      child: Image.asset(
++        'assets/icons/linkedin.png',
++        fit: BoxFit.contain,
++      ),
+     );
+     final twitterLogo = Container(
+       width: 36,
+       height: 36,
+-      decoration: const BoxDecoration(
+-        color: Color(0xFF1DA1F2),
++      decoration: BoxDecoration(
++        color: Colors.white.withValues(alpha: 0.08),
+         shape: BoxShape.circle,
+       ),
+-      child: const Icon(Icons.share_rounded, color: Colors.white, size: 18),
++      // padding: const EdgeInsets.all(8),
++      child: Image.asset(
++        'assets/icons/twitter.png',
++        fit: BoxFit.contain,
++      ),
+     );
+     final instagramLogo = Container(
+       width: 36,
+       height: 36,
+-      decoration: const BoxDecoration(
+-        gradient: LinearGradient(
+-          colors: [Color(0xFFF58529), Color(0xFFDD2A7B), Color(0xFF8134AF)],
+-        ),
++      decoration: BoxDecoration(
++        color: Colors.white.withValues(alpha: 0.08),
++        shape: BoxShape.circle,
++      ),
++      // padding: const EdgeInsets.all(8),
++      child: Image.asset(
++        'assets/icons/instagram.png',
++        fit: BoxFit.contain,
++      ),
++    );
++    final spotifyLogo = Container(
++      width: 36,
++      height: 36,
++      decoration: BoxDecoration(
++        color: Colors.white.withValues(alpha: 0.08),
+         shape: BoxShape.circle,
+       ),
+-      child:
+-          const Icon(Icons.camera_alt_rounded, color: Colors.white, size: 18),
++      padding: const EdgeInsets.all(8),
++      child: Image.asset(
++        'assets/icons/spotify.png',
++        fit: BoxFit.contain,
++      ),
+     );
+ 
+     return Scaffold(
+@@ -1445,6 +1495,7 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
+                           linkedinLogo: linkedinLogo,
+                           twitterLogo: twitterLogo,
+                           instagramLogo: instagramLogo,
++                          spotifyLogo: spotifyLogo,
+                         )
+                       else ...[
+                         _buildReadOnlyField(
+@@ -1468,6 +1519,7 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
+                           _activeFields['linkedin'] ?? '',
+                           _activeFields['twitter'] ?? '',
+                           _activeFields['instagram'] ?? '',
++                          _activeFields['spotify'] ?? '',
+                         ].any((v) => v.trim().isNotEmpty)) ...[
+                           const SizedBox(height: 16),
+                           Text(
+@@ -1494,8 +1546,16 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
+                             handle: _activeFields['instagram'] ?? '',
+                             logo: instagramLogo,
+                           ),
++                          _buildSocialCard(
++                            title: 'Spotify',
++                            handle: _activeFields['spotify'] ?? '',
++                            logo: spotifyLogo,
++                          ),
+                         ],
+                       ],
++
++                      // CUSTOM LINKS
++                      ..._buildCustomLinksList(_fieldAssignments),
+                       const SizedBox(height: 32),
+                     ],
+                   ),
+@@ -1590,6 +1650,7 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
+     required Widget linkedinLogo,
+     required Widget twitterLogo,
+     required Widget instagramLogo,
++    required Widget spotifyLogo,
+   }) {
+     final widgets = <Widget>[];
+ 
+@@ -1626,7 +1687,7 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
+     addField('phoneNumber', 'Phone Number', Icons.phone_android_outlined);
+     addField('bio', 'Bio', Icons.description_outlined);
+ 
+-    // --- Social handles ---
++    // --- Helper to emit social card row. ---
+     void addSocial(String key, String title, Widget logo) {
+       final casual = casualFields[key]?.trim() ?? '';
+       final professional = professionalFields[key]?.trim() ?? '';
+@@ -1661,6 +1722,8 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
+       professionalFields['twitter'],
+       casualFields['instagram'],
+       professionalFields['instagram'],
++      casualFields['spotify'],
++      professionalFields['spotify'],
+     ].any((v) => (v ?? '').trim().isNotEmpty);
+ 
+     if (hasAnySocial) {
+@@ -1677,6 +1740,72 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
+       addSocial('linkedin', 'LinkedIn', linkedinLogo);
+       addSocial('twitter', 'Twitter', twitterLogo);
+       addSocial('instagram', 'Instagram', instagramLogo);
++      addSocial('spotify', 'Spotify', spotifyLogo);
++    }
++
++    return widgets;
++  }
++
++  List<Widget> _buildCustomLinksList(dynamic fieldAssignments) {
++    final widgets = <Widget>[];
++
++    // Filter links based on visibility
++    final visibleLinks = _customLinks.where((link) {
++      final String linkId = link['id'] ?? '';
++      return ProfileFieldFilter.isFieldVisible(linkId, _sharedCardPermission, fieldAssignments);
++    }).toList();
++
++    if (visibleLinks.isEmpty) return widgets;
++
++    widgets.add(const SizedBox(height: 24));
++    widgets.add(Text(
++      'CUSTOM LINKS',
++      style: context.captionText.copyWith(
++        color: context.textSecondary,
++        fontWeight: FontWeight.bold,
++        letterSpacing: 1.5,
++      ),
++    ));
++    widgets.add(const SizedBox(height: 16));
++
++    for (final link in visibleLinks) {
++      final String name = link['name'] ?? '';
++      final String url = link['url'] ?? '';
++      final String id = link['id'] ?? '';
++
++      String label = name;
++      if (_sharedCardPermission == 'both') {
++        final assignments = ProfileFieldFilter.parseFieldAssignments(fieldAssignments);
++        final assignment = assignments != null ? assignments[id] : null;
++        final isC = assignment != null && assignment['c'] == true;
++        final isP = assignment != null && assignment['p'] == true;
++        if (isC && !isP) {
++          label = '$name (Casual)';
++        } else if (isP && !isC) {
++          label = '$name (Professional)';
++        }
++      }
++
++      final globeLogo = Container(
++        width: 36,
++        height: 36,
++        decoration: BoxDecoration(
++          color: Colors.white.withValues(alpha: 0.08),
++          shape: BoxShape.circle,
++        ),
++        padding: const EdgeInsets.all(8),
++        child: Icon(
++          Icons.language_rounded,
++          color: context.accentSecondary,
++          size: 20,
++        ),
++      );
++
++      widgets.add(_buildSocialCard(
++        title: label,
++        handle: url,
++        logo: globeLogo,
++      ));
+     }
+ 
+     return widgets;
+diff --git a/lib/Pages/ProfilePage.dart b/lib/Pages/ProfilePage.dart
+index 784fa69..6684200 100644
+--- a/lib/Pages/ProfilePage.dart
++++ b/lib/Pages/ProfilePage.dart
+@@ -1318,8 +1318,8 @@ class _ProfilePageState extends State<ProfilePage> {
+         scanCard,
+         const SizedBox(height: gap),
+         shareCard,
+-        // const SizedBox(height: gap),
+-        // blurCard,
++        const SizedBox(height: gap),
++        blurCard,
+       ],
+     );
+   }
+diff --git a/lib/Pages/yet_to_be_built_profile_page.dart b/lib/Pages/yet_to_be_built_profile_page.dart
+index ab9e494..5025fe7 100644
+--- a/lib/Pages/yet_to_be_built_profile_page.dart
++++ b/lib/Pages/yet_to_be_built_profile_page.dart
+@@ -1,5 +1,6 @@
+ import 'package:connect/Config/app_theme.dart';
+ import 'package:connect/Models/profile_card_type.dart';
++import 'package:connect/Models/custom_link.dart';
+ import 'package:connect/Providers/profile_provider.dart';
+ import 'package:connect/Widgets/card_field_input.dart';
+ import 'package:flutter/material.dart';
+@@ -738,6 +739,9 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
+                     const SizedBox(height: 32),
+ 
+                     _buildSocialLinksSection(),
++                    const SizedBox(height: 32),
++
++                    _buildCustomLinksSection(),
+                     const SizedBox(height: 16),
+ 
+                     _buildSaveButton(),
+@@ -769,20 +773,14 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
+     final linkedinLogo = Container(
+       width: 36,
+       height: 36,
+-      decoration: const BoxDecoration(
+-        color: Color(0xFFD946EF),
++      decoration: BoxDecoration(
++        color: Colors.white,
+         shape: BoxShape.circle,
+       ),
+-      child: const Center(
+-        child: Text(
+-          "in",
+-          style: TextStyle(
+-            color: Colors.white,
+-            fontWeight: FontWeight.w900,
+-            fontSize: 16,
+-            fontFamily: "Inter",
+-          ),
+-        ),
++      // padding: const EdgeInsets.all(8),
++      child: Image.asset(
++        'assets/icons/linkedin.png',
++        fit: BoxFit.contain,
+       ),
+     );
+ 
+@@ -790,16 +788,14 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
+     final twitterLogo = Container(
+       width: 36,
+       height: 36,
+-      decoration: const BoxDecoration(
+-        color: Color(0xFF1DA1F2),
++      decoration: BoxDecoration(
++        color: Colors.white.withValues(alpha: 0.08),
+         shape: BoxShape.circle,
+       ),
+-      child: const Center(
+-        child: Icon(
+-          Icons.flutter_dash_rounded,
+-          color: Colors.white,
+-          size: 20,
+-        ),
++      // padding: const EdgeInsets.all(8),
++      child: Image.asset(
++        'assets/icons/twitter.png',
++        fit: BoxFit.contain,
+       ),
+     );
+ 
+@@ -837,7 +833,7 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
+         ),
+         _buildSocialCard(
+           fieldKey: 'twitter',
+-          title: 'Twitter',
++          title: 'X (Former Twitter)',
+           handle: provider.twitter,
+           logo: twitterLogo,
+           onEdit: () =>
+@@ -850,22 +846,39 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
+           logo: Container(
+             width: 36,
+             height: 36,
+-            decoration: const BoxDecoration(
+-              gradient: LinearGradient(
+-                colors: [
+-                  Color(0xFFF58529),
+-                  Color(0xFFDD2A7B),
+-                  Color(0xFF8134AF)
+-                ],
+-              ),
++            decoration: BoxDecoration(
++              color: Colors.white,
+               shape: BoxShape.circle,
+             ),
+-            child: const Icon(Icons.camera_alt_rounded,
+-                color: Colors.white, size: 18),
++            // padding: const EdgeInsets.all(8),
++            child: Image.asset(
++              'assets/icons/instagram.png',
++              fit: BoxFit.contain,
++            ),
+           ),
+           onEdit: () => _showEditSocialDialog(
+               'Instagram', 'instagram', provider.instagram),
+         ),
++        _buildSocialCard(
++          fieldKey: 'spotify',
++          title: 'Spotify',
++          handle: provider.spotify,
++          logo: Container(
++            width: 36,
++            height: 36,
++            decoration: BoxDecoration(
++              color: Colors.white,
++              shape: BoxShape.circle,
++            ),
++            // padding: const EdgeInsets.all(8),
++            child: Image.asset(
++              'assets/icons/spotify.png',
++              fit: BoxFit.contain,
++            ),
++          ),
++          onEdit: () =>
++              _showEditSocialDialog('Spotify', 'spotify', provider.spotify),
++        ),
+       ],
+     );
+   }
+@@ -3309,6 +3322,223 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
+       ),
+     );
+   }
++
++  Widget _buildCustomLinksSection() {
++    final provider = Provider.of<ProfileProvider>(context);
++
++    return Column(
++      crossAxisAlignment: CrossAxisAlignment.start,
++      children: [
++        Row(
++          mainAxisAlignment: MainAxisAlignment.spaceBetween,
++          children: [
++            Row(
++              children: [
++                Icon(Icons.language_rounded,
++                    color: context.accentSecondary, size: 18),
++                const SizedBox(width: 8),
++                Text(
++                  'CUSTOM LINKS',
++                  style: context.captionText.copyWith(
++                    color: context.textSecondary,
++                    fontSize: 14.0,
++                    letterSpacing: 1.5,
++                  ),
++                ),
++              ],
++            ),
++            TextButton.icon(
++              onPressed: () => _showCustomLinkDialog(),
++              icon: Icon(Icons.add_circle_outline_rounded,
++                  color: context.accentSecondary, size: 18),
++              label: Text(
++                "Add New",
++                style: TextStyle(
++                  color: context.accentSecondary,
++                  fontWeight: FontWeight.bold,
++                  fontSize: 12,
++                ),
++              ),
++            ),
++          ],
++        ),
++        const SizedBox(height: 12),
++        if (provider.customLinks.isEmpty)
++          Container(
++            padding: const EdgeInsets.all(24),
++            decoration: BoxDecoration(
++              color: context.surfacePrimary,
++              borderRadius: BorderRadius.circular(16),
++              border:
++                  Border.all(color: context.textMuted.withValues(alpha: 0.2)),
++            ),
++            child: Center(
++              child: Text(
++                "No custom links added yet. Tap 'Add New' to share websites, portfolios, or other links.",
++                textAlign: TextAlign.center,
++                style: context.bodyText.copyWith(
++                  color: context.textMuted,
++                  fontSize: 13,
++                ),
++              ),
++            ),
++          )
++        else
++          ...provider.customLinks.map((link) {
++            final globeLogo = Container(
++              width: 36,
++              height: 36,
++              decoration: const BoxDecoration(
++                color: Colors.white,
++                shape: BoxShape.circle,
++              ),
++              child: Icon(
++                Icons.language_rounded,
++                color: context.accentSecondary,
++                size: 20,
++              ),
++            );
++
++            return _buildSocialCard(
++              fieldKey: link.id,
++              title: link.name,
++              handle: link.url,
++              logo: globeLogo,
++              onEdit: () => _showCustomLinkDialog(existingLink: link),
++            );
++          }),
++      ],
++    );
++  }
++
++  void _showCustomLinkDialog({CustomLink? existingLink}) {
++    final nameController =
++        TextEditingController(text: existingLink?.name ?? '');
++    final urlController = TextEditingController(text: existingLink?.url ?? '');
++
++    showDialog(
++      context: context,
++      builder: (context) {
++        return AlertDialog(
++          backgroundColor: context.surfacePrimary,
++          shape: RoundedRectangleBorder(
++            borderRadius:
++                BorderRadius.circular(AppDimensions.radiusPremiumCard),
++            side: BorderSide(
++              color: context.textMuted.withValues(alpha: 0.2),
++              width: 1.0,
++            ),
++          ),
++          title: Text(
++            existingLink == null ? "Add Custom Link" : "Edit Custom Link",
++            style: context.cardTitle.copyWith(
++              color: context.textPrimary,
++              fontWeight: FontWeight.bold,
++            ),
++          ),
++          content: Column(
++            mainAxisSize: MainAxisSize.min,
++            children: [
++              TextField(
++                controller: nameController,
++                style: TextStyle(color: context.textPrimary),
++                cursorColor: context.accentPrimary,
++                decoration: InputDecoration(
++                  hintText: "Link Name (e.g., Portfolio, Website)",
++                  hintStyle: TextStyle(color: context.textMuted),
++                  filled: true,
++                  fillColor: context.surfaceSecondary,
++                  focusedBorder: OutlineInputBorder(
++                    borderRadius:
++                        BorderRadius.circular(AppDimensions.radiusComponent),
++                    borderSide:
++                        BorderSide(color: context.accentPrimary, width: 1),
++                  ),
++                  enabledBorder: OutlineInputBorder(
++                    borderRadius:
++                        BorderRadius.circular(AppDimensions.radiusComponent),
++                    borderSide: BorderSide(
++                        color: context.textMuted.withValues(alpha: 0.2)),
++                  ),
++                ),
++              ),
++              const SizedBox(height: 12),
++              TextField(
++                controller: urlController,
++                style: TextStyle(color: context.textPrimary),
++                cursorColor: context.accentPrimary,
++                decoration: InputDecoration(
++                  hintText: "URL (e.g., https://mywebsite.com)",
++                  hintStyle: TextStyle(color: context.textMuted),
++                  filled: true,
++                  fillColor: context.surfaceSecondary,
++                  focusedBorder: OutlineInputBorder(
++                    borderRadius:
++                        BorderRadius.circular(AppDimensions.radiusComponent),
++                    borderSide:
++                        BorderSide(color: context.accentPrimary, width: 1),
++                  ),
++                  enabledBorder: OutlineInputBorder(
++                    borderRadius:
++                        BorderRadius.circular(AppDimensions.radiusComponent),
++                    borderSide: BorderSide(
++                        color: context.textMuted.withValues(alpha: 0.2)),
++                  ),
++                ),
++              ),
++            ],
++          ),
++          actions: [
++            if (existingLink != null)
++              TextButton(
++                onPressed: () async {
++                  final provider =
++                      Provider.of<ProfileProvider>(context, listen: false);
++                  await provider.removeCustomLink(
++                      existingLink.id, provider.userId);
++                  if (context.mounted) Navigator.pop(context);
++                },
++                child: const Text("Delete",
++                    style: TextStyle(color: Colors.redAccent)),
++              ),
++            TextButton(
++              onPressed: () => Navigator.pop(context),
++              child: Text("Cancel",
++                  style: TextStyle(color: context.textSecondary)),
++            ),
++            ElevatedButton(
++              onPressed: () async {
++                final nameVal = nameController.text.trim();
++                final urlVal = urlController.text.trim();
++                if (nameVal.isEmpty || urlVal.isEmpty) return;
++
++                final provider =
++                    Provider.of<ProfileProvider>(context, listen: false);
++                if (existingLink == null) {
++                  await provider.addCustomLink(
++                      nameVal, urlVal, provider.userId);
++                } else {
++                  await provider.editCustomLink(
++                      existingLink.id, nameVal, urlVal, provider.userId);
++                }
++                if (context.mounted) Navigator.pop(context);
++              },
++              style: ElevatedButton.styleFrom(
++                backgroundColor: context.accentSecondary,
++                shape: RoundedRectangleBorder(
++                  borderRadius:
++                      BorderRadius.circular(AppDimensions.radiusComponent),
++                ),
++              ),
++              child: const Text("Save",
++                  style: TextStyle(
++                      color: Colors.white, fontWeight: FontWeight.bold)),
++            ),
++          ],
++        );
++      },
++    );
++  }
+ }
+ 
+ class CountryInfo {
+@@ -3621,3 +3851,32 @@ class CardPatternPainter extends CustomPainter {
+   bool shouldRepaint(covariant CardPatternPainter oldDelegate) =>
+       oldDelegate.color != color;
+ }
++
++// class CardPatternPainter extends CustomPainter {
++//   final Color color;
++//   CardPatternPainter({required this.color});
++
++//   @override
++//   void paint(Canvas canvas, Size size) {
++//     final paint = Paint()
++//       ..color = color
++//       ..style = PaintingStyle.stroke
++//       ..strokeWidth = 1.0;
++
++//     // Draw concentric circles in the top right corner
++//     final centerTR = Offset(size.width, 0);
++//     for (double r = 40.0; r <= 220.0; r += 16.0) {
++//       canvas.drawCircle(centerTR, r, paint);
++//     }
++
++//     // Draw concentric circles in the bottom left corner
++//     final centerBL = Offset(0, size.height);
++//     for (double r = 40.0; r <= 220.0; r += 16.0) {
++//       canvas.drawCircle(centerBL, r, paint);
++//     }
++//   }
++
++//   @override
++//   bool shouldRepaint(covariant CardPatternPainter oldDelegate) =>
++//       oldDelegate.color != color;
++// }
+diff --git a/lib/Providers/profile_provider.dart b/lib/Providers/profile_provider.dart
+index ed7b9bf..5dcf269 100644
+--- a/lib/Providers/profile_provider.dart
++++ b/lib/Providers/profile_provider.dart
+@@ -3,6 +3,7 @@ import 'dart:math';
+ 
+ import 'package:connect/Models/profile_card_type.dart';
+ import 'package:connect/Models/app_error.dart';
++import 'package:connect/Models/custom_link.dart';
+ import 'package:connect/Repositories/profile_repository.dart';
+ import 'package:flutter/material.dart';
+ import 'package:supabase_flutter/supabase_flutter.dart';
+@@ -58,6 +59,8 @@ class ProfileProvider with ChangeNotifier {
+   String professionalBio = '';
+   String avatarUrl = '';
+   String gender = '';
++  String spotify = '';
++  List<CustomLink> customLinks = [];
+   bool showProfileToConnections = true;
+ 
+   String? _ownerId;
+@@ -102,11 +105,13 @@ class ProfileProvider with ChangeNotifier {
+     instagram = '';
+     linkedin = '';
+     twitter = '';
++    spotify = '';
+     company = '';
+     bio = '';
+     professionalBio = '';
+     avatarUrl = '';
+     gender = '';
++    customLinks = [];
+   }
+ 
+   // Which card(s) each field appears on (Casual / Professional).
+@@ -130,6 +135,9 @@ class ProfileProvider with ChangeNotifier {
+   }
+ 
+   bool isFieldOnCard(String field, ProfileCardType card) {
++    _ensureDefaultFieldAssignments();
++    fieldAssignments.putIfAbsent(
++        field, () => FieldCardAssignment(casual: false, professional: true));
+     final assignment = fieldAssignments[field];
+     if (assignment == null) return card == ProfileCardType.professional;
+     return card == ProfileCardType.casual
+@@ -139,6 +147,8 @@ class ProfileProvider with ChangeNotifier {
+ 
+   Future<void> toggleFieldOnCard(String field, ProfileCardType card) async {
+     _ensureDefaultFieldAssignments();
++    fieldAssignments.putIfAbsent(
++        field, () => FieldCardAssignment(casual: false, professional: true));
+     final current = fieldAssignments[field]!;
+     if (card == ProfileCardType.casual) {
+       fieldAssignments[field] = current.copyWith(casual: !current.casual);
+@@ -164,6 +174,8 @@ class ProfileProvider with ChangeNotifier {
+   Future<void> setFieldOnCard(
+       String field, ProfileCardType card, bool enabled) async {
+     _ensureDefaultFieldAssignments();
++    fieldAssignments.putIfAbsent(
++        field, () => FieldCardAssignment(casual: false, professional: true));
+     final current = fieldAssignments[field]!;
+     if (card == ProfileCardType.casual) {
+       fieldAssignments[field] = current.copyWith(casual: enabled);
+@@ -213,6 +225,8 @@ class ProfileProvider with ChangeNotifier {
+         return twitter;
+       case 'instagram':
+         return instagram;
++      case 'spotify':
++        return spotify;
+       default:
+         return null;
+     }
+@@ -311,6 +325,9 @@ class ProfileProvider with ChangeNotifier {
+       case 'gender':
+         gender = value;
+         break;
++      case 'spotify':
++        spotify = value;
++        break;
+     }
+     notifyListeners();
+   }
+@@ -343,6 +360,40 @@ class ProfileProvider with ChangeNotifier {
+     notifyListeners();
+   }
+ 
++  Future<void> addCustomLink(String name, String url, int? profileId) async {
++    final newLink = CustomLink(
++      id: 'custom_link_${DateTime.now().millisecondsSinceEpoch}',
++      name: name,
++      url: url,
++    );
++    customLinks.add(newLink);
++    fieldAssignments[newLink.id] = FieldCardAssignment(casual: false, professional: true);
++    notifyListeners();
++    if (profileId != null) {
++      await saveOrUpdateProfile();
++    }
++  }
++
++  Future<void> editCustomLink(String id, String name, String url, int? profileId) async {
++    final idx = customLinks.indexWhere((l) => l.id == id);
++    if (idx != -1) {
++      customLinks[idx] = customLinks[idx].copyWith(name: name, url: url);
++      notifyListeners();
++      if (profileId != null) {
++        await saveOrUpdateProfile();
++      }
++    }
++  }
++
++  Future<void> removeCustomLink(String id, int? profileId) async {
++    customLinks.removeWhere((l) => l.id == id);
++    fieldAssignments.remove(id);
++    notifyListeners();
++    if (profileId != null) {
++      await saveOrUpdateProfile();
++    }
++  }
++
+   Future<void> setShowProfileToConnections(bool value) async {
+     showProfileToConnections = value;
+     notifyListeners();
+@@ -422,11 +473,12 @@ class ProfileProvider with ChangeNotifier {
+       "instagram": "",
+       "linkedin": "",
+       "twitter": "",
+-      "company": "",
++      "spotify": "",
+       "bio": "",
+       "professionalBio": "",
+       "avatarUrl": "",
+       "gender": "",
++      "custom_links": [],
+       "showProfileToConnections": true
+     };
+     try {
+@@ -450,6 +502,7 @@ class ProfileProvider with ChangeNotifier {
+         instagram = response['instagram'] ?? '';
+         linkedin = response['linkedin'] ?? '';
+         twitter = response['twitter'] ?? '';
++        spotify = response['spotify'] ?? '';
+         company = response['company'] ?? '';
+         bio = response['bio'] ?? '';
+         professionalBio = response['professional_bio'] ?? '';
+@@ -458,6 +511,18 @@ class ProfileProvider with ChangeNotifier {
+         showProfileToConnections =
+             response['show_profile_to_connections'] == true;
+ 
++        customLinks = [];
++        if (response['custom_links'] != null) {
++          try {
++            final List<dynamic> decoded = response['custom_links'] is String
++                ? jsonDecode(response['custom_links'] as String) as List<dynamic>
++                : response['custom_links'] as List<dynamic>;
++            customLinks = decoded.map((item) => CustomLink.fromJson(item as Map<String, dynamic>)).toList();
++          } catch (e) {
++            print("Error parsing custom_links: $e");
++          }
++        }
++
+         profileData["name"] = name;
+         profileData["profession"] = profession;
+         profileData["email"] = email;
+@@ -467,11 +532,13 @@ class ProfileProvider with ChangeNotifier {
+         profileData["instagram"] = instagram;
+         profileData["linkedin"] = linkedin;
+         profileData["twitter"] = twitter;
++        profileData["spotify"] = spotify;
+         profileData["company"] = company;
+         profileData["bio"] = bio;
+         profileData["professionalBio"] = professionalBio;
+         profileData["avatarUrl"] = avatarUrl;
+         profileData["gender"] = gender;
++        profileData["custom_links"] = customLinks.map((l) => l.toJson()).toList();
+         profileData["showProfileToConnections"] = showProfileToConnections;
+ 
+         _setLoadedState(id, true);
+@@ -528,6 +595,7 @@ class ProfileProvider with ChangeNotifier {
+           'instagram': instagram,
+           'linkedin': linkedin,
+           'twitter': twitter,
++          'spotify': spotify,
+           'is_my_profile': isMyProfile,
+           'company': company,
+           'bio': bio,
+@@ -536,6 +604,7 @@ class ProfileProvider with ChangeNotifier {
+           'gender': gender,
+           'show_profile_to_connections': showProfileToConnections,
+           'field_assignments': assignmentsMap,
++          'custom_links': customLinks.map((l) => l.toJson()).toList(),
+         });
+ 
+         _setLoadedState(insertedId, true);
+@@ -564,12 +633,14 @@ class ProfileProvider with ChangeNotifier {
+       'instagram': instagram,
+       'linkedin': linkedin,
+       'twitter': twitter,
++      'spotify': spotify,
+       'company': company,
+       'bio': bio,
+       'professional_bio': professionalBio,
+       'avatar_url': avatarUrl,
+       'show_profile_to_connections': showProfileToConnections,
+       'field_assignments': assignmentsMap,
++      'custom_links': customLinks.map((l) => l.toJson()).toList(),
+     };
+ 
+     try {
+@@ -604,6 +675,8 @@ class ProfileProvider with ChangeNotifier {
+     instagram = '';
+     linkedin = '';
+     twitter = '';
++    spotify = '';
++    customLinks = [];
+     company = '';
+     bio = '';
+     professionalBio = '';
+@@ -628,6 +701,7 @@ class ProfileProvider with ChangeNotifier {
+           'instagram': response['instagram'] ?? '',
+           'linkedin': response['linkedin'] ?? '',
+           'twitter': response['twitter'] ?? '',
++          'spotify': response['spotify'] ?? '',
+           'isMyProfile': response['is_my_profile'] == true,
+           'created_at': response['created_at'],
+           'company': response['company'] ?? '',
+@@ -641,6 +715,11 @@ class ProfileProvider with ChangeNotifier {
+               : <String>[],
+           'connection_profile_id': response['id'],
+           'field_assignments': response['field_assignments'],
++          'custom_links': response['custom_links'] != null
++              ? (response['custom_links'] is String
++                  ? jsonDecode(response['custom_links'] as String) as List<dynamic>
++                  : response['custom_links'] as List<dynamic>)
++              : <dynamic>[],
+         };
+       }
+     } catch (e) {
+diff --git a/pubspec.yaml b/pubspec.yaml
+index 9d07db9..c8551cb 100644
+--- a/pubspec.yaml
++++ b/pubspec.yaml
+@@ -106,6 +106,11 @@ flutter:
+     - assets/icons/Mandala Icon 1.png
+     - assets/icons/Mandala Icon 1.svg
+     - assets/icons/Mandala Icon 2.png
++    - assets/icons/Google-Sign-in.png
++    - assets/icons/twitter.png
++    - assets/icons/linkedin.png
++    - assets/icons/instagram.png
++    - assets/icons/spotify.png
+ 
+   # An image asset can refer to one or more resolution-specific "variants", see
+   # https://flutter.dev/to/resolution-aware-images

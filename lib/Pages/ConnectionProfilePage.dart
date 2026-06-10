@@ -24,6 +24,7 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
 
   bool _showFront = true;
   bool _isLoading = false;
+  Map<String, dynamic>? _fieldAssignments;
 
   late String _name;
   late String _profession;
@@ -38,6 +39,8 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
   late String _instagram;
   late String _linkedin;
   late String _twitter;
+  late String _spotify;
+  List<dynamic> _customLinks = [];
   Map<String, String> _casualFields = {};
   Map<String, String> _professionalFields = {};
 
@@ -76,6 +79,11 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
 
   Future<void> _loadProfileData() async {
     final data = widget.profileData;
+    _fieldAssignments = data['field_assignments'] is Map<String, dynamic>
+        ? data['field_assignments'] as Map<String, dynamic>
+        : (data['field_assignments'] is String
+            ? jsonDecode(data['field_assignments'] as String) as Map<String, dynamic>
+            : null);
     _name = data['name'] ?? '';
     _profession = data['profession'] ?? '';
     _company = data['company'] ?? '';
@@ -93,6 +101,10 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
     _instagram = data['instagram'] ?? '';
     _linkedin = data['linkedin'] ?? '';
     _twitter = data['twitter'] ?? '';
+    _spotify = data['spotify'] ?? '';
+    _customLinks = data['custom_links'] != null
+        ? List<dynamic>.from(data['custom_links'] as List)
+        : [];
 
     // Fallbacks for skeleton loading shapes
     if (_name.isEmpty) _name = "Jane Doe";
@@ -112,6 +124,7 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
     if (_instagram.isEmpty) _instagram = "instagram_handle";
     if (_linkedin.isEmpty) _linkedin = "linkedin_handle";
     if (_twitter.isEmpty) _twitter = "twitter_handle";
+    if (_spotify.isEmpty) _spotify = "";
 
     final String initialProfEmail = _professionalEmail;
     final String initialProfPhone = _professionalPhoneNumber;
@@ -122,6 +135,7 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
       'instagram': _instagram,
       'linkedin': _linkedin,
       'twitter': _twitter,
+      'spotify': _spotify,
       'bio': _bio,
     };
     _professionalFields = {
@@ -130,6 +144,7 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
       'instagram': _instagram,
       'linkedin': _linkedin,
       'twitter': _twitter,
+      'spotify': _spotify,
       'bio': _professionalBio,
     };
 
@@ -157,6 +172,7 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
                       : null);
 
           setState(() {
+            _fieldAssignments = fieldAssignments;
             _name = response['name'] ?? '';
             _avatarUrl = response['avatar_url'] ?? '';
             _profession = response['profession'] ?? '';
@@ -196,8 +212,18 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
                 response['twitter'] ?? '',
                 _sharedCardPermission,
                 fieldAssignments);
+            _spotify = ProfileFieldFilter.getVisibleValue(
+                'spotify',
+                response['spotify'] ?? '',
+                _sharedCardPermission,
+                fieldAssignments);
             _bio = ProfileFieldFilter.getVisibleValue('bio',
                 response['bio'] ?? '', _sharedCardPermission, fieldAssignments);
+            _customLinks = response['custom_links'] != null
+                ? List<dynamic>.from(response['custom_links'] is String
+                    ? jsonDecode(response['custom_links'] as String) as List<dynamic>
+                    : response['custom_links'] as List<dynamic>)
+                : [];
           });
 
           // Build per-card filtered field sets
@@ -237,6 +263,7 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
                   filterField('instagram', response['instagram'] ?? ''),
               'linkedin': filterField('linkedin', response['linkedin'] ?? ''),
               'twitter': filterField('twitter', response['twitter'] ?? ''),
+              'spotify': filterField('spotify', response['spotify'] ?? ''),
               'bio': filterField('bio', response['bio'] ?? ''),
             };
 
@@ -255,6 +282,7 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
               'linkedin':
                   filterFieldPro('linkedin', response['linkedin'] ?? ''),
               'twitter': filterFieldPro('twitter', response['twitter'] ?? ''),
+              'spotify': filterFieldPro('spotify', response['spotify'] ?? ''),
               'bio': filterFieldPro('professionalBio', rawProfBio),
             };
           });
@@ -1293,32 +1321,54 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
     final linkedinLogo = Container(
       width: 36,
       height: 36,
-      decoration: const BoxDecoration(
-        color: Color(0xFF0077B5),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.08),
         shape: BoxShape.circle,
       ),
-      child: const Icon(Icons.link_rounded, color: Colors.white, size: 18),
+      // padding: const EdgeInsets.all(8),
+      child: Image.asset(
+        'assets/icons/linkedin.png',
+        fit: BoxFit.contain,
+      ),
     );
     final twitterLogo = Container(
       width: 36,
       height: 36,
-      decoration: const BoxDecoration(
-        color: Color(0xFF1DA1F2),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.08),
         shape: BoxShape.circle,
       ),
-      child: const Icon(Icons.share_rounded, color: Colors.white, size: 18),
+      // padding: const EdgeInsets.all(8),
+      child: Image.asset(
+        'assets/icons/twitter.png',
+        fit: BoxFit.contain,
+      ),
     );
     final instagramLogo = Container(
       width: 36,
       height: 36,
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          colors: [Color(0xFFF58529), Color(0xFFDD2A7B), Color(0xFF8134AF)],
-        ),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.08),
         shape: BoxShape.circle,
       ),
-      child:
-          const Icon(Icons.camera_alt_rounded, color: Colors.white, size: 18),
+      // padding: const EdgeInsets.all(8),
+      child: Image.asset(
+        'assets/icons/instagram.png',
+        fit: BoxFit.contain,
+      ),
+    );
+    final spotifyLogo = Container(
+      width: 36,
+      height: 36,
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.08),
+        shape: BoxShape.circle,
+      ),
+      padding: const EdgeInsets.all(8),
+      child: Image.asset(
+        'assets/icons/spotify.png',
+        fit: BoxFit.contain,
+      ),
     );
 
     return Scaffold(
@@ -1445,6 +1495,7 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
                           linkedinLogo: linkedinLogo,
                           twitterLogo: twitterLogo,
                           instagramLogo: instagramLogo,
+                          spotifyLogo: spotifyLogo,
                         )
                       else ...[
                         _buildReadOnlyField(
@@ -1468,6 +1519,7 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
                           _activeFields['linkedin'] ?? '',
                           _activeFields['twitter'] ?? '',
                           _activeFields['instagram'] ?? '',
+                          _activeFields['spotify'] ?? '',
                         ].any((v) => v.trim().isNotEmpty)) ...[
                           const SizedBox(height: 16),
                           Text(
@@ -1494,8 +1546,16 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
                             handle: _activeFields['instagram'] ?? '',
                             logo: instagramLogo,
                           ),
+                          _buildSocialCard(
+                            title: 'Spotify',
+                            handle: _activeFields['spotify'] ?? '',
+                            logo: spotifyLogo,
+                          ),
                         ],
                       ],
+
+                      // CUSTOM LINKS
+                      ..._buildCustomLinksList(_fieldAssignments),
                       const SizedBox(height: 32),
                     ],
                   ),
@@ -1590,6 +1650,7 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
     required Widget linkedinLogo,
     required Widget twitterLogo,
     required Widget instagramLogo,
+    required Widget spotifyLogo,
   }) {
     final widgets = <Widget>[];
 
@@ -1626,7 +1687,7 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
     addField('phoneNumber', 'Phone Number', Icons.phone_android_outlined);
     addField('bio', 'Bio', Icons.description_outlined);
 
-    // --- Social handles ---
+    // --- Helper to emit social card row. ---
     void addSocial(String key, String title, Widget logo) {
       final casual = casualFields[key]?.trim() ?? '';
       final professional = professionalFields[key]?.trim() ?? '';
@@ -1661,6 +1722,8 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
       professionalFields['twitter'],
       casualFields['instagram'],
       professionalFields['instagram'],
+      casualFields['spotify'],
+      professionalFields['spotify'],
     ].any((v) => (v ?? '').trim().isNotEmpty);
 
     if (hasAnySocial) {
@@ -1677,6 +1740,72 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
       addSocial('linkedin', 'LinkedIn', linkedinLogo);
       addSocial('twitter', 'Twitter', twitterLogo);
       addSocial('instagram', 'Instagram', instagramLogo);
+      addSocial('spotify', 'Spotify', spotifyLogo);
+    }
+
+    return widgets;
+  }
+
+  List<Widget> _buildCustomLinksList(dynamic fieldAssignments) {
+    final widgets = <Widget>[];
+
+    // Filter links based on visibility
+    final visibleLinks = _customLinks.where((link) {
+      final String linkId = link['id'] ?? '';
+      return ProfileFieldFilter.isFieldVisible(linkId, _sharedCardPermission, fieldAssignments);
+    }).toList();
+
+    if (visibleLinks.isEmpty) return widgets;
+
+    widgets.add(const SizedBox(height: 24));
+    widgets.add(Text(
+      'CUSTOM LINKS',
+      style: context.captionText.copyWith(
+        color: context.textSecondary,
+        fontWeight: FontWeight.bold,
+        letterSpacing: 1.5,
+      ),
+    ));
+    widgets.add(const SizedBox(height: 16));
+
+    for (final link in visibleLinks) {
+      final String name = link['name'] ?? '';
+      final String url = link['url'] ?? '';
+      final String id = link['id'] ?? '';
+
+      String label = name;
+      if (_sharedCardPermission == 'both') {
+        final assignments = ProfileFieldFilter.parseFieldAssignments(fieldAssignments);
+        final assignment = assignments != null ? assignments[id] : null;
+        final isC = assignment != null && assignment['c'] == true;
+        final isP = assignment != null && assignment['p'] == true;
+        if (isC && !isP) {
+          label = '$name (Casual)';
+        } else if (isP && !isC) {
+          label = '$name (Professional)';
+        }
+      }
+
+      final globeLogo = Container(
+        width: 36,
+        height: 36,
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.08),
+          shape: BoxShape.circle,
+        ),
+        padding: const EdgeInsets.all(8),
+        child: Icon(
+          Icons.language_rounded,
+          color: context.accentSecondary,
+          size: 20,
+        ),
+      );
+
+      widgets.add(_buildSocialCard(
+        title: label,
+        handle: url,
+        logo: globeLogo,
+      ));
     }
 
     return widgets;

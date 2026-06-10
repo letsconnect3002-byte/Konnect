@@ -612,15 +612,15 @@ class _AuthScreenState extends State<AuthScreen> {
                       ] else ...[
                         // Main Welcome Headers (Left-aligned)
                         Text(
-                          _isSignIn ? "Hey, Emily" : "Let's earn stamps!",
+                          _isSignIn ? "Hey, pull up." : "We're letting you in.",
                           textAlign: TextAlign.left,
                           style: context.displayHeader,
                         ),
                         const SizedBox(height: 12),
                         Text(
                           _isSignIn
-                              ? "Your close circle, not your contacts list."
-                              : "Create an account to build your cards & sync contacts.",
+                              ? "back with the real ones."
+                              : "no randoms, no noise. just the people you actually see IRL.",
                           textAlign: TextAlign.left,
                           style: context.bodyText
                               .copyWith(color: context.textSecondary),
@@ -827,12 +827,13 @@ class _AuthScreenState extends State<AuthScreen> {
                 duration: const Duration(milliseconds: 200),
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(AppDimensions.radiusComponent - 4),
+                  borderRadius:
+                      BorderRadius.circular(AppDimensions.radiusComponent - 4),
                   color:
                       _isSignIn ? context.surfaceSecondary : Colors.transparent,
                 ),
                 child: Text(
-                  "Sign In",
+                  "I'm in",
                   style: TextStyle(
                     color:
                         _isSignIn ? context.textPrimary : context.textSecondary,
@@ -859,7 +860,8 @@ class _AuthScreenState extends State<AuthScreen> {
                 duration: const Duration(milliseconds: 200),
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(AppDimensions.radiusComponent - 4),
+                  borderRadius:
+                      BorderRadius.circular(AppDimensions.radiusComponent - 4),
                   color: !_isSignIn
                       ? context.surfaceSecondary
                       : Colors.transparent,
@@ -1013,7 +1015,7 @@ class _AuthScreenState extends State<AuthScreen> {
         ),
         onPressed: _submit,
         child: Text(
-          _isSignIn ? "Sign In" : "Sign Up",
+          _isSignIn ? "I'm in" : "I'm in",
           style: context.cardTitle.copyWith(
             color: Colors.black,
             fontWeight: FontWeight.bold,
@@ -1040,17 +1042,11 @@ class _AuthScreenState extends State<AuthScreen> {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Container(
-              padding: const EdgeInsets.all(2),
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.g_mobiledata_rounded,
-                color: Colors.black,
-                size: 20,
-              ),
+            Image.asset(
+              'assets/icons/Google-Sign-in.png',
+              width: 22,
+              height: 22,
+              fit: BoxFit.contain,
             ),
             const SizedBox(width: 12),
             Text(
