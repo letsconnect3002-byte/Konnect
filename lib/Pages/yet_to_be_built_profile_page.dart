@@ -353,16 +353,18 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
+          SnackBar(
             content: Row(
               children: [
-                Icon(Icons.check_circle_rounded, color: Colors.white),
-                SizedBox(width: 8),
+                const Icon(Icons.check_circle_rounded, color: Colors.white),
+                const SizedBox(width: 8),
                 Text("Profile saved successfully!",
-                    style: TextStyle(fontWeight: FontWeight.bold)),
+                    style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: context.textPrimary)),
               ],
             ),
-            backgroundColor: Color(0xFF7C3AED),
+            backgroundColor: const Color(0xFF7C3AED),
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -1754,44 +1756,44 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                     ),
                   ),
                   child: ClipOval(
-                    child: (_avatarUrl.isNotEmpty &&
-                            _avatarUrl.startsWith('http'))
-                        ? Image.network(
-                            _avatarUrl,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => Container(
-                              color: context.surfaceSecondary,
-                              alignment: Alignment.center,
-                              child: Text(
-                                _nameController.text.isNotEmpty
-                                    ? _nameController.text
-                                        .substring(0, 1)
-                                        .toUpperCase()
-                                    : "?",
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.bold,
+                    child:
+                        (_avatarUrl.isNotEmpty && _avatarUrl.startsWith('http'))
+                            ? Image.network(
+                                _avatarUrl,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) => Container(
+                                  color: context.surfaceSecondary,
+                                  alignment: Alignment.center,
+                                  child: Text(
+                                    _nameController.text.isNotEmpty
+                                        ? _nameController.text
+                                            .substring(0, 1)
+                                            .toUpperCase()
+                                        : "?",
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              )
+                            : Container(
+                                color: context.surfaceSecondary,
+                                alignment: Alignment.center,
+                                child: Text(
+                                  _nameController.text.isNotEmpty
+                                      ? _nameController.text
+                                          .substring(0, 1)
+                                          .toUpperCase()
+                                      : "?",
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
                               ),
-                            ),
-                          )
-                        : Container(
-                            color: context.surfaceSecondary,
-                            alignment: Alignment.center,
-                            child: Text(
-                              _nameController.text.isNotEmpty
-                                  ? _nameController.text
-                                      .substring(0, 1)
-                                      .toUpperCase()
-                                  : "?",
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 14,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
                   ),
                 ),
               if (_fieldVisible('avatarUrl'))
@@ -2111,50 +2113,50 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                   ),
                 ),
                 child: ClipOval(
-                  child: (_avatarUrl.isNotEmpty &&
-                          _avatarUrl.startsWith('http'))
-                      ? Image.network(
-                          _avatarUrl,
-                          width: 72,
-                          height: 72,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => Container(
-                            width: 72,
-                            height: 72,
-                            color: context.surfaceSecondary,
-                            alignment: Alignment.center,
-                            child: Text(
-                              _nameController.text.isNotEmpty
-                                  ? _nameController.text
-                                      .substring(0, 1)
-                                      .toUpperCase()
-                                  : "?",
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 24,
-                                fontWeight: FontWeight.bold,
+                  child:
+                      (_avatarUrl.isNotEmpty && _avatarUrl.startsWith('http'))
+                          ? Image.network(
+                              _avatarUrl,
+                              width: 72,
+                              height: 72,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => Container(
+                                width: 72,
+                                height: 72,
+                                color: context.surfaceSecondary,
+                                alignment: Alignment.center,
+                                child: Text(
+                                  _nameController.text.isNotEmpty
+                                      ? _nameController.text
+                                          .substring(0, 1)
+                                          .toUpperCase()
+                                      : "?",
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 24,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            )
+                          : Container(
+                              width: 72,
+                              height: 72,
+                              color: context.surfaceSecondary,
+                              alignment: Alignment.center,
+                              child: Text(
+                                _nameController.text.isNotEmpty
+                                    ? _nameController.text
+                                        .substring(0, 1)
+                                        .toUpperCase()
+                                    : "?",
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 24,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                             ),
-                          ),
-                        )
-                      : Container(
-                          width: 72,
-                          height: 72,
-                          color: context.surfaceSecondary,
-                          alignment: Alignment.center,
-                          child: Text(
-                            _nameController.text.isNotEmpty
-                                ? _nameController.text
-                                    .substring(0, 1)
-                                    .toUpperCase()
-                                : "?",
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 24,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
                 ),
               ),
               const SizedBox(width: 16),

@@ -82,7 +82,8 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
     _fieldAssignments = data['field_assignments'] is Map<String, dynamic>
         ? data['field_assignments'] as Map<String, dynamic>
         : (data['field_assignments'] is String
-            ? jsonDecode(data['field_assignments'] as String) as Map<String, dynamic>
+            ? jsonDecode(data['field_assignments'] as String)
+                as Map<String, dynamic>
             : null);
     _name = data['name'] ?? '';
     _profession = data['profession'] ?? '';
@@ -221,7 +222,8 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
                 response['bio'] ?? '', _sharedCardPermission, fieldAssignments);
             _customLinks = response['custom_links'] != null
                 ? List<dynamic>.from(response['custom_links'] is String
-                    ? jsonDecode(response['custom_links'] as String) as List<dynamic>
+                    ? jsonDecode(response['custom_links'] as String)
+                        as List<dynamic>
                     : response['custom_links'] as List<dynamic>)
                 : [];
           });
@@ -459,8 +461,7 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
                   color: context.surfaceSecondary,
                 ),
                 clipBehavior: Clip.antiAlias,
-                child: (_avatarUrl.isNotEmpty &&
-                        _avatarUrl.startsWith('http'))
+                child: (_avatarUrl.isNotEmpty && _avatarUrl.startsWith('http'))
                     ? Image.network(
                         _avatarUrl,
                         fit: BoxFit.cover,
@@ -873,8 +874,7 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
                   ),
                 ),
                 child: ClipOval(
-                  child: (avatar.isNotEmpty &&
-                          avatar.startsWith('http'))
+                  child: (avatar.isNotEmpty && avatar.startsWith('http'))
                       ? Image.network(
                           avatar,
                           fit: BoxFit.cover,
@@ -1750,7 +1750,8 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
     // Filter links based on visibility
     final visibleLinks = _customLinks.where((link) {
       final String linkId = link['id'] ?? '';
-      return ProfileFieldFilter.isFieldVisible(linkId, _sharedCardPermission, fieldAssignments);
+      return ProfileFieldFilter.isFieldVisible(
+          linkId, _sharedCardPermission, fieldAssignments);
     }).toList();
 
     if (visibleLinks.isEmpty) return widgets;
@@ -1773,7 +1774,8 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
 
       String label = name;
       if (_sharedCardPermission == 'both') {
-        final assignments = ProfileFieldFilter.parseFieldAssignments(fieldAssignments);
+        final assignments =
+            ProfileFieldFilter.parseFieldAssignments(fieldAssignments);
         final assignment = assignments != null ? assignments[id] : null;
         final isC = assignment != null && assignment['c'] == true;
         final isP = assignment != null && assignment['p'] == true;
@@ -1987,7 +1989,7 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
         SnackBar(
           content:
               Text("Sharing settings updated to ${accessType.toUpperCase()}"),
-          backgroundColor: context.surfaceSecondary,
+          backgroundColor: context.textPrimary,
           duration: const Duration(milliseconds: 1500),
         ),
       );
