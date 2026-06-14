@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:connect/Models/app_error.dart';
 import 'package:connect/Repositories/chat_repository.dart';
 import 'package:flutter/material.dart';
@@ -43,6 +44,30 @@ class ChatProvider with ChangeNotifier {
   Map<int, String> _lastKnownRooms = {};
 
   ChatState _state = ChatInitial();
+
+  bool _isOtherUserTyping = false;
+  bool get isOtherUserTyping => _isOtherUserTyping;
+  Timer? _typingTimer;
+
+  final Map<String, bool> _typingRooms = {};
+  final Map<String, Timer> _typingRoomTimers = {};
+
+  bool isRoomTyping(String roomId) => _typingRooms[roomId] ?? false;
+
+  final Map<String, Map<String, dynamic>?> _lastMessagesByRoom = {};
+  Map<String, Map<String, dynamic>?> get lastMessagesByRoom =>
+      _lastMessagesByRoom;
+
+  Future<void> _updateLastMessageForRoomSilent(String roomId) async {
+    final lastMsg = await _repository.getLastMessageForRoom(roomId);
+    _lastMessagesByRoom[roomId] = lastMsg;
+  }
+
+  Future<void> updateLastMessageForRoom(String roomId) async {
+    await _updateLastMessageForRoomSilent(roomId);
+    notifyListeners();
+  }
+
   ChatState get state => _state;
 
   bool get isChatRoomsLoaded => _state is ChatRoomsLoaded;
@@ -123,6 +148,12 @@ class ChatProvider with ChangeNotifier {
       }
 
       _setRoomsLoadedState(newRooms);
+
+      _lastMessagesByRoom.clear();
+      for (final roomId in newRooms.values) {
+        await _updateLastMessageForRoomSilent(roomId);
+      }
+
       notifyListeners();
 
       await fetchPendingMessages();
@@ -204,8 +235,11 @@ class ChatProvider with ChangeNotifier {
       replyToMessagePayload: replyToMessagePayload,
       replyToMessageSenderName: replyToMessageSenderName,
     );
+    await _updateLastMessageForRoomSilent(roomId);
     if (activeRoomId == roomId) {
       await refreshActiveRoomMessages();
+    } else {
+      notifyListeners();
     }
 
     try {
@@ -223,9 +257,7 @@ class ChatProvider with ChangeNotifier {
       });
 
       await _repository.updateMessageStatusLocally(messageId, 'sent');
-      if (activeRoomId == roomId) {
-        await refreshActiveRoomMessages();
-      }
+      await updateLastMessageForRoom(roomId);
     } catch (e) {
       print("Error sending message: $e");
       _setError(e);
@@ -235,14 +267,23 @@ class ChatProvider with ChangeNotifier {
   Future<void> deleteChatMessage(String messageId,
       {required bool deleteForEveryone}) async {
     try {
+      final localMsg = await _repository.getMessageByIdLocally(messageId);
+      final roomId = localMsg?['room_id'] as String?;
+
       await _repository.deleteMessageLocally(messageId);
 
       if (deleteForEveryone) {
         await _repository.deleteMessageInSupabase(messageId);
       }
 
+      if (roomId != null) {
+        await _updateLastMessageForRoomSilent(roomId);
+      }
+
       if (activeRoomId != null) {
         await refreshActiveRoomMessages();
+      } else {
+        notifyListeners();
       }
       await updateUnreadCount();
     } catch (e) {
@@ -285,6 +326,7 @@ class ChatProvider with ChangeNotifier {
         );
 
         await acknowledgeDelivery(msgId, isActiveInChat: isInChat);
+        await _updateLastMessageForRoomSilent(rId);
 
         if (isInChat) {
           await refreshActiveRoomMessages();
@@ -301,9 +343,12 @@ class ChatProvider with ChangeNotifier {
         final rId = newRecord['room_id'] as String;
 
         await _repository.updateMessageStatusLocally(messageId, newStatus);
+        await _updateLastMessageForRoomSilent(rId);
 
         if (activeRoomId == rId) {
           await refreshActiveRoomMessages();
+        } else {
+          notifyListeners();
         }
         await updateUnreadCount();
       },
@@ -324,8 +369,14 @@ class ChatProvider with ChangeNotifier {
             }
           }
 
+          if (rId != null) {
+            await _updateLastMessageForRoomSilent(rId);
+          }
+
           if (activeRoomId == rId) {
             await refreshActiveRoomMessages();
+          } else {
+            notifyListeners();
           }
           await updateUnreadCount();
         }
@@ -337,9 +388,57 @@ class ChatProvider with ChangeNotifier {
           await updateUnreadCount();
         }
       },
+      onTyping: (payload) {
+        final int? senderId = payload['user_id'] is int
+            ? payload['user_id'] as int
+            : int.tryParse(payload['user_id']?.toString() ?? '');
+        final bool? typing = payload['is_typing'] as bool?;
+
+        if (senderId != null && typing != null && senderId != _userId) {
+          if (activeRoomId == roomId) {
+            _isOtherUserTyping = typing;
+            _typingTimer?.cancel();
+            if (_isOtherUserTyping) {
+              _typingTimer = Timer(const Duration(seconds: 5), () {
+                _isOtherUserTyping = false;
+                notifyListeners();
+              });
+            }
+          }
+
+          _typingRoomTimers[roomId]?.cancel();
+          if (typing) {
+            _typingRooms[roomId] = true;
+            _typingRoomTimers[roomId] = Timer(const Duration(seconds: 5), () {
+              _typingRooms.remove(roomId);
+              _typingRoomTimers.remove(roomId);
+              notifyListeners();
+            });
+          } else {
+            _typingRooms.remove(roomId);
+            _typingRoomTimers.remove(roomId);
+          }
+          notifyListeners();
+        }
+      },
     );
 
     _roomSubscriptions[roomId] = channel;
+  }
+
+  Future<void> sendTypingStatus(bool isTyping) async {
+    final roomId = activeRoomId;
+    final myUserId = _userId;
+    if (roomId == null || myUserId == null) return;
+
+    final channel = _roomSubscriptions[roomId];
+    if (channel == null) return;
+
+    try {
+      await _repository.sendTypingBroadcast(channel, myUserId, isTyping);
+    } catch (e) {
+      print("Error sending typing status: $e");
+    }
   }
 
   Future<void> acknowledgeDelivery(String messageId,
@@ -485,6 +584,10 @@ class ChatProvider with ChangeNotifier {
         await acknowledgeDelivery(msgId, isActiveInChat: isInChat);
       }
 
+      for (final rId in roomIds) {
+        await _updateLastMessageForRoomSilent(rId);
+      }
+
       if (activeRoomId != null) {
         await refreshActiveRoomMessages();
       } else {
@@ -543,6 +646,8 @@ class ChatProvider with ChangeNotifier {
         }
       }
 
+      await updateLastMessageForRoom(roomId);
+
       if (activeRoomId == roomId) {
         await refreshActiveRoomMessages();
       }
@@ -556,6 +661,7 @@ class ChatProvider with ChangeNotifier {
     if (activeRoomId == null) return;
     _activeRoomMessages = List<Map<String, dynamic>>.from(
         await _repository.getMessagesForRoomLocally(activeRoomId!));
+    await _updateLastMessageForRoomSilent(activeRoomId!);
     notifyListeners();
   }
 
@@ -599,8 +705,11 @@ class ChatProvider with ChangeNotifier {
   Future<void> markRoomMessagesAsReadLocally(String roomId) async {
     final myUserId = _userId;
     if (myUserId == null) return;
+
     try {
       await _repository.markRoomMessagesAsReadLocally(roomId, myUserId);
+      await updateLastMessageForRoom(roomId);
+      await updateUnreadCount();
     } catch (e) {
       print("Error marking room messages as read locally: $e");
       _setError(e);
@@ -630,6 +739,10 @@ class ChatProvider with ChangeNotifier {
             await _repository.deleteMessageLocally(localId);
           }
         }
+      }
+
+      for (final roomId in connectionRooms.values) {
+        await _updateLastMessageForRoomSilent(roomId);
       }
 
       totalUnreadCount = await _repository.getTotalUnreadCountLocally(myUserId);
@@ -676,6 +789,8 @@ class ChatProvider with ChangeNotifier {
 
   void setActiveRoom(String? roomId) {
     activeRoomId = roomId;
+    _isOtherUserTyping = false;
+    _typingTimer?.cancel();
     if (roomId != null) {
       // Refresh local messages first (fast local DB read), then notify once.
       refreshActiveRoomMessages().then((_) {
@@ -759,6 +874,8 @@ class ChatProvider with ChangeNotifier {
         if (channel != null) {
           _repository.removeChannel(channel);
         }
+        _typingRooms.remove(roomId);
+        _typingRoomTimers.remove(roomId)?.cancel();
 
         print(
             "Chat rooms state and subscriptions updated for deleted profile: $profileId");
@@ -783,5 +900,15 @@ class ChatProvider with ChangeNotifier {
 
   Future<Map<String, dynamic>?> getLastMessageForRoom(String roomId) {
     return _repository.getLastMessageForRoom(roomId);
+  }
+
+  @override
+  void dispose() {
+    _typingTimer?.cancel();
+    for (final timer in _typingRoomTimers.values) {
+      timer.cancel();
+    }
+    _typingRoomTimers.clear();
+    super.dispose();
   }
 }

@@ -35,12 +35,12 @@ class NotificationProvider with ChangeNotifier {
   NotificationState _state = NotificationInitial();
   NotificationState get state => _state;
 
-  List<Map<String, dynamic>> get notifications =>
-      _state is NotificationLoaded
-          ? (_state as NotificationLoaded).notifications
-          : _lastKnownNotifications;
+  List<Map<String, dynamic>> get notifications => _state is NotificationLoaded
+      ? (_state as NotificationLoaded).notifications
+      : _lastKnownNotifications;
 
-  int get unreadCount => notifications.where((n) => n['is_seen'] == false).length;
+  int get unreadCount =>
+      notifications.where((n) => n['is_seen'] == false).length;
 
   AppError? get lastError =>
       _state is NotificationError ? (_state as NotificationError).error : null;
@@ -121,7 +121,8 @@ class NotificationProvider with ChangeNotifier {
       final index = notifications.indexWhere((n) => n['id'] == notificationId);
       if (index != -1) {
         final updated = List<Map<String, dynamic>>.from(notifications);
-        updated[index] = Map<String, dynamic>.from(updated[index])..['is_seen'] = true;
+        updated[index] = Map<String, dynamic>.from(updated[index])
+          ..['is_seen'] = true;
         _setLoadedState(updated);
         notifyListeners();
       }
@@ -159,6 +160,27 @@ class NotificationProvider with ChangeNotifier {
     } catch (e) {
       print("Error deleting notification: $e");
       _setError(e);
+    }
+  }
+
+  Future<void> sendReferral({
+    required int toUserId,
+    required int referredUserId,
+    String? note,
+  }) async {
+    final myUserId = _userId;
+    if (myUserId == null) return;
+    try {
+      await _repository.insertReferralNotification(
+        userId: toUserId,
+        otherUserId: myUserId,
+        referredUserId: referredUserId,
+        note: note,
+      );
+    } catch (e) {
+      print("Error sending referral: $e");
+      _setError(e);
+      rethrow;
     }
   }
 

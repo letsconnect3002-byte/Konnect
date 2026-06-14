@@ -7,6 +7,12 @@ abstract class NotificationRepository {
     required int otherUserId,
     required String type,
   });
+  Future<void> insertReferralNotification({
+    required int userId,
+    required int otherUserId,
+    required int referredUserId,
+    String? note,
+  });
   Future<void> markAsSeen(String notificationId);
   Future<void> markAllAsSeen(int userId);
   Future<void> deleteNotification(String notificationId);
@@ -25,7 +31,8 @@ class SupabaseNotificationRepository implements NotificationRepository {
   Future<List<Map<String, dynamic>>> getNotifications(int userId) async {
     final response = await _client
         .from('connection_notifications')
-        .select('*, other_user:profiles!other_user_id(*)')
+        .select(
+            '*, other_user:profiles!other_user_id(*), referred_user:profiles!referred_user_id(*)')
         .eq('user_id', userId)
         .order('created_at', ascending: false);
 
@@ -48,11 +55,27 @@ class SupabaseNotificationRepository implements NotificationRepository {
   }
 
   @override
+  Future<void> insertReferralNotification({
+    required int userId,
+    required int otherUserId,
+    required int referredUserId,
+    String? note,
+  }) async {
+    await _client.from('connection_notifications').insert({
+      'user_id': userId,
+      'other_user_id': otherUserId,
+      'referred_user_id': referredUserId,
+      'type': 'referral',
+      'note': note,
+      'is_seen': false,
+    });
+  }
+
+  @override
   Future<void> markAsSeen(String notificationId) async {
     await _client
         .from('connection_notifications')
-        .update({'is_seen': true})
-        .eq('id', notificationId);
+        .update({'is_seen': true}).eq('id', notificationId);
   }
 
   @override
@@ -89,7 +112,8 @@ class SupabaseNotificationRepository implements NotificationRepository {
           callback: callback,
         );
     channel.subscribe((status, [error]) {
-      print("Realtime notifications subscription status for user $userId: $status, error: $error");
+      print(
+          "Realtime notifications subscription status for user $userId: $status, error: $error");
     });
     return channel;
   }

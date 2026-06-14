@@ -1,6 +1,7 @@
 import 'package:connect/Config/app_theme.dart';
 import 'package:connect/Pages/ConnectionProfilePage.dart';
 import 'package:connect/Pages/IndividualChatPage.dart';
+import 'package:connect/Providers/connection_provider.dart';
 import 'package:connect/Providers/notification_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -246,9 +247,26 @@ class _NotificationPageState extends State<NotificationPage> {
         _getRelativeTime(notification['created_at'] as String?);
     final bool isUnseen = notification['is_seen'] == false;
 
+    final bool isReferral = type == 'referral';
     final bool isQr = type == 'qr_code';
-    final Color accentColor =
-        isQr ? const Color(0xFF00F2FE) : const Color(0xFF8B5CF6);
+    final bool isReferralConnect = type == 'referral_connect';
+    final Color accentColor = (isReferral || isReferralConnect)
+        ? context.accentSecondary
+        : (isQr ? const Color(0xFF00F2FE) : const Color(0xFF8B5CF6));
+
+    final referredUser =
+        notification['referred_user'] as Map<String, dynamic>? ?? {};
+    final String referredName = referredUser['name'] ?? 'Unknown User';
+    final String referredAvatarUrl =
+        referredUser['avatar_url'] ?? referredUser['avatarUrl'] ?? '';
+    final String referredProfession = referredUser['profession'] ?? '';
+    final String? note = notification['note'] as String?;
+
+    final connectionProvider =
+        Provider.of<ConnectionProvider>(context, listen: false);
+    final bool isAlreadyConnected = referredUser['id'] != null &&
+        connectionProvider.connections
+            .any((c) => c['id'] == referredUser['id']);
 
     return Dismissible(
       key: Key(notification['id'].toString()),
@@ -276,14 +294,16 @@ class _NotificationPageState extends State<NotificationPage> {
           onTap: () {
             HapticFeedback.lightImpact();
             provider.markAsSeen(notification['id']);
+            final targetUser = isReferral ? referredUser : otherUser;
             final profileMap = {
-              'id': otherUser['id'],
-              'name': name,
-              'profession': profession,
-              'avatarUrl': avatarUrl,
-              'company': otherUser['company'] ?? '',
-              'bio': otherUser['bio'] ?? '',
-              'connection_profile_id': otherUser['id'],
+              'id': targetUser['id'],
+              'name': targetUser['name'] ?? 'Unknown',
+              'profession': targetUser['profession'] ?? '',
+              'avatarUrl':
+                  targetUser['avatar_url'] ?? targetUser['avatarUrl'] ?? '',
+              'company': targetUser['company'] ?? '',
+              'bio': targetUser['bio'] ?? '',
+              'connection_profile_id': targetUser['id'],
             };
             Navigator.push(
               context,
@@ -332,39 +352,107 @@ class _NotificationPageState extends State<NotificationPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      RichText(
-                        text: TextSpan(
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 13.5,
-                            fontFamily: 'Inter',
-                            height: 1.3,
-                          ),
-                          children: [
-                            TextSpan(
-                              text: name,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                              ),
+                      if (isReferral)
+                        RichText(
+                          text: TextSpan(
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 13.5,
+                              fontFamily: 'Inter',
+                              height: 1.3,
                             ),
-                            TextSpan(
-                              text: isQr
-                                  ? " connected via QR scan"
-                                  : " connected via VIP Pass",
-                              style: const TextStyle(color: Colors.white70),
-                            ),
-                            if (timeStr.isNotEmpty)
+                            children: [
                               TextSpan(
-                                text: " • $timeStr",
+                                text: name,
                                 style: const TextStyle(
-                                  color: Color(0xFF5C5E78),
-                                  fontWeight: FontWeight.normal,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
                                 ),
                               ),
-                          ],
+                              const TextSpan(
+                                text: " referred ",
+                                style: TextStyle(color: Colors.white70),
+                              ),
+                              TextSpan(
+                                text: referredName,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              const TextSpan(
+                                text: " to you",
+                                style: TextStyle(color: Colors.white70),
+                              ),
+                              if (timeStr.isNotEmpty)
+                                TextSpan(
+                                  text: " • $timeStr",
+                                  style: const TextStyle(
+                                    color: Color(0xFF5C5E78),
+                                    fontWeight: FontWeight.normal,
+                                  ),
+                                ),
+                            ],
+                          ),
+                        )
+                      else
+                        RichText(
+                          text: TextSpan(
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 13.5,
+                              fontFamily: 'Inter',
+                              height: 1.3,
+                            ),
+                            children: [
+                              TextSpan(
+                                text: name,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              TextSpan(
+                                text: isQr
+                                    ? " connected via QR scan"
+                                    : (type == 'referral_connect'
+                                        ? " connected via Referral"
+                                        : " connected via Private Key"),
+                                style: const TextStyle(color: Colors.white70),
+                              ),
+                              if (timeStr.isNotEmpty)
+                                TextSpan(
+                                  text: " • $timeStr",
+                                  style: const TextStyle(
+                                    color: Color(0xFF5C5E78),
+                                    fontWeight: FontWeight.normal,
+                                  ),
+                                ),
+                            ],
+                          ),
                         ),
-                      ),
+                      if (isReferral && note != null && note.isNotEmpty) ...[
+                        const SizedBox(height: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 8),
+                          decoration: BoxDecoration(
+                            color:
+                                context.surfaceSecondary.withValues(alpha: 0.5),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                                color: Colors.white.withValues(alpha: 0.03)),
+                          ),
+                          child: Text(
+                            "\"$note\"",
+                            style: context.bodyText.copyWith(
+                              color: context.textSecondary,
+                              fontStyle: FontStyle.italic,
+                              fontSize: 12.0,
+                            ),
+                          ),
+                        ),
+                      ],
                       // const SizedBox(height: 2),
                       // Text(
                       //   profession,
@@ -381,100 +469,196 @@ class _NotificationPageState extends State<NotificationPage> {
                 SizedBox(
                   width: 76,
                   height: 30,
-                  child: isUnseen
-                      ? Container(
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: isQr
-                                  ? [
-                                      const Color(0xFF00F2FE),
-                                      const Color(0xFF00B5FE)
-                                    ]
-                                  : [
-                                      const Color(0xFF8B5CF6),
-                                      const Color(0xFF6D28D9)
-                                    ],
-                            ),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: ElevatedButton(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.transparent,
-                              foregroundColor: Colors.white,
-                              shadowColor: Colors.transparent,
-                              padding: EdgeInsets.zero,
-                              shape: RoundedRectangleBorder(
+                  child: isReferral
+                      ? (isAlreadyConnected
+                          ? ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF1F2030),
+                                foregroundColor: const Color(0xFF8B8C9E),
+                                shadowColor: Colors.transparent,
+                                padding: EdgeInsets.zero,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                  side: BorderSide(
+                                    color: Colors.white.withValues(alpha: 0.03),
+                                    width: 1,
+                                  ),
+                                ),
+                              ),
+                              onPressed: () {
+                                HapticFeedback.lightImpact();
+                                final chatProfileMap = {
+                                  'id': referredUser['id'],
+                                  'name': referredName,
+                                  'profession': referredProfession,
+                                  'avatarUrl': referredAvatarUrl,
+                                  'avatar_url': referredAvatarUrl,
+                                };
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => IndividualChatPage(
+                                        connectionData: chatProfileMap),
+                                  ),
+                                );
+                              },
+                              child: const Text(
+                                "Message",
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  fontFamily: 'Inter',
+                                ),
+                              ),
+                            )
+                          : Container(
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: [
+                                    context.accentSecondary,
+                                    context.accentSecondary
+                                        .withValues(alpha: 0.7)
+                                  ],
+                                ),
                                 borderRadius: BorderRadius.circular(10),
                               ),
-                            ),
-                            onPressed: () {
-                              HapticFeedback.lightImpact();
-                              provider.markAsSeen(notification['id']);
-                              final chatProfileMap = {
-                                'id': otherUser['id'],
-                                'name': name,
-                                'profession': profession,
-                                'avatarUrl': avatarUrl,
-                                'avatar_url': avatarUrl,
-                              };
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => IndividualChatPage(
-                                      connectionData: chatProfileMap),
+                              child: ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.transparent,
+                                  foregroundColor: Colors.white,
+                                  shadowColor: Colors.transparent,
+                                  padding: EdgeInsets.zero,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
                                 ),
-                              );
-                            },
-                            child: const Text(
-                              "Chat",
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                                fontFamily: 'Inter',
+                                onPressed: () {
+                                  HapticFeedback.lightImpact();
+                                  final messenger =
+                                      ScaffoldMessenger.of(context);
+                                  connectionProvider
+                                      .connectUsers(
+                                    provider.userId!,
+                                    referredUser['id'],
+                                    connectionType: 'referral_connect',
+                                  )
+                                      .then((_) {
+                                    provider.markAsSeen(notification['id']);
+                                  }).catchError((err) {
+                                    messenger.showSnackBar(
+                                      SnackBar(content: Text("Error: $err")),
+                                    );
+                                  });
+                                },
+                                child: const Text(
+                                  "Connect",
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    fontFamily: 'Inter',
+                                  ),
+                                ),
                               ),
-                            ),
-                          ),
-                        )
-                      : ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF1F2030),
-                            foregroundColor: const Color(0xFF8B8C9E),
-                            shadowColor: Colors.transparent,
-                            padding: EdgeInsets.zero,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
-                              side: BorderSide(
-                                color: Colors.white.withValues(alpha: 0.03),
-                                width: 1,
+                            ))
+                      : (isUnseen
+                          ? Container(
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: isQr
+                                      ? [
+                                          const Color(0xFF00F2FE),
+                                          const Color(0xFF00B5FE)
+                                        ]
+                                      : (type == 'referral_connect'
+                                          ? [
+                                              context.accentSecondary,
+                                              context.accentSecondary.withValues(alpha: 0.7)
+                                            ]
+                                          : [
+                                              const Color(0xFF8B5CF6),
+                                              const Color(0xFF6D28D9)
+                                            ]),
+                                ),
+                                borderRadius: BorderRadius.circular(10),
                               ),
-                            ),
-                          ),
-                          onPressed: () {
-                            HapticFeedback.lightImpact();
-                            final chatProfileMap = {
-                              'id': otherUser['id'],
-                              'name': name,
-                              'profession': profession,
-                              'avatarUrl': avatarUrl,
-                              'avatar_url': avatarUrl,
-                            };
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => IndividualChatPage(
-                                    connectionData: chatProfileMap),
+                              child: ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.transparent,
+                                  foregroundColor: Colors.white,
+                                  shadowColor: Colors.transparent,
+                                  padding: EdgeInsets.zero,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                ),
+                                onPressed: () {
+                                  HapticFeedback.lightImpact();
+                                  provider.markAsSeen(notification['id']);
+                                  final chatProfileMap = {
+                                    'id': otherUser['id'],
+                                    'name': name,
+                                    'profession': profession,
+                                    'avatarUrl': avatarUrl,
+                                    'avatar_url': avatarUrl,
+                                  };
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => IndividualChatPage(
+                                          connectionData: chatProfileMap),
+                                    ),
+                                  );
+                                },
+                                child: const Text(
+                                  "Chat",
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    fontFamily: 'Inter',
+                                  ),
+                                ),
                               ),
-                            );
-                          },
-                          child: const Text(
-                            "Message",
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                              fontFamily: 'Inter',
-                            ),
-                          ),
-                        ),
+                            )
+                          : ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF1F2030),
+                                foregroundColor: const Color(0xFF8B8C9E),
+                                shadowColor: Colors.transparent,
+                                padding: EdgeInsets.zero,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                  side: BorderSide(
+                                    color: Colors.white.withValues(alpha: 0.03),
+                                    width: 1,
+                                  ),
+                                ),
+                              ),
+                              onPressed: () {
+                                HapticFeedback.lightImpact();
+                                final chatProfileMap = {
+                                  'id': otherUser['id'],
+                                  'name': name,
+                                  'profession': profession,
+                                  'avatarUrl': avatarUrl,
+                                  'avatar_url': avatarUrl,
+                                };
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => IndividualChatPage(
+                                        connectionData: chatProfileMap),
+                                  ),
+                                );
+                              },
+                              child: const Text(
+                                "Message",
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  fontFamily: 'Inter',
+                                ),
+                              ),
+                            )),
                 ),
               ],
             ),
@@ -518,7 +702,7 @@ class _NotificationPageState extends State<NotificationPage> {
           const Padding(
             padding: EdgeInsets.symmetric(horizontal: 48),
             child: Text(
-              "New connections via QR code scans or VIP pass keys will show up here.",
+              "New connections via QR code scans or Private Keys will show up here.",
               style: TextStyle(
                 color: Color(0xFF8B8C9E),
                 fontSize: 13,

@@ -3,7 +3,9 @@ import 'package:connect/Pages/IndividualChatPage.dart';
 import 'package:connect/Pages/QrCodeScanner.dart';
 import 'package:connect/Providers/connection_provider.dart';
 import 'package:connect/Providers/chat_provider.dart';
+import 'package:connect/Providers/notification_provider.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:connect/Utils/profile_field_filter.dart';
@@ -33,6 +35,32 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
         setState(() {});
       }
     });
+  }
+
+  void _showReferBottomSheet(
+      BuildContext context, Map<String, dynamic> targetProfile) {
+    final provider = Provider.of<ConnectionProvider>(context, listen: false);
+    final allConnections = provider.connections;
+
+    // Filter out the referred user
+    final eligibleConnections =
+        allConnections.where((c) => c['id'] != targetProfile['id']).toList();
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: context.surfacePrimary,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(
+            top: Radius.circular(AppDimensions.radiusPremiumCard)),
+      ),
+      builder: (context) {
+        return _ReferBottomSheet(
+          targetProfile: targetProfile,
+          eligibleConnections: eligibleConnections,
+        );
+      },
+    );
   }
 
   void _showRedeemVipDialog(BuildContext context, ConnectionProvider provider) {
@@ -646,15 +674,15 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
                       color: context.surfaceSecondary,
                     ),
                     clipBehavior: Clip.antiAlias,
-                    child: (avatarUrl.isNotEmpty &&
-                            avatarUrl.startsWith('http'))
-                        ? Image.network(
-                            avatarUrl,
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) =>
-                                _buildFallbackAvatar(name, 22),
-                          )
-                        : _buildFallbackAvatar(name, 22),
+                    child:
+                        (avatarUrl.isNotEmpty && avatarUrl.startsWith('http'))
+                            ? Image.network(
+                                avatarUrl,
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) =>
+                                    _buildFallbackAvatar(name, 22),
+                              )
+                            : _buildFallbackAvatar(name, 22),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -699,9 +727,24 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
                   onSelected: (val) {
                     if (val == 1) {
                       _showDeleteConfirmation(context, profileData, provider);
+                    } else if (val == 2) {
+                      _showReferBottomSheet(context, profileData);
                     }
                   },
                   itemBuilder: (context) => [
+                    PopupMenuItem(
+                      value: 2,
+                      child: Row(
+                        children: [
+                          Icon(Icons.share_rounded,
+                              color: context.accentSecondary, size: 18),
+                          const SizedBox(width: 8),
+                          Text("Refer to Connection",
+                              style: context.bodyText
+                                  .copyWith(color: Colors.white)),
+                        ],
+                      ),
+                    ),
                     PopupMenuItem(
                       value: 1,
                       child: Row(
@@ -789,6 +832,33 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
                     ),
                   ),
                 ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () {
+                      HapticFeedback.lightImpact();
+                      _showReferBottomSheet(context, profileData);
+                    },
+                    style: OutlinedButton.styleFrom(
+                      backgroundColor: context.surfaceSecondary,
+                      foregroundColor: Colors.white,
+                      side: BorderSide(
+                        color: context.surfaceSecondary,
+                        width: 1.0,
+                      ),
+                      shape: const StadiumBorder(),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      elevation: 0,
+                    ),
+                    child: Text(
+                      "Refer",
+                      style: context.bodyText.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
               ],
             ),
           ],
@@ -853,8 +923,7 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
                   color: context.surfaceSecondary,
                 ),
                 clipBehavior: Clip.antiAlias,
-                child: (avatarUrl.isNotEmpty &&
-                        avatarUrl.startsWith('http'))
+                child: (avatarUrl.isNotEmpty && avatarUrl.startsWith('http'))
                     ? Image.network(
                         avatarUrl,
                         fit: BoxFit.cover,
@@ -913,9 +982,24 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
               onSelected: (val) {
                 if (val == 1) {
                   _showDeleteConfirmation(context, profileData, provider);
+                } else if (val == 2) {
+                  _showReferBottomSheet(context, profileData);
                 }
               },
               itemBuilder: (context) => [
+                PopupMenuItem(
+                  value: 2,
+                  child: Row(
+                    children: [
+                      Icon(Icons.share_rounded,
+                          color: context.accentSecondary, size: 18),
+                      const SizedBox(width: 8),
+                      Text("Refer to Connection",
+                          style:
+                              context.bodyText.copyWith(color: Colors.white)),
+                    ],
+                  ),
+                ),
                 PopupMenuItem(
                   value: 1,
                   child: Row(
@@ -1139,6 +1223,359 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
           );
         }
       },
+    );
+  }
+}
+
+class _ReferBottomSheet extends StatefulWidget {
+  final Map<String, dynamic> targetProfile;
+  final List<Map<String, dynamic>> eligibleConnections;
+
+  const _ReferBottomSheet({
+    required this.targetProfile,
+    required this.eligibleConnections,
+  });
+
+  @override
+  State<_ReferBottomSheet> createState() => _ReferBottomSheetState();
+}
+
+class _ReferBottomSheetState extends State<_ReferBottomSheet> {
+  int? selectedConnectionId;
+  final TextEditingController noteController = TextEditingController();
+  bool isSending = false;
+
+  @override
+  void dispose() {
+    noteController.dispose();
+    super.dispose();
+  }
+
+  String _getInitials(String name) {
+    if (name.trim().isEmpty) return '?';
+    final parts = name.trim().split(RegExp(r'\s+'));
+    if (parts.length >= 2) {
+      return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+    }
+    return parts[0][0].toUpperCase();
+  }
+
+  String _getAvatarUrl(String name, String? existingUrl) {
+    if (existingUrl != null &&
+        existingUrl.isNotEmpty &&
+        existingUrl.startsWith('http')) {
+      return existingUrl;
+    }
+    return '';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final targetId = widget.targetProfile['id'];
+
+    return Padding(
+      padding: EdgeInsets.only(
+        left: AppDimensions.marginStandard,
+        right: AppDimensions.marginStandard,
+        top: 24.0,
+        bottom: 24.0 + MediaQuery.of(context).viewInsets.bottom,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            "Refer ${widget.targetProfile['name'] ?? 'Connection'}",
+            style: context.screenHeading.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            "Introduce them to another connection in your network.",
+            style: context.bodyText.copyWith(
+              color: context.textSecondary,
+              fontSize: 12.5,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 20),
+          Text(
+            "SELECT RECIPIENT",
+            style: context.captionText.copyWith(
+              color: context.textSecondary,
+              letterSpacing: 1.5,
+            ),
+          ),
+          const SizedBox(height: 10),
+          if (widget.eligibleConnections.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 20),
+              child: Text(
+                "You need at least one other connection to make a referral.",
+                style: context.bodyText.copyWith(
+                  color: context.textMuted,
+                  fontStyle: FontStyle.italic,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            )
+          else
+            Container(
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.of(context).size.height * 0.25,
+              ),
+              child: ListView.separated(
+                shrinkWrap: true,
+                itemCount: widget.eligibleConnections.length,
+                separatorBuilder: (context, index) =>
+                    const SizedBox(height: 8),
+                itemBuilder: (context, index) {
+                  final conn = widget.eligibleConnections[index];
+                  final connId = conn['id'] as int;
+                  final isSelected = selectedConnectionId == connId;
+                  final name = conn['name'] ?? 'Unknown';
+                  final avatar = _getAvatarUrl(name, conn['avatarUrl']);
+                  final profession = conn['profession'] ?? '';
+
+                  return GestureDetector(
+                    onTap: () {
+                      HapticFeedback.lightImpact();
+                      setState(() {
+                        selectedConnectionId = connId;
+                      });
+                    },
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: isSelected
+                            ? context.accentSecondary
+                                .withValues(alpha: 0.08)
+                            : context.surfaceSecondary,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: isSelected
+                              ? context.accentSecondary
+                              : context.surfaceSecondary,
+                          width: 1.5,
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          CircleAvatar(
+                            radius: 18,
+                            backgroundColor: context.surfacePrimary,
+                            backgroundImage: avatar.startsWith('http')
+                                ? NetworkImage(avatar)
+                                : null,
+                            child: avatar.startsWith('http')
+                                ? null
+                                : Text(
+                                    _getInitials(name),
+                                    style: TextStyle(
+                                      color: context.textPrimary,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment:
+                                  CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  name,
+                                  style: context.bodyText.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                    color: isSelected
+                                        ? Colors.white
+                                        : context.textPrimary,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                if (profession.isNotEmpty)
+                                  Text(
+                                    profession,
+                                    style: context.captionText.copyWith(
+                                      color: context.textSecondary,
+                                      fontWeight: FontWeight.normal,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                              ],
+                            ),
+                          ),
+                          if (isSelected)
+                            Icon(
+                              Icons.check_circle_rounded,
+                              color: context.accentSecondary,
+                              size: 20,
+                            ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          const SizedBox(height: 20),
+          Text(
+            "LEAVE A NOTE (OPTIONAL)",
+            style: context.captionText.copyWith(
+              color: context.textSecondary,
+              letterSpacing: 1.5,
+            ),
+          ),
+          const SizedBox(height: 10),
+          TextField(
+            controller: noteController,
+            maxLines: 3,
+            style: context.bodyText,
+            cursorColor: context.accentSecondary,
+            decoration: InputDecoration(
+              hintText: "Add a note to introduce them...",
+              hintStyle:
+                  context.bodyText.copyWith(color: context.textMuted),
+              filled: true,
+              fillColor: context.surfaceSecondary,
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(
+                    AppDimensions.radiusComponent),
+                borderSide: BorderSide(color: context.surfaceSecondary),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(
+                    AppDimensions.radiusComponent),
+                borderSide: BorderSide(color: context.accentSecondary),
+              ),
+            ),
+          ),
+          const SizedBox(height: 24),
+          if (isSending)
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.symmetric(vertical: 8.0),
+                child: CircularProgressIndicator(
+                  valueColor:
+                      AlwaysStoppedAnimation<Color>(Color(0xFF7C3AED)),
+                ),
+              ),
+            )
+          else
+            ElevatedButton(
+              onPressed: selectedConnectionId == null
+                  ? null
+                  : () async {
+                      HapticFeedback.mediumImpact();
+                      setState(() {
+                        isSending = true;
+                      });
+
+                      final navigator = Navigator.of(context);
+                      final messenger = ScaffoldMessenger.of(context);
+                      final textPrimaryColor = context.textPrimary;
+
+                      try {
+                        final notifProvider =
+                            Provider.of<NotificationProvider>(context,
+                                listen: false);
+                        await notifProvider.sendReferral(
+                          toUserId: selectedConnectionId!,
+                          referredUserId: targetId,
+                          note: noteController.text.trim().isEmpty
+                              ? null
+                              : noteController.text.trim(),
+                        );
+
+                        if (mounted) {
+                          navigator.pop();
+                          messenger.showSnackBar(
+                            SnackBar(
+                              content: Row(
+                                children: [
+                                  const Icon(Icons.check_circle_rounded,
+                                      color: Colors.white),
+                                  const SizedBox(width: 8),
+                                  Text("Referral sent successfully!",
+                                      style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          color: textPrimaryColor)),
+                                ],
+                              ),
+                              backgroundColor: const Color(0xFF7C3AED),
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          );
+                        }
+                      } catch (e) {
+                        if (mounted) {
+                          setState(() {
+                            isSending = false;
+                          });
+
+                          String friendlyMessage = "Failed to send referral. Please try again.";
+                          final errStr = e.toString();
+                          if (errStr.contains("check constraint") || errStr.contains("23514")) {
+                            friendlyMessage = "Failed to send: unsupported database constraint. Please contact support.";
+                          } else if (errStr.contains("network") || errStr.contains("SocketException")) {
+                            friendlyMessage = "Network error. Please check your internet connection.";
+                          }
+
+                          messenger.showSnackBar(
+                            SnackBar(
+                              content: Row(
+                                children: [
+                                  const Icon(Icons.error_outline_rounded,
+                                      color: Colors.white),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      friendlyMessage,
+                                      style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          color: textPrimaryColor),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              backgroundColor: Colors.redAccent,
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          );
+                        }
+                      }
+                    },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: context.accentSecondary,
+                foregroundColor: Colors.white,
+                disabledBackgroundColor:
+                    context.surfaceSecondary.withValues(alpha: 0.5),
+                disabledForegroundColor: context.textMuted,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(
+                      AppDimensions.radiusComponent),
+                ),
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                elevation: 0,
+              ),
+              child: Text(
+                "Send Referral",
+                style: context.bodyText.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: selectedConnectionId == null
+                      ? context.textMuted
+                      : Colors.white,
+                ),
+              ),
+            ),
+        ],
+      ),
     );
   }
 }

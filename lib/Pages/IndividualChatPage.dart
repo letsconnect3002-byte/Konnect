@@ -24,7 +24,8 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
   final ScrollController _scrollController = ScrollController();
   final FocusNode _messageFocusNode = FocusNode();
 
-  final bool _isTyping = false; // Keep final since it is not set dynamically yet
+  Timer? _localTypingTimer;
+  bool _amITyping = false;
   late String _name;
   late String _avatarUrl;
   late String _profession;
@@ -51,6 +52,7 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
     _provider = Provider.of<ChatProvider>(context, listen: false);
     _myUserId = Provider.of<ProfileProvider>(context, listen: false).userId;
     _scrollController.addListener(_onScroll);
+    _messageController.addListener(_onTextChanged);
 
     // Start chat room init after the very first frame so the page shell
     // (app bar, background, loading spinner) renders instantly.
@@ -76,6 +78,7 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
               completer.complete();
             }
           }
+
           animation.addStatusListener(statusListener);
           await completer.future;
         }
@@ -129,8 +132,39 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
     return pos.pixels < 100;
   }
 
+  void _onTextChanged() {
+    final text = _messageController.text;
+
+    // Turn typing status ON when user starts inputting text
+    if (text.isNotEmpty && !_amITyping) {
+      _amITyping = true;
+      _provider.sendTypingStatus(true);
+    }
+
+    // Debounce: if user stops typing for 2.5s, broadcast false
+    _localTypingTimer?.cancel();
+    _localTypingTimer = Timer(const Duration(milliseconds: 2500), () {
+      if (mounted && _amITyping) {
+        _amITyping = false;
+        _provider.sendTypingStatus(false);
+      }
+    });
+
+    // If text box is completely cleared, instantly broadcast false
+    if (text.isEmpty && _amITyping) {
+      _localTypingTimer?.cancel();
+      _amITyping = false;
+      _provider.sendTypingStatus(false);
+    }
+  }
+
   @override
   void dispose() {
+    _messageController.removeListener(_onTextChanged);
+    _localTypingTimer?.cancel();
+    if (_amITyping) {
+      _provider.sendTypingStatus(false);
+    }
     _provider.setActiveRoom(null);
     _scrollController.removeListener(_onScroll);
     _messageController.dispose();
@@ -157,6 +191,13 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
   Future<void> _sendMessage() async {
     final text = _messageController.text.trim();
     if (text.isEmpty || _roomId == null) return;
+
+    // Reset typing tracking immediately upon send
+    _localTypingTimer?.cancel();
+    if (_amITyping) {
+      _amITyping = false;
+      _provider.sendTypingStatus(false);
+    }
 
     _messageController.clear();
     HapticFeedback.lightImpact();
@@ -271,7 +312,6 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
     );
   }
 
-
   String _getAvatarUrl(String name, String? existingUrl) {
     if (existingUrl != null &&
         existingUrl.isNotEmpty &&
@@ -286,6 +326,7 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
     final avatar = _getAvatarUrl(_name, _avatarUrl);
     final provider = Provider.of<ChatProvider>(context);
     final messages = provider.activeRoomMessages;
+    final isOtherTyping = provider.isOtherUserTyping;
 
     // Auto-scroll ONLY when a genuinely new message arrives AND user is near the bottom
     if (messages.length > _previousMessageCount && _previousMessageCount > 0) {
@@ -397,13 +438,13 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
                         reverse: true,
                         padding: const EdgeInsets.symmetric(
                             horizontal: 16, vertical: 20),
-                        itemCount: messages.length + (_isTyping ? 1 : 0),
+                        itemCount: messages.length + (isOtherTyping ? 1 : 0),
                         itemBuilder: (context, index) {
-                          if (_isTyping && index == 0) {
+                          if (isOtherTyping && index == 0) {
                             return _buildTypingIndicator();
                           }
 
-                          final int msgIndex = _isTyping
+                          final int msgIndex = isOtherTyping
                               ? messages.length - index
                               : messages.length - 1 - index;
 
@@ -426,7 +467,8 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
                           Offset tapPosition = Offset.zero;
 
                           final prevCreatedAt = msgIndex > 0
-                              ? (messages[msgIndex - 1]['created_at'] as String? ??
+                              ? (messages[msgIndex - 1]['created_at']
+                                      as String? ??
                                   '')
                               : '';
                           final currentCreatedAt =
@@ -510,7 +552,8 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
                                   margin: const EdgeInsets.all(1.5),
                                   decoration: BoxDecoration(
                                     shape: BoxShape.circle,
-                                    color: context.surfacePrimary, // Blend with dark background
+                                    color: context
+                                        .surfacePrimary, // Blend with dark background
                                   ),
                                   child: const Icon(
                                     Icons.keyboard_arrow_down_rounded,
@@ -546,8 +589,12 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
     final bubbleRadius = BorderRadius.only(
       topLeft: const Radius.circular(AppDimensions.radiusPremiumCard),
       topRight: const Radius.circular(AppDimensions.radiusPremiumCard),
-      bottomLeft: isMe ? const Radius.circular(AppDimensions.radiusPremiumCard) : const Radius.circular(4.0),
-      bottomRight: isMe ? const Radius.circular(4.0) : const Radius.circular(AppDimensions.radiusPremiumCard),
+      bottomLeft: isMe
+          ? const Radius.circular(AppDimensions.radiusPremiumCard)
+          : const Radius.circular(4.0),
+      bottomRight: isMe
+          ? const Radius.circular(4.0)
+          : const Radius.circular(AppDimensions.radiusPremiumCard),
     );
 
     return Padding(
@@ -575,10 +622,11 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
                 ),
                 decoration: BoxDecoration(
                   borderRadius: bubbleRadius,
-                  color: isMe ? context.surfaceSecondary : context.surfacePrimary,
+                  color:
+                      isMe ? context.surfaceSecondary : context.surfacePrimary,
                   border: Border.all(
-                    color: isMe 
-                        ? context.accentSecondary.withValues(alpha: 0.5) 
+                    color: isMe
+                        ? context.accentSecondary.withValues(alpha: 0.5)
                         : context.surfaceSecondary.withValues(alpha: 0.5),
                     width: 1.5,
                   ),
@@ -668,7 +716,7 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
           Transform.translate(
             offset: const Offset(-6, 0),
             child: Icon(Icons.check_rounded,
-              size: 12, color: context.textSecondary.withValues(alpha: 0.6)),
+                size: 12, color: context.textSecondary.withValues(alpha: 0.6)),
           ),
         ],
       );
@@ -702,14 +750,9 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: List.generate(3, (index) {
-            return Container(
-              margin: const EdgeInsets.symmetric(horizontal: 2),
-              width: 6,
-              height: 6,
-              decoration: BoxDecoration(
-                color: context.accentSecondary,
-                shape: BoxShape.circle,
-              ),
+            return _BouncingDot(
+              color: context.accentSecondary,
+              delay: Duration(milliseconds: index * 200),
             );
           }),
         ),
@@ -720,12 +763,17 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
   Widget _buildInputBar() {
     return SafeArea(
       child: Container(
-        margin: const EdgeInsets.fromLTRB(16.0, 8.0, 16.0, 16.0), // Floating above bottom zone
-        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 6.0), // Horiz padding 16.0 matched
+        margin: const EdgeInsets.fromLTRB(
+            16.0, 8.0, 16.0, 16.0), // Floating above bottom zone
+        padding: const EdgeInsets.symmetric(
+            horizontal: 16.0, vertical: 6.0), // Horiz padding 16.0 matched
         decoration: BoxDecoration(
-          color: context.surfacePrimary, // input field structure matching AppTheme.surfacePrimary
-          borderRadius: BorderRadius.circular(AppDimensions.radiusPill), // Capsule row profile
-          border: Border.all(color: context.surfaceSecondary.withValues(alpha: 0.8), width: 1),
+          color: context
+              .surfacePrimary, // input field structure matching AppTheme.surfacePrimary
+          borderRadius: BorderRadius.circular(
+              AppDimensions.radiusPill), // Capsule row profile
+          border: Border.all(
+              color: context.surfaceSecondary.withValues(alpha: 0.8), width: 1),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.4),
@@ -744,7 +792,8 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
                 cursorColor: context.accentPrimary,
                 decoration: InputDecoration(
                   hintText: 'Type a message...',
-                  hintStyle: context.bodyText.copyWith(color: context.textMuted),
+                  hintStyle:
+                      context.bodyText.copyWith(color: context.textMuted),
                   border: InputBorder.none,
                   isDense: true,
                   contentPadding: EdgeInsets.zero,
@@ -759,7 +808,8 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
                 width: 40,
                 height: 40,
                 decoration: BoxDecoration(
-                  color: context.accentPrimary, // sharp circular neon asset powered by AppTheme.accentPrimary
+                  color: context
+                      .accentPrimary, // sharp circular neon asset powered by AppTheme.accentPrimary
                   shape: BoxShape.circle,
                   boxShadow: [
                     BoxShadow(
@@ -1184,6 +1234,70 @@ class _SwipeToReplyState extends State<SwipeToReply>
           ),
         ],
       ),
+    );
+  }
+}
+
+class _BouncingDot extends StatefulWidget {
+  final Color color;
+  final Duration delay;
+
+  const _BouncingDot({required this.color, required this.delay});
+
+  @override
+  State<_BouncingDot> createState() => _BouncingDotState();
+}
+
+class _BouncingDotState extends State<_BouncingDot>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _animation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 600),
+    );
+    _animation = Tween<double>(begin: 0, end: -6).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+    );
+
+    // Stagger the start of each dot's animation
+    Future.delayed(widget.delay, () {
+      if (mounted) {
+        _controller.repeat(reverse: true);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _animation,
+      builder: (context, child) {
+        return Container(
+          margin: const EdgeInsets.symmetric(horizontal: 2),
+          child: Transform.translate(
+            offset: Offset(0, _animation.value),
+            child: Container(
+              width: 7,
+              height: 7,
+              decoration: BoxDecoration(
+                color: widget.color,
+                shape: BoxShape.circle,
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }

@@ -11,6 +11,7 @@ import 'package:connect/Pages/ProfilePage.dart';
 import 'package:connect/Pages/DirectMessagesHubPage.dart';
 import 'package:connect/Pages/yet_to_be_built_profile_page.dart';
 import 'package:connect/Pages/IndividualChatPage.dart';
+import 'package:connect/Pages/MonkModePage.dart';
 import 'package:connect/Providers/profile_provider.dart';
 import 'package:connect/Providers/connection_provider.dart';
 import 'package:connect/Providers/chat_provider.dart';
@@ -19,6 +20,8 @@ import 'package:connect/Repositories/connection_repository.dart';
 import 'package:connect/Repositories/chat_repository.dart';
 import 'package:connect/Providers/notification_provider.dart';
 import 'package:connect/Repositories/notification_repository.dart';
+import 'package:connect/Providers/monk_mode_provider.dart';
+import 'package:timezone/data/latest.dart' as tz;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -123,6 +126,28 @@ Future<void> handleLocalNotificationClickPayload(String payload) async {
   }
 }
 
+Future<bool> _isUserMutedUnderMonkMode(int senderId) async {
+  try {
+    final settings = await LocalDatabaseHelper.instance.getMonkModeSettings();
+    final bool enabled = settings['enabled'] as bool? ?? false;
+    if (!enabled) return false;
+
+    final String? deactivateAtStr = settings['deactivate_at'] as String?;
+    if (deactivateAtStr != null) {
+      final deactivateAt = DateTime.tryParse(deactivateAtStr);
+      if (deactivateAt != null && DateTime.now().isAfter(deactivateAt)) {
+        return false;
+      }
+    }
+
+    final List<int> blockedIds = List<int>.from(settings['blocked_ids'] as List? ?? []);
+    return blockedIds.contains(senderId);
+  } catch (e) {
+    print("Error checking monk mode status: $e");
+    return false;
+  }
+}
+
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -217,17 +242,22 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
         // 4. Show local notification via flutter_local_notifications
         try {
-          await showLocalNotification(
-            messageId,
-            senderName,
-            payload,
-            {
-              'sender_id': senderIdStr,
-              'room_id': roomId,
-            },
-          );
-          print(
-              "PushNotifications: Background local notification displayed successfully.");
+          final isMuted = await _isUserMutedUnderMonkMode(senderId);
+          if (isMuted) {
+            print("PushNotifications: Background notification suppressed because sender $senderId is muted.");
+          } else {
+            await showLocalNotification(
+              messageId,
+              senderName,
+              payload,
+              {
+                'sender_id': senderIdStr,
+                'room_id': roomId,
+              },
+            );
+            print(
+                "PushNotifications: Background local notification displayed successfully.");
+          }
         } catch (e) {
           print(
               "PushNotifications: Error displaying background notification: $e");
@@ -267,6 +297,7 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  tz.initializeTimeZones();
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
@@ -326,6 +357,13 @@ class MyApp extends StatelessWidget {
           create: (_) => ProfileProvider(
             profileRepository: SupabaseProfileRepository(),
           )..loadBackgroundBlurPref(),
+        ),
+        ChangeNotifierProxyProvider<ProfileProvider, MonkModeProvider>(
+          create: (_) => MonkModeProvider(),
+          update: (_, profileProvider, monkModeProvider) {
+            monkModeProvider!.updateProfileProvider(profileProvider);
+            return monkModeProvider;
+          },
         ),
         ChangeNotifierProxyProvider<ProfileProvider, ConnectionProvider>(
           create: (_) => ConnectionProvider(
@@ -589,6 +627,7 @@ class _AppShellGateState extends State<AppShellGate> {
 
                 // 3. Update providers so UI updates immediately
                 try {
+                  await provider.updateLastMessageForRoom(roomId);
                   await provider.refreshActiveRoomMessages();
                   await provider.updateUnreadCount();
                 } catch (e) {
@@ -598,17 +637,22 @@ class _AppShellGateState extends State<AppShellGate> {
                 // 4. Show notification ONLY if the user is NOT actively in the chat room
                 if (!isCurrentRoom) {
                   try {
-                    await showLocalNotification(
-                      messageId,
-                      senderName,
-                      payload,
-                      {
-                        'sender_id': senderIdStr,
-                        'room_id': roomId,
-                      },
-                    );
-                    print(
-                        "PushNotifications: Foreground local notification displayed successfully.");
+                    final isMuted = await _isUserMutedUnderMonkMode(senderId);
+                    if (isMuted) {
+                      print("PushNotifications: Foreground notification suppressed because sender $senderId is muted.");
+                    } else {
+                      await showLocalNotification(
+                        messageId,
+                        senderName,
+                        payload,
+                        {
+                          'sender_id': senderIdStr,
+                          'room_id': roomId,
+                        },
+                      );
+                      print(
+                          "PushNotifications: Foreground local notification displayed successfully.");
+                    }
                   } catch (e) {
                     print(
                         "PushNotifications: Error showing local notification in foreground: $e");
@@ -706,6 +750,7 @@ class _AppShellState extends State<_AppShell> with WidgetsBindingObserver {
       const DirectMessagesHubPage(),
       const OtherProfilesPage(),
       const YetToBeBuiltProfilePage(),
+      const MonkModePage(),
     ];
     _setupNotificationTapListeners();
 
@@ -861,6 +906,8 @@ class _AppShellState extends State<_AppShell> with WidgetsBindingObserver {
                     _buildNavItem(
                         index: 1, icon: Icons.chat_bubble_outline_rounded),
                     _buildNavItem(index: 2, icon: Icons.search_rounded),
+                    _buildNavItem(
+                        index: 4, icon: Icons.self_improvement_rounded),
                     _buildNavItem(index: 3, icon: Icons.person_outline_rounded),
                   ],
                 ),

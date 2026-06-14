@@ -62,6 +62,9 @@ class ProfileProvider with ChangeNotifier {
   String spotify = '';
   List<CustomLink> customLinks = [];
   bool showProfileToConnections = true;
+  bool monkModeEnabled = false;
+  String? monkModeDeactivateAt;
+  List<int> monkModeBlockedIds = [];
 
   String? _ownerId;
   int? _lastKnownUserId;
@@ -112,6 +115,9 @@ class ProfileProvider with ChangeNotifier {
     avatarUrl = '';
     gender = '';
     customLinks = [];
+    monkModeEnabled = false;
+    monkModeDeactivateAt = null;
+    monkModeBlockedIds = [];
   }
 
   // Which card(s) each field appears on (Casual / Professional).
@@ -409,6 +415,15 @@ class ProfileProvider with ChangeNotifier {
     }
   }
 
+  Map<String, dynamic>? getMonkModeData() {
+    if (userId == null) return null;
+    return {
+      'enabled': monkModeEnabled,
+      'deactivate_at': monkModeDeactivateAt != null ? DateTime.tryParse(monkModeDeactivateAt!) : null,
+      'blocked_ids': monkModeBlockedIds,
+    };
+  }
+
   // Method to fetch and set userId by profile type (isMyProfile)
   Future<void> fetchAndSetUserId(bool isMyProfile) async {
     final res = await fetchAndSetUserId2(isMyProfile);
@@ -479,7 +494,10 @@ class ProfileProvider with ChangeNotifier {
       "avatarUrl": "",
       "gender": "",
       "custom_links": [],
-      "showProfileToConnections": true
+      "showProfileToConnections": true,
+      "monkModeEnabled": false,
+      "monkModeDeactivateAt": null,
+      "monkModeBlockedIds": <int>[]
     };
     try {
       // Only transition to ProfileLoading if we don't already have data.
@@ -510,6 +528,14 @@ class ProfileProvider with ChangeNotifier {
         gender = response['gender'] ?? '';
         showProfileToConnections =
             response['show_profile_to_connections'] == true;
+        monkModeEnabled = response['monk_mode_enabled'] == true;
+        monkModeDeactivateAt = response['monk_mode_deactivate_at'];
+        final List<dynamic>? blockedRaw = response['monk_mode_blocked_ids'];
+        if (blockedRaw != null) {
+          monkModeBlockedIds = blockedRaw.map((e) => int.tryParse(e.toString())).whereType<int>().toList();
+        } else {
+          monkModeBlockedIds = [];
+        }
 
         customLinks = [];
         if (response['custom_links'] != null) {
@@ -540,6 +566,9 @@ class ProfileProvider with ChangeNotifier {
         profileData["gender"] = gender;
         profileData["custom_links"] = customLinks.map((l) => l.toJson()).toList();
         profileData["showProfileToConnections"] = showProfileToConnections;
+        profileData["monkModeEnabled"] = monkModeEnabled;
+        profileData["monkModeDeactivateAt"] = monkModeDeactivateAt;
+        profileData["monkModeBlockedIds"] = monkModeBlockedIds;
 
         _setLoadedState(id, true);
 
@@ -605,6 +634,9 @@ class ProfileProvider with ChangeNotifier {
           'show_profile_to_connections': showProfileToConnections,
           'field_assignments': assignmentsMap,
           'custom_links': customLinks.map((l) => l.toJson()).toList(),
+          'monk_mode_enabled': monkModeEnabled,
+          'monk_mode_deactivate_at': monkModeDeactivateAt,
+          'monk_mode_blocked_ids': monkModeBlockedIds,
         });
 
         _setLoadedState(insertedId, true);
@@ -641,6 +673,9 @@ class ProfileProvider with ChangeNotifier {
       'show_profile_to_connections': showProfileToConnections,
       'field_assignments': assignmentsMap,
       'custom_links': customLinks.map((l) => l.toJson()).toList(),
+      'monk_mode_enabled': monkModeEnabled,
+      'monk_mode_deactivate_at': monkModeDeactivateAt,
+      'monk_mode_blocked_ids': monkModeBlockedIds,
     };
 
     try {
@@ -683,6 +718,9 @@ class ProfileProvider with ChangeNotifier {
     avatarUrl = '';
     gender = '';
     showProfileToConnections = true;
+    monkModeEnabled = false;
+    monkModeDeactivateAt = null;
+    monkModeBlockedIds = [];
     _state = ProfileInitial();
     notifyListeners();
   }

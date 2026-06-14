@@ -4,8 +4,10 @@ import 'package:sqflite/sqflite.dart';
 
 abstract class ChatRepository {
   Future<List<String>> fetchUserRoomIds(int myUserId);
-  Future<List<Map<String, dynamic>>> fetchDirectParticipants(List<String> roomIds, int myUserId);
-  Future<Map<String, dynamic>?> getCommonDirectRoom(int myUserId, int otherUserId, List<String> myRoomIds);
+  Future<List<Map<String, dynamic>>> fetchDirectParticipants(
+      List<String> roomIds, int myUserId);
+  Future<Map<String, dynamic>?> getCommonDirectRoom(
+      int myUserId, int otherUserId, List<String> myRoomIds);
   Future<String> createChatRoom();
   Future<void> addParticipants(String roomId, int myUserId, int otherUserId);
   Future<void> insertMessageLocally(
@@ -24,7 +26,8 @@ abstract class ChatRepository {
   Future<Map<String, dynamic>?> getMessageByIdLocally(String id);
   Future<List<Map<String, dynamic>>> getMessagesForRoomLocally(String roomId);
   Future<List<Map<String, dynamic>>> getUnreadSentMessagesLocally(int senderId);
-  Future<List<Map<String, dynamic>>> getUnreadIncomingMessagesLocally(int senderId);
+  Future<List<Map<String, dynamic>>> getUnreadIncomingMessagesLocally(
+      int senderId);
   Future<int> getTotalUnreadCountLocally(int myUserId);
   Future<List<Map<String, dynamic>>> getRoomUnreadCountsLocally(int myUserId);
   Future<void> clearLocalDatabase();
@@ -33,18 +36,26 @@ abstract class ChatRepository {
   Future<void> deleteMessageInSupabase(String messageId);
   Future<void> updateMessageStatusInSupabase(String messageId, String status);
   Future<List<Map<String, dynamic>>> fetchMessagesFromSupabase(String roomId);
-  Future<List<Map<String, dynamic>>> fetchPendingMessagesFromSupabase(List<String> roomIds, int myUserId);
-  Future<List<Map<String, dynamic>>> fetchDeliveredMessagesFromSupabase(String roomId, int myUserId);
-  Future<List<Map<String, dynamic>>> fetchSupabaseMessageStatuses(List<String> messageIds);
+  Future<List<Map<String, dynamic>>> fetchPendingMessagesFromSupabase(
+      List<String> roomIds, int myUserId);
+  Future<List<Map<String, dynamic>>> fetchDeliveredMessagesFromSupabase(
+      String roomId, int myUserId);
+  Future<List<Map<String, dynamic>>> fetchSupabaseMessageStatuses(
+      List<String> messageIds);
   Future<void> updatePushTokenInSupabase(int myUserId, String token);
   Future<void> markRoomMessagesAsReadLocally(String roomId, int myUserId);
-  Future<void> deleteDirectRoomParticipantsLocallyAndRemotely(int profileId, String roomId, int myUserId);
-  RealtimeChannel subscribeToRoom(String roomId, {
+  Future<void> deleteDirectRoomParticipantsLocallyAndRemotely(
+      int profileId, String roomId, int myUserId);
+  RealtimeChannel subscribeToRoom(
+    String roomId, {
     required void Function(dynamic payload) onInsert,
     required void Function(dynamic payload) onUpdate,
     required void Function(dynamic payload) onDelete,
     required void Function(RealtimeSubscribeStatus status) onSubscribeStatus,
+    required void Function(Map<String, dynamic> payload) onTyping,
   });
+  Future<void> sendTypingBroadcast(
+      RealtimeChannel channel, int userId, bool isTyping);
   void removeChannel(RealtimeChannel channel);
 }
 
@@ -66,7 +77,8 @@ class SupabaseChatRepository implements ChatRepository {
   }
 
   @override
-  Future<List<Map<String, dynamic>>> fetchDirectParticipants(List<String> roomIds, int myUserId) async {
+  Future<List<Map<String, dynamic>>> fetchDirectParticipants(
+      List<String> roomIds, int myUserId) async {
     final response = await _client
         .from('room_participants')
         .select('room_id, user_id, chat_rooms!inner(type)')
@@ -76,7 +88,8 @@ class SupabaseChatRepository implements ChatRepository {
   }
 
   @override
-  Future<Map<String, dynamic>?> getCommonDirectRoom(int myUserId, int otherUserId, List<String> myRoomIds) async {
+  Future<Map<String, dynamic>?> getCommonDirectRoom(
+      int myUserId, int otherUserId, List<String> myRoomIds) async {
     return await _client
         .from('room_participants')
         .select('room_id, chat_rooms!inner(type)')
@@ -98,7 +111,8 @@ class SupabaseChatRepository implements ChatRepository {
   }
 
   @override
-  Future<void> addParticipants(String roomId, int myUserId, int otherUserId) async {
+  Future<void> addParticipants(
+      String roomId, int myUserId, int otherUserId) async {
     await _client.from('room_participants').insert([
       {'room_id': roomId, 'user_id': myUserId},
       {'room_id': roomId, 'user_id': otherUserId},
@@ -131,7 +145,8 @@ class SupabaseChatRepository implements ChatRepository {
   }
 
   @override
-  Future<void> updateMessageStatusLocally(String messageId, String status) async {
+  Future<void> updateMessageStatusLocally(
+      String messageId, String status) async {
     await _localDb.updateMessageStatus(messageId, status);
   }
 
@@ -146,17 +161,20 @@ class SupabaseChatRepository implements ChatRepository {
   }
 
   @override
-  Future<List<Map<String, dynamic>>> getMessagesForRoomLocally(String roomId) async {
+  Future<List<Map<String, dynamic>>> getMessagesForRoomLocally(
+      String roomId) async {
     return await _localDb.getMessagesForRoom(roomId);
   }
 
   @override
-  Future<List<Map<String, dynamic>>> getUnreadSentMessagesLocally(int senderId) async {
+  Future<List<Map<String, dynamic>>> getUnreadSentMessagesLocally(
+      int senderId) async {
     return await _localDb.getUnreadSentMessages(senderId);
   }
 
   @override
-  Future<List<Map<String, dynamic>>> getUnreadIncomingMessagesLocally(int senderId) async {
+  Future<List<Map<String, dynamic>>> getUnreadIncomingMessagesLocally(
+      int senderId) async {
     final db = await _localDb.database;
     return await db.query(
       'messages',
@@ -180,7 +198,8 @@ class SupabaseChatRepository implements ChatRepository {
   }
 
   @override
-  Future<List<Map<String, dynamic>>> getRoomUnreadCountsLocally(int myUserId) async {
+  Future<List<Map<String, dynamic>>> getRoomUnreadCountsLocally(
+      int myUserId) async {
     final db = await _localDb.database;
     return await db.rawQuery(
       "SELECT room_id, COUNT(*) as count FROM messages WHERE sender_id != ? AND status != 'read' GROUP BY room_id",
@@ -209,12 +228,16 @@ class SupabaseChatRepository implements ChatRepository {
   }
 
   @override
-  Future<void> updateMessageStatusInSupabase(String messageId, String status) async {
-    await _client.from('messages').update({'status': status}).eq('id', messageId);
+  Future<void> updateMessageStatusInSupabase(
+      String messageId, String status) async {
+    await _client
+        .from('messages')
+        .update({'status': status}).eq('id', messageId);
   }
 
   @override
-  Future<List<Map<String, dynamic>>> fetchMessagesFromSupabase(String roomId) async {
+  Future<List<Map<String, dynamic>>> fetchMessagesFromSupabase(
+      String roomId) async {
     final response = await _client
         .from('messages')
         .select()
@@ -224,7 +247,8 @@ class SupabaseChatRepository implements ChatRepository {
   }
 
   @override
-  Future<List<Map<String, dynamic>>> fetchPendingMessagesFromSupabase(List<String> roomIds, int myUserId) async {
+  Future<List<Map<String, dynamic>>> fetchPendingMessagesFromSupabase(
+      List<String> roomIds, int myUserId) async {
     final response = await _client
         .from('messages')
         .select()
@@ -235,7 +259,8 @@ class SupabaseChatRepository implements ChatRepository {
   }
 
   @override
-  Future<List<Map<String, dynamic>>> fetchDeliveredMessagesFromSupabase(String roomId, int myUserId) async {
+  Future<List<Map<String, dynamic>>> fetchDeliveredMessagesFromSupabase(
+      String roomId, int myUserId) async {
     final response = await _client
         .from('messages')
         .select('id')
@@ -246,7 +271,8 @@ class SupabaseChatRepository implements ChatRepository {
   }
 
   @override
-  Future<List<Map<String, dynamic>>> fetchSupabaseMessageStatuses(List<String> messageIds) async {
+  Future<List<Map<String, dynamic>>> fetchSupabaseMessageStatuses(
+      List<String> messageIds) async {
     final response = await _client
         .from('messages')
         .select('id, status')
@@ -264,7 +290,8 @@ class SupabaseChatRepository implements ChatRepository {
   }
 
   @override
-  Future<void> markRoomMessagesAsReadLocally(String roomId, int myUserId) async {
+  Future<void> markRoomMessagesAsReadLocally(
+      String roomId, int myUserId) async {
     final db = await _localDb.database;
     await db.update(
       'messages',
@@ -275,21 +302,13 @@ class SupabaseChatRepository implements ChatRepository {
   }
 
   @override
-  Future<void> deleteDirectRoomParticipantsLocallyAndRemotely(int profileId, String roomId, int myUserId) async {
-    await _client
-        .from('room_participants')
-        .delete()
-        .eq('room_id', roomId);
+  Future<void> deleteDirectRoomParticipantsLocallyAndRemotely(
+      int profileId, String roomId, int myUserId) async {
+    await _client.from('room_participants').delete().eq('room_id', roomId);
 
-    await _client
-        .from('messages')
-        .delete()
-        .eq('room_id', roomId);
+    await _client.from('messages').delete().eq('room_id', roomId);
 
-    await _client
-        .from('chat_rooms')
-        .delete()
-        .eq('id', roomId);
+    await _client.from('chat_rooms').delete().eq('id', roomId);
 
     final db = await _localDb.database;
     await db.delete(
@@ -300,11 +319,13 @@ class SupabaseChatRepository implements ChatRepository {
   }
 
   @override
-  RealtimeChannel subscribeToRoom(String roomId, {
+  RealtimeChannel subscribeToRoom(
+    String roomId, {
     required void Function(dynamic payload) onInsert,
     required void Function(dynamic payload) onUpdate,
     required void Function(dynamic payload) onDelete,
     required void Function(RealtimeSubscribeStatus status) onSubscribeStatus,
+    required void Function(Map<String, dynamic> payload) onTyping,
   }) {
     final channel = _client.channel('room-$roomId');
     channel
@@ -340,13 +361,31 @@ class SupabaseChatRepository implements ChatRepository {
             value: roomId,
           ),
           callback: onDelete,
+        )
+        .onBroadcast(
+          event: 'typing',
+          callback: (payload) {
+            onTyping(Map<String, dynamic>.from(payload));
+          },
         );
-    
+
     channel.subscribe((status, [error]) {
       onSubscribeStatus(status);
     });
 
     return channel;
+  }
+
+  @override
+  Future<void> sendTypingBroadcast(
+      RealtimeChannel channel, int userId, bool isTyping) async {
+    await channel.sendBroadcastMessage(
+      event: 'typing',
+      payload: {
+        'user_id': userId,
+        'is_typing': isTyping,
+      },
+    );
   }
 
   @override

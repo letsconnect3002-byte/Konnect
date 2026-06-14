@@ -111,7 +111,7 @@ class _ProfilePageState extends State<ProfilePage> {
     }
   }
 
-  // Share profile details by generating a VIP Pass and sharing it
+  // Share profile details by generating a Private Key and sharing it
   void _shareProfile(ProfileProvider profileProvider) async {
     if (profileProvider.userId == null) return;
 
@@ -138,7 +138,7 @@ class _ProfilePageState extends State<ProfilePage> {
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  "Generating VIP Pass...",
+                  "Generating Private Key...",
                   style: context.cardTitle,
                 ),
               ],
@@ -823,7 +823,7 @@ class _ProfilePageState extends State<ProfilePage> {
                       ),
                       const SizedBox(height: 20),
                       Text(
-                        "Share VIP Pass Options",
+                        "Share Private Key Options",
                         style: TextStyle(
                           color: context.textPrimary,
                           fontSize: 20,
@@ -833,7 +833,7 @@ class _ProfilePageState extends State<ProfilePage> {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        "Select which digital card you want to share with this VIP Pass code:",
+                        "Select which digital card you want to share with this Private Key code:",
                         style: TextStyle(
                           color: context.textSecondary,
                           fontSize: 13,
@@ -894,7 +894,7 @@ class _ProfilePageState extends State<ProfilePage> {
                           padding: const EdgeInsets.symmetric(vertical: 14),
                         ),
                         child: const Text(
-                          "Share VIP Pass",
+                          "Share Private Key",
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 14,
@@ -1293,7 +1293,7 @@ class _ProfilePageState extends State<ProfilePage> {
     final shareCard = compactCard(
       icon: Icons.share_rounded,
       label: 'Share Link',
-      subtitle: 'Send your VIP pass',
+      subtitle: 'Send your Private Key',
       disabled: !hasProfile,
       onTap: () => _showShareOptionsBottomSheet(context, profileProvider),
     );

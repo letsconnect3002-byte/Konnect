@@ -40,12 +40,6 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
     }
   }
 
-  Future<Map<String, dynamic>?> _getLastMessage(
-      String? roomId, ChatProvider chatProvider) async {
-    if (roomId == null) return null;
-    return await chatProvider.getLastMessageForRoom(roomId);
-  }
-
   @override
   void dispose() {
     _searchController.dispose();
@@ -197,6 +191,28 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
       final query = _searchQuery.toLowerCase();
       return name.contains(query) || profession.contains(query);
     }).toList();
+
+    // Sort dynamically by recent conversation (most recent on top)
+    filteredConnections.sort((a, b) {
+      final aRoomId = chatProvider.connectionRooms[a['id']];
+      final bRoomId = chatProvider.connectionRooms[b['id']];
+
+      final aMsg =
+          aRoomId != null ? chatProvider.lastMessagesByRoom[aRoomId] : null;
+      final bMsg =
+          bRoomId != null ? chatProvider.lastMessagesByRoom[bRoomId] : null;
+
+      if (aMsg == null && bMsg == null) return 0;
+      if (aMsg == null) return 1;
+      if (bMsg == null) return -1;
+
+      final aTime = DateTime.tryParse(aMsg['created_at'] ?? '') ??
+          DateTime.fromMillisecondsSinceEpoch(0);
+      final bTime = DateTime.tryParse(bMsg['created_at'] ?? '') ??
+          DateTime.fromMillisecondsSinceEpoch(0);
+
+      return bTime.compareTo(aTime);
+    });
 
     return Scaffold(
       backgroundColor: context.canvasBackground,
@@ -523,6 +539,25 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
                           final roomId =
                               chatProvider.connectionRooms[connection['id']];
 
+                          final lastMsg = roomId != null
+                              ? chatProvider.lastMessagesByRoom[roomId]
+                              : null;
+
+                          final String lastMessageText =
+                              lastMsg != null ? lastMsg['payload'] ?? '' : '';
+
+                          final String msgTime = lastMsg != null
+                              ? _formatMessageTime(
+                                  lastMsg['created_at'] as String?)
+                              : '';
+
+                          final bool isUnread = lastMsg != null &&
+                              lastMsg['sender_id'] != myUserId &&
+                              lastMsg['status'] != 'read';
+
+                          final bool isTyping = roomId != null &&
+                              chatProvider.isRoomTyping(roomId);
+
                           return Container(
                             decoration: BoxDecoration(
                               color: context.surfacePrimary,
@@ -539,161 +574,143 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
                               clipBehavior: Clip.antiAlias,
                               borderRadius: BorderRadius.circular(
                                   AppDimensions.radiusPremiumCard),
-                              child: FutureBuilder<Map<String, dynamic>?>(
-                                future: _getLastMessage(roomId, chatProvider),
-                                builder: (context, snapshot) {
-                                  final lastMsg = snapshot.data;
-
-                                  final String lastMessageText = lastMsg != null
-                                      ? lastMsg['payload'] ?? ''
-                                      : '';
-
-                                  final String msgTime = lastMsg != null
-                                      ? _formatMessageTime(
-                                          lastMsg['created_at'] as String?)
-                                      : '';
-
-                                  final bool isUnread = lastMsg != null &&
-                                      lastMsg['sender_id'] != myUserId &&
-                                      lastMsg['status'] != 'read';
-
-                                  return ListTile(
-                                    onTap: () {
-                                      HapticFeedback.lightImpact();
-                                      Navigator.push(
-                                        context,
-                                        PageRouteBuilder(
-                                          pageBuilder: (context, animation,
-                                                  secondaryAnimation) =>
-                                              IndividualChatPage(
-                                                  connectionData: connection),
-                                          transitionsBuilder: (context,
-                                              animation,
-                                              secondaryAnimation,
-                                              child) {
-                                            return SlideTransition(
-                                              position: Tween<Offset>(
-                                                begin: const Offset(1.0, 0.0),
-                                                end: Offset.zero,
-                                              ).animate(CurvedAnimation(
-                                                parent: animation,
-                                                curve: Curves.easeOutCubic,
-                                              )),
-                                              child: child,
-                                            );
-                                          },
-                                          transitionDuration:
-                                              const Duration(milliseconds: 300),
-                                          reverseTransitionDuration:
-                                              const Duration(milliseconds: 250),
-                                        ),
-                                      );
-                                    },
-                                    onLongPress: () {
-                                      HapticFeedback.mediumImpact();
-                                      _showDeleteConfirmation(context,
-                                          connection, connectionProvider);
-                                    },
-                                    contentPadding: const EdgeInsets.symmetric(
-                                        horizontal: 14, vertical: 6),
-                                    leading: Container(
-                                      width: 44,
-                                      height: 44,
-                                      decoration: const BoxDecoration(
-                                        shape: BoxShape.circle,
-                                      ),
-                                      child: ClipOval(
-                                        child: avatar.isNotEmpty
-                                            ? Image.network(avatar,
-                                                fit: BoxFit.cover)
-                                            : Container(
-                                                color: context.surfaceSecondary,
-                                                alignment: Alignment.center,
-                                                child: Text(
-                                                  name.isNotEmpty
-                                                      ? name
-                                                          .substring(0, 1)
-                                                          .toUpperCase()
-                                                      : "?",
-                                                  style: TextStyle(
-                                                      color:
-                                                          context.textPrimary,
-                                                      fontWeight:
-                                                          FontWeight.bold,
-                                                      fontSize: 15),
-                                                ),
-                                              ),
-                                      ),
+                              child: ListTile(
+                                onTap: () {
+                                  HapticFeedback.lightImpact();
+                                  Navigator.push(
+                                    context,
+                                    PageRouteBuilder(
+                                      pageBuilder: (context, animation,
+                                              secondaryAnimation) =>
+                                          IndividualChatPage(
+                                              connectionData: connection),
+                                      transitionsBuilder: (context, animation,
+                                          secondaryAnimation, child) {
+                                        return SlideTransition(
+                                          position: Tween<Offset>(
+                                            begin: const Offset(1.0, 0.0),
+                                            end: Offset.zero,
+                                          ).animate(CurvedAnimation(
+                                            parent: animation,
+                                            curve: Curves.easeOutCubic,
+                                          )),
+                                          child: child,
+                                        );
+                                      },
+                                      transitionDuration:
+                                          const Duration(milliseconds: 300),
+                                      reverseTransitionDuration:
+                                          const Duration(milliseconds: 250),
                                     ),
-                                    title: Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        Text(
-                                          name,
-                                          style: context.cardTitle.copyWith(
-                                            fontWeight: FontWeight.bold,
-                                            color: context.textPrimary,
-                                          ),
-                                        ),
-                                        if (msgTime.isNotEmpty)
-                                          Text(
-                                            msgTime,
-                                            style: context.captionText.copyWith(
-                                              color: isUnread
-                                                  ? context.accentSecondary
-                                                  : context.textMuted,
-                                              fontWeight: isUnread
-                                                  ? FontWeight.bold
-                                                  : FontWeight.normal,
-                                            ),
-                                          ),
-                                      ],
-                                    ),
-                                    subtitle: lastMessageText.isEmpty
-                                        ? null
-                                        : Padding(
-                                            padding:
-                                                const EdgeInsets.only(top: 4.0),
-                                            child: Row(
-                                              children: [
-                                                Expanded(
-                                                  child: Text(
-                                                    lastMessageText,
-                                                    maxLines: 1,
-                                                    overflow:
-                                                        TextOverflow.ellipsis,
-                                                    style: context.bodyText
-                                                        .copyWith(
-                                                      color: isUnread
-                                                          ? context.textPrimary
-                                                          : context
-                                                              .textSecondary,
-                                                      fontSize: 12.5,
-                                                      fontWeight: isUnread
-                                                          ? FontWeight.w600
-                                                          : FontWeight.normal,
-                                                    ),
-                                                  ),
-                                                ),
-                                                if (isUnread)
-                                                  Container(
-                                                    margin:
-                                                        const EdgeInsets.only(
-                                                            left: 8),
-                                                    width: 8,
-                                                    height: 8,
-                                                    decoration: BoxDecoration(
-                                                      color: context
-                                                          .accentSecondary,
-                                                      shape: BoxShape.circle,
-                                                    ),
-                                                  ),
-                                              ],
-                                            ),
-                                          ),
                                   );
                                 },
+                                onLongPress: () {
+                                  HapticFeedback.mediumImpact();
+                                  _showDeleteConfirmation(
+                                      context, connection, connectionProvider);
+                                },
+                                contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 14, vertical: 6),
+                                leading: Container(
+                                  width: 44,
+                                  height: 44,
+                                  decoration: const BoxDecoration(
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: ClipOval(
+                                    child: avatar.isNotEmpty
+                                        ? Image.network(avatar,
+                                            fit: BoxFit.cover)
+                                        : Container(
+                                            color: context.surfaceSecondary,
+                                            alignment: Alignment.center,
+                                            child: Text(
+                                              name.isNotEmpty
+                                                  ? name
+                                                      .substring(0, 1)
+                                                      .toUpperCase()
+                                                  : "?",
+                                              style: TextStyle(
+                                                  color: context.textPrimary,
+                                                  fontWeight: FontWeight.bold,
+                                                  fontSize: 15),
+                                            ),
+                                          ),
+                                  ),
+                                ),
+                                title: Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(
+                                      name,
+                                      style: context.cardTitle.copyWith(
+                                        fontWeight: FontWeight.bold,
+                                        color: context.textPrimary,
+                                      ),
+                                    ),
+                                    if (msgTime.isNotEmpty)
+                                      Text(
+                                        msgTime,
+                                        style: context.captionText.copyWith(
+                                          color: isUnread
+                                              ? context.accentSecondary
+                                              : context.textMuted,
+                                          fontWeight: isUnread
+                                              ? FontWeight.bold
+                                              : FontWeight.normal,
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                                subtitle: lastMessageText.isEmpty && !isTyping
+                                    ? null
+                                    : Padding(
+                                        padding:
+                                            const EdgeInsets.only(top: 4.0),
+                                        child: Row(
+                                          children: [
+                                            Expanded(
+                                              child: Text(
+                                                isTyping
+                                                    ? "typing..."
+                                                    : lastMessageText,
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                                style:
+                                                    context.bodyText.copyWith(
+                                                  color: isTyping
+                                                      ? context.accentSecondary
+                                                      : (isUnread
+                                                          ? context.textPrimary
+                                                          : context
+                                                              .textSecondary),
+                                                  fontSize: 12.5,
+                                                  fontWeight:
+                                                      isTyping || isUnread
+                                                          ? FontWeight.w600
+                                                          : FontWeight.normal,
+                                                  fontStyle: isTyping
+                                                      ? FontStyle.italic
+                                                      : FontStyle.normal,
+                                                ),
+                                              ),
+                                            ),
+                                            if (isUnread)
+                                              Container(
+                                                margin: const EdgeInsets.only(
+                                                    left: 8),
+                                                width: 8,
+                                                height: 8,
+                                                decoration: BoxDecoration(
+                                                  color:
+                                                      context.accentSecondary,
+                                                  shape: BoxShape.circle,
+                                                ),
+                                              ),
+                                          ],
+                                        ),
+                                      ),
                               ),
                             ),
                           );

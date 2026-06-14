@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 
@@ -19,7 +20,7 @@ class LocalDatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 2,
+      version: 3,
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
     );
@@ -42,6 +43,22 @@ class LocalDatabaseHelper {
 
     // Create index on room_id for fast retrieval
     await db.execute('CREATE INDEX idx_messages_room_id ON messages (room_id)');
+
+    await db.execute('''
+      CREATE TABLE monk_mode_settings (
+        id INTEGER PRIMARY KEY,
+        enabled INTEGER NOT NULL,
+        deactivate_at TEXT,
+        blocked_ids TEXT
+      )
+    ''');
+
+    await db.insert('monk_mode_settings', {
+      'id': 1,
+      'enabled': 0,
+      'deactivate_at': null,
+      'blocked_ids': '[]',
+    });
   }
 
   Future<void> _upgradeDB(Database db, int oldVersion, int newVersion) async {
@@ -52,6 +69,26 @@ class LocalDatabaseHelper {
           'ALTER TABLE messages ADD COLUMN reply_to_message_payload TEXT');
       await db.execute(
           'ALTER TABLE messages ADD COLUMN reply_to_message_sender_name TEXT');
+    }
+    if (oldVersion < 3) {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS monk_mode_settings (
+          id INTEGER PRIMARY KEY,
+          enabled INTEGER NOT NULL,
+          deactivate_at TEXT,
+          blocked_ids TEXT
+        )
+      ''');
+      await db.insert(
+        'monk_mode_settings',
+        {
+          'id': 1,
+          'enabled': 0,
+          'deactivate_at': null,
+          'blocked_ids': '[]',
+        },
+        conflictAlgorithm: ConflictAlgorithm.ignore,
+      );
     }
   }
 
@@ -156,9 +193,59 @@ class LocalDatabaseHelper {
     );
   }
 
+  Future<void> updateMonkMode({
+    required bool enabled,
+    String? deactivateAt,
+    required List<int> blockedIds,
+  }) async {
+    final db = await database;
+    await db.insert(
+      'monk_mode_settings',
+      {
+        'id': 1,
+        'enabled': enabled ? 1 : 0,
+        'deactivate_at': deactivateAt,
+        'blocked_ids': jsonEncode(blockedIds),
+      },
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<Map<String, dynamic>> getMonkModeSettings() async {
+    final db = await database;
+    final List<Map<String, dynamic>> results = await db.query(
+      'monk_mode_settings',
+      where: 'id = 1',
+    );
+    if (results.isNotEmpty) {
+      final row = results.first;
+      final bool enabled = row['enabled'] == 1;
+      final String? deactivateAt = row['deactivate_at'];
+      final String blockedIdsStr = row['blocked_ids'] ?? '[]';
+      List<int> blockedIds = [];
+      try {
+        final List<dynamic> decoded = jsonDecode(blockedIdsStr);
+        blockedIds = decoded.map((e) => e as int).toList();
+      } catch (e) {
+        print("Error parsing blocked_ids: $e");
+      }
+      return {
+        'enabled': enabled,
+        'deactivate_at': deactivateAt,
+        'blocked_ids': blockedIds,
+      };
+    }
+    return {
+      'enabled': false,
+      'deactivate_at': null,
+      'blocked_ids': <int>[],
+    };
+  }
+
   Future<void> clearDatabase() async {
     final db = await database;
     await db.delete('messages');
+    await db.delete('monk_mode_settings');
   }
 
   Future<void> close() async {
