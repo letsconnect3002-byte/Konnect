@@ -310,12 +310,33 @@ class _ProfileCardState extends State<ProfileCard> {
   late final ConnectionProvider connectionProvider;
   String _shareBackType = 'casual';
 
+  bool _isAlreadyConnected = false;
+
   @override
   void initState() {
     super.initState();
     profileProvider = Provider.of<ProfileProvider>(context, listen: false);
     connectionProvider =
         Provider.of<ConnectionProvider>(context, listen: false);
+
+    final otherUserIdVal = widget.profileData['id'];
+    if (otherUserIdVal != null) {
+      final int scannedUserId = otherUserIdVal is int
+          ? otherUserIdVal
+          : int.parse(otherUserIdVal.toString());
+      _isAlreadyConnected =
+          connectionProvider.connections.any((c) => c['id'] == scannedUserId);
+      if (_isAlreadyConnected) {
+        final existingConnection = connectionProvider.connections
+            .firstWhere((c) => c['id'] == scannedUserId);
+        final myShared = existingConnection['my_shared_card'] ?? 'casual';
+        if (myShared == 'professional' || myShared == 'both') {
+          _shareBackType = myShared;
+        } else {
+          _shareBackType = 'casual';
+        }
+      }
+    }
   }
 
   String _getAvatarUrl(String name, String? existingUrl) {
@@ -374,7 +395,7 @@ class _ProfileCardState extends State<ProfileCard> {
               ),
               const SizedBox(height: 16),
               Text(
-                "Saving connection...",
+                _isAlreadyConnected ? "Updating connection..." : "Saving connection...",
                 style: context.bodyText.copyWith(fontWeight: FontWeight.bold),
               ),
             ],
@@ -400,7 +421,9 @@ class _ProfileCardState extends State<ProfileCard> {
               Icon(Icons.check_circle_rounded, color: themeAccentPrimary),
               const SizedBox(width: 10),
               Text(
-                "Connected with $otherName!",
+                _isAlreadyConnected
+                    ? "Connection updated with $otherName!"
+                    : "Connected with $otherName!",
                 style: const TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.bold,
@@ -855,6 +878,63 @@ class _ProfileCardState extends State<ProfileCard> {
     );
   }
 
+  Widget _buildAlreadyConnectedBadge() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: context.surfacePrimary,
+        borderRadius: BorderRadius.circular(AppDimensions.radiusPremiumCard),
+        border: Border.all(
+          color: context.accentPrimary.withValues(alpha: 0.35),
+          width: 1.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: context.accentPrimary.withValues(alpha: 0.05),
+            blurRadius: 10,
+            spreadRadius: 1,
+          )
+        ],
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.verified_user_rounded,
+            color: context.accentPrimary,
+            size: 24,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  "ALREADY CONNECTED",
+                  style: TextStyle(
+                    color: context.accentPrimary,
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 1.5,
+                    fontFamily: 'Inter',
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  "You are already connected to this user.",
+                  style: context.captionText.copyWith(
+                    color: context.textSecondary,
+                    height: 1.3,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -881,7 +961,10 @@ class _ProfileCardState extends State<ProfileCard> {
               const SizedBox(height: 10),
               _buildProfileHeaderCard(),
               _buildProfileDetailsSection(),
-              _buildShareBackSelector(),
+              if (_isAlreadyConnected)
+                _buildAlreadyConnectedBadge()
+              else
+                _buildShareBackSelector(),
               Padding(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
@@ -890,47 +973,57 @@ class _ProfileCardState extends State<ProfileCard> {
                   height: 52,
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(16),
-                    gradient: LinearGradient(
-                      colors: _shareBackType == 'casual'
-                          ? [
-                              context.accentSecondary,
-                              context.accentSecondary.withValues(alpha: 0.8)
-                            ]
-                          : [
-                              context.accentPrimary,
-                              context.accentPrimary.withValues(alpha: 0.8)
-                            ],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: (_shareBackType == 'casual'
-                                ? context.accentSecondary
-                                : context.accentPrimary)
-                            .withValues(alpha: 0.2),
-                        blurRadius: 16,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
+                    gradient: _isAlreadyConnected
+                        ? null
+                        : LinearGradient(
+                            colors: _shareBackType == 'casual'
+                                ? [
+                                    context.accentSecondary,
+                                    context.accentSecondary.withValues(alpha: 0.8)
+                                  ]
+                                : [
+                                    context.accentPrimary,
+                                    context.accentPrimary.withValues(alpha: 0.8)
+                                  ],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                    color: _isAlreadyConnected ? context.surfaceSecondary : null,
+                    boxShadow: _isAlreadyConnected
+                        ? null
+                        : [
+                            BoxShadow(
+                              color: (_shareBackType == 'casual'
+                                      ? context.accentSecondary
+                                      : context.accentPrimary)
+                                  .withValues(alpha: 0.2),
+                              blurRadius: 16,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
                   ),
                   child: ElevatedButton(
-                    onPressed: saveProfile,
+                    onPressed: _isAlreadyConnected ? null : saveProfile,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.transparent,
                       shadowColor: Colors.transparent,
+                      disabledBackgroundColor: Colors.transparent,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(16),
                       ),
                     ),
                     child: Text(
-                      _shareBackType == 'casual'
-                          ? "Add to My Casual Network"
-                          : "Add to My Professional Network",
+                      _isAlreadyConnected
+                          ? "Already Connected"
+                          : (_shareBackType == 'casual'
+                              ? "Add to My Casual Network"
+                              : "Add to My Professional Network"),
                       style: TextStyle(
-                        color: _shareBackType == 'casual'
-                            ? Colors.white
-                            : Colors.black,
+                        color: _isAlreadyConnected
+                            ? context.textMuted
+                            : (_shareBackType == 'casual'
+                                ? Colors.white
+                                : Colors.black),
                         fontWeight: FontWeight.bold,
                         fontSize: 15,
                         fontFamily: 'Inter',

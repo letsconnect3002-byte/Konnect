@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 abstract class ConnectionRepository {
   Future<List<Map<String, dynamic>>> getOtherProfiles(int myUserId);
   Future<void> saveOtherProfileData(Map<String, dynamic> data);
+  Future<bool> connectionExists(int id1, int id2);
   Future<void> connectUsers(int id1, int id2, String u1Share, String u2Share);
   Future<void> updateConnectionAccess(int id1, int id2, String columnToUpdate, String newAccessType);
   Future<void> disconnectUsers(int id1, int id2);
@@ -96,6 +97,17 @@ class SupabaseConnectionRepository implements ConnectionRepository {
   @override
   Future<void> saveOtherProfileData(Map<String, dynamic> data) async {
     await _client.from('profiles').insert(data);
+  }
+
+  @override
+  Future<bool> connectionExists(int id1, int id2) async {
+    final response = await _client
+        .from('user_connections')
+        .select('user_id_1, user_id_2')
+        .eq('user_id_1', id1)
+        .eq('user_id_2', id2)
+        .maybeSingle();
+    return response != null;
   }
 
   @override

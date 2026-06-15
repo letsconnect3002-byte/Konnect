@@ -192,25 +192,31 @@ class ConnectionProvider with ChangeNotifier {
     }
 
     try {
+      final bool alreadyConnected = await _repository.connectionExists(id1, id2);
+
       await _repository.connectUsers(id1, id2, u1Share, u2Share);
       print(
           "Successfully connected user $id1 and user $id2 (shares: $u1Share, $u2Share)");
       
-      // Insert notifications for both users
-      try {
-        await _notificationRepository.insertNotification(
-          userId: idA,
-          otherUserId: idB,
-          type: connectionType,
-        );
-        await _notificationRepository.insertNotification(
-          userId: idB,
-          otherUserId: idA,
-          type: connectionType,
-        );
-        print("Inserted connection notifications");
-      } catch (notifErr) {
-        print("Non-fatal error inserting notifications: $notifErr");
+      if (!alreadyConnected) {
+        // Insert notifications for both users since this is a new connection
+        try {
+          await _notificationRepository.insertNotification(
+            userId: idA,
+            otherUserId: idB,
+            type: connectionType,
+          );
+          await _notificationRepository.insertNotification(
+            userId: idB,
+            otherUserId: idA,
+            type: connectionType,
+          );
+          print("Inserted connection notifications");
+        } catch (notifErr) {
+          print("Non-fatal error inserting notifications: $notifErr");
+        }
+      } else {
+        print("Connection already exists. Skipping insertion of duplicate notifications.");
       }
 
       notifyListeners();
@@ -249,6 +255,15 @@ class ConnectionProvider with ChangeNotifier {
     try {
       await _repository.disconnectUsers(id1, id2);
       print("Successfully disconnected user $id1 and user $id2");
+      
+      // Delete connection notifications between the users
+      try {
+        await _notificationRepository.deleteNotificationsBetweenUsers(idA, idB);
+        print("Deleted notifications between $idA and $idB");
+      } catch (notifErr) {
+        print("Non-fatal error deleting connection notifications: $notifErr");
+      }
+
       notifyListeners();
     } catch (e) {
       print("Error disconnecting users: $e");

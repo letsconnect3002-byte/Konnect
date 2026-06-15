@@ -629,9 +629,10 @@ class _MonkModePageState extends State<MonkModePage> {
 
                                   Widget labelWidget;
                                   if (isCustom) {
-                                    final String displayLabel = monkMode.customDurationMinutes != null
-                                        ? "Custom ($labelText)"
-                                        : "Custom...";
+                                    final String displayLabel =
+                                        monkMode.customDurationMinutes != null
+                                            ? "Custom ($labelText)"
+                                            : "Custom...";
                                     labelWidget = Row(
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
@@ -666,7 +667,8 @@ class _MonkModePageState extends State<MonkModePage> {
                                     );
                                   }
 
-                                  final double borderWidth = isCustom ? 1.5 : 1.0;
+                                  final double borderWidth =
+                                      isCustom ? 1.5 : 1.0;
                                   final BorderSide borderSide;
                                   if (isSelected) {
                                     borderSide = BorderSide(
@@ -678,15 +680,18 @@ class _MonkModePageState extends State<MonkModePage> {
                                   } else {
                                     borderSide = BorderSide(
                                       color: isCustom
-                                          ? context.accentPrimary.withValues(alpha: 0.5)
+                                          ? context.accentPrimary
+                                              .withValues(alpha: 0.5)
                                           : context.surfaceSecondary,
                                       width: borderWidth,
                                     );
                                   }
 
-                                  final Color chipBgColor = isCustom && !isSelected
-                                      ? context.surfaceSecondary.withValues(alpha: 0.4)
-                                      : context.surfaceSecondary;
+                                  final Color chipBgColor =
+                                      isCustom && !isSelected
+                                          ? context.surfaceSecondary
+                                              .withValues(alpha: 0.4)
+                                          : context.surfaceSecondary;
 
                                   return ChoiceChip(
                                     label: labelWidget,

@@ -16,6 +16,7 @@ abstract class NotificationRepository {
   Future<void> markAsSeen(String notificationId);
   Future<void> markAllAsSeen(int userId);
   Future<void> deleteNotification(String notificationId);
+  Future<void> deleteNotificationsBetweenUsers(int idA, int idB);
   RealtimeChannel subscribeToNotifications(
       int userId, void Function(dynamic payload) callback);
   void removeChannel(RealtimeChannel channel);
@@ -93,6 +94,20 @@ class SupabaseNotificationRepository implements NotificationRepository {
         .from('connection_notifications')
         .delete()
         .eq('id', notificationId);
+  }
+
+  @override
+  Future<void> deleteNotificationsBetweenUsers(int idA, int idB) async {
+    await _client
+        .from('connection_notifications')
+        .delete()
+        .eq('user_id', idA)
+        .eq('other_user_id', idB);
+    await _client
+        .from('connection_notifications')
+        .delete()
+        .eq('user_id', idB)
+        .eq('other_user_id', idA);
   }
 
   @override
