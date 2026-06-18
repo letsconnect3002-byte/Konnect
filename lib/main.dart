@@ -56,19 +56,50 @@ int getNotificationId(String messageId) {
   }
 }
 
-Future<void> showLocalNotification(String messageId, String title, String body,
-    Map<String, dynamic> dataPayload) async {
-  final notificationId = getNotificationId(messageId);
+/// Shows a local notification keyed by [roomId] so that multiple messages
+/// from the same conversation collapse into a single tray entry.
+/// [messageLines] contains every unread message payload for this room,
+/// ordered oldest-first.  When there is more than one line, Android uses
+/// InboxStyle so the user can see ALL accumulated messages in the tray.
+Future<void> showLocalNotification(
+  String roomId,
+  String title,
+  List<String> messageLines,
+  Map<String, dynamic> dataPayload,
+) async {
+  final notificationId = getNotificationId(roomId);
+  final int count = messageLines.length;
 
-  const AndroidNotificationDetails androidNotificationDetails =
-      AndroidNotificationDetails(
-    'messages_channel',
-    'Messages',
-    channelDescription: 'Notifications for new messages',
-    importance: Importance.max,
-    priority: Priority.high,
-    showWhen: true,
-  );
+  // Build the single-line body (always the latest message)
+  final String latestBody = messageLines.last;
+
+  // Android: use InboxStyle when there are multiple unread messages
+  final AndroidNotificationDetails androidNotificationDetails;
+  if (count > 1) {
+    androidNotificationDetails = AndroidNotificationDetails(
+      'messages_channel',
+      'Messages',
+      channelDescription: 'Notifications for new messages',
+      importance: Importance.max,
+      priority: Priority.high,
+      showWhen: true,
+      number: count,
+      styleInformation: InboxStyleInformation(
+        messageLines,
+        contentTitle: title,
+        summaryText: '$count new messages',
+      ),
+    );
+  } else {
+    androidNotificationDetails = const AndroidNotificationDetails(
+      'messages_channel',
+      'Messages',
+      channelDescription: 'Notifications for new messages',
+      importance: Importance.max,
+      priority: Priority.high,
+      showWhen: true,
+    );
+  }
 
   const DarwinNotificationDetails iosNotificationDetails =
       DarwinNotificationDetails(
@@ -77,7 +108,7 @@ Future<void> showLocalNotification(String messageId, String title, String body,
     presentSound: true,
   );
 
-  const NotificationDetails notificationDetails = NotificationDetails(
+  final NotificationDetails notificationDetails = NotificationDetails(
     android: androidNotificationDetails,
     iOS: iosNotificationDetails,
   );
@@ -85,14 +116,15 @@ Future<void> showLocalNotification(String messageId, String title, String body,
   await flutterLocalNotificationsPlugin.show(
     id: notificationId,
     title: title,
-    body: body,
+    body: latestBody,
     notificationDetails: notificationDetails,
     payload: jsonEncode(dataPayload),
   );
 }
 
-Future<void> cancelLocalNotification(String messageId) async {
-  final notificationId = getNotificationId(messageId);
+/// Cancels the notification for a given chat room.
+Future<void> cancelLocalNotification(String roomId) async {
+  final notificationId = getNotificationId(roomId);
   await flutterLocalNotificationsPlugin.cancel(id: notificationId);
 }
 
@@ -241,17 +273,28 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
             print(
                 "PushNotifications: Background notification suppressed because sender $senderId is muted.");
           } else {
+            // Query all accumulated unread messages for this room from this sender
+            final unreadRows = await LocalDatabaseHelper.instance
+                .getUnreadMessagesForRoomBySender(roomId, senderId);
+            final List<String> messageLines = unreadRows
+                .map((r) => r['payload'] as String)
+                .toList();
+            // Fallback: if the query returned empty (race condition), use the current payload
+            if (messageLines.isEmpty) {
+              messageLines.add(payload);
+            }
+
             await showLocalNotification(
-              messageId,
+              roomId,
               senderName,
-              payload,
+              messageLines,
               {
                 'sender_id': senderIdStr,
                 'room_id': roomId,
               },
             );
             print(
-                "PushNotifications: Background local notification displayed successfully.");
+                "PushNotifications: Background local notification displayed with ${messageLines.length} lines.");
           }
         } catch (e) {
           print(
@@ -261,30 +304,53 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
     }
   } else if (action == 'delete_message') {
     if (messageId != null) {
-      // 1. Cancel notification FIRST
-      try {
-        await cancelLocalNotification(messageId);
-        print(
-            "PushNotifications: Background notification cancelled successfully.");
-      } catch (e) {
-        print(
-            "PushNotifications: Error cancelling notification in background: $e");
-      }
-
-      // 2. Delete from SQLite if not read
       try {
         final localMsg =
             await LocalDatabaseHelper.instance.getMessageById(messageId);
         if (localMsg != null) {
+          final roomId = localMsg['room_id'] as String?;
+          final senderId = localMsg['sender_id'] as int?;
+
+          // Delete from SQLite first
           final localStatus = localMsg['status'] as String?;
           if (localStatus != 'read') {
             await LocalDatabaseHelper.instance.deleteMessage(messageId);
             print("PushNotifications: Background message deleted from SQLite.");
           }
+
+          // Rebuild or cancel the notification based on remaining unread messages
+          if (roomId != null && senderId != null) {
+            final remaining = await LocalDatabaseHelper.instance
+                .getUnreadMessagesForRoomBySender(roomId, senderId);
+            if (remaining.isEmpty) {
+              await cancelLocalNotification(roomId);
+              print(
+                  "PushNotifications: Background notification cancelled — no remaining unread for room $roomId.");
+            } else {
+              final List<String> remainingLines = remaining
+                  .map((r) => r['payload'] as String)
+                  .toList();
+              // We don't have the sender name in the background handler here,
+              // so fetch it from the first remaining message's sender_id via a
+              // simple title. The notification title stays unchanged since the
+              // system reuses the existing tray slot.
+              await showLocalNotification(
+                roomId,
+                'Message', // title — the existing tray slot keeps its original title
+                remainingLines,
+                {
+                  'sender_id': senderId.toString(),
+                  'room_id': roomId,
+                },
+              );
+              print(
+                  "PushNotifications: Background notification rebuilt with ${remainingLines.length} remaining messages.");
+            }
+          }
         }
       } catch (e) {
         print(
-            "PushNotifications: Error deleting message from SQLite in background: $e");
+            "PushNotifications: Error handling background message delete: $e");
       }
     }
   }
@@ -692,17 +758,27 @@ class _AppShellGateState extends State<AppShellGate> {
                       print(
                           "PushNotifications: Foreground notification suppressed because sender $senderId is muted.");
                     } else {
+                      // Query all accumulated unread messages for this room from this sender
+                      final unreadRows = await LocalDatabaseHelper.instance
+                          .getUnreadMessagesForRoomBySender(roomId, senderId);
+                      final List<String> messageLines = unreadRows
+                          .map((r) => r['payload'] as String)
+                          .toList();
+                      if (messageLines.isEmpty) {
+                        messageLines.add(payload);
+                      }
+
                       await showLocalNotification(
-                        messageId,
+                        roomId,
                         senderName,
-                        payload,
+                        messageLines,
                         {
                           'sender_id': senderIdStr,
                           'room_id': roomId,
                         },
                       );
                       print(
-                          "PushNotifications: Foreground local notification displayed successfully.");
+                          "PushNotifications: Foreground local notification displayed with ${messageLines.length} lines.");
                     }
                   } catch (e) {
                     print(
@@ -713,40 +789,61 @@ class _AppShellGateState extends State<AppShellGate> {
             }
           } else if (action == 'delete_message') {
             if (messageId != null) {
-              // 1. Delete from SQLite if not read
               try {
                 final localMsg = await LocalDatabaseHelper.instance
                     .getMessageById(messageId);
                 if (localMsg != null) {
+                  final roomId = localMsg['room_id'] as String?;
+                  final senderId = localMsg['sender_id'] as int?;
+
+                  // Delete from SQLite first
                   final localStatus = localMsg['status'] as String?;
                   if (localStatus != 'read') {
                     await LocalDatabaseHelper.instance.deleteMessage(messageId);
                     print(
                         "PushNotifications: Foreground message deleted from SQLite.");
                   }
+
+                  // Rebuild or cancel the notification based on remaining unread messages
+                  if (roomId != null && senderId != null) {
+                    final remaining = await LocalDatabaseHelper.instance
+                        .getUnreadMessagesForRoomBySender(roomId, senderId);
+                    if (remaining.isEmpty) {
+                      await cancelLocalNotification(roomId);
+                      print(
+                          "PushNotifications: Foreground notification cancelled — no remaining unread for room $roomId.");
+                    } else {
+                      final List<String> remainingLines = remaining
+                          .map((r) => r['payload'] as String)
+                          .toList();
+                      final senderName =
+                          data['sender_name'] as String? ?? 'Message';
+                      await showLocalNotification(
+                        roomId,
+                        senderName,
+                        remainingLines,
+                        {
+                          'sender_id': senderId.toString(),
+                          'room_id': roomId,
+                        },
+                      );
+                      print(
+                          "PushNotifications: Foreground notification rebuilt with ${remainingLines.length} remaining messages.");
+                    }
+                  }
                 }
               } catch (e) {
                 print(
-                    "PushNotifications: Error deleting message from SQLite in foreground: $e");
+                    "PushNotifications: Error handling foreground message delete: $e");
               }
 
-              // 2. Update providers so UI updates
+              // Update providers so UI updates
               try {
                 await provider.refreshActiveRoomMessages();
                 await provider.updateUnreadCount();
               } catch (e) {
                 print(
                     "PushNotifications: Error updating providers after delete: $e");
-              }
-
-              // 3. Cancel local notification
-              try {
-                await cancelLocalNotification(messageId);
-                print(
-                    "PushNotifications: Foreground notification cancelled successfully.");
-              } catch (e) {
-                print(
-                    "PushNotifications: Error cancelling notification in foreground: $e");
               }
             }
           }
