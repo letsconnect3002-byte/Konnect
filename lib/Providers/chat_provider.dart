@@ -260,6 +260,62 @@ class ChatProvider with ChangeNotifier {
       await updateLastMessageForRoom(roomId);
     } catch (e) {
       print("Error sending message: $e");
+      await _repository.updateMessageStatusLocally(messageId, 'error');
+      if (activeRoomId == roomId) {
+        await refreshActiveRoomMessages();
+      } else {
+        notifyListeners();
+      }
+      _setError(e);
+    }
+  }
+
+  Future<void> resendChatMessage(String messageId) async {
+    final myUserId = _userId;
+    if (myUserId == null) return;
+
+    try {
+      final localMsg = await _repository.getMessageByIdLocally(messageId);
+      if (localMsg == null) return;
+
+      final roomId = localMsg['room_id'] as String;
+      final text = localMsg['payload'] as String;
+      final replyToMessageId = localMsg['reply_to_message_id'] as String?;
+      final replyToMessagePayload = localMsg['reply_to_message_payload'] as String?;
+      final replyToMessageSenderName = localMsg['reply_to_message_sender_name'] as String?;
+
+      await _repository.updateMessageStatusLocally(messageId, 'pending');
+      if (activeRoomId == roomId) {
+        await refreshActiveRoomMessages();
+      } else {
+        notifyListeners();
+      }
+
+      final createdAt = DateTime.now().toUtc().toIso8601String();
+
+      await _repository.upsertMessageToSupabase({
+        'id': messageId,
+        'room_id': roomId,
+        'sender_id': myUserId,
+        'payload': text,
+        'status': 'sent',
+        'created_at': createdAt,
+        'updated_at': createdAt,
+        'reply_to_message_id': replyToMessageId,
+        'reply_to_message_payload': replyToMessagePayload,
+        'reply_to_message_sender_name': replyToMessageSenderName,
+      });
+
+      await _repository.updateMessageStatusLocally(messageId, 'sent');
+      await updateLastMessageForRoom(roomId);
+    } catch (e) {
+      print("Error resending message: $e");
+      await _repository.updateMessageStatusLocally(messageId, 'error');
+      if (activeRoomId != null) {
+        await refreshActiveRoomMessages();
+      } else {
+        notifyListeners();
+      }
       _setError(e);
     }
   }

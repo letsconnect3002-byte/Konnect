@@ -419,7 +419,7 @@ class ProfileProvider with ChangeNotifier {
     if (userId == null) return null;
     return {
       'enabled': monkModeEnabled,
-      'deactivate_at': monkModeDeactivateAt != null ? DateTime.tryParse(monkModeDeactivateAt!) : null,
+      'deactivate_at': monkModeDeactivateAt != null ? DateTime.tryParse(monkModeDeactivateAt!)?.toLocal() : null,
       'blocked_ids': monkModeBlockedIds,
     };
   }

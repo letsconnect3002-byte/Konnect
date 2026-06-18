@@ -65,8 +65,9 @@ class _MonkModePageState extends State<MonkModePage> {
   }
 
   String _formatTime(DateTime dateTime) {
-    final hour = dateTime.hour;
-    final minute = dateTime.minute.toString().padLeft(2, '0');
+    final localDateTime = dateTime.toLocal();
+    final hour = localDateTime.hour;
+    final minute = localDateTime.minute.toString().padLeft(2, '0');
     final period = hour >= 12 ? 'PM' : 'AM';
     final displayHour = hour % 12 == 0 ? 12 : hour % 12;
     return "$displayHour:$minute $period";
@@ -75,7 +76,7 @@ class _MonkModePageState extends State<MonkModePage> {
   String _formatDurationRemaining(DateTime? deactivateAt) {
     if (deactivateAt == null) return "";
     final now = DateTime.now();
-    final diff = deactivateAt.difference(now);
+    final diff = deactivateAt.toLocal().difference(now);
     if (diff.isNegative) return "0s remaining";
 
     if (diff.inHours > 0) {

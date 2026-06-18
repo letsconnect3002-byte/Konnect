@@ -8,11 +8,13 @@ import 'package:provider/provider.dart';
 import 'package:connect/Config/app_theme.dart';
 
 class IndividualChatPage extends StatefulWidget {
-  final Map<String, dynamic> connectionData;
+  final Map<String, dynamic>? connectionData;
+  final int? otherUserId;
 
   const IndividualChatPage({
     super.key,
-    required this.connectionData,
+    this.connectionData,
+    this.otherUserId,
   });
 
   @override
@@ -26,9 +28,11 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
 
   Timer? _localTypingTimer;
   bool _amITyping = false;
-  late String _name;
-  late String _avatarUrl;
-  late String _profession;
+  String _name = 'Loading...';
+  String _avatarUrl = '';
+  String _profession = 'Connection';
+  Map<String, dynamic>? _connectionData;
+  bool _isProfileLoading = false;
 
   late final ChatProvider _provider;
   late final int? _myUserId;
@@ -43,11 +47,16 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
   @override
   void initState() {
     super.initState();
-    _name = widget.connectionData['name'] ?? 'Unknown';
-    _avatarUrl = widget.connectionData['avatarUrl'] ??
-        widget.connectionData['avatar_url'] ??
-        '';
-    _profession = widget.connectionData['profession'] ?? 'Connection';
+    _connectionData = widget.connectionData;
+    if (_connectionData != null) {
+      _name = _connectionData!['name'] ?? 'Unknown';
+      _avatarUrl =
+          _connectionData!['avatarUrl'] ?? _connectionData!['avatar_url'] ?? '';
+      _profession = _connectionData!['profession'] ?? 'Connection';
+      _isProfileLoading = false;
+    } else {
+      _isProfileLoading = true;
+    }
 
     _provider = Provider.of<ChatProvider>(context, listen: false);
     _myUserId = Provider.of<ProfileProvider>(context, listen: false).userId;
@@ -86,7 +95,35 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
 
       if (!mounted) return;
 
-      final otherUserId = widget.connectionData['id'] as int;
+      // ── Fetch sender profile details in the background if connectionData was null ──
+      if (_connectionData == null && widget.otherUserId != null) {
+        final profileProvider =
+            Provider.of<ProfileProvider>(context, listen: false);
+        try {
+          final profile =
+              await profileProvider.fetchProfileDataOnly(widget.otherUserId!);
+          if (mounted && profile.isNotEmpty) {
+            setState(() {
+              _connectionData = profile;
+              _name = profile['name'] ?? 'Unknown';
+              _avatarUrl = profile['avatarUrl'] ?? profile['avatar_url'] ?? '';
+              _profession = profile['profession'] ?? 'Connection';
+              _isProfileLoading = false;
+            });
+          }
+        } catch (e) {
+          print("Error loading profile in IndividualChatPage: $e");
+          if (mounted) {
+            setState(() {
+              _isProfileLoading = false;
+            });
+          }
+        }
+      }
+
+      final otherUserId = _connectionData != null
+          ? (_connectionData!['id'] as int)
+          : widget.otherUserId!;
       final roomId = await _provider.getOrCreateDirectRoom(otherUserId);
 
       if (!mounted) return;
@@ -349,15 +386,17 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
         titleSpacing: 0,
         title: GestureDetector(
           onTap: () {
-            HapticFeedback.lightImpact();
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => ConnectionProfilePage(
-                  profileData: widget.connectionData,
+            if (_connectionData != null) {
+              HapticFeedback.lightImpact();
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => ConnectionProfilePage(
+                    profileData: _connectionData!,
+                  ),
                 ),
-              ),
-            );
+              );
+            }
           },
           behavior: HitTestBehavior.opaque,
           child: Row(
@@ -379,23 +418,29 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
                     color: context.surfaceSecondary,
                   ),
                   padding: const EdgeInsets.all(1.5),
-                  child: ClipOval(
-                    child: avatar.isNotEmpty
-                        ? Image.network(avatar, fit: BoxFit.cover)
-                        : Container(
-                            color: context.surfaceSecondary,
-                            alignment: Alignment.center,
-                            child: Text(
-                              _name.isNotEmpty
-                                  ? _name.substring(0, 1).toUpperCase()
-                                  : "?",
-                              style: TextStyle(
-                                  color: context.textPrimary,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 14),
-                            ),
-                          ),
-                  ),
+                  child: _isProfileLoading
+                      ? const _ShimmerBox(
+                          width: 34,
+                          height: 34,
+                          shape: BoxShape.circle,
+                        )
+                      : ClipOval(
+                          child: avatar.isNotEmpty
+                              ? Image.network(avatar, fit: BoxFit.cover)
+                              : Container(
+                                  color: context.surfaceSecondary,
+                                  alignment: Alignment.center,
+                                  child: Text(
+                                    _name.isNotEmpty
+                                        ? _name.substring(0, 1).toUpperCase()
+                                        : "?",
+                                    style: TextStyle(
+                                        color: context.textPrimary,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 14),
+                                  ),
+                                ),
+                        ),
                 ),
               ),
               const SizedBox(width: 10),
@@ -403,22 +448,36 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      _name,
-                      style: context.bodyText.copyWith(
-                        color: context.textPrimary,
-                        fontWeight: FontWeight.bold,
+                    if (_isProfileLoading) ...[
+                      const _ShimmerBox(
+                        width: 100,
+                        height: 14,
+                        borderRadius: 4,
                       ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      _profession,
-                      style: context.captionText.copyWith(
-                        color: context.textSecondary,
+                      const SizedBox(height: 5),
+                      const _ShimmerBox(
+                        width: 70,
+                        height: 10,
+                        borderRadius: 3,
                       ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
+                    ] else ...[
+                      Text(
+                        _name,
+                        style: context.bodyText.copyWith(
+                          color: context.textPrimary,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        _profession,
+                        style: context.captionText.copyWith(
+                          color: context.textSecondary,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -429,8 +488,13 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
       body: Column(
         children: [
           Expanded(
-            child: _isRoomLoading
-                ? const SizedBox.shrink()
+            child: (_isRoomLoading || _isProfileLoading)
+                ? Center(
+                    child: CircularProgressIndicator(
+                      valueColor:
+                          AlwaysStoppedAnimation<Color>(context.accentPrimary),
+                    ),
+                  )
                 : Stack(
                     children: [
                       ListView.builder(
@@ -670,9 +734,9 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
                   isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
               children: [
                 Text(
-                  time,
+                  status == 'error' ? 'Failed to send' : time,
                   style: context.captionText.copyWith(
-                    color: context.textMuted,
+                    color: status == 'error' ? Colors.redAccent : context.textMuted,
                   ),
                 ),
                 if (isMe && status != null) ...[
@@ -688,6 +752,14 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
   }
 
   Widget _buildStatusIcon(String status) {
+    if (status == 'error') {
+      return const Icon(
+        Icons.error_outline_rounded,
+        size: 12,
+        color: Colors.redAccent,
+      );
+    }
+
     // 🕒 PENDING — saved locally, not yet confirmed by Supabase
     if (status == 'pending') {
       return Icon(
@@ -1049,6 +1121,18 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
         side: BorderSide(color: surfaceSecondaryColor),
       ),
       items: [
+        if (isMe && message['status'] == 'error')
+          const PopupMenuItem(
+            value: 'resend',
+            child: Row(
+              children: [
+                Icon(Icons.refresh_rounded, color: Color(0xFF00F2FE), size: 18),
+                SizedBox(width: 8),
+                Text("Resend",
+                    style: TextStyle(color: Color(0xFF00F2FE), fontSize: 14)),
+              ],
+            ),
+          ),
         const PopupMenuItem(
           value: 'reply',
           child: Row(
@@ -1074,7 +1158,9 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
         ),
       ],
     ).then((value) {
-      if (value == 'reply') {
+      if (value == 'resend') {
+        _provider.resendChatMessage(message['id'] as String);
+      } else if (value == 'reply') {
         _setReplyMessage(message, isMe);
         _messageFocusNode.requestFocus();
       } else if (value == 'delete') {
@@ -1294,6 +1380,71 @@ class _BouncingDotState extends State<_BouncingDot>
                 color: widget.color,
                 shape: BoxShape.circle,
               ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _ShimmerBox extends StatefulWidget {
+  final double width;
+  final double height;
+  final double borderRadius;
+  final BoxShape shape;
+
+  const _ShimmerBox({
+    required this.width,
+    required this.height,
+    this.borderRadius = 4.0,
+    this.shape = BoxShape.rectangle,
+  });
+
+  @override
+  State<_ShimmerBox> createState() => _ShimmerBoxState();
+}
+
+class _ShimmerBoxState extends State<_ShimmerBox>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _animation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1000),
+    );
+    _animation = Tween<double>(begin: 0.35, end: 0.7).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+    );
+    _controller.repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _animation,
+      builder: (context, child) {
+        return Opacity(
+          opacity: _animation.value,
+          child: Container(
+            width: widget.width,
+            height: widget.height,
+            decoration: BoxDecoration(
+              shape: widget.shape,
+              color: Colors.white.withValues(alpha: 0.15),
+              borderRadius: widget.shape == BoxShape.circle
+                  ? null
+                  : BorderRadius.circular(widget.borderRadius),
             ),
           ),
         );

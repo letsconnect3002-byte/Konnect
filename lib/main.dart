@@ -97,28 +97,21 @@ Future<void> cancelLocalNotification(String messageId) async {
 }
 
 String? pendingNotificationPayload;
+int? targetChatSenderId;
 
-Future<void> handleLocalNotificationClickPayload(String payload) async {
+void handleLocalNotificationClickPayload(String payload) {
   try {
     final data = jsonDecode(payload);
     final senderIdStr = data['sender_id'] as String?;
     if (senderIdStr != null) {
       final senderId = int.tryParse(senderIdStr);
       if (senderId != null) {
-        final context = navigatorKey.currentContext;
-        if (context != null) {
-          final provider = Provider.of<ProfileProvider>(context, listen: false);
-          // Use fetchProfileDataOnly to avoid mutating the logged-in user's profile state
-          final profile = await provider.fetchProfileDataOnly(senderId);
-          if (profile.isNotEmpty) {
-            navigatorKey.currentState?.push(
-              MaterialPageRoute(
-                builder: (routeContext) =>
-                    IndividualChatPage(connectionData: profile),
-              ),
-            );
-          }
-        }
+        navigatorKey.currentState?.push(
+          MaterialPageRoute(
+            builder: (routeContext) =>
+                IndividualChatPage(otherUserId: senderId),
+          ),
+        );
       }
     }
   } catch (e) {
@@ -134,13 +127,14 @@ Future<bool> _isUserMutedUnderMonkMode(int senderId) async {
 
     final String? deactivateAtStr = settings['deactivate_at'] as String?;
     if (deactivateAtStr != null) {
-      final deactivateAt = DateTime.tryParse(deactivateAtStr);
+      final deactivateAt = DateTime.tryParse(deactivateAtStr)?.toLocal();
       if (deactivateAt != null && DateTime.now().isAfter(deactivateAt)) {
         return false;
       }
     }
 
-    final List<int> blockedIds = List<int>.from(settings['blocked_ids'] as List? ?? []);
+    final List<int> blockedIds =
+        List<int>.from(settings['blocked_ids'] as List? ?? []);
     return blockedIds.contains(senderId);
   } catch (e) {
     print("Error checking monk mode status: $e");
@@ -244,7 +238,8 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
         try {
           final isMuted = await _isUserMutedUnderMonkMode(senderId);
           if (isMuted) {
-            print("PushNotifications: Background notification suppressed because sender $senderId is muted.");
+            print(
+                "PushNotifications: Background notification suppressed because sender $senderId is muted.");
           } else {
             await showLocalNotification(
               messageId,
@@ -305,6 +300,7 @@ void main() async {
   await Supabase.initialize(
     url: SupabaseConfig.url,
     anonKey: SupabaseConfig.serviceRoleKey,
+    // authCallbackUrlScheme: 'connectapp',
   );
 
   // Initialize flutter_local_notifications
@@ -326,6 +322,15 @@ void main() async {
           handleLocalNotificationClickPayload(payload);
         } else {
           pendingNotificationPayload = payload;
+          try {
+            final data = jsonDecode(payload);
+            final senderIdStr = data['sender_id'] as String?;
+            if (senderIdStr != null) {
+              targetChatSenderId = int.tryParse(senderIdStr);
+            }
+          } catch (e) {
+            print("Error parsing local notification payload on startup: $e");
+          }
         }
       }
     },
@@ -339,6 +344,33 @@ void main() async {
         ?.createNotificationChannel(notificationChannel);
   } catch (e) {
     print("Error creating notification channel on startup: $e");
+  }
+
+  // Check for initial launch notification
+  try {
+    final localDetails =
+        await flutterLocalNotificationsPlugin.getNotificationAppLaunchDetails();
+    if (localDetails?.didNotificationLaunchApp ?? false) {
+      final localPayload = localDetails?.notificationResponse?.payload;
+      if (localPayload != null) {
+        final data = jsonDecode(localPayload);
+        final senderIdStr = data['sender_id'] as String?;
+        if (senderIdStr != null) {
+          targetChatSenderId = int.tryParse(senderIdStr);
+        }
+      }
+    }
+
+    final fcmMessage = await FirebaseMessaging.instance.getInitialMessage();
+    if (fcmMessage != null) {
+      final data = fcmMessage.data;
+      final senderIdStr = data['sender_id'] as String?;
+      if (senderIdStr != null) {
+        targetChatSenderId = int.tryParse(senderIdStr);
+      }
+    }
+  } catch (e) {
+    print("Error checking launch notifications in main(): $e");
   }
 
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
@@ -514,6 +546,21 @@ class _AppShellGateState extends State<AppShellGate> {
       // Chat rooms, push tokens, and unread counts load in the background.
       if (mounted) setState(() => _initialized = true);
 
+      if (targetChatSenderId != null) {
+        final targetId = targetChatSenderId!;
+        targetChatSenderId = null;
+        pendingNotificationPayload = null;
+
+        navigatorKey.currentState?.push(
+          PageRouteBuilder(
+            pageBuilder: (context, anim, secAnim) =>
+                IndividualChatPage(otherUserId: targetId),
+            transitionDuration: Duration.zero,
+            reverseTransitionDuration: Duration.zero,
+          ),
+        );
+      }
+
       // Step 3 (background): Load chat + notifications without blocking the UI.
       if (userId != null) {
         Future.microtask(() async {
@@ -547,11 +594,14 @@ class _AppShellGateState extends State<AppShellGate> {
       print(
           "PushNotifications: Authorization status is ${settings.authorizationStatus}");
 
-      // Configure foreground notification presentation options
+      // Disable automatic system-level foreground notification presentation.
+      // We manually control notification display via showLocalNotification()
+      // inside the onMessage handler. Leaving these enabled causes duplicate
+      // notifications on certain Android OEM skins and iOS.
       await messaging.setForegroundNotificationPresentationOptions(
-        alert: true,
-        badge: true,
-        sound: true,
+        alert: false,
+        badge: false,
+        sound: false,
       );
 
       // Fetch the token (FCM can generate tokens on Android even if notification permission is denied)
@@ -639,7 +689,8 @@ class _AppShellGateState extends State<AppShellGate> {
                   try {
                     final isMuted = await _isUserMutedUnderMonkMode(senderId);
                     if (isMuted) {
-                      print("PushNotifications: Foreground notification suppressed because sender $senderId is muted.");
+                      print(
+                          "PushNotifications: Foreground notification suppressed because sender $senderId is muted.");
                     } else {
                       await showLocalNotification(
                         messageId,
@@ -753,15 +804,6 @@ class _AppShellState extends State<_AppShell> with WidgetsBindingObserver {
       const MonkModePage(),
     ];
     _setupNotificationTapListeners();
-
-    // Check if there is a pending local notification click payload stored globally
-    if (pendingNotificationPayload != null) {
-      final payload = pendingNotificationPayload!;
-      pendingNotificationPayload = null; // Clear immediately
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        handleLocalNotificationClickPayload(payload);
-      });
-    }
   }
 
   @override
@@ -786,58 +828,26 @@ class _AppShellState extends State<_AppShell> with WidgetsBindingObserver {
   }
 
   void _setupNotificationTapListeners() {
-    // 1. Handle notification click when app is in background but still running
+    // Handle notification click when app is in background but still running
     FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
       _handleNotificationClick(message);
     });
-
-    // 2. Handle notification click when app was cold-started from terminated state
-    FirebaseMessaging.instance
-        .getInitialMessage()
-        .then((RemoteMessage? message) {
-      if (message != null) {
-        _handleNotificationClick(message);
-      }
-    });
-
-    // 3. Handle local notifications plugin launch details (cold start via local notification)
-    flutterLocalNotificationsPlugin
-        .getNotificationAppLaunchDetails()
-        .then((NotificationAppLaunchDetails? details) {
-      if (details != null && details.didNotificationLaunchApp) {
-        final payload = details.notificationResponse?.payload;
-        if (payload != null) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            handleLocalNotificationClickPayload(payload);
-          });
-        }
-      }
-    });
   }
 
-  Future<void> _handleNotificationClick(RemoteMessage message) async {
+  void _handleNotificationClick(RemoteMessage message) {
     final data = message.data;
     final senderIdStr = data['sender_id'] as String?;
 
     if (senderIdStr != null) {
       final senderId = int.tryParse(senderIdStr);
       if (senderId != null) {
-        final provider = Provider.of<ProfileProvider>(context, listen: false);
-        try {
-          // Use fetchProfileDataOnly to avoid mutating the logged-in user's profile state
-          final profile = await provider.fetchProfileDataOnly(senderId);
-          if (mounted && profile.isNotEmpty) {
-            // Push IndividualChatPage with the fetched sender profile
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) =>
-                    IndividualChatPage(connectionData: profile),
-              ),
-            );
-          }
-        } catch (e) {
-          print("Error handling notification tap redirection: $e");
+        if (mounted) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => IndividualChatPage(otherUserId: senderId),
+            ),
+          );
         }
       }
     }

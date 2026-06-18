@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -169,34 +170,76 @@ class _AuthScreenState extends State<AuthScreen> {
   }
 
   Future<void> _signInWithGoogle() async {
+    debugPrint('[Google Sign-In] Starting _signInWithGoogle process...');
     setState(() => _isLoading = true);
     HapticFeedback.mediumImpact();
+
+    bool useFallback = false;
+
     try {
       // Initialize GoogleSignIn (singleton)
+      debugPrint(
+          '[Google Sign-In] Initializing GoogleSignIn.instance with serverClientId...');
       await GoogleSignIn.instance.initialize(
         serverClientId:
             '150827597127-gnh9lamc1ed61u9hcd31f0e8ilri4g5n.apps.googleusercontent.com',
       );
+      debugPrint(
+          '[Google Sign-In] GoogleSignIn.instance.initialize completed successfully.');
 
-      // Await the native authenticate() method to retrieve the user's GoogleSignInAccount
+      // Await the native authenticate() method with timeout
+      debugPrint(
+          '[Google Sign-In] Requesting native authentication via GoogleSignIn.instance.authenticate()...');
       final GoogleSignInAccount googleUser =
-          await GoogleSignIn.instance.authenticate();
+          await GoogleSignIn.instance.authenticate()
+              .timeout(const Duration(seconds: 5));
+      debugPrint('[Google Sign-In] authenticate() returned: $googleUser');
 
       // Retrieve the corresponding GoogleSignInAuthentication object
+      debugPrint(
+          '[Google Sign-In] Retrieving authentication credentials from googleUser...');
       final GoogleSignInAuthentication googleAuth = googleUser.authentication;
+      debugPrint(
+          '[Google Sign-In] Authentication credentials retrieved successfully.');
+
       final String? idToken = googleAuth.idToken;
+      debugPrint(
+          '[Google Sign-In] idToken retrieved: ${idToken != null ? "Yes (length: ${idToken.length})" : "No (null)"}');
 
       if (idToken == null) {
         throw Exception('Google Sign-In failed: No ID Token found.');
       }
 
       // Pass these tokens to Supabase using signInWithIdToken
-      await Supabase.instance.client.auth.signInWithIdToken(
+      debugPrint('[Google Sign-In] Sending ID token to Supabase client...');
+      final authResponse =
+          await Supabase.instance.client.auth.signInWithIdToken(
         provider: OAuthProvider.google,
         idToken: idToken,
       );
+      debugPrint(
+          '[Google Sign-In] Supabase sign-in response received. User email: ${authResponse.user?.email}');
+      
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    } on TimeoutException catch (e) {
+      debugPrint(
+          '[Google Sign-In] Native authentication timed out: $e. Activating web OAuth fallback.');
+      useFallback = true;
+    } on PlatformException catch (e) {
+      debugPrint(
+          '[Google Sign-In] PlatformException caught: $e. Activating web OAuth fallback.');
+      useFallback = true;
+    } on AuthException catch (e) {
+      debugPrint(
+          '[Google Sign-In] Supabase AuthException caught: ${e.message} (status: ${e.statusCode}). Activating web OAuth fallback.');
+      useFallback = true;
     } on GoogleSignInException catch (e) {
+      debugPrint(
+          '[Google Sign-In] GoogleSignInException caught: code=${e.code}, description=${e.description}');
       if (e.code == GoogleSignInExceptionCode.canceled) {
+        debugPrint('[Google Sign-In] User cancelled Google Sign-In. Not falling back.');
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -206,40 +249,63 @@ class _AuthScreenState extends State<AuthScreen> {
             ),
           );
         }
+        if (mounted) {
+          setState(() => _isLoading = false);
+        }
         return;
       }
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Google Sign-In failed: ${e.description}'),
-            backgroundColor: Colors.redAccent,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+      
+      if (e.toString().contains('NullPointerException')) {
+        debugPrint(
+            '[Google Sign-In] GoogleSignInException contains NullPointerException. Activating web OAuth fallback.');
+        useFallback = true;
+      } else {
+        debugPrint(
+            '[Google Sign-In] Standard GoogleSignInException. Activating web OAuth fallback.');
+        useFallback = true;
       }
-    } on AuthException catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(e.message),
-            backgroundColor: Colors.redAccent,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+    } catch (e, stackTrace) {
+      final errorStr = e.toString();
+      debugPrint(
+          '[Google Sign-In] Unexpected error caught during Google Sign-In: $errorStr');
+      debugPrint('[Google Sign-In] Stack trace:\n$stackTrace');
+      
+      if (errorStr.contains('NullPointerException')) {
+        debugPrint(
+            '[Google Sign-In] NullPointerException detected. Activating web OAuth fallback.');
+        useFallback = true;
+      } else {
+        debugPrint(
+            '[Google Sign-In] Fallback activated due to unexpected error.');
+        useFallback = true;
       }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to complete Google Sign In: $e'),
-            backgroundColor: Colors.redAccent,
-            behavior: SnackBarBehavior.floating,
-          ),
+    }
+
+    if (useFallback) {
+      try {
+        debugPrint(
+            '[Google Sign-In] Launching browser-based Supabase OAuth pipeline...');
+        await Supabase.instance.client.auth.signInWithOAuth(
+          OAuthProvider.google,
+          redirectTo: 'connectapp://login-callback',
         );
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
+        debugPrint('[Google Sign-In] Web OAuth pipeline completed successfully.');
+      } catch (e, stackTrace) {
+        debugPrint('[Google Sign-In] Fallback Web OAuth failed: $e');
+        debugPrint('[Google Sign-In] Stack trace:\n$stackTrace');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to complete Google Sign In: $e'),
+              backgroundColor: Colors.redAccent,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      } finally {
+        if (mounted) {
+          setState(() => _isLoading = false);
+        }
       }
     }
   }

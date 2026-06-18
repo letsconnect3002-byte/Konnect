@@ -48,7 +48,7 @@ class MonkModeProvider with ChangeNotifier {
       final settings = await LocalDatabaseHelper.instance.getMonkModeSettings();
       _enabled = settings['enabled'] as bool? ?? false;
       final String? deactivateAtStr = settings['deactivate_at'] as String?;
-      _deactivateAt = deactivateAtStr != null ? DateTime.tryParse(deactivateAtStr) : null;
+      _deactivateAt = deactivateAtStr != null ? DateTime.tryParse(deactivateAtStr)?.toLocal() : null;
       _blockedIds = List<int>.from(settings['blocked_ids'] as List? ?? []);
 
       final prefs = await SharedPreferences.getInstance();
@@ -200,7 +200,7 @@ class MonkModeProvider with ChangeNotifier {
   Future<void> _saveToLocalDb() async {
     await LocalDatabaseHelper.instance.updateMonkMode(
       enabled: _enabled,
-      deactivateAt: _deactivateAt?.toIso8601String(),
+      deactivateAt: _deactivateAt?.toUtc().toIso8601String(),
       blockedIds: _blockedIds,
     );
   }
@@ -210,7 +210,7 @@ class MonkModeProvider with ChangeNotifier {
     if (userId == null) return;
     try {
       _profileProvider!.monkModeEnabled = _enabled;
-      _profileProvider!.monkModeDeactivateAt = _deactivateAt?.toIso8601String();
+      _profileProvider!.monkModeDeactivateAt = _deactivateAt?.toUtc().toIso8601String();
       _profileProvider!.monkModeBlockedIds = _blockedIds;
 
       await _profileProvider!.saveOrUpdateProfile();
