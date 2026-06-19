@@ -76,9 +76,11 @@ serve(async (req) => {
       const body = {
         message: {
           token: fcmToken,
-          // Data-only payload: FCM only delivers the data block, giving full Dart
-          // control inside onMessage and onBackgroundMessage. This ensures grouping,
-          // deduplication, and remote deletion can be managed reliably.
+          // IMPORTANT: Do NOT add a top-level `notification` field here.
+          // On Android, messages with a `notification` payload bypass the Dart
+          // `onBackgroundMessage` handler when the app is killed/in background.
+          // All delivery acknowledgment, SQLite persistence, and local notification
+          // display is handled by the Dart background handler using this `data` payload.
           data: {
             action: "new_message",
             message_id: messageId,
@@ -93,7 +95,7 @@ serve(async (req) => {
           },
           apns: {
             headers: {
-              "apns-priority": "5",
+              "apns-priority": "10",
               "apns-push-type": "background",
             },
             payload: {

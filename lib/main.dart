@@ -231,17 +231,6 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
         payload != null) {
       final senderId = int.tryParse(senderIdStr);
       if (senderId != null) {
-        // Deduplication: Check if the message is already in SQLite
-        try {
-          final existingMsg = await LocalDatabaseHelper.instance.getMessageById(messageId);
-          if (existingMsg != null) {
-            print("PushNotifications: Background message $messageId already exists in SQLite. Skipping duplicate processing.");
-            return;
-          }
-        } catch (e) {
-          print("PushNotifications: Error checking existing message in background: $e");
-        }
-
         // 1. Save to local SQLite safely
         try {
           await LocalDatabaseHelper.instance.insertMessage(
@@ -316,52 +305,47 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   } else if (action == 'delete_message') {
     if (messageId != null) {
       try {
-        // Try to get room_id and sender_id from local SQLite first.
-        // Fall back to the FCM data payload fields if the message was never
-        // cached locally (e.g. app was killed when the original message arrived
-        // and the OS showed it natively via the hybrid notification payload).
         final localMsg =
             await LocalDatabaseHelper.instance.getMessageById(messageId);
-
-        final String? roomId = localMsg?['room_id'] as String? ??
-            data['room_id'] as String?;
-        final int? senderId = localMsg?['sender_id'] as int? ??
-            (data['sender_id'] != null
-                ? int.tryParse(data['sender_id'] as String)
-                : null);
-
-        // Delete from SQLite if it exists and hasn't been read
         if (localMsg != null) {
+          final roomId = localMsg['room_id'] as String?;
+          final senderId = localMsg['sender_id'] as int?;
+
+          // Delete from SQLite first
           final localStatus = localMsg['status'] as String?;
           if (localStatus != 'read') {
             await LocalDatabaseHelper.instance.deleteMessage(messageId);
             print("PushNotifications: Background message deleted from SQLite.");
           }
-        }
 
-        // Rebuild or cancel the notification based on remaining unread messages
-        if (roomId != null && senderId != null) {
-          final remaining = await LocalDatabaseHelper.instance
-              .getUnreadMessagesForRoomBySender(roomId, senderId);
-          if (remaining.isEmpty) {
-            await cancelLocalNotification(roomId);
-            print(
-                "PushNotifications: Background notification cancelled — no remaining unread for room $roomId.");
-          } else {
-            final List<String> remainingLines = remaining
-                .map((r) => r['payload'] as String)
-                .toList();
-            await showLocalNotification(
-              roomId,
-              'Message',
-              remainingLines,
-              {
-                'sender_id': senderId.toString(),
-                'room_id': roomId,
-              },
-            );
-            print(
-                "PushNotifications: Background notification rebuilt with ${remainingLines.length} remaining messages.");
+          // Rebuild or cancel the notification based on remaining unread messages
+          if (roomId != null && senderId != null) {
+            final remaining = await LocalDatabaseHelper.instance
+                .getUnreadMessagesForRoomBySender(roomId, senderId);
+            if (remaining.isEmpty) {
+              await cancelLocalNotification(roomId);
+              print(
+                  "PushNotifications: Background notification cancelled — no remaining unread for room $roomId.");
+            } else {
+              final List<String> remainingLines = remaining
+                  .map((r) => r['payload'] as String)
+                  .toList();
+              // We don't have the sender name in the background handler here,
+              // so fetch it from the first remaining message's sender_id via a
+              // simple title. The notification title stays unchanged since the
+              // system reuses the existing tray slot.
+              await showLocalNotification(
+                roomId,
+                'Message', // title — the existing tray slot keeps its original title
+                remainingLines,
+                {
+                  'sender_id': senderId.toString(),
+                  'room_id': roomId,
+                },
+              );
+              print(
+                  "PushNotifications: Background notification rebuilt with ${remainingLines.length} remaining messages.");
+            }
           }
         }
       } catch (e) {
@@ -729,42 +713,32 @@ class _AppShellGateState extends State<AppShellGate> {
                 payload != null) {
               final senderId = int.tryParse(senderIdStr);
               if (senderId != null) {
-                // 1. Save to local SQLite if it doesn't exist
+                // 1. Save to local SQLite
                 final isCurrentRoom = provider.activeRoomId == roomId;
                 try {
-                  final existingMsg = await LocalDatabaseHelper.instance.getMessageById(messageId);
-                  if (existingMsg == null) {
-                    try {
-                      await LocalDatabaseHelper.instance.insertMessage(
-                        messageId,
-                        roomId,
-                        senderId,
-                        payload,
-                        status: isCurrentRoom ? 'read' : 'delivered',
-                      );
-                      print(
-                          "PushNotifications: Foreground message inserted to SQLite.");
-                    } catch (e) {
-                      print(
-                          "PushNotifications: Error inserting message in foreground SQLite: $e");
-                    }
-
-                    // 2. Acknowledge delivery
-                    try {
-                      await provider.acknowledgeDelivery(messageId,
-                          isActiveInChat: isCurrentRoom);
-                      print(
-                          "PushNotifications: Foreground message delivery status updated in Supabase via provider.");
-                    } catch (e) {
-                      print(
-                          "PushNotifications: Error acknowledging delivery in foreground: $e");
-                    }
-                  } else {
-                    print(
-                        "PushNotifications: Foreground message $messageId already exists in SQLite. Skipping duplicate insert and delivery acknowledgement.");
-                  }
+                  await LocalDatabaseHelper.instance.insertMessage(
+                    messageId,
+                    roomId,
+                    senderId,
+                    payload,
+                    status: isCurrentRoom ? 'read' : 'delivered',
+                  );
+                  print(
+                      "PushNotifications: Foreground message inserted to SQLite.");
                 } catch (e) {
-                  print("PushNotifications: Error checking existing message in foreground: $e");
+                  print(
+                      "PushNotifications: Error inserting message in foreground SQLite: $e");
+                }
+
+                // 2. Acknowledge delivery
+                try {
+                  await provider.acknowledgeDelivery(messageId,
+                      isActiveInChat: isCurrentRoom);
+                  print(
+                      "PushNotifications: Foreground message delivery status updated in Supabase via provider.");
+                } catch (e) {
+                  print(
+                      "PushNotifications: Error acknowledging delivery in foreground: $e");
                 }
 
                 // 3. Update providers so UI updates immediately
@@ -816,55 +790,46 @@ class _AppShellGateState extends State<AppShellGate> {
           } else if (action == 'delete_message') {
             if (messageId != null) {
               try {
-                // Try to get room_id and sender_id from local SQLite first.
-                // Fall back to the FCM data payload fields if the message was
-                // never cached locally (e.g. app was killed when the original
-                // message arrived and the OS showed it natively).
                 final localMsg = await LocalDatabaseHelper.instance
                     .getMessageById(messageId);
-
-                final String? roomId = localMsg?['room_id'] as String? ??
-                    data['room_id'] as String?;
-                final int? senderId = localMsg?['sender_id'] as int? ??
-                    (data['sender_id'] != null
-                        ? int.tryParse(data['sender_id'] as String)
-                        : null);
-
-                // Delete from SQLite if it exists and hasn't been read
                 if (localMsg != null) {
+                  final roomId = localMsg['room_id'] as String?;
+                  final senderId = localMsg['sender_id'] as int?;
+
+                  // Delete from SQLite first
                   final localStatus = localMsg['status'] as String?;
                   if (localStatus != 'read') {
                     await LocalDatabaseHelper.instance.deleteMessage(messageId);
                     print(
                         "PushNotifications: Foreground message deleted from SQLite.");
                   }
-                }
 
-                // Rebuild or cancel the notification based on remaining unread messages
-                if (roomId != null && senderId != null) {
-                  final remaining = await LocalDatabaseHelper.instance
-                      .getUnreadMessagesForRoomBySender(roomId, senderId);
-                  if (remaining.isEmpty) {
-                    await cancelLocalNotification(roomId);
-                    print(
-                        "PushNotifications: Foreground notification cancelled — no remaining unread for room $roomId.");
-                  } else {
-                    final List<String> remainingLines = remaining
-                        .map((r) => r['payload'] as String)
-                        .toList();
-                    final senderName =
-                        data['sender_name'] as String? ?? 'Message';
-                    await showLocalNotification(
-                      roomId,
-                      senderName,
-                      remainingLines,
-                      {
-                        'sender_id': senderId.toString(),
-                        'room_id': roomId,
-                      },
-                    );
-                    print(
-                        "PushNotifications: Foreground notification rebuilt with ${remainingLines.length} remaining messages.");
+                  // Rebuild or cancel the notification based on remaining unread messages
+                  if (roomId != null && senderId != null) {
+                    final remaining = await LocalDatabaseHelper.instance
+                        .getUnreadMessagesForRoomBySender(roomId, senderId);
+                    if (remaining.isEmpty) {
+                      await cancelLocalNotification(roomId);
+                      print(
+                          "PushNotifications: Foreground notification cancelled — no remaining unread for room $roomId.");
+                    } else {
+                      final List<String> remainingLines = remaining
+                          .map((r) => r['payload'] as String)
+                          .toList();
+                      final senderName =
+                          data['sender_name'] as String? ?? 'Message';
+                      await showLocalNotification(
+                        roomId,
+                        senderName,
+                        remainingLines,
+                        {
+                          'sender_id': senderId.toString(),
+                          'room_id': roomId,
+                        },
+                      );
+                      print(
+                          "PushNotifications: Foreground notification rebuilt with ${remainingLines.length} remaining messages.");
+                    }
                   }
                 }
               } catch (e) {

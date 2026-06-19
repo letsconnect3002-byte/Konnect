@@ -797,14 +797,32 @@ class _MonkModePageState extends State<MonkModePage> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Expanded(
-                          child: Text(
-                            "INDIVIDUAL PREFERENCES",
-                            style: context.captionText.copyWith(
-                              color: context.textSecondary,
-                              letterSpacing: 1.2,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                "INDIVIDUAL PREFERENCES",
+                                style: context.captionText.copyWith(
+                                  color: context.textSecondary,
+                                  letterSpacing: 1.2,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              if (!monkMode.enabled) ...[
+                                const SizedBox(height: 2),
+                                Text(
+                                  "Inactive (default is allowed all when Zen Mode is off)",
+                                  style: context.captionText.copyWith(
+                                    color: context.textMuted,
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.normal,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                            ],
                           ),
                         ),
                         Row(
@@ -923,7 +941,7 @@ class _MonkModePageState extends State<MonkModePage> {
                                           borderRadius: BorderRadius.circular(
                                               AppDimensions.radiusComponent),
                                           border: Border.all(
-                                            color: isBlocked
+                                            color: (monkMode.enabled && isBlocked)
                                                 ? Colors.redAccent
                                                     .withValues(alpha: 0.15)
                                                 : context.surfaceSecondary
@@ -1019,15 +1037,16 @@ class _MonkModePageState extends State<MonkModePage> {
                                                 Row(
                                                   children: [
                                                     Text(
-                                                      isBlocked
+                                                      (monkMode.enabled && isBlocked)
                                                           ? "MUTED"
                                                           : "ALLOWED",
                                                       style: context.captionText
                                                           .copyWith(
-                                                        color: isBlocked
+                                                        color: (monkMode.enabled && isBlocked)
                                                             ? Colors.redAccent
-                                                            : context
-                                                                .accentPrimary,
+                                                            : (monkMode.enabled
+                                                                ? context.accentPrimary
+                                                                : context.textSecondary),
                                                         fontSize: 10,
                                                         fontWeight:
                                                             FontWeight.bold,
@@ -1042,9 +1061,12 @@ class _MonkModePageState extends State<MonkModePage> {
                                                             : Icons
                                                                 .notifications_active_rounded,
                                                         color: isBlocked
-                                                            ? Colors.redAccent
-                                                            : context
-                                                                .accentPrimary,
+                                                            ? (monkMode.enabled
+                                                                ? Colors.redAccent
+                                                                : Colors.redAccent.withValues(alpha: 0.5))
+                                                            : (monkMode.enabled
+                                                                ? context.accentPrimary
+                                                                : context.textSecondary.withValues(alpha: 0.5)),
                                                         size: 20,
                                                       ),
                                                       onPressed: () {
