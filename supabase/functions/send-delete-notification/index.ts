@@ -72,13 +72,14 @@ serve(async (req) => {
             action: "delete_message",
             message_id: messageId,
             room_id: roomId,
+            sender_id: String(senderId),
           },
           android: {
             priority: "high",
           },
           apns: {
             headers: {
-              "apns-priority": "10",
+              "apns-priority": "5",
               "apns-push-type": "background",
             },
             payload: {
