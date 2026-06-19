@@ -222,7 +222,6 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   if (action == 'new_message') {
     final roomId = data['room_id'] as String?;
     final senderIdStr = data['sender_id'] as String?;
-    final senderName = data['sender_name'] as String? ?? 'New Message';
     final payload = data['payload'] as String?;
 
     if (messageId != null &&
@@ -264,41 +263,6 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
         } catch (e) {
           print(
               "PushNotifications: Error acknowledging delivery in background: $e");
-        }
-
-        // 4. Show local notification via flutter_local_notifications
-        try {
-          final isMuted = await _isUserMutedUnderMonkMode(senderId);
-          if (isMuted) {
-            print(
-                "PushNotifications: Background notification suppressed because sender $senderId is muted.");
-          } else {
-            // Query all accumulated unread messages for this room from this sender
-            final unreadRows = await LocalDatabaseHelper.instance
-                .getUnreadMessagesForRoomBySender(roomId, senderId);
-            final List<String> messageLines = unreadRows
-                .map((r) => r['payload'] as String)
-                .toList();
-            // Fallback: if the query returned empty (race condition), use the current payload
-            if (messageLines.isEmpty) {
-              messageLines.add(payload);
-            }
-
-            await showLocalNotification(
-              roomId,
-              senderName,
-              messageLines,
-              {
-                'sender_id': senderIdStr,
-                'room_id': roomId,
-              },
-            );
-            print(
-                "PushNotifications: Background local notification displayed with ${messageLines.length} lines.");
-          }
-        } catch (e) {
-          print(
-              "PushNotifications: Error displaying background notification: $e");
         }
       }
     }

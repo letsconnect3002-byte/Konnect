@@ -256,11 +256,26 @@ class ChatProvider with ChangeNotifier {
         'reply_to_message_sender_name': replyToMessageSenderName,
       });
 
-      await _repository.updateMessageStatusLocally(messageId, 'sent');
-      await updateLastMessageForRoom(roomId);
+      String resolvedStatus = 'sent';
+      try {
+        final existingStatuses = await _repository.fetchSupabaseMessageStatuses([messageId]);
+        if (existingStatuses.isNotEmpty) {
+          resolvedStatus = existingStatuses.first['status'] as String? ?? 'sent';
+        }
+      } catch (checkError) {
+        print("Error checking supabase message status: $checkError");
+      }
+
+      await _updateMessageStatusLocallySafely(messageId, resolvedStatus);
+      await _updateLastMessageForRoomSilent(roomId);
+      if (activeRoomId == roomId) {
+        await refreshActiveRoomMessages();
+      } else {
+        notifyListeners();
+      }
     } catch (e) {
       print("Error sending message: $e");
-      await _repository.updateMessageStatusLocally(messageId, 'error');
+      await _updateMessageStatusLocallySafely(messageId, 'error');
       if (activeRoomId == roomId) {
         await refreshActiveRoomMessages();
       } else {
@@ -306,11 +321,26 @@ class ChatProvider with ChangeNotifier {
         'reply_to_message_sender_name': replyToMessageSenderName,
       });
 
-      await _repository.updateMessageStatusLocally(messageId, 'sent');
-      await updateLastMessageForRoom(roomId);
+      String resolvedStatus = 'sent';
+      try {
+        final existingStatuses = await _repository.fetchSupabaseMessageStatuses([messageId]);
+        if (existingStatuses.isNotEmpty) {
+          resolvedStatus = existingStatuses.first['status'] as String? ?? 'sent';
+        }
+      } catch (checkError) {
+        print("Error checking supabase message status: $checkError");
+      }
+
+      await _updateMessageStatusLocallySafely(messageId, resolvedStatus);
+      await _updateLastMessageForRoomSilent(roomId);
+      if (activeRoomId == roomId) {
+        await refreshActiveRoomMessages();
+      } else {
+        notifyListeners();
+      }
     } catch (e) {
       print("Error resending message: $e");
-      await _repository.updateMessageStatusLocally(messageId, 'error');
+      await _updateMessageStatusLocallySafely(messageId, 'error');
       if (activeRoomId != null) {
         await refreshActiveRoomMessages();
       } else {
@@ -602,6 +632,23 @@ class ChatProvider with ChangeNotifier {
         return 3;
       default:
         return -1;
+    }
+  }
+
+  Future<void> _updateMessageStatusLocallySafely(String messageId, String targetStatus) async {
+    try {
+      final localMsg = await _repository.getMessageByIdLocally(messageId);
+      if (localMsg == null) return;
+      final currentStatus = localMsg['status'] as String? ?? 'pending';
+      if (targetStatus == 'error') {
+        if (currentStatus == 'pending') {
+          await _repository.updateMessageStatusLocally(messageId, targetStatus);
+        }
+      } else if (_statusRank(targetStatus) > _statusRank(currentStatus)) {
+        await _repository.updateMessageStatusLocally(messageId, targetStatus);
+      }
+    } catch (e) {
+      print("Error safely updating message status locally: $e");
     }
   }
 

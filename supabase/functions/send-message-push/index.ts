@@ -44,15 +44,58 @@ serve(async (req) => {
 
     const recipientIds = participants.map((p) => p.user_id)
 
-    // 4. Fetch registered FCM tokens for the recipients
+    // 4. Fetch registered FCM tokens for the recipients (including user_id)
     const { data: tokens, error: tError } = await supabase
       .from("user_push_tokens")
-      .select("fcm_token")
+      .select("user_id, fcm_token")
       .in("user_id", recipientIds)
 
     if (tError || !tokens || tokens.length === 0) {
       console.log("No registered push tokens found for recipients:", recipientIds)
       return new Response("No push tokens registered", { status: 200 })
+    }
+
+    // Fetch Monk Mode settings from profiles table
+    const { data: recipientProfiles, error: rpError } = await supabase
+      .from("profiles")
+      .select("id, monk_mode_enabled, monk_mode_deactivate_at, monk_mode_blocked_ids")
+      .in("id", recipientIds)
+
+    if (rpError) {
+      console.error("Error fetching recipient profiles for Monk Mode check:", rpError)
+    }
+
+    // Build a map of Monk Mode status per recipient
+    const recipientMonkModeMap = new Map<number, {
+      enabled: boolean;
+      deactivateAt: string | null;
+      blockedIds: number[];
+    }>()
+
+    if (recipientProfiles) {
+      for (const prof of recipientProfiles) {
+        recipientMonkModeMap.set(prof.id, {
+          enabled: !!prof.monk_mode_enabled,
+          deactivateAt: prof.monk_mode_deactivate_at || null,
+          blockedIds: prof.monk_mode_blocked_ids || [],
+        })
+      }
+    }
+
+    const isMuted = (recipientId: number): boolean => {
+      const settings = recipientMonkModeMap.get(recipientId)
+      if (!settings) return false
+      if (!settings.enabled) return false
+
+      if (settings.deactivateAt) {
+        const deactivateTime = new Date(settings.deactivateAt).getTime()
+        if (Date.now() > deactivateTime) {
+          return false // Monk mode has expired
+        }
+      }
+
+      const numSenderId = Number(senderId)
+      return settings.blockedIds.map(Number).includes(numSenderId)
     }
 
     // 5. Generate Google OAuth2 access token for Firebase Cloud Messaging
@@ -68,19 +111,23 @@ serve(async (req) => {
     const results = []
     for (const row of tokens) {
       const fcmToken = row.fcm_token
+      const recipientId = row.user_id
 
       // Generate a stable numeric notification ID from the message UUID
       // Take first 8 hex chars of the UUID and convert to a 31-bit positive integer
       const notificationId = parseInt(messageId.replace(/-/g, "").substring(0, 8), 16) & 0x7FFFFFFF
 
+      const muted = isMuted(recipientId)
+
       const body = {
         message: {
           token: fcmToken,
-          // IMPORTANT: Do NOT add a top-level `notification` field here.
-          // On Android, messages with a `notification` payload bypass the Dart
-          // `onBackgroundMessage` handler when the app is killed/in background.
-          // All delivery acknowledgment, SQLite persistence, and local notification
-          // display is handled by the Dart background handler using this `data` payload.
+          ...(!muted && {
+            notification: {
+              title: senderName,
+              body: msgPayload,
+            },
+          }),
           data: {
             action: "new_message",
             message_id: messageId,
@@ -92,15 +139,28 @@ serve(async (req) => {
           },
           android: {
             priority: "high",
+            ...(!muted && {
+              notification: {
+                channel_id: "messages_channel",
+                tag: roomId,
+              },
+            }),
           },
           apns: {
             headers: {
-              "apns-priority": "10",
-              "apns-push-type": "background",
+              "apns-priority": muted ? "5" : "10",
+              "apns-push-type": muted ? "background" : "alert",
             },
             payload: {
               aps: {
                 "content-available": 1,
+                ...(!muted && {
+                  alert: {
+                    title: senderName,
+                    body: msgPayload,
+                  },
+                  sound: "default",
+                }),
               },
             },
           },
