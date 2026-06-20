@@ -251,24 +251,38 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
               "PushNotifications: Error saving message to database in background: $e");
         }
 
-        // 3. Acknowledge delivery to Supabase safely.
-        // NOTE: This background handler runs in a separate background isolate.
-        // The main application state and initialized Supabase singleton are not shared or accessible here.
-        // Therefore, we must instantiate a fresh, dedicated SupabaseClient using raw config keys
-        // to perform database mutations within the background isolate context.
+        // 2. Show notification if sender is not muted
         try {
-          final client = SupabaseClient(
-            SupabaseConfig.url,
-            SupabaseConfig.serviceRoleKey,
-          );
-          await client
-              .from('messages')
-              .update({'status': 'delivered'}).eq('id', messageId);
-          print(
-              "PushNotifications: Background status update acknowledged to Supabase.");
+          final isMuted = await _isUserMutedUnderMonkMode(senderId);
+          if (!isMuted) {
+            final unreadRows = await LocalDatabaseHelper.instance
+                .getUnreadMessagesForRoomBySender(roomId, senderId);
+            final List<String> messageLines = unreadRows
+                .map((r) => r['payload'] as String)
+                .toList();
+            if (messageLines.isEmpty) {
+              messageLines.add(payload);
+            }
+
+            final senderName = data['sender_name'] as String? ?? 'New Message';
+            await showLocalNotification(
+              roomId,
+              senderName,
+              messageLines,
+              {
+                'sender_id': senderIdStr,
+                'room_id': roomId,
+              },
+            );
+            print(
+                "PushNotifications: Background local notification displayed with ${messageLines.length} lines.");
+          } else {
+            print(
+                "PushNotifications: Background notification suppressed because sender $senderId is muted.");
+          }
         } catch (e) {
           print(
-              "PushNotifications: Error acknowledging delivery in background: $e");
+              "PushNotifications: Error showing local notification in background: $e");
         }
       }
     }

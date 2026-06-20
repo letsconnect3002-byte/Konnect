@@ -122,12 +122,6 @@ serve(async (req) => {
       const body = {
         message: {
           token: fcmToken,
-          ...(!muted && {
-            notification: {
-              title: senderName,
-              body: msgPayload,
-            },
-          }),
           data: {
             action: "new_message",
             message_id: messageId,
@@ -139,12 +133,6 @@ serve(async (req) => {
           },
           android: {
             priority: "high",
-            ...(!muted && {
-              notification: {
-                channel_id: "messages_channel",
-                tag: roomId,
-              },
-            }),
           },
           apns: {
             headers: {

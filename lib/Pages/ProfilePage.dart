@@ -1199,77 +1199,7 @@ class _ProfilePageState extends State<ProfilePage> {
           ),
         );
 
-    Widget toggleCard({
-      required IconData icon,
-      required String label,
-      required String subtitle,
-      required bool value,
-      required ValueChanged<bool> onChanged,
-    }) =>
-        Container(
-          height: 76,
-          decoration: darkCard(),
-          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: context.surfaceSecondary,
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  icon,
-                  color: context.accentPrimary,
-                  size: 20,
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      label,
-                      style: context.cardTitle.copyWith(fontSize: 14),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      subtitle,
-                      style: context.captionText.copyWith(
-                        color: context.textMuted,
-                        fontWeight: FontWeight.w400,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              Theme(
-                data: Theme.of(context),
-                child: Transform.scale(
-                  scale: 0.85,
-                  child: Switch(
-                    value: value,
-                    onChanged: onChanged,
-                    activeThumbColor: context.accentPrimary,
-                    activeTrackColor:
-                        context.accentPrimary.withValues(alpha: 0.2),
-                    inactiveThumbColor: context.textMuted,
-                    inactiveTrackColor: context.surfaceSecondary,
-                    trackOutlineColor:
-                        WidgetStateProperty.all(Colors.transparent),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        );
+
 
     final scanCard = compactCard(
       icon: Icons.camera_alt_rounded,
@@ -1298,15 +1228,7 @@ class _ProfilePageState extends State<ProfilePage> {
       onTap: () => _showShareOptionsBottomSheet(context, profileProvider),
     );
 
-    final blurCard = toggleCard(
-      icon: Icons.blur_on_rounded,
-      label: 'Blur Background',
-      subtitle: 'Soften ambient gradients',
-      value: profileProvider.blurBackground,
-      onChanged: (val) {
-        profileProvider.setBlurBackground(val);
-      },
-    );
+
 
     // ── Assemble Column ──────────────────────────────────────────────────
     return Column(
