@@ -175,7 +175,7 @@ class _AuthScreenState extends State<AuthScreen> {
       // Initialize GoogleSignIn (singleton)
       await GoogleSignIn.instance.initialize(
         serverClientId:
-            '150827597127-gnh9lamc1ed61u9hcd31f0e8ilri4g5n.apps.googleusercontent.com',
+            '698580767225-9ib3bsce1hd9a9c266ck4ilrdkj1sa4n.apps.googleusercontent.com',
       );
 
       // Await the native authenticate() method to retrieve the user's GoogleSignInAccount
@@ -196,27 +196,19 @@ class _AuthScreenState extends State<AuthScreen> {
         idToken: idToken,
       );
     } on GoogleSignInException catch (e) {
-      if (e.code == GoogleSignInExceptionCode.canceled) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Google Sign-In was cancelled'),
-              backgroundColor: Colors.orangeAccent,
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
-        }
-        return;
-      }
+      debugPrint(
+          'GoogleSignInException caught: code=${e.code}, description=${e.description}, details=${e.details}');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Google Sign-In failed: ${e.description}'),
-            backgroundColor: Colors.redAccent,
+            content: Text(
+                'Google Sign-In error (Code: ${e.code}): ${e.description ?? e.toString()}'),
+            backgroundColor: Colors.orangeAccent,
             behavior: SnackBarBehavior.floating,
           ),
         );
       }
+      return;
     } on AuthException catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
