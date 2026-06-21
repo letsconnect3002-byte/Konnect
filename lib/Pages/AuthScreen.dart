@@ -182,7 +182,7 @@ class _AuthScreenState extends State<AuthScreen> {
           '[Google Sign-In] Initializing GoogleSignIn.instance with serverClientId...');
       await GoogleSignIn.instance.initialize(
         serverClientId:
-            '150827597127-gnh9lamc1ed61u9hcd31f0e8ilri4g5n.apps.googleusercontent.com',
+            '698580767225-9ib3bsce1hd9a9c266ck4ilrdkj1sa4n.apps.googleusercontent.com',
       );
       debugPrint(
           '[Google Sign-In] GoogleSignIn.instance.initialize completed successfully.');
@@ -190,9 +190,9 @@ class _AuthScreenState extends State<AuthScreen> {
       // Await the native authenticate() method with timeout
       debugPrint(
           '[Google Sign-In] Requesting native authentication via GoogleSignIn.instance.authenticate()...');
-      final GoogleSignInAccount googleUser =
-          await GoogleSignIn.instance.authenticate()
-              .timeout(const Duration(seconds: 5));
+      final GoogleSignInAccount googleUser = await GoogleSignIn.instance
+          .authenticate()
+          .timeout(const Duration(seconds: 5));
       debugPrint('[Google Sign-In] authenticate() returned: $googleUser');
 
       // Retrieve the corresponding GoogleSignInAuthentication object
@@ -219,7 +219,7 @@ class _AuthScreenState extends State<AuthScreen> {
       );
       debugPrint(
           '[Google Sign-In] Supabase sign-in response received. User email: ${authResponse.user?.email}');
-      
+
       if (mounted) {
         setState(() => _isLoading = false);
       }
@@ -239,7 +239,8 @@ class _AuthScreenState extends State<AuthScreen> {
       debugPrint(
           '[Google Sign-In] GoogleSignInException caught: code=${e.code}, description=${e.description}');
       if (e.code == GoogleSignInExceptionCode.canceled) {
-        debugPrint('[Google Sign-In] User cancelled Google Sign-In. Not falling back.');
+        debugPrint(
+            '[Google Sign-In] User cancelled Google Sign-In. Not falling back.');
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -254,7 +255,7 @@ class _AuthScreenState extends State<AuthScreen> {
         }
         return;
       }
-      
+
       if (e.toString().contains('NullPointerException')) {
         debugPrint(
             '[Google Sign-In] GoogleSignInException contains NullPointerException. Activating web OAuth fallback.');
@@ -269,7 +270,7 @@ class _AuthScreenState extends State<AuthScreen> {
       debugPrint(
           '[Google Sign-In] Unexpected error caught during Google Sign-In: $errorStr');
       debugPrint('[Google Sign-In] Stack trace:\n$stackTrace');
-      
+
       if (errorStr.contains('NullPointerException')) {
         debugPrint(
             '[Google Sign-In] NullPointerException detected. Activating web OAuth fallback.');
@@ -289,7 +290,8 @@ class _AuthScreenState extends State<AuthScreen> {
           OAuthProvider.google,
           redirectTo: 'connectapp://login-callback',
         );
-        debugPrint('[Google Sign-In] Web OAuth pipeline completed successfully.');
+        debugPrint(
+            '[Google Sign-In] Web OAuth pipeline completed successfully.');
       } catch (e, stackTrace) {
         debugPrint('[Google Sign-In] Fallback Web OAuth failed: $e');
         debugPrint('[Google Sign-In] Stack trace:\n$stackTrace');

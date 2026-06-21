@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:awesome_notifications/awesome_notifications.dart';
+import 'package:timezone/timezone.dart' as tz;
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:connect/main.dart';
 import 'package:connect/Providers/LocalDatabaseHelper.dart';
 import 'package:connect/Providers/profile_provider.dart';
 
@@ -222,20 +224,32 @@ class MonkModeProvider with ChangeNotifier {
 
   Future<void> _scheduleDeactivationNotification(DateTime deactivateAt) async {
     try {
+      const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
+        'monk_mode_channel',
+        'Monk Mode Alerts',
+        channelDescription: 'Alerts for Monk Mode state changes',
+        importance: Importance.max,
+        priority: Priority.high,
+      );
+      const DarwinNotificationDetails iosDetails = DarwinNotificationDetails(
+        presentAlert: true,
+        presentBadge: true,
+        presentSound: true,
+      );
+      const NotificationDetails details = NotificationDetails(
+        android: androidDetails,
+        iOS: iosDetails,
+      );
+
       await _cancelScheduledDeactivationNotification();
 
-      await AwesomeNotifications().createNotification(
-        content: NotificationContent(
-          id: _monkModeNotificationId,
-          channelKey: 'monk_mode_channel',
-          title: 'Monk Mode',
-          body: 'Monk Mode deactivated automatically. You are back in the loop!',
-        ),
-        schedule: NotificationCalendar.fromDate(
-          date: deactivateAt,
-          preciseAlarm: true,
-          allowWhileIdle: true,
-        ),
+      await flutterLocalNotificationsPlugin.zonedSchedule(
+        id: _monkModeNotificationId,
+        title: 'Monk Mode',
+        body: 'Monk Mode deactivated automatically. You are back in the loop!',
+        scheduledDate: tz.TZDateTime.from(deactivateAt, tz.local),
+        notificationDetails: details,
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
       );
       print("Scheduled Monk Mode deactivation alert at $deactivateAt");
     } catch (e) {
@@ -245,7 +259,7 @@ class MonkModeProvider with ChangeNotifier {
 
   Future<void> _cancelScheduledDeactivationNotification() async {
     try {
-      await AwesomeNotifications().cancel(_monkModeNotificationId);
+      await flutterLocalNotificationsPlugin.cancel(id: _monkModeNotificationId);
       print("Cancelled scheduled Monk Mode deactivation alert.");
     } catch (e) {
       print("Error cancelling Monk Mode notification: $e");

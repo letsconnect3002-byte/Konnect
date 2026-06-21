@@ -29,75 +29,19 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:connect/Config/app_theme.dart';
 import 'package:connect/Pages/AuthScreen.dart';
 import 'package:connect/Pages/ResetPasswordScreen.dart';
-import 'package:awesome_notifications/awesome_notifications.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
-final List<NotificationChannel> awesomeNotificationChannels = [
-  NotificationChannel(
-    channelKey: 'messages_channel',
-    channelName: 'Messages',
-    channelDescription: 'Notifications for new messages',
-    defaultColor: const Color(0xFF9D50BB),
-    ledColor: Colors.white,
-    importance: NotificationImportance.Max,
-    channelShowBadge: true,
-    onlyAlertOnce: true,
-    playSound: true,
-    criticalAlerts: true,
-  ),
-  NotificationChannel(
-    channelKey: 'monk_mode_channel',
-    channelName: 'Monk Mode Alerts',
-    channelDescription: 'Alerts for Monk Mode state changes',
-    defaultColor: const Color(0xFF9D50BB),
-    ledColor: Colors.white,
-    importance: NotificationImportance.Max,
-    channelShowBadge: true,
-    playSound: true,
-  ),
-];
+final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
+    FlutterLocalNotificationsPlugin();
 
-class NotificationController {
-  @pragma("vm:entry-point")
-  static Future<void> onNotificationCreatedMethod(ReceivedNotification receivedNotification) async {
-    print("Notification created: ${receivedNotification.id}");
-  }
-
-  @pragma("vm:entry-point")
-  static Future<void> onNotificationDisplayedMethod(ReceivedNotification receivedNotification) async {
-    print("Notification displayed: ${receivedNotification.id}");
-  }
-
-  @pragma("vm:entry-point")
-  static Future<void> onDismissActionReceivedMethod(ReceivedAction receivedAction) async {
-    print("Notification dismissed: ${receivedAction.id}");
-  }
-
-  @pragma("vm:entry-point")
-  static Future<void> onActionReceivedMethod(ReceivedAction receivedAction) async {
-    final payload = receivedAction.payload;
-    print("Notification action received. Payload: $payload");
-    if (payload != null) {
-      final senderIdStr = payload['sender_id'];
-      if (senderIdStr != null) {
-        final senderId = int.tryParse(senderIdStr);
-        if (senderId != null) {
-          final context = navigatorKey.currentContext;
-          if (context != null) {
-            navigatorKey.currentState?.push(
-              MaterialPageRoute(
-                builder: (routeContext) => IndividualChatPage(otherUserId: senderId),
-              ),
-            );
-          } else {
-            targetChatSenderId = senderId;
-          }
-        }
-      }
-    }
-  }
-}
+const AndroidNotificationChannel notificationChannel = AndroidNotificationChannel(
+  'messages_channel',
+  'Messages',
+  description: 'Notifications for new messages',
+  importance: Importance.max,
+);
 
 int getNotificationId(String messageId) {
   try {
@@ -124,26 +68,59 @@ Future<void> showLocalNotification(
   final int count = messageLines.length;
   final String latestBody = messageLines.last;
 
-  final Map<String, String> stringPayload = dataPayload.map((k, v) => MapEntry(k, v.toString()));
+  final AndroidNotificationDetails androidNotificationDetails;
+  if (count > 1) {
+    androidNotificationDetails = AndroidNotificationDetails(
+      'messages_channel',
+      'Messages',
+      channelDescription: 'Notifications for new messages',
+      importance: Importance.max,
+      priority: Priority.high,
+      showWhen: true,
+      number: count,
+      styleInformation: InboxStyleInformation(
+        messageLines,
+        contentTitle: title,
+        summaryText: '$count new messages',
+      ),
+    );
+  } else {
+    androidNotificationDetails = const AndroidNotificationDetails(
+      'messages_channel',
+      'Messages',
+      channelDescription: 'Notifications for new messages',
+      importance: Importance.max,
+      priority: Priority.high,
+      showWhen: true,
+    );
+  }
 
-  await AwesomeNotifications().createNotification(
-    content: NotificationContent(
-      id: notificationId,
-      channelKey: 'messages_channel',
-      title: title,
-      body: latestBody,
-      summary: count > 1 ? '$count new messages' : null,
-      notificationLayout: count > 1 ? NotificationLayout.Inbox : NotificationLayout.Default,
-      payload: stringPayload,
-      groupKey: roomId,
-    ),
+  final DarwinNotificationDetails iosNotificationDetails =
+      DarwinNotificationDetails(
+    presentAlert: true,
+    presentBadge: true,
+    presentSound: true,
+    threadIdentifier: roomId,
+  );
+
+  final NotificationDetails notificationDetails = NotificationDetails(
+    android: androidNotificationDetails,
+    iOS: iosNotificationDetails,
+  );
+
+  await flutterLocalNotificationsPlugin.show(
+    id: notificationId,
+    title: title,
+    body: latestBody,
+    notificationDetails: notificationDetails,
+    payload: jsonEncode(dataPayload),
   );
 }
 
 /// Cancels the notification for a given chat room.
 Future<void> cancelLocalNotification(String roomId) async {
   final notificationId = getNotificationId(roomId);
-  await AwesomeNotifications().cancel(notificationId);
+  await flutterLocalNotificationsPlugin.cancel(id: notificationId);
 }
 
 String? pendingNotificationPayload;
@@ -207,15 +184,27 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
     print("Error initializing Firebase in background: $e");
   }
 
-  // 2. Initialize awesome_notifications safely
+  // 2. Initialize flutter_local_notifications & register channel safely
   try {
-    await AwesomeNotifications().initialize(
-      null,
-      awesomeNotificationChannels,
-      debug: true,
+    const AndroidInitializationSettings initializationSettingsAndroid =
+        AndroidInitializationSettings('@mipmap/ic_launcher');
+    const DarwinInitializationSettings initializationSettingsDarwin =
+        DarwinInitializationSettings();
+    const InitializationSettings initializationSettings =
+        InitializationSettings(
+      android: initializationSettingsAndroid,
+      iOS: initializationSettingsDarwin,
     );
+    await flutterLocalNotificationsPlugin.initialize(
+      settings: initializationSettings,
+    );
+
+    await flutterLocalNotificationsPlugin
+        .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>()
+        ?.createNotificationChannel(notificationChannel);
   } catch (e) {
-    print("Error initializing awesome notifications in background: $e");
+    print("Error initializing local notifications in background: $e");
   }
 
   final data = message.data;
@@ -353,27 +342,61 @@ void main() async {
     // authCallbackUrlScheme: 'connectapp',
   );
 
-  // Initialize awesome_notifications
-  await AwesomeNotifications().initialize(
-    null,
-    awesomeNotificationChannels,
-    debug: true,
+  // Initialize flutter_local_notifications
+  const AndroidInitializationSettings initializationSettingsAndroid =
+      AndroidInitializationSettings('@mipmap/ic_launcher');
+  const DarwinInitializationSettings initializationSettingsDarwin =
+      DarwinInitializationSettings();
+  const InitializationSettings initializationSettings = InitializationSettings(
+    android: initializationSettingsAndroid,
+    iOS: initializationSettingsDarwin,
+  );
+  await flutterLocalNotificationsPlugin.initialize(
+    settings: initializationSettings,
+    onDidReceiveNotificationResponse: (NotificationResponse response) async {
+      final payload = response.payload;
+      if (payload != null) {
+        final context = navigatorKey.currentContext;
+        if (context != null) {
+          handleLocalNotificationClickPayload(payload);
+        } else {
+          pendingNotificationPayload = payload;
+          try {
+            final data = jsonDecode(payload);
+            final senderIdStr = data['sender_id'] as String?;
+            if (senderIdStr != null) {
+              targetChatSenderId = int.tryParse(senderIdStr);
+            }
+          } catch (e) {
+            print("Error parsing local notification payload on startup: $e");
+          }
+        }
+      }
+    },
   );
 
-  await AwesomeNotifications().setListeners(
-    onActionReceivedMethod: NotificationController.onActionReceivedMethod,
-    onNotificationCreatedMethod: NotificationController.onNotificationCreatedMethod,
-    onNotificationDisplayedMethod: NotificationController.onNotificationDisplayedMethod,
-    onDismissActionReceivedMethod: NotificationController.onDismissActionReceivedMethod,
-  );
+  // Explicitly create the Android notification channel
+  try {
+    await flutterLocalNotificationsPlugin
+        .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>()
+        ?.createNotificationChannel(notificationChannel);
+  } catch (e) {
+    print("Error creating notification channel on startup: $e");
+  }
 
   // Check for initial launch notification
   try {
-    final ReceivedAction? initialAction = await AwesomeNotifications().getInitialNotificationAction();
-    if (initialAction != null && initialAction.payload != null) {
-      final senderIdStr = initialAction.payload!['sender_id'];
-      if (senderIdStr != null) {
-        targetChatSenderId = int.tryParse(senderIdStr);
+    final localDetails =
+        await flutterLocalNotificationsPlugin.getNotificationAppLaunchDetails();
+    if (localDetails?.didNotificationLaunchApp ?? false) {
+      final localPayload = localDetails?.notificationResponse?.payload;
+      if (localPayload != null) {
+        final data = jsonDecode(localPayload);
+        final senderIdStr = data['sender_id'] as String?;
+        if (senderIdStr != null) {
+          targetChatSenderId = int.tryParse(senderIdStr);
+        }
       }
     }
 
@@ -637,10 +660,10 @@ class _AppShellGateState extends State<AppShellGate> {
       });
 
       // Request permission for local notifications (needed for Android 13+)
-      final isAllowed = await AwesomeNotifications().isNotificationAllowed();
-      if (!isAllowed) {
-        await AwesomeNotifications().requestPermissionToSendNotifications();
-      }
+      await flutterLocalNotificationsPlugin
+          .resolvePlatformSpecificImplementation<
+              AndroidFlutterLocalNotificationsPlugin>()
+          ?.requestNotificationsPermission();
 
       // Listen to foreground FCM messages
       FirebaseMessaging.onMessage.listen((RemoteMessage message) async {
