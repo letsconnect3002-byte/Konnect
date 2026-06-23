@@ -264,12 +264,9 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
   String _formatMessageTime(String isoString) {
     try {
       final dateTime = DateTime.parse(isoString).toLocal();
-      final hour = dateTime.hour > 12
-          ? dateTime.hour - 12
-          : (dateTime.hour == 0 ? 12 : dateTime.hour);
+      final hour = dateTime.hour.toString().padLeft(2, '0');
       final minute = dateTime.minute.toString().padLeft(2, '0');
-      final period = dateTime.hour >= 12 ? 'PM' : 'AM';
-      return "$hour:$minute $period";
+      return "$hour:$minute";
     } catch (_) {
       return "Just now";
     }
@@ -652,18 +649,18 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
     bool isHighlighted = false,
   }) {
     final bubbleRadius = BorderRadius.only(
-      topLeft: const Radius.circular(AppDimensions.radiusPremiumCard),
-      topRight: const Radius.circular(AppDimensions.radiusPremiumCard),
+      topLeft: const Radius.circular(AppDimensions.radiusPremiumCard / 1.75),
+      topRight: const Radius.circular(AppDimensions.radiusPremiumCard / 1.75),
       bottomLeft: isMe
-          ? const Radius.circular(AppDimensions.radiusPremiumCard)
-          : const Radius.circular(4.0),
+          ? const Radius.circular(AppDimensions.radiusPremiumCard / 1.75)
+          : const Radius.circular(0.0),
       bottomRight: isMe
-          ? const Radius.circular(4.0)
-          : const Radius.circular(AppDimensions.radiusPremiumCard),
+          ? const Radius.circular(0.0)
+          : const Radius.circular(AppDimensions.radiusPremiumCard / 1.75),
     );
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.only(bottom: 3),
       child: Column(
         crossAxisAlignment:
             isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
@@ -674,7 +671,7 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
             curve: Curves.easeInOut,
             padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 2),
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: BorderRadius.circular(5),
               color: isHighlighted
                   ? Colors.white.withValues(alpha: 0.08)
                   : Colors.transparent,
@@ -696,57 +693,58 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
                     width: 1.5,
                   ),
                 ),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (replyToId != null) ...[
-                      GestureDetector(
-                        onTap: () {
-                          _scrollToAndHighlightMessage(
-                              replyToId, _provider.activeRoomMessages);
-                        },
-                        child: _buildBubbleReplyQuote(replyToSenderName ?? '',
-                            replyToPayload ?? '', isMe),
+                padding: const EdgeInsets.only(
+                    left: 12, right: 8, top: 10, bottom: 6),
+                child: IntrinsicWidth(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (replyToId != null) ...[
+                        GestureDetector(
+                          onTap: () {
+                            _scrollToAndHighlightMessage(
+                                replyToId, _provider.activeRoomMessages);
+                          },
+                          child: _buildBubbleReplyQuote(replyToSenderName ?? '',
+                              replyToPayload ?? '', isMe),
+                        ),
+                        const SizedBox(height: 6),
+                      ],
+                      Text(
+                        text,
+                        style: context.bodyText.copyWith(
+                          color: context.textPrimary,
+                          height: 1.35,
+                        ),
                       ),
-                      const SizedBox(height: 6),
+                      const SizedBox(height: 4),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            Text(
+                              status == 'error' ? 'Failed to send' : time,
+                              style: context.captionText.copyWith(
+                                color: status == 'error'
+                                    ? Colors.redAccent
+                                    : context.textMuted,
+                                fontSize: 9,
+                              ),
+                            ),
+                            if (isMe && status != null) ...[
+                              const SizedBox(width: 4),
+                              _buildStatusIcon(status),
+                            ]
+                          ],
+                        ),
+                      ),
                     ],
-                    Text(
-                      text,
-                      style: context.bodyText.copyWith(
-                        color: context.textPrimary,
-                        height: 1.35,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 4),
-          // ── Time + status row (never highlighted) ──
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 6),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              mainAxisAlignment:
-                  isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
-              children: [
-                Text(
-                  status == 'error' ? 'Failed to send' : time,
-                  style: context.captionText.copyWith(
-                    color: status == 'error'
-                        ? Colors.redAccent
-                        : context.textMuted,
                   ),
                 ),
-                if (isMe && status != null) ...[
-                  const SizedBox(width: 4),
-                  _buildStatusIcon(status),
-                ]
-              ],
+              ),
             ),
           ),
         ],

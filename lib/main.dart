@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:ui';
+import 'dart:async';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:connect/firebase_options.dart';
@@ -41,6 +42,14 @@ const AndroidNotificationChannel notificationChannel =
   'messages_channel',
   'Messages',
   description: 'Notifications for new messages',
+  importance: Importance.max,
+);
+
+const AndroidNotificationChannel monkModeChannel =
+    AndroidNotificationChannel(
+  'monk_mode_channel',
+  'Monk Mode Alerts',
+  description: 'Alerts for Monk Mode state changes',
   importance: Importance.max,
 );
 
@@ -204,10 +213,13 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
       settings: initializationSettings,
     );
 
-    await flutterLocalNotificationsPlugin
+    final androidPlugin = flutterLocalNotificationsPlugin
         .resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin>()
-        ?.createNotificationChannel(notificationChannel);
+            AndroidFlutterLocalNotificationsPlugin>();
+    if (androidPlugin != null) {
+      await androidPlugin.createNotificationChannel(notificationChannel);
+      await androidPlugin.createNotificationChannel(monkModeChannel);
+    }
   } catch (e) {
     print("Error initializing local notifications in background: $e");
   }
@@ -247,63 +259,80 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
         // 2. Add Missing Supabase Status Acknowledgment in the Background Handler
         try {
-          final client = SupabaseClient(SupabaseConfig.url, SupabaseConfig.serviceRoleKey);
-          await client.from('messages').update({'status': 'delivered'}).eq('id', messageId);
-          print("PushNotifications: Background delivery status acknowledged in Supabase for $messageId.");
-        } catch (e) {
-          print("PushNotifications: Error updating remote Supabase status in background: $e");
-        }
-
-        // 3. Show notification if sender is not muted
-        try {
-          final isMuted = await _isUserMutedUnderMonkMode(senderId);
-          if (!isMuted) {
-            List<String> messageLines = [];
-            bool isFallback = false;
-            try {
-              final unreadRows = await LocalDatabaseHelper.instance
-                  .getUnreadMessagesForRoomBySender(roomId, senderId);
-              messageLines = unreadRows.map((r) => r['payload'] as String).toList();
-              if (messageLines.isEmpty) {
-                isFallback = true;
-              }
-            } catch (dbError) {
-              print("PushNotifications: Database read failed in background: $dbError");
-              isFallback = true;
-            }
-
-            final senderName = data['sender_name'] as String? ?? 'New Message';
-            if (isFallback) {
-              await showLocalNotification(
-                messageId, // Using messageId instead of roomId so it's individual and doesn't collapse
-                senderName,
-                [payload],
-                {
-                  'sender_id': senderIdStr,
-                  'room_id': roomId,
-                  'message_id': messageId,
-                },
-              );
-              print("PushNotifications: Background fallback notification displayed for messageId: $messageId.");
-            } else {
-              await showLocalNotification(
-                roomId,
-                senderName,
-                messageLines,
-                {
-                  'sender_id': senderIdStr,
-                  'room_id': roomId,
-                },
-              );
-              print("PushNotifications: Background local notification displayed with ${messageLines.length} lines.");
-            }
-          } else {
-            print(
-                "PushNotifications: Background notification suppressed because sender $senderId is muted.");
-          }
+          final client =
+              SupabaseClient(SupabaseConfig.url, SupabaseConfig.serviceRoleKey);
+          await client
+              .from('messages')
+              .update({'status': 'delivered'}).eq('id', messageId);
+          print(
+              "PushNotifications: Background delivery status acknowledged in Supabase for $messageId.");
         } catch (e) {
           print(
-              "PushNotifications: Error showing local notification in background: $e");
+              "PushNotifications: Error updating remote Supabase status in background: $e");
+        }
+
+        // 3. Show notification if sender is not muted and OS hasn't already shown it natively
+        final hasNotificationStr = data['has_notification'] as String?;
+        final bool serverSentNotification = hasNotificationStr == 'true';
+
+        if (message.notification == null && !serverSentNotification) {
+          try {
+            final isMuted = await _isUserMutedUnderMonkMode(senderId);
+            if (!isMuted) {
+              List<String> messageLines = [];
+              bool isFallback = false;
+              try {
+                final unreadRows = await LocalDatabaseHelper.instance
+                    .getUnreadMessagesForRoomBySender(roomId, senderId);
+                messageLines =
+                    unreadRows.map((r) => r['payload'] as String).toList();
+                if (messageLines.isEmpty) {
+                  isFallback = true;
+                }
+              } catch (dbError) {
+                print(
+                    "PushNotifications: Database read failed in background: $dbError");
+                isFallback = true;
+              }
+
+              final senderName = data['sender_name'] as String? ?? 'New Message';
+              if (isFallback) {
+                await showLocalNotification(
+                  messageId, // Using messageId instead of roomId so it's individual and doesn't collapse
+                  senderName,
+                  [payload],
+                  {
+                    'sender_id': senderIdStr,
+                    'room_id': roomId,
+                    'message_id': messageId,
+                  },
+                );
+                print(
+                    "PushNotifications: Background fallback notification displayed for messageId: $messageId.");
+              } else {
+                await showLocalNotification(
+                  roomId,
+                  senderName,
+                  messageLines,
+                  {
+                    'sender_id': senderIdStr,
+                    'room_id': roomId,
+                  },
+                );
+                print(
+                    "PushNotifications: Background local notification displayed with ${messageLines.length} lines.");
+              }
+            } else {
+              print(
+                  "PushNotifications: Background notification suppressed because sender $senderId is muted.");
+            }
+          } catch (e) {
+            print(
+                "PushNotifications: Error showing local notification in background: $e");
+          }
+        } else {
+          print(
+              "PushNotifications: Background handler skipping local notification because message.notification is present or server sent notification ($serverSentNotification).");
         }
       }
     }
@@ -406,14 +435,17 @@ void main() async {
     },
   );
 
-  // Explicitly create the Android notification channel
+  // Explicitly create the Android notification channels
   try {
-    await flutterLocalNotificationsPlugin
+    final androidPlugin = flutterLocalNotificationsPlugin
         .resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin>()
-        ?.createNotificationChannel(notificationChannel);
+            AndroidFlutterLocalNotificationsPlugin>();
+    if (androidPlugin != null) {
+      await androidPlugin.createNotificationChannel(notificationChannel);
+      await androidPlugin.createNotificationChannel(monkModeChannel);
+    }
   } catch (e) {
-    print("Error creating notification channel on startup: $e");
+    print("Error creating notification channels on startup: $e");
   }
 
   // Check for initial launch notification
@@ -508,7 +540,11 @@ class MyApp extends StatelessWidget {
         theme: AppTheme.darkTheme,
         builder: (context, child) {
           final profileProvider = Provider.of<ProfileProvider>(context);
-          final blurEnabled = profileProvider.blurBackground;
+          final bool blurEnabled = profileProvider.blurBackground;
+          final monkMode = Provider.of<MonkModeProvider>(context);
+          final bool isMonkModeActive =
+              monkMode.enabled && monkMode.deactivateAt != null;
+          final double topPadding = MediaQuery.of(context).padding.top;
 
           Widget backgroundGradient = Container(
             decoration: BoxDecoration(
@@ -530,7 +566,26 @@ class MyApp extends StatelessWidget {
           return Stack(
             children: [
               Positioned.fill(child: backgroundGradient),
-              if (child != null) Positioned.fill(child: child),
+              if (child != null)
+                Positioned.fill(
+                  child: isMonkModeActive
+                      ? Padding(
+                          padding: EdgeInsets.only(top: topPadding + 28.0),
+                          child: MediaQuery.removePadding(
+                            context: context,
+                            removeTop: true,
+                            child: child,
+                          ),
+                        )
+                      : child,
+                ),
+              if (isMonkModeActive)
+                const Positioned(
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  child: MonkModeTopBanner(),
+                ),
             ],
           );
         },
@@ -669,7 +724,7 @@ class _AppShellGateState extends State<AppShellGate> {
       // inside the onMessage handler. Leaving these enabled causes duplicate
       // notifications on certain Android OEM skins and iOS.
       await messaging.setForegroundNotificationPresentationOptions(
-        alert: true,
+        alert: false,
         badge: true,
         sound: true,
       );
@@ -767,12 +822,15 @@ class _AppShellGateState extends State<AppShellGate> {
                       try {
                         final unreadRows = await LocalDatabaseHelper.instance
                             .getUnreadMessagesForRoomBySender(roomId, senderId);
-                        messageLines = unreadRows.map((r) => r['payload'] as String).toList();
+                        messageLines = unreadRows
+                            .map((r) => r['payload'] as String)
+                            .toList();
                         if (messageLines.isEmpty) {
                           isFallback = true;
                         }
                       } catch (dbError) {
-                        print("PushNotifications: Database read failed in foreground: $dbError");
+                        print(
+                            "PushNotifications: Database read failed in foreground: $dbError");
                         isFallback = true;
                       }
 
@@ -787,7 +845,8 @@ class _AppShellGateState extends State<AppShellGate> {
                             'message_id': messageId,
                           },
                         );
-                        print("PushNotifications: Foreground local fallback notification displayed for messageId: $messageId.");
+                        print(
+                            "PushNotifications: Foreground local fallback notification displayed for messageId: $messageId.");
                       } else {
                         await showLocalNotification(
                           roomId,
@@ -1100,6 +1159,126 @@ class _AppShellState extends State<_AppShell> with WidgetsBindingObserver {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class MonkModeTopBanner extends StatefulWidget {
+  const MonkModeTopBanner({super.key});
+
+  @override
+  State<MonkModeTopBanner> createState() => _MonkModeTopBannerState();
+}
+
+class _MonkModeTopBannerState extends State<MonkModeTopBanner> {
+  Timer? _timer;
+  String _timeString = "";
+
+  @override
+  void initState() {
+    super.initState();
+    _updateTime();
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      _updateTime();
+    });
+  }
+
+  void _updateTime() {
+    if (!mounted) return;
+    final monkMode = Provider.of<MonkModeProvider>(context, listen: false);
+    if (!monkMode.enabled || monkMode.deactivateAt == null) {
+      setState(() {
+        _timeString = "00:00";
+      });
+      return;
+    }
+    final remaining = monkMode.deactivateAt!.difference(DateTime.now());
+    if (remaining.isNegative) {
+      setState(() {
+        _timeString = "00:00";
+      });
+      return;
+    }
+    final hours = remaining.inHours;
+    final minutes =
+        remaining.inMinutes.remainder(60).toString().padLeft(2, '0');
+    final seconds =
+        remaining.inSeconds.remainder(60).toString().padLeft(2, '0');
+    setState(() {
+      _timeString =
+          hours > 0 ? "$hours:$minutes:$seconds" : "$minutes:$seconds";
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final topPadding = MediaQuery.of(context).padding.top;
+    return Material(
+      type: MaterialType.transparency,
+      child: Container(
+        height: topPadding + 28.0,
+        width: double.infinity,
+        color: Colors.transparent,
+        child: GlassmorphicContainer(
+          borderRadius: BorderRadius.zero,
+          glassColor: const Color(0xFF1E2D24)
+              .withValues(alpha: 0.8), // subtle dark green glass
+          fallbackColor: const Color(0xFF121A15),
+          blurSigma: 10.0,
+          border: const Border(
+            bottom: BorderSide(
+              color: Color(0xFF1ED760), // Volt green bottom border line
+              width: 1.0,
+            ),
+          ),
+          padding: EdgeInsets.only(top: topPadding, left: 16, right: 16),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              const Icon(
+                Icons.self_improvement_rounded,
+                color: Color(0xFF1ED760),
+                size: 14,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                "MONK MODE ACTIVE",
+                style: context.captionText.copyWith(
+                  color: const Color(0xFF1ED760),
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 1.2,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                "•",
+                style: context.captionText.copyWith(
+                  color: Colors.white54,
+                  fontSize: 11,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                _timeString,
+                style: context.captionText.copyWith(
+                  color: Colors.white,
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 1.0,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

@@ -47,12 +47,25 @@ serve(async (req) => {
     // 4. Fetch registered FCM tokens for the recipients
     const { data: tokens, error: tError } = await supabase
       .from("user_push_tokens")
-      .select("fcm_token")
+      .select("user_id, fcm_token")
       .in("user_id", recipientIds)
 
     if (tError || !tokens || tokens.length === 0) {
       console.log("No registered push tokens found for recipients:", recipientIds)
       return new Response("No push tokens registered", { status: 200 })
+    }
+
+    // Fetch recipients' profiles to check Monk Mode settings
+    const { data: recipientProfiles } = await supabase
+      .from("profiles")
+      .select("id, monk_mode_enabled, monk_mode_deactivate_at, monk_mode_blocked_ids")
+      .in("id", recipientIds)
+
+    const profileMap = new Map()
+    if (recipientProfiles) {
+      for (const p of recipientProfiles) {
+        profileMap.set(p.id, p)
+      }
     }
 
     // 5. Generate Google OAuth2 access token for Firebase Cloud Messaging
@@ -68,14 +81,41 @@ serve(async (req) => {
     const results = []
     for (const row of tokens) {
       const fcmToken = row.fcm_token
+      const recipientId = row.user_id
+
+      // Check if this recipient has muted the sender under Monk Mode
+      const profile = profileMap.get(recipientId)
+      let isMuted = false
+      if (profile) {
+        const enabled = profile.monk_mode_enabled || false
+        const deactivateAtStr = profile.monk_mode_deactivate_at
+        const blockedIds = profile.monk_mode_blocked_ids || []
+
+        if (enabled && deactivateAtStr) {
+          const deactivateAt = new Date(deactivateAtStr)
+          const now = new Date()
+          if (now < deactivateAt) {
+            // Monk Mode is currently active
+            if (blockedIds.includes(senderId)) {
+              isMuted = true
+            }
+          }
+        }
+      }
 
       // Generate a stable numeric notification ID from the message UUID
       // Take first 8 hex chars of the UUID and convert to a 31-bit positive integer
       const notificationId = parseInt(messageId.replace(/-/g, "").substring(0, 8), 16) & 0x7FFFFFFF
 
+      const notificationPayload = isMuted ? undefined : {
+        title: senderName,
+        body: msgPayload,
+      }
+
       const body = {
         message: {
           token: fcmToken,
+          ...(notificationPayload ? { notification: notificationPayload } : {}),
           data: {
             action: "new_message",
             message_id: messageId,
@@ -84,18 +124,33 @@ serve(async (req) => {
             sender_name: senderName,
             payload: msgPayload,
             notification_id: String(notificationId),
+            has_notification: notificationPayload ? "true" : "false",
           },
           android: {
             priority: "high",
+            ...(notificationPayload ? {
+              notification: {
+                channelId: "messages_channel",
+              }
+            } : {}),
           },
           apns: {
             headers: {
-              "apns-priority": "5",
-              "apns-push-type": "background",
+              "apns-priority": notificationPayload ? "10" : "5",
+              "apns-push-type": notificationPayload ? "alert" : "background",
             },
             payload: {
               aps: {
-                "content-available": 1,
+                ...(notificationPayload ? {
+                  alert: {
+                    title: senderName,
+                    body: msgPayload,
+                  },
+                  sound: "default",
+                  badge: 1,
+                } : {
+                  "content-available": 1,
+                }),
               },
             },
           },

@@ -61,9 +61,15 @@ class MonkModeProvider with ChangeNotifier {
           _enabled = false;
           _deactivateAt = null;
           await _saveToLocalDb();
+          await _cancelOngoingNotification();
         } else {
           _startDeactivateTimer();
+          await _showOngoingNotification();
         }
+      } else if (_enabled) {
+        await _showOngoingNotification();
+      } else {
+        await _cancelOngoingNotification();
       }
 
       _initialized = true;
@@ -92,13 +98,20 @@ class MonkModeProvider with ChangeNotifier {
           _deactivateAt = null;
           await _saveToLocalDb();
           _syncToSupabase();
+          await _cancelOngoingNotification();
         } else {
           _startDeactivateTimer();
           await _scheduleDeactivationNotification(_deactivateAt!);
+          await _showOngoingNotification();
         }
+      } else if (_enabled) {
+        _deactivateTimer?.cancel();
+        await _cancelScheduledDeactivationNotification();
+        await _showOngoingNotification();
       } else {
         _deactivateTimer?.cancel();
         await _cancelScheduledDeactivationNotification();
+        await _cancelOngoingNotification();
       }
       notifyListeners();
     }
@@ -140,14 +153,28 @@ class MonkModeProvider with ChangeNotifier {
     }
 
     if (_enabled) {
+      try {
+        final androidPlugin = flutterLocalNotificationsPlugin
+            .resolvePlatformSpecificImplementation<
+                AndroidFlutterLocalNotificationsPlugin>();
+        if (androidPlugin != null) {
+          await androidPlugin.requestNotificationsPermission();
+          await androidPlugin.requestExactAlarmsPermission();
+        }
+      } catch (e) {
+        print("Error requesting permissions in setMonkMode: $e");
+      }
+
       _startDeactivateTimer();
       if (_deactivateAt != null) {
         await _scheduleDeactivationNotification(_deactivateAt!);
       }
+      await _showOngoingNotification();
     } else {
       _deactivateTimer?.cancel();
       _deactivateAt = null;
       await _cancelScheduledDeactivationNotification();
+      await _cancelOngoingNotification();
     }
 
     await _saveToLocalDb();
@@ -192,6 +219,7 @@ class MonkModeProvider with ChangeNotifier {
     _deactivateTimer?.cancel();
     _deactivatedAutomatically = automatic;
     await _cancelScheduledDeactivationNotification();
+    await _cancelOngoingNotification();
     await _saveToLocalDb();
     _syncToSupabase();
     notifyListeners();
@@ -221,6 +249,7 @@ class MonkModeProvider with ChangeNotifier {
   }
 
   static const int _monkModeNotificationId = 888888;
+  static const int _monkModeOngoingNotificationId = 999999;
 
   Future<void> _scheduleDeactivationNotification(DateTime deactivateAt) async {
     try {
@@ -243,15 +272,28 @@ class MonkModeProvider with ChangeNotifier {
 
       await _cancelScheduledDeactivationNotification();
 
-      await flutterLocalNotificationsPlugin.zonedSchedule(
-        id: _monkModeNotificationId,
-        title: 'Monk Mode',
-        body: 'Monk Mode deactivated automatically. You are back in the loop!',
-        scheduledDate: tz.TZDateTime.from(deactivateAt, tz.local),
-        notificationDetails: details,
-        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-      );
-      print("Scheduled Monk Mode deactivation alert at $deactivateAt");
+      try {
+        await flutterLocalNotificationsPlugin.zonedSchedule(
+          id: _monkModeNotificationId,
+          title: 'Monk Mode',
+          body: 'Monk Mode deactivated automatically. You are back in the loop!',
+          scheduledDate: tz.TZDateTime.from(deactivateAt.toUtc(), tz.UTC),
+          notificationDetails: details,
+          androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        );
+        print("Scheduled Monk Mode deactivation alert (exact) at $deactivateAt");
+      } catch (e) {
+        print("Exact alarm scheduling failed, falling back to inexact: $e");
+        await flutterLocalNotificationsPlugin.zonedSchedule(
+          id: _monkModeNotificationId,
+          title: 'Monk Mode',
+          body: 'Monk Mode deactivated automatically. You are back in the loop!',
+          scheduledDate: tz.TZDateTime.from(deactivateAt.toUtc(), tz.UTC),
+          notificationDetails: details,
+          androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+        );
+        print("Scheduled Monk Mode deactivation alert (inexact) at $deactivateAt");
+      }
     } catch (e) {
       print("Error scheduling Monk Mode notification: $e");
     }
@@ -263,6 +305,64 @@ class MonkModeProvider with ChangeNotifier {
       print("Cancelled scheduled Monk Mode deactivation alert.");
     } catch (e) {
       print("Error cancelling Monk Mode notification: $e");
+    }
+  }
+
+  Future<void> _showOngoingNotification() async {
+    try {
+      final deactivateAt = _deactivateAt;
+      String body = 'Monk Mode is active.';
+      int? timeoutMs;
+      if (deactivateAt != null) {
+        final localTime = deactivateAt.toLocal();
+        final hour = localTime.hour.toString().padLeft(2, '0');
+        final minute = localTime.minute.toString().padLeft(2, '0');
+        body = 'Muting select notifications until $hour:$minute.';
+        final diff = deactivateAt.difference(DateTime.now());
+        if (!diff.isNegative) {
+          timeoutMs = diff.inMilliseconds;
+        }
+      }
+
+      final AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
+        'monk_mode_channel',
+        'Monk Mode Alerts',
+        channelDescription: 'Alerts for Monk Mode state changes',
+        importance: Importance.low,
+        priority: Priority.low,
+        ongoing: true,
+        onlyAlertOnce: true,
+        showWhen: false,
+        timeoutAfter: timeoutMs,
+      );
+      const DarwinNotificationDetails iosDetails = DarwinNotificationDetails(
+        presentAlert: true,
+        presentBadge: true,
+        presentSound: false,
+      );
+      final NotificationDetails details = NotificationDetails(
+        android: androidDetails,
+        iOS: iosDetails,
+      );
+
+      await flutterLocalNotificationsPlugin.show(
+        id: _monkModeOngoingNotificationId,
+        title: 'Monk Mode Active',
+        body: body,
+        notificationDetails: details,
+      );
+      print("Showed ongoing Monk Mode notification. Timeout: $timeoutMs ms");
+    } catch (e) {
+      print("Error showing ongoing Monk Mode notification: $e");
+    }
+  }
+
+  Future<void> _cancelOngoingNotification() async {
+    try {
+      await flutterLocalNotificationsPlugin.cancel(id: _monkModeOngoingNotificationId);
+      print("Cancelled ongoing Monk Mode notification.");
+    } catch (e) {
+      print("Error cancelling ongoing Monk Mode notification: $e");
     }
   }
 
