@@ -196,6 +196,7 @@ class _QrDisplayPageState extends State<QrDisplayPage> {
         ),
         backgroundColor: Colors.transparent,
         elevation: 0,
+        flexibleSpace: const GlassmorphicFlexibleSpace(),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded,
               color: Colors.white, size: 18),

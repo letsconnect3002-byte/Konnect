@@ -36,7 +36,8 @@ final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
     FlutterLocalNotificationsPlugin();
 
-const AndroidNotificationChannel notificationChannel = AndroidNotificationChannel(
+const AndroidNotificationChannel notificationChannel =
+    AndroidNotificationChannel(
   'messages_channel',
   'Messages',
   description: 'Notifications for new messages',
@@ -45,7 +46,11 @@ const AndroidNotificationChannel notificationChannel = AndroidNotificationChanne
 
 int getNotificationId(String messageId) {
   try {
-    final hex = messageId.replaceAll('-', '').substring(0, 8);
+    final cleanStr = messageId.replaceAll('-', '');
+    if (cleanStr.length < 8) {
+      return messageId.hashCode & 0x7FFFFFFF;
+    }
+    final hex = cleanStr.substring(0, 8);
     return int.parse(hex, radix: 16) & 0x7FFFFFFF;
   } catch (e) {
     print("Error parsing UUID for notification ID: $e");
@@ -240,31 +245,58 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
               "PushNotifications: Error saving message to database in background: $e");
         }
 
-        // 2. Show notification if sender is not muted
+        // 2. Add Missing Supabase Status Acknowledgment in the Background Handler
+        try {
+          final client = SupabaseClient(SupabaseConfig.url, SupabaseConfig.serviceRoleKey);
+          await client.from('messages').update({'status': 'delivered'}).eq('id', messageId);
+          print("PushNotifications: Background delivery status acknowledged in Supabase for $messageId.");
+        } catch (e) {
+          print("PushNotifications: Error updating remote Supabase status in background: $e");
+        }
+
+        // 3. Show notification if sender is not muted
         try {
           final isMuted = await _isUserMutedUnderMonkMode(senderId);
           if (!isMuted) {
-            final unreadRows = await LocalDatabaseHelper.instance
-                .getUnreadMessagesForRoomBySender(roomId, senderId);
-            final List<String> messageLines = unreadRows
-                .map((r) => r['payload'] as String)
-                .toList();
-            if (messageLines.isEmpty) {
-              messageLines.add(payload);
+            List<String> messageLines = [];
+            bool isFallback = false;
+            try {
+              final unreadRows = await LocalDatabaseHelper.instance
+                  .getUnreadMessagesForRoomBySender(roomId, senderId);
+              messageLines = unreadRows.map((r) => r['payload'] as String).toList();
+              if (messageLines.isEmpty) {
+                isFallback = true;
+              }
+            } catch (dbError) {
+              print("PushNotifications: Database read failed in background: $dbError");
+              isFallback = true;
             }
 
             final senderName = data['sender_name'] as String? ?? 'New Message';
-            await showLocalNotification(
-              roomId,
-              senderName,
-              messageLines,
-              {
-                'sender_id': senderIdStr,
-                'room_id': roomId,
-              },
-            );
-            print(
-                "PushNotifications: Background local notification displayed with ${messageLines.length} lines.");
+            if (isFallback) {
+              await showLocalNotification(
+                messageId, // Using messageId instead of roomId so it's individual and doesn't collapse
+                senderName,
+                [payload],
+                {
+                  'sender_id': senderIdStr,
+                  'room_id': roomId,
+                  'message_id': messageId,
+                },
+              );
+              print("PushNotifications: Background fallback notification displayed for messageId: $messageId.");
+            } else {
+              await showLocalNotification(
+                roomId,
+                senderName,
+                messageLines,
+                {
+                  'sender_id': senderIdStr,
+                  'room_id': roomId,
+                },
+              );
+              print("PushNotifications: Background local notification displayed with ${messageLines.length} lines.");
+            }
           } else {
             print(
                 "PushNotifications: Background notification suppressed because sender $senderId is muted.");
@@ -300,9 +332,8 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
               print(
                   "PushNotifications: Background notification cancelled — no remaining unread for room $roomId.");
             } else {
-              final List<String> remainingLines = remaining
-                  .map((r) => r['payload'] as String)
-                  .toList();
+              final List<String> remainingLines =
+                  remaining.map((r) => r['payload'] as String).toList();
               // We don't have the sender name in the background handler here,
               // so fetch it from the first remaining message's sender_id via a
               // simple title. The notification title stays unchanged since the
@@ -638,9 +669,9 @@ class _AppShellGateState extends State<AppShellGate> {
       // inside the onMessage handler. Leaving these enabled causes duplicate
       // notifications on certain Android OEM skins and iOS.
       await messaging.setForegroundNotificationPresentationOptions(
-        alert: false,
-        badge: false,
-        sound: false,
+        alert: true,
+        badge: true,
+        sound: true,
       );
 
       // Fetch the token (FCM can generate tokens on Android even if notification permission is denied)
@@ -731,27 +762,45 @@ class _AppShellGateState extends State<AppShellGate> {
                       print(
                           "PushNotifications: Foreground notification suppressed because sender $senderId is muted.");
                     } else {
-                      // Query all accumulated unread messages for this room from this sender
-                      final unreadRows = await LocalDatabaseHelper.instance
-                          .getUnreadMessagesForRoomBySender(roomId, senderId);
-                      final List<String> messageLines = unreadRows
-                          .map((r) => r['payload'] as String)
-                          .toList();
-                      if (messageLines.isEmpty) {
-                        messageLines.add(payload);
+                      List<String> messageLines = [];
+                      bool isFallback = false;
+                      try {
+                        final unreadRows = await LocalDatabaseHelper.instance
+                            .getUnreadMessagesForRoomBySender(roomId, senderId);
+                        messageLines = unreadRows.map((r) => r['payload'] as String).toList();
+                        if (messageLines.isEmpty) {
+                          isFallback = true;
+                        }
+                      } catch (dbError) {
+                        print("PushNotifications: Database read failed in foreground: $dbError");
+                        isFallback = true;
                       }
 
-                      await showLocalNotification(
-                        roomId,
-                        senderName,
-                        messageLines,
-                        {
-                          'sender_id': senderIdStr,
-                          'room_id': roomId,
-                        },
-                      );
-                      print(
-                          "PushNotifications: Foreground local notification displayed with ${messageLines.length} lines.");
+                      if (isFallback) {
+                        await showLocalNotification(
+                          messageId, // Using messageId instead of roomId so it's individual and doesn't collapse
+                          senderName,
+                          [payload],
+                          {
+                            'sender_id': senderIdStr,
+                            'room_id': roomId,
+                            'message_id': messageId,
+                          },
+                        );
+                        print("PushNotifications: Foreground local fallback notification displayed for messageId: $messageId.");
+                      } else {
+                        await showLocalNotification(
+                          roomId,
+                          senderName,
+                          messageLines,
+                          {
+                            'sender_id': senderIdStr,
+                            'room_id': roomId,
+                          },
+                        );
+                        print(
+                            "PushNotifications: Foreground local notification displayed with ${messageLines.length} lines.");
+                      }
                     }
                   } catch (e) {
                     print(
@@ -786,9 +835,8 @@ class _AppShellGateState extends State<AppShellGate> {
                       print(
                           "PushNotifications: Foreground notification cancelled — no remaining unread for room $roomId.");
                     } else {
-                      final List<String> remainingLines = remaining
-                          .map((r) => r['payload'] as String)
-                          .toList();
+                      final List<String> remainingLines =
+                          remaining.map((r) => r['payload'] as String).toList();
                       final senderName =
                           data['sender_name'] as String? ?? 'Message';
                       await showLocalNotification(
@@ -965,32 +1013,27 @@ class _AppShellState extends State<_AppShell> with WidgetsBindingObserver {
               ),
             ],
           ),
-          child: ClipRRect(
+          child: GlassmorphicContainer(
             borderRadius: BorderRadius.circular(99),
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 15.0, sigmaY: 15.0),
-              child: Container(
-                height: 58,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF121316).withValues(alpha: 0.65),
-                  borderRadius: BorderRadius.circular(99),
-                  border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.08),
-                    width: 1.0,
-                  ),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    _buildNavItem(index: 0, icon: Icons.home_outlined),
-                    _buildNavItem(
-                        index: 1, icon: Icons.chat_bubble_outline_rounded),
-                    _buildNavItem(index: 2, icon: Icons.search_rounded),
-                    _buildNavItem(
-                        index: 4, icon: Icons.self_improvement_rounded),
-                    _buildNavItem(index: 3, icon: Icons.person_outline_rounded),
-                  ],
-                ),
+            blurSigma: 15.0,
+            glassColor: const Color(0xFF121316).withValues(alpha: 0.65),
+            fallbackColor: const Color(0xFF121316),
+            border: Border.all(
+              color: Colors.white.withValues(alpha: 0.08),
+              width: 1.0,
+            ),
+            child: SizedBox(
+              height: 58,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  _buildNavItem(index: 0, icon: Icons.home_outlined),
+                  _buildNavItem(
+                      index: 1, icon: Icons.chat_bubble_outline_rounded),
+                  _buildNavItem(index: 2, icon: Icons.search_rounded),
+                  _buildNavItem(index: 4, icon: Icons.self_improvement_rounded),
+                  _buildNavItem(index: 3, icon: Icons.person_outline_rounded),
+                ],
               ),
             ),
           ),

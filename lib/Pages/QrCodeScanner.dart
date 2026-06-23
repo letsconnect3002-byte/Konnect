@@ -43,6 +43,7 @@ class _QRScannerPageState extends State<QRScannerPage> {
         ),
         backgroundColor: Colors.transparent,
         elevation: 0,
+        flexibleSpace: const GlassmorphicFlexibleSpace(),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded,
               color: Colors.white, size: 18),
@@ -189,32 +190,30 @@ class _QRScannerPageState extends State<QRScannerPage> {
                 context: context,
                 barrierDismissible: false,
                 builder: (context) => Dialog(
-                  backgroundColor: context.surfacePrimary,
-                  shape: RoundedRectangleBorder(
-                    borderRadius:
-                        BorderRadius.circular(AppDimensions.radiusPremiumCard),
-                    side:
-                        BorderSide(color: context.surfaceSecondary, width: 1.5),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                        vertical: 24, horizontal: 16),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        CircularProgressIndicator(
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                              context.accentPrimary),
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          "Loading their card...",
-                          style: context.bodyText.copyWith(
-                            fontWeight: FontWeight.bold,
+                  backgroundColor: Colors.transparent,
+                  elevation: 0,
+                  child: GlassmorphicContainer(
+                    borderRadius: BorderRadius.circular(AppDimensions.radiusPremiumCard),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                          vertical: 24, horizontal: 16),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          CircularProgressIndicator(
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                                context.accentPrimary),
                           ),
-                        ),
-                      ],
+                          const SizedBox(height: 16),
+                          Text(
+                            "Loading their card...",
+                            style: context.bodyText.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -379,26 +378,26 @@ class _ProfileCardState extends State<ProfileCard> {
       context: context,
       barrierDismissible: false,
       builder: (context) => Dialog(
-        backgroundColor: themeSurfacePrimary,
-        shape: RoundedRectangleBorder(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        child: GlassmorphicContainer(
           borderRadius: BorderRadius.circular(AppDimensions.radiusPremiumCard),
-          side: BorderSide(color: themeSurfaceSecondary, width: 1.5),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(themeAccentPrimary),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                _isAlreadyConnected ? "Updating connection..." : "Saving connection...",
-                style: context.bodyText.copyWith(fontWeight: FontWeight.bold),
-              ),
-            ],
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                CircularProgressIndicator(
+                  valueColor: AlwaysStoppedAnimation<Color>(themeAccentPrimary),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  _isAlreadyConnected ? "Updating connection..." : "Saving connection...",
+                  style: context.bodyText.copyWith(fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -946,6 +945,7 @@ class _ProfileCardState extends State<ProfileCard> {
         ),
         backgroundColor: Colors.transparent,
         elevation: 0,
+        flexibleSpace: const GlassmorphicFlexibleSpace(),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded,
               color: Colors.white, size: 18),

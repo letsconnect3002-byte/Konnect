@@ -486,21 +486,16 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
     required IconData icon,
     required VoidCallback onPressed,
   }) {
-    return GestureDetector(
-      onTap: onPressed,
-      child: Container(
-        width: 44,
-        height: 44,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: context.surfacePrimary,
-          border: Border.all(color: context.surfaceSecondary, width: 1),
-        ),
-        child: Icon(
-          icon,
-          color: Colors.white,
-          size: 20,
-        ),
+    return GlassmorphicButton(
+      onPressed: onPressed,
+      width: 44,
+      height: 44,
+      borderRadius: BorderRadius.circular(22),
+      padding: EdgeInsets.zero,
+      child: Icon(
+        icon,
+        color: Colors.white,
+        size: 20,
       ),
     );
   }
@@ -834,22 +829,13 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
                 ),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: OutlinedButton(
+                  child: GlassmorphicButton(
                     onPressed: () {
                       HapticFeedback.lightImpact();
                       _showReferBottomSheet(context, profileData);
                     },
-                    style: OutlinedButton.styleFrom(
-                      backgroundColor: context.surfaceSecondary,
-                      foregroundColor: Colors.white,
-                      side: BorderSide(
-                        color: context.surfaceSecondary,
-                        width: 1.0,
-                      ),
-                      shape: const StadiumBorder(),
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      elevation: 0,
-                    ),
+                    borderRadius: BorderRadius.circular(99),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
                     child: Text(
                       "Refer",
                       style: context.bodyText.copyWith(

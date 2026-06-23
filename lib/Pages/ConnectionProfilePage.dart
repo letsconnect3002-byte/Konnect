@@ -1582,17 +1582,13 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
           child: Row(
             children: [
               Expanded(
-                child: OutlinedButton(
+                child: GlassmorphicButton(
                   onPressed: () {
                     _showDeleteConfirmation(
                         context, widget.profileData, connectionProvider);
                   },
-                  style: OutlinedButton.styleFrom(
-                    side:
-                        BorderSide(color: context.surfaceSecondary, width: 1.0),
-                    shape: const StadiumBorder(),
-                    padding: const EdgeInsets.symmetric(vertical: 16.0),
-                  ),
+                  borderRadius: BorderRadius.circular(99),
+                  padding: const EdgeInsets.symmetric(vertical: 16.0),
                   child: Text(
                     "Remove Connection",
                     style: context.bodyText.copyWith(

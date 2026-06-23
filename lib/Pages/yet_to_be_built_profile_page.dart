@@ -527,7 +527,7 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                         ),
                       ),
                     ] else ...[
-                      ElevatedButton.icon(
+                      GlassmorphicButton(
                         onPressed: () {
                           setModalState(() {
                             isUploading = true;
@@ -579,27 +579,24 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                             },
                           );
                         },
-                        icon: const Icon(Icons.photo_library_rounded,
-                            color: Colors.white, size: 18),
-                        label: const Text(
-                          "Upload from Gallery",
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 14,
-                            fontFamily: 'Inter',
-                          ),
-                        ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: context.surfaceSecondary,
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(
-                                AppDimensions.radiusComponent),
-                            side: BorderSide(
-                                color:
-                                    context.textMuted.withValues(alpha: 0.2)),
-                          ),
-                          padding: const EdgeInsets.symmetric(vertical: 14),
+                        borderRadius: BorderRadius.circular(
+                            AppDimensions.radiusComponent),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: const [
+                            Icon(Icons.photo_library_rounded,
+                                color: Colors.white, size: 18),
+                            SizedBox(width: 8),
+                            Text(
+                              "Upload from Gallery",
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                                fontFamily: 'Inter',
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],

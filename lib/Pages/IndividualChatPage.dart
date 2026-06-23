@@ -376,8 +376,9 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
     return Scaffold(
       backgroundColor: context.canvasBackground,
       appBar: AppBar(
-        backgroundColor: context.canvasBackground,
+        backgroundColor: Colors.transparent,
         elevation: 0,
+        flexibleSpace: const GlassmorphicFlexibleSpace(),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded,
               color: Colors.white, size: 18),
@@ -736,7 +737,9 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
                 Text(
                   status == 'error' ? 'Failed to send' : time,
                   style: context.captionText.copyWith(
-                    color: status == 'error' ? Colors.redAccent : context.textMuted,
+                    color: status == 'error'
+                        ? Colors.redAccent
+                        : context.textMuted,
                   ),
                 ),
                 if (isMe && status != null) ...[
@@ -1176,12 +1179,7 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
     showDialog(
       context: context,
       builder: (BuildContext dialogContext) {
-        return AlertDialog(
-          backgroundColor: context.surfacePrimary,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-            side: BorderSide(color: context.surfaceSecondary),
-          ),
+        return GlassmorphicAlertDialog(
           title: Text(
             "Delete Message?",
             style: context.screenHeading.copyWith(fontWeight: FontWeight.bold),

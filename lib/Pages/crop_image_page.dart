@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:image/image.dart' as img;
+import 'package:connect/Config/app_theme.dart';
 
 class CropImagePage extends StatefulWidget {
   final Uint8List imageBytes;
@@ -157,8 +158,9 @@ class _CropImagePageState extends State<CropImagePage> {
     return Scaffold(
       backgroundColor: scaffoldBg,
       appBar: AppBar(
-        backgroundColor: scaffoldBg,
+        backgroundColor: Colors.transparent,
         elevation: 0,
+        flexibleSpace: const GlassmorphicFlexibleSpace(),
         leading: IconButton(
           icon:
               const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white),

@@ -95,13 +95,7 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
     return showDialog(
       context: context,
       builder: (BuildContext dialogContext) {
-        return AlertDialog(
-          backgroundColor: context.surfacePrimary,
-          shape: RoundedRectangleBorder(
-            borderRadius:
-                BorderRadius.circular(AppDimensions.radiusPremiumCard),
-            side: BorderSide(color: context.surfaceSecondary, width: 1.5),
-          ),
+        return GlassmorphicAlertDialog(
           title: Text(
             "Delete Connection",
             style: context.screenHeading.copyWith(fontWeight: FontWeight.bold),
@@ -219,6 +213,7 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
+        flexibleSpace: const GlassmorphicFlexibleSpace(),
         leading: Navigator.canPop(context)
             ? IconButton(
                 icon: const Icon(Icons.arrow_back_ios_new_rounded,

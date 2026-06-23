@@ -121,27 +121,27 @@ class _ProfilePageState extends State<ProfilePage> {
         context: context,
         barrierDismissible: false,
         builder: (context) => Dialog(
-          backgroundColor: context.surfacePrimary,
-          shape: const RoundedRectangleBorder(
-            borderRadius: BorderRadius.all(
-                Radius.circular(AppDimensions.radiusPremiumCard)),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                CircularProgressIndicator(
-                  valueColor:
-                      AlwaysStoppedAnimation<Color>(context.accentPrimary),
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  "Generating Private Key...",
-                  style: context.cardTitle,
-                ),
-              ],
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          child: GlassmorphicContainer(
+            borderRadius: BorderRadius.circular(AppDimensions.radiusPremiumCard),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  CircularProgressIndicator(
+                    valueColor:
+                        AlwaysStoppedAnimation<Color>(context.accentPrimary),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    "Generating Private Key...",
+                    style: context.cardTitle,
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -654,15 +654,12 @@ class _ProfilePageState extends State<ProfilePage> {
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setModalState) {
-            return Container(
-              decoration: BoxDecoration(
-                color: context.surfacePrimary,
-                borderRadius: const BorderRadius.vertical(
-                    top: Radius.circular(AppDimensions.radiusPremiumCard)),
-                border: Border(
-                  top: BorderSide(
-                      color: Colors.white.withValues(alpha: 0.04), width: 1),
-                ),
+            return GlassmorphicContainer(
+              borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(AppDimensions.radiusPremiumCard)),
+              border: Border(
+                top: BorderSide(
+                    color: Colors.white.withValues(alpha: 0.04), width: 1),
               ),
               padding: EdgeInsets.only(
                 left: 24,
@@ -789,15 +786,12 @@ class _ProfilePageState extends State<ProfilePage> {
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setModalState) {
-            return Container(
-              decoration: BoxDecoration(
-                color: context.surfacePrimary,
-                borderRadius: const BorderRadius.vertical(
-                    top: Radius.circular(AppDimensions.radiusPremiumCard)),
-                border: Border(
-                  top: BorderSide(
-                      color: Colors.white.withValues(alpha: 0.04), width: 1),
-                ),
+            return GlassmorphicContainer(
+              borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(AppDimensions.radiusPremiumCard)),
+              border: Border(
+                top: BorderSide(
+                    color: Colors.white.withValues(alpha: 0.04), width: 1),
               ),
               padding: EdgeInsets.only(
                 left: 24,
