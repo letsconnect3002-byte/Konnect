@@ -430,8 +430,11 @@ class GlassmorphicAlertDialog extends StatelessWidget {
                   const SizedBox(height: 24),
                 ],
                 if (actions != null)
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
+                  OverflowBar(
+                    alignment: MainAxisAlignment.end,
+                    spacing: 8.0,
+                    overflowSpacing: 8.0,
+                    overflowAlignment: OverflowBarAlignment.end,
                     children: actions!,
                   ),
               ],
