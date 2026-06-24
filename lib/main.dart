@@ -785,41 +785,49 @@ class _AppShellGateState extends State<AppShellGate> {
                 payload != null) {
               final senderId = int.tryParse(senderIdStr);
               if (senderId != null) {
-                // 1. Save to local SQLite
                 final isCurrentRoom = provider.activeRoomId == roomId;
-                try {
-                  await LocalDatabaseHelper.instance.insertMessage(
-                    messageId,
-                    roomId,
-                    senderId,
-                    payload,
-                    status: isCurrentRoom ? 'read' : 'delivered',
-                  );
-                  print(
-                      "PushNotifications: Foreground message inserted to SQLite.");
-                } catch (e) {
-                  print(
-                      "PushNotifications: Error inserting message in foreground SQLite: $e");
-                }
 
-                // 2. Acknowledge delivery
-                try {
-                  await provider.acknowledgeDelivery(messageId,
-                      isActiveInChat: isCurrentRoom);
-                  print(
-                      "PushNotifications: Foreground message delivery status updated in Supabase via provider.");
-                } catch (e) {
-                  print(
-                      "PushNotifications: Error acknowledging delivery in foreground: $e");
-                }
+                // When the user is already in this chat room, the Supabase
+                // Realtime onInsert handler handles SQLite insertion,
+                // delivery acknowledgment, and UI refresh. Processing the
+                // same message again here via FCM causes race conditions
+                // that can delete freshly-inserted messages.
+                if (!isCurrentRoom) {
+                  // 1. Save to local SQLite
+                  try {
+                    await LocalDatabaseHelper.instance.insertMessage(
+                      messageId,
+                      roomId,
+                      senderId,
+                      payload,
+                      status: 'delivered',
+                    );
+                    print(
+                        "PushNotifications: Foreground message inserted to SQLite.");
+                  } catch (e) {
+                    print(
+                        "PushNotifications: Error inserting message in foreground SQLite: $e");
+                  }
 
-                // 3. Update providers so UI updates immediately
-                try {
-                  await provider.updateLastMessageForRoom(roomId);
-                  await provider.refreshActiveRoomMessages();
-                  await provider.updateUnreadCount();
-                } catch (e) {
-                  print("PushNotifications: Error updating providers: $e");
+                  // 2. Acknowledge delivery
+                  try {
+                    await provider.acknowledgeDelivery(messageId,
+                        isActiveInChat: false);
+                    print(
+                        "PushNotifications: Foreground message delivery status updated in Supabase via provider.");
+                  } catch (e) {
+                    print(
+                        "PushNotifications: Error acknowledging delivery in foreground: $e");
+                  }
+
+                  // 3. Update providers so UI updates immediately
+                  try {
+                    await provider.updateLastMessageForRoom(roomId);
+                    await provider.refreshActiveRoomMessages();
+                    await provider.updateUnreadCount();
+                  } catch (e) {
+                    print("PushNotifications: Error updating providers: $e");
+                  }
                 }
 
                 // 4. Show notification ONLY if the user is NOT actively in the chat room

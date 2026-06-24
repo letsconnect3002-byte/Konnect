@@ -439,33 +439,25 @@ class ChatProvider with ChangeNotifier {
         await updateUnreadCount();
       },
       onDelete: (payload) async {
+        // Do NOT delete local messages here. Supabase Realtime DELETE events
+        // can fire spuriously due to upsert behavior or RLS re-evaluation
+        // during status updates. Intentional "delete for everyone" is handled
+        // reliably by the dedicated FCM delete_message push notification.
         final oldRecord = payload.oldRecord;
         if (oldRecord == null) return;
-        final messageId = oldRecord['id'] as String?;
         final rId = oldRecord['room_id'] as String?;
 
-        if (messageId != null) {
-          final localMsg = await _repository.getMessageByIdLocally(messageId);
-          if (localMsg != null) {
-            final localStatus = localMsg['status'] as String?;
-            if (localStatus != 'read') {
-              await _repository.deleteMessageLocally(messageId);
-            } else {
-              await _repository.updateMessageStatusLocally(messageId, 'read');
-            }
-          }
-
-          if (rId != null) {
-            await _updateLastMessageForRoomSilent(rId);
-          }
-
-          if (activeRoomId == rId) {
-            await refreshActiveRoomMessages();
-          } else {
-            notifyListeners();
-          }
-          await updateUnreadCount();
+        // Just refresh the last-message cache and UI in case the delete was real.
+        if (rId != null) {
+          await _updateLastMessageForRoomSilent(rId);
         }
+
+        if (activeRoomId == rId) {
+          await refreshActiveRoomMessages();
+        } else {
+          notifyListeners();
+        }
+        await updateUnreadCount();
       },
       onSubscribeStatus: (status) async {
         if (status == RealtimeSubscribeStatus.subscribed) {
@@ -824,25 +816,11 @@ class ChatProvider with ChangeNotifier {
     if (myUserId == null) return;
 
     try {
-      final unreadIncoming =
-          await _repository.getUnreadIncomingMessagesLocally(myUserId);
-
-      if (unreadIncoming.isNotEmpty) {
-        final messageIds =
-            unreadIncoming.map((m) => m['id'] as String).toList();
-        final existing =
-            await _repository.fetchSupabaseMessageStatuses(messageIds);
-
-        final Set<String> existingIds = {
-          for (final row in existing) row['id'] as String
-        };
-
-        for (final localId in messageIds) {
-          if (!existingIds.contains(localId)) {
-            await _repository.deleteMessageLocally(localId);
-          }
-        }
-      }
+      // Note: We intentionally do NOT delete local messages that are missing
+      // from Supabase here. Such deletions caused a race condition where
+      // freshly-inserted messages were removed before Supabase acknowledged
+      // them. Intentional "delete for everyone" is handled by the dedicated
+      // FCM delete_message push notification.
 
       for (final roomId in connectionRooms.values) {
         await _updateLastMessageForRoomSilent(roomId);
