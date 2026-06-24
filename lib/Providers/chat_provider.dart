@@ -76,6 +76,31 @@ class ChatProvider with ChangeNotifier {
   ChatProvider({ChatRepository? chatRepository})
       : _repository = chatRepository ?? SupabaseChatRepository() {
     _loadSoundEffectsPreference();
+    _configureAudioContext();
+  }
+
+  void _configureAudioContext() {
+    try {
+      final AudioContext audioContext = AudioContext(
+        iOS: AudioContextIOS(
+          category: AVAudioSessionCategory.playback,
+          options: const {
+            AVAudioSessionOptions.defaultToSpeaker,
+            AVAudioSessionOptions.mixWithOthers,
+          },
+        ),
+        android: AudioContextAndroid(
+          isSpeakerphoneOn: true,
+          stayAwake: true,
+          contentType: AndroidContentType.sonification,
+          usageType: AndroidUsageType.assistanceSonification,
+          audioFocus: AndroidAudioFocus.none,
+        ),
+      );
+      AudioPlayer.global.setAudioContext(audioContext);
+    } catch (e) {
+      print("Error setting audio context: $e");
+    }
   }
 
   int? _userId;
@@ -345,7 +370,7 @@ class ChatProvider with ChangeNotifier {
     final myUserId = _userId;
     if (myUserId == null) return;
 
-    _playSendSound();
+    // _playSendSound();
 
     try {
       final localMsg = await _repository.getMessageByIdLocally(messageId);
@@ -394,6 +419,7 @@ class ChatProvider with ChangeNotifier {
       }
 
       await _updateMessageStatusLocallySafely(messageId, resolvedStatus);
+      _playSendSound();
       await _updateLastMessageForRoomSilent(roomId);
       if (activeRoomId == roomId) {
         await refreshActiveRoomMessages();
