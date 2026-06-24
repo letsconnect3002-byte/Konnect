@@ -4,6 +4,7 @@ import 'package:connect/Repositories/chat_repository.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
+import 'package:audioplayers/audioplayers.dart';
 
 sealed class ChatState {}
 
@@ -23,6 +24,26 @@ class ChatError extends ChatState {
 
 class ChatProvider with ChangeNotifier {
   final ChatRepository _repository;
+  final AudioPlayer _sendPlayer = AudioPlayer();
+  final AudioPlayer _receivePlayer = AudioPlayer();
+
+  Future<void> _playSendSound() async {
+    try {
+      await _sendPlayer.stop();
+      await _sendPlayer.play(AssetSource('message_audio/Send Sound.mp3'));
+    } catch (e) {
+      print("Error playing send sound: $e");
+    }
+  }
+
+  Future<void> _playReceiveSound() async {
+    try {
+      await _receivePlayer.stop();
+      await _receivePlayer.play(AssetSource('message_audio/Receive Sound.mp3'));
+    } catch (e) {
+      print("Error playing receive sound: $e");
+    }
+  }
 
   ChatProvider({ChatRepository? chatRepository})
       : _repository = chatRepository ?? SupabaseChatRepository();
@@ -221,6 +242,8 @@ class ChatProvider with ChangeNotifier {
     final myUserId = _userId;
     if (myUserId == null) return;
 
+    _playSendSound();
+
     final messageId = const Uuid().v4();
     final createdAt = DateTime.now().toUtc().toIso8601String();
 
@@ -288,6 +311,8 @@ class ChatProvider with ChangeNotifier {
   Future<void> resendChatMessage(String messageId) async {
     final myUserId = _userId;
     if (myUserId == null) return;
+
+    _playSendSound();
 
     try {
       final localMsg = await _repository.getMessageByIdLocally(messageId);
@@ -415,6 +440,7 @@ class ChatProvider with ChangeNotifier {
         await _updateLastMessageForRoomSilent(rId);
 
         if (isInChat) {
+          _playReceiveSound();
           await refreshActiveRoomMessages();
         } else {
           notifyListeners();
@@ -1012,6 +1038,8 @@ class ChatProvider with ChangeNotifier {
       timer.cancel();
     }
     _typingRoomTimers.clear();
+    _sendPlayer.dispose();
+    _receivePlayer.dispose();
     super.dispose();
   }
 }

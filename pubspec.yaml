@@ -59,6 +59,7 @@ dependencies:
   share_plus: ^13.1.0
   skeletonizer: ^2.1.3
   google_fonts: ^6.2.1
+  audioplayers: ^6.8.0
   # flutter_launcher_icons: ^0.14.1
   # flutter_native_splash: ^2.4.2
   # image_gallery_saver: ^2.0.3
@@ -112,6 +113,8 @@ flutter:
     - assets/icons/linkedin.png
     - assets/icons/instagram.png
     - assets/icons/spotify.png
+    - assets/message_audio/Receive Sound.mp3
+    - assets/message_audio/Send Sound.mp3
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images
