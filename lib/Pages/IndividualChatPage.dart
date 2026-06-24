@@ -482,6 +482,48 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
             ],
           ),
         ),
+        actions: [
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                provider.soundEffectsEnabled
+                    ? Icons.notifications_active_rounded
+                    : Icons.notifications_off_rounded,
+                size: 16,
+                color: provider.soundEffectsEnabled
+                    ? context.accentPrimary
+                    : context.textMuted,
+              ),
+              const SizedBox(width: 4),
+              Text(
+                "Sounds",
+                style: context.captionText.copyWith(
+                  fontSize: 11,
+                  color: provider.soundEffectsEnabled
+                      ? context.textPrimary
+                      : context.textMuted,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              Transform.scale(
+                scale: 0.65,
+                child: Switch.adaptive(
+                  value: provider.soundEffectsEnabled,
+                  activeThumbColor: context.accentPrimary,
+                  activeTrackColor: context.accentPrimary.withValues(alpha: 0.3),
+                  inactiveThumbColor: context.textMuted,
+                  inactiveTrackColor: context.surfaceSecondary,
+                  onChanged: (val) {
+                    HapticFeedback.lightImpact();
+                    provider.setSoundEffectsEnabled(val);
+                  },
+                ),
+              ),
+              const SizedBox(width: 8),
+            ],
+          ),
+        ],
       ),
       body: Column(
         children: [

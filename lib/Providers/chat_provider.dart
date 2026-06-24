@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 import 'package:audioplayers/audioplayers.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 sealed class ChatState {}
 
@@ -27,7 +28,33 @@ class ChatProvider with ChangeNotifier {
   final AudioPlayer _sendPlayer = AudioPlayer();
   final AudioPlayer _receivePlayer = AudioPlayer();
 
+  bool _soundEffectsEnabled = true;
+  bool get soundEffectsEnabled => _soundEffectsEnabled;
+
+  Future<void> _loadSoundEffectsPreference() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      _soundEffectsEnabled =
+          prefs.getBool('chat_sound_effects_enabled') ?? true;
+      notifyListeners();
+    } catch (e) {
+      print("Error loading sound preference: $e");
+    }
+  }
+
+  Future<void> setSoundEffectsEnabled(bool value) async {
+    _soundEffectsEnabled = value;
+    notifyListeners();
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('chat_sound_effects_enabled', value);
+    } catch (e) {
+      print("Error saving sound preference: $e");
+    }
+  }
+
   Future<void> _playSendSound() async {
+    if (!_soundEffectsEnabled) return;
     try {
       await _sendPlayer.stop();
       await _sendPlayer.play(AssetSource('message_audio/Send Sound.mp3'));
@@ -37,6 +64,7 @@ class ChatProvider with ChangeNotifier {
   }
 
   Future<void> _playReceiveSound() async {
+    if (!_soundEffectsEnabled) return;
     try {
       await _receivePlayer.stop();
       await _receivePlayer.play(AssetSource('message_audio/Receive Sound.mp3'));
@@ -46,7 +74,9 @@ class ChatProvider with ChangeNotifier {
   }
 
   ChatProvider({ChatRepository? chatRepository})
-      : _repository = chatRepository ?? SupabaseChatRepository();
+      : _repository = chatRepository ?? SupabaseChatRepository() {
+    _loadSoundEffectsPreference();
+  }
 
   int? _userId;
   List<Map<String, dynamic>> _externalConnections = [];
@@ -242,7 +272,7 @@ class ChatProvider with ChangeNotifier {
     final myUserId = _userId;
     if (myUserId == null) return;
 
-    _playSendSound();
+    // _playSendSound();
 
     final messageId = const Uuid().v4();
     final createdAt = DateTime.now().toUtc().toIso8601String();
@@ -281,15 +311,18 @@ class ChatProvider with ChangeNotifier {
 
       String resolvedStatus = 'sent';
       try {
-        final existingStatuses = await _repository.fetchSupabaseMessageStatuses([messageId]);
+        final existingStatuses =
+            await _repository.fetchSupabaseMessageStatuses([messageId]);
         if (existingStatuses.isNotEmpty) {
-          resolvedStatus = existingStatuses.first['status'] as String? ?? 'sent';
+          resolvedStatus =
+              existingStatuses.first['status'] as String? ?? 'sent';
         }
       } catch (checkError) {
         print("Error checking supabase message status: $checkError");
       }
 
       await _updateMessageStatusLocallySafely(messageId, resolvedStatus);
+      _playSendSound();
       await _updateLastMessageForRoomSilent(roomId);
       if (activeRoomId == roomId) {
         await refreshActiveRoomMessages();
@@ -321,8 +354,10 @@ class ChatProvider with ChangeNotifier {
       final roomId = localMsg['room_id'] as String;
       final text = localMsg['payload'] as String;
       final replyToMessageId = localMsg['reply_to_message_id'] as String?;
-      final replyToMessagePayload = localMsg['reply_to_message_payload'] as String?;
-      final replyToMessageSenderName = localMsg['reply_to_message_sender_name'] as String?;
+      final replyToMessagePayload =
+          localMsg['reply_to_message_payload'] as String?;
+      final replyToMessageSenderName =
+          localMsg['reply_to_message_sender_name'] as String?;
 
       await _repository.updateMessageStatusLocally(messageId, 'pending');
       if (activeRoomId == roomId) {
@@ -348,9 +383,11 @@ class ChatProvider with ChangeNotifier {
 
       String resolvedStatus = 'sent';
       try {
-        final existingStatuses = await _repository.fetchSupabaseMessageStatuses([messageId]);
+        final existingStatuses =
+            await _repository.fetchSupabaseMessageStatuses([messageId]);
         if (existingStatuses.isNotEmpty) {
-          resolvedStatus = existingStatuses.first['status'] as String? ?? 'sent';
+          resolvedStatus =
+              existingStatuses.first['status'] as String? ?? 'sent';
         }
       } catch (checkError) {
         print("Error checking supabase message status: $checkError");
@@ -661,7 +698,8 @@ class ChatProvider with ChangeNotifier {
     }
   }
 
-  Future<void> _updateMessageStatusLocallySafely(String messageId, String targetStatus) async {
+  Future<void> _updateMessageStatusLocallySafely(
+      String messageId, String targetStatus) async {
     try {
       final localMsg = await _repository.getMessageByIdLocally(messageId);
       if (localMsg == null) return;
