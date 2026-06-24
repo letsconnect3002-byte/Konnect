@@ -115,7 +115,6 @@ serve(async (req) => {
       const body = {
         message: {
           token: fcmToken,
-          ...(notificationPayload ? { notification: notificationPayload } : {}),
           data: {
             action: "new_message",
             message_id: messageId,
@@ -128,29 +127,15 @@ serve(async (req) => {
           },
           android: {
             priority: "high",
-            ...(notificationPayload ? {
-              notification: {
-                channelId: "messages_channel",
-              }
-            } : {}),
           },
           apns: {
             headers: {
-              "apns-priority": notificationPayload ? "10" : "5",
-              "apns-push-type": notificationPayload ? "alert" : "background",
+              "apns-priority": "5",
+              "apns-push-type": "background",
             },
             payload: {
               aps: {
-                ...(notificationPayload ? {
-                  alert: {
-                    title: senderName,
-                    body: msgPayload,
-                  },
-                  sound: "default",
-                  badge: 1,
-                } : {
-                  "content-available": 1,
-                }),
+                "content-available": 1,
               },
             },
           },

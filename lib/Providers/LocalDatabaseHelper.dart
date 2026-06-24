@@ -207,6 +207,20 @@ class LocalDatabaseHelper {
     );
   }
 
+  /// Returns all unread (non-'read') messages in [roomId] from any sender,
+  /// ordered oldest-first.
+  Future<List<Map<String, dynamic>>> getUnreadMessagesForRoom(
+      String roomId) async {
+    final db = await database;
+    return await db.query(
+      'messages',
+      columns: ['payload', 'sender_id'],
+      where: "room_id = ? AND status != 'read'",
+      whereArgs: [roomId],
+      orderBy: 'created_at ASC',
+    );
+  }
+
   Future<void> updateMonkMode({
     required bool enabled,
     String? deactivateAt,
