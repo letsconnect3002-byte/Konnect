@@ -264,12 +264,9 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
   String _formatMessageTime(String isoString) {
     try {
       final dateTime = DateTime.parse(isoString).toLocal();
-      final hour = dateTime.hour > 12
-          ? dateTime.hour - 12
-          : (dateTime.hour == 0 ? 12 : dateTime.hour);
+      final hour = dateTime.hour.toString().padLeft(2, '0');
       final minute = dateTime.minute.toString().padLeft(2, '0');
-      final period = dateTime.hour >= 12 ? 'PM' : 'AM';
-      return "$hour:$minute $period";
+      return "$hour:$minute";
     } catch (_) {
       return "Just now";
     }
@@ -663,7 +660,7 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
     );
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.only(bottom: 12),
       child: Column(
         crossAxisAlignment:
             isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
@@ -683,6 +680,7 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
               alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
               child: Container(
                 constraints: BoxConstraints(
+                  minWidth: 80,
                   maxWidth: MediaQuery.of(context).size.width * 0.75,
                 ),
                 decoration: BoxDecoration(
@@ -696,57 +694,60 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
                     width: 1.5,
                   ),
                 ),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (replyToId != null) ...[
-                      GestureDetector(
-                        onTap: () {
-                          _scrollToAndHighlightMessage(
-                              replyToId, _provider.activeRoomMessages);
-                        },
-                        child: _buildBubbleReplyQuote(replyToSenderName ?? '',
-                            replyToPayload ?? '', isMe),
-                      ),
-                      const SizedBox(height: 6),
-                    ],
-                    Text(
-                      text,
-                      style: context.bodyText.copyWith(
-                        color: context.textPrimary,
-                        height: 1.35,
-                      ),
-                    ),
-                  ],
+                padding: const EdgeInsets.only(
+                  left: 12,
+                  right: 12,
+                  top: 10,
+                  bottom: 6,
                 ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 4),
-          // ── Time + status row (never highlighted) ──
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 6),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              mainAxisAlignment:
-                  isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
-              children: [
-                Text(
-                  status == 'error' ? 'Failed to send' : time,
-                  style: context.captionText.copyWith(
-                    color: status == 'error'
-                        ? Colors.redAccent
-                        : context.textMuted,
+                child: IntrinsicWidth(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (replyToId != null) ...[
+                        GestureDetector(
+                          onTap: () {
+                            _scrollToAndHighlightMessage(
+                                replyToId, _provider.activeRoomMessages);
+                          },
+                          child: _buildBubbleReplyQuote(replyToSenderName ?? '',
+                              replyToPayload ?? '', isMe),
+                        ),
+                        const SizedBox(height: 6),
+                      ],
+                      Text(
+                        text,
+                        style: context.bodyText.copyWith(
+                          color: context.textPrimary,
+                          height: 1.35,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            status == 'error' ? 'Failed to send' : time,
+                            style: context.captionText.copyWith(
+                              color: status == 'error'
+                                  ? Colors.redAccent
+                                  : context.textMuted,
+                              fontSize: 9.5,
+                              fontWeight: FontWeight.normal,
+                            ),
+                          ),
+                          if (isMe && status != null) ...[
+                            const SizedBox(width: 4),
+                            _buildStatusIcon(status),
+                          ],
+                        ],
+                      ),
+                    ],
                   ),
                 ),
-                if (isMe && status != null) ...[
-                  const SizedBox(width: 4),
-                  _buildStatusIcon(status),
-                ]
-              ],
+              ),
             ),
           ),
         ],
