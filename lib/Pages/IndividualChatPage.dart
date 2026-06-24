@@ -694,9 +694,9 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
                     width: 1.5,
                   ),
                 ),
-                padding: const EdgeInsets.only(
+                padding: EdgeInsets.only(
                   left: 12,
-                  right: 12,
+                  right: isMe ? 8 : 12,
                   top: 10,
                   bottom: 6,
                 ),
@@ -784,31 +784,38 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
 
     // ✓✓ DELIVERED — landed on recipient's device (grey)
     if (status == 'delivered') {
-      return Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.check_rounded,
-              size: 12, color: context.textSecondary.withValues(alpha: 0.6)),
-          Transform.translate(
-            offset: const Offset(-6, 0),
-            child: Icon(Icons.check_rounded,
+      return SizedBox(
+        width: 17,
+        height: 12,
+        child: Stack(
+          children: [
+            Icon(Icons.check_rounded,
                 size: 12, color: context.textSecondary.withValues(alpha: 0.6)),
-          ),
-        ],
+            Positioned(
+              left: 5,
+              child: Icon(Icons.check_rounded,
+                  size: 12,
+                  color: context.textSecondary.withValues(alpha: 0.6)),
+            ),
+          ],
+        ),
       );
     }
 
     // ✓✓ READ — recipient opened the chat (blue)
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(Icons.check_rounded, size: 12, color: const Color(0xFF00F2FE)),
-        Transform.translate(
-          offset: const Offset(-6, 0),
-          child: Icon(Icons.check_rounded,
-              size: 12, color: const Color(0xFF00F2FE)),
-        ),
-      ],
+    return const SizedBox(
+      width: 17,
+      height: 12,
+      child: Stack(
+        children: [
+          Icon(Icons.check_rounded, size: 12, color: Color(0xFF00F2FE)),
+          Positioned(
+            left: 5,
+            child:
+                Icon(Icons.check_rounded, size: 12, color: Color(0xFF00F2FE)),
+          ),
+        ],
+      ),
     );
   }
 
