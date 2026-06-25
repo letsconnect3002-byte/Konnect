@@ -1,8 +1,10 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/gestures.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:connect/Config/app_theme.dart';
 
 class AuthScreen extends StatefulWidget {
@@ -26,6 +28,7 @@ class _AuthScreenState extends State<AuthScreen> {
   String? _selectedGender;
   bool _isRecoveryMode = false;
   bool _isRecoveryOtpMode = false;
+  bool _acceptPrivacyPolicy = false;
 
   @override
   void dispose() {
@@ -37,6 +40,17 @@ class _AuthScreenState extends State<AuthScreen> {
   }
 
   Future<void> _submit() async {
+    if (!_isSignIn && !_acceptPrivacyPolicy) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("You must agree to the Privacy Policy to sign up"),
+          backgroundColor: Colors.orangeAccent,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
     if (!_formKey.currentState!.validate()) return;
 
     final email = _emailController.text.trim();
@@ -801,6 +815,8 @@ class _AuthScreenState extends State<AuthScreen> {
                           const SizedBox(height: 16),
                           // Gender Selection Field
                           _buildGenderDropdown(context),
+                          const SizedBox(height: 16),
+                          _buildPrivacyPolicyCheckbox(context),
                         ],
 
                         const SizedBox(height: 32),
@@ -842,6 +858,10 @@ class _AuthScreenState extends State<AuthScreen> {
 
                         // Google Sign In Button
                         _buildGoogleButton(context),
+                        if (_isSignIn) ...[
+                          const SizedBox(height: 24),
+                          _buildSignInPrivacyNotice(context),
+                        ],
                       ],
                     ],
                   ),
@@ -887,6 +907,7 @@ class _AuthScreenState extends State<AuthScreen> {
                   HapticFeedback.selectionClick();
                   setState(() {
                     _isSignIn = true;
+                    _acceptPrivacyPolicy = false;
                     _formKey.currentState?.reset();
                   });
                 }
@@ -920,6 +941,7 @@ class _AuthScreenState extends State<AuthScreen> {
                   HapticFeedback.selectionClick();
                   setState(() {
                     _isSignIn = false;
+                    _acceptPrivacyPolicy = false;
                     _formKey.currentState?.reset();
                   });
                 }
@@ -1233,6 +1255,135 @@ class _AuthScreenState extends State<AuthScreen> {
             color: Colors.black,
             fontWeight: FontWeight.bold,
           ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _launchPrivacyPolicy() async {
+    final Uri url = Uri.parse('https://www.joinmandala.in/legal');
+    try {
+      if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text("Could not open the privacy policy link."),
+              backgroundColor: Colors.redAccent,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("Error opening link: $e"),
+            backgroundColor: Colors.redAccent,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
+
+  Widget _buildPrivacyPolicyCheckbox(BuildContext context) {
+    return Theme(
+      data: Theme.of(context).copyWith(
+        checkboxTheme: CheckboxThemeData(
+          fillColor: WidgetStateProperty.resolveWith<Color?>((states) {
+            if (states.contains(WidgetState.selected)) {
+              return context.accentPrimary;
+            }
+            return Colors.transparent;
+          }),
+          checkColor: WidgetStateProperty.all<Color>(Colors.black),
+          side: BorderSide(
+            color: context.textSecondary.withValues(alpha: 0.5),
+            width: 1.5,
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(4),
+          ),
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Checkbox(
+            value: _acceptPrivacyPolicy,
+            onChanged: (bool? value) {
+              setState(() {
+                _acceptPrivacyPolicy = value ?? false;
+              });
+            },
+          ),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.only(top: 4.0),
+              child: RichText(
+                text: TextSpan(
+                  style: context.bodyText.copyWith(
+                    color: context.textSecondary,
+                    fontSize: 13,
+                  ),
+                  children: [
+                    const TextSpan(text: "I confirm that I am at least 18 years old, and I agree to the "),
+                    TextSpan(
+                      text: "Privacy Policy",
+                      style: TextStyle(
+                        color: context.accentPrimary,
+                        fontWeight: FontWeight.bold,
+                        decoration: TextDecoration.underline,
+                        decorationColor: context.accentPrimary,
+                      ),
+                      recognizer: TapGestureRecognizer()..onTap = _launchPrivacyPolicy,
+                    ),
+                    const TextSpan(text: " and "),
+                    TextSpan(
+                      text: "Terms of Service",
+                      style: TextStyle(
+                        color: context.accentPrimary,
+                        fontWeight: FontWeight.bold,
+                        decoration: TextDecoration.underline,
+                        decorationColor: context.accentPrimary,
+                      ),
+                      recognizer: TapGestureRecognizer()..onTap = _launchPrivacyPolicy,
+                    ),
+                    const TextSpan(text: "."),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSignInPrivacyNotice(BuildContext context) {
+    return Center(
+      child: RichText(
+        textAlign: TextAlign.center,
+        text: TextSpan(
+          style: context.bodyText.copyWith(
+            color: context.textMuted,
+            fontSize: 12,
+          ),
+          children: [
+            const TextSpan(text: "By signing in, you agree to our "),
+            TextSpan(
+              text: "Privacy Policy & Terms",
+              style: TextStyle(
+                color: context.accentPrimary,
+                fontWeight: FontWeight.bold,
+                decoration: TextDecoration.underline,
+                decorationColor: context.accentPrimary,
+              ),
+              recognizer: TapGestureRecognizer()..onTap = _launchPrivacyPolicy,
+            ),
+            const TextSpan(text: "."),
+          ],
         ),
       ),
     );

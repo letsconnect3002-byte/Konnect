@@ -52,28 +52,28 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: 'AIzaSyCxFF1YByi-eDQ9KNJZjl-TVP9EPKO6G1g',
-    appId: '1:698580767225:android:457233b0ff7d3ddaa02d28',
+    appId: '1:698580767225:android:08de1c441b67b491a02d28',
     messagingSenderId: '698580767225',
     projectId: 'circle-e21b6',
     storageBucket: 'circle-e21b6.firebasestorage.app',
   );
-
   static const FirebaseOptions ios = FirebaseOptions(
     apiKey: 'AIzaSyBUfcMVRtALk-m-HjYpRlAurCZK10G_QFE',
-    appId: '1:698580767225:ios:5dcf22ea5dbc1b52a02d28',
+    appId: '1:698580767225:ios:7de669925317c51ba02d28',
     messagingSenderId: '698580767225',
     projectId: 'circle-e21b6',
     storageBucket: 'circle-e21b6.firebasestorage.app',
-    iosBundleId: 'com.example.connect',
+    androidClientId: '698580767225-p4frff5103v3t7aaoh01ahlphafbopsp.apps.googleusercontent.com',
+    iosBundleId: 'com.india.jana',
   );
-
   static const FirebaseOptions macos = FirebaseOptions(
     apiKey: 'AIzaSyBUfcMVRtALk-m-HjYpRlAurCZK10G_QFE',
-    appId: '1:698580767225:ios:5dcf22ea5dbc1b52a02d28',
+    appId: '1:698580767225:ios:7de669925317c51ba02d28',
     messagingSenderId: '698580767225',
     projectId: 'circle-e21b6',
     storageBucket: 'circle-e21b6.firebasestorage.app',
-    iosBundleId: 'com.example.connect',
+    androidClientId: '698580767225-p4frff5103v3t7aaoh01ahlphafbopsp.apps.googleusercontent.com',
+    iosBundleId: 'com.india.jana',
   );
 
   static const FirebaseOptions windows = FirebaseOptions(

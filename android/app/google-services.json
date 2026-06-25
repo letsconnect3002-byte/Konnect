@@ -12,7 +12,12 @@
           "package_name": "com.example.connect"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "698580767225-9ib3bsce1hd9a9c266ck4ilrdkj1sa4n.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyCxFF1YByi-eDQ9KNJZjl-TVP9EPKO6G1g"
@@ -20,7 +25,49 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "698580767225-9ib3bsce1hd9a9c266ck4ilrdkj1sa4n.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:698580767225:android:08de1c441b67b491a02d28",
+        "android_client_info": {
+          "package_name": "com.india.jana"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "698580767225-p4frff5103v3t7aaoh01ahlphafbopsp.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.india.jana",
+            "certificate_hash": "87eb9b47593efa2d2c660e85a87afe6d5860f368"
+          }
+        },
+        {
+          "client_id": "698580767225-9ib3bsce1hd9a9c266ck4ilrdkj1sa4n.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCxFF1YByi-eDQ9KNJZjl-TVP9EPKO6G1g"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "698580767225-9ib3bsce1hd9a9c266ck4ilrdkj1sa4n.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }
