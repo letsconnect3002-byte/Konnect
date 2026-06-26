@@ -88,14 +88,30 @@ serve(async (req) => {
           android: {
             priority: "high",
           },
+          // apns: {
+          //   headers: {
+          //     "apns-priority": "5",
+          //     "apns-push-type": "background",
+          //   },
+          //   payload: {
+          //     aps: {
+          //       "content-available": 1,
+          //     },
+          //   },
+          // },
           apns: {
             headers: {
-              "apns-priority": "5",
-              "apns-push-type": "background",
+              "apns-priority": "10",         // 10 = immediate delivery (required for alert type)
+              "apns-push-type": "alert",     // alert type so iOS treats it as a displayable notification
             },
             payload: {
               aps: {
-                "content-available": 1,
+                "content-available": 1,      // still request background execution when app is backgrounded
+                alert: {
+                  title: senderName,
+                  body: msgPayload,          // this is the data['payload'] you already have in scope
+                },
+                sound: "default",
               },
             },
           },

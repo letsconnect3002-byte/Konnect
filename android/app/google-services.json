@@ -7,35 +7,6 @@
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:698580767225:android:457233b0ff7d3ddaa02d28",
-        "android_client_info": {
-          "package_name": "com.example.connect"
-        }
-      },
-      "oauth_client": [
-        {
-          "client_id": "698580767225-9ib3bsce1hd9a9c266ck4ilrdkj1sa4n.apps.googleusercontent.com",
-          "client_type": 3
-        }
-      ],
-      "api_key": [
-        {
-          "current_key": "AIzaSyCxFF1YByi-eDQ9KNJZjl-TVP9EPKO6G1g"
-        }
-      ],
-      "services": {
-        "appinvite_service": {
-          "other_platform_oauth_client": [
-            {
-              "client_id": "698580767225-9ib3bsce1hd9a9c266ck4ilrdkj1sa4n.apps.googleusercontent.com",
-              "client_type": 3
-            }
-          ]
-        }
-      }
-    },
-    {
-      "client_info": {
         "mobilesdk_app_id": "1:698580767225:android:08de1c441b67b491a02d28",
         "android_client_info": {
           "package_name": "com.india.jana"

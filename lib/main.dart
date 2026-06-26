@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'dart:ui';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -676,12 +677,28 @@ class _AppShellGateState extends State<AppShellGate> {
 
       // Fetch the token (FCM can generate tokens on Android even if notification permission is denied)
       print("PushNotifications: Fetching FCM token...");
-      final token = await messaging.getToken();
-      if (token != null) {
-        print("PushNotifications: FCM token retrieved successfully: $token");
-        await provider.updatePushToken(token);
-      } else {
-        print("PushNotifications: FCM token is null.");
+      try {
+        String? token;
+        if (Platform.isIOS) {
+          final apnsToken = await messaging.getAPNSToken();
+          if (apnsToken != null) {
+            token = await messaging.getToken();
+          } else {
+            print(
+                "PushNotifications: APNS token is not set yet. FCM token retrieval will be deferred to token refresh.");
+          }
+        } else {
+          token = await messaging.getToken();
+        }
+
+        if (token != null) {
+          print("PushNotifications: FCM token retrieved successfully: $token");
+          await provider.updatePushToken(token);
+        } else {
+          print("PushNotifications: FCM token is null.");
+        }
+      } catch (e) {
+        print("PushNotifications: Error retrieving initial FCM token: $e");
       }
 
       // Listen for token updates and upsert them
@@ -690,11 +707,22 @@ class _AppShellGateState extends State<AppShellGate> {
         await provider.updatePushToken(newToken);
       });
 
-      // Request permission for local notifications (needed for Android 13+)
-      await flutterLocalNotificationsPlugin
-          .resolvePlatformSpecificImplementation<
-              AndroidFlutterLocalNotificationsPlugin>()
-          ?.requestNotificationsPermission();
+      // Request permission for local notifications (needed for Android 13+ and iOS)
+      if (Platform.isIOS) {
+        await flutterLocalNotificationsPlugin
+            .resolvePlatformSpecificImplementation<
+                IOSFlutterLocalNotificationsPlugin>()
+            ?.requestPermissions(
+              alert: true,
+              badge: true,
+              sound: true,
+            );
+      } else if (Platform.isAndroid) {
+        await flutterLocalNotificationsPlugin
+            .resolvePlatformSpecificImplementation<
+                AndroidFlutterLocalNotificationsPlugin>()
+            ?.requestNotificationsPermission();
+      }
 
       // Listen to foreground FCM messages
       FirebaseMessaging.onMessage.listen((RemoteMessage message) async {
