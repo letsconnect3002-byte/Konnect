@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:skeletonizer/skeletonizer.dart';
+import 'package:connect/Widgets/connect_hub_bottom_sheet.dart';
 import 'package:connect/Config/app_theme.dart';
 
 class DirectMessagesHubPage extends StatefulWidget {
@@ -226,6 +227,36 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
           style: context.screenHeading,
         ),
         actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 12.0),
+            child: Center(
+              child: GestureDetector(
+                onTap: () {
+                  HapticFeedback.lightImpact();
+                  showModalBottomSheet(
+                    context: context,
+                    isScrollControlled: true,
+                    backgroundColor: Colors.transparent,
+                    builder: (context) => const ConnectHubBottomSheet(),
+                  );
+                },
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: context.surfacePrimary,
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.04)),
+                  ),
+                  child: const Icon(
+                    Icons.person_add_rounded,
+                    color: Colors.white70,
+                    size: 20,
+                  ),
+                ),
+              ),
+            ),
+          ),
           Consumer<NotificationProvider>(
             builder: (context, notifProvider, child) {
               final unread = notifProvider.unreadCount;
@@ -637,14 +668,19 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
                                   mainAxisAlignment:
                                       MainAxisAlignment.spaceBetween,
                                   children: [
-                                    Text(
-                                      name,
-                                      style: context.cardTitle.copyWith(
-                                        fontWeight: FontWeight.bold,
-                                        color: context.textPrimary,
+                                    Expanded(
+                                      child: Text(
+                                        name,
+                                        style: context.cardTitle.copyWith(
+                                          fontWeight: FontWeight.bold,
+                                          color: context.textPrimary,
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
+                                        maxLines: 1,
                                       ),
                                     ),
-                                    if (msgTime.isNotEmpty)
+                                    if (msgTime.isNotEmpty) ...[
+                                      const SizedBox(width: 8),
                                       Text(
                                         msgTime,
                                         style: context.captionText.copyWith(
@@ -656,6 +692,7 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
                                               : FontWeight.normal,
                                         ),
                                       ),
+                                    ],
                                   ],
                                 ),
                                 subtitle: lastMessageText.isEmpty && !isTyping

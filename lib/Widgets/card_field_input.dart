@@ -60,7 +60,11 @@ class _CardFieldInputState extends State<CardFieldInput> {
   }
 
   void _onFocusChange() {
-    if (!_focusNode.hasFocus) {
+    if (_focusNode.hasFocus) {
+      if (!widget.isEditing) {
+        widget.onEditingChanged(true);
+      }
+    } else {
       if (widget.isEditing) {
         widget.onEditingChanged(false);
       }

@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'package:connect/Pages/QrCodeScanner.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:connect/Providers/profile_provider.dart';
 import 'package:flutter/material.dart';
@@ -9,6 +8,7 @@ import 'package:pretty_qr_code/pretty_qr_code.dart';
 import 'package:connect/Providers/notification_provider.dart';
 import 'package:connect/Pages/NotificationPage.dart';
 import 'package:skeletonizer/skeletonizer.dart';
+import 'package:connect/Widgets/connect_hub_bottom_sheet.dart';
 import 'package:connect/Config/app_theme.dart';
 
 class ProfilePage extends StatefulWidget {
@@ -1196,13 +1196,15 @@ class _ProfilePageState extends State<ProfilePage> {
 
 
     final scanCard = compactCard(
-      icon: Icons.camera_alt_rounded,
-      label: 'Scan QR',
-      subtitle: 'Read a contact code',
+      icon: Icons.person_add_rounded,
+      label: 'Connect Hub',
+      subtitle: 'Scan QR, Show QR, or Add Code',
       onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (context) => const QRScannerPage()),
+        showModalBottomSheet(
+          context: context,
+          isScrollControlled: true,
+          backgroundColor: Colors.transparent,
+          builder: (context) => const ConnectHubBottomSheet(),
         ).then((_) => _refreshData());
       },
     );

@@ -1266,10 +1266,12 @@ class _ReferBottomSheetState extends State<_ReferBottomSheet> {
         top: 24.0,
         bottom: 24.0 + MediaQuery.of(context).viewInsets.bottom,
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
+      child: SingleChildScrollView(
+        physics: const BouncingScrollPhysics(),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
           Text(
             "Refer ${widget.targetProfile['name'] ?? 'Connection'}",
             style: context.screenHeading.copyWith(
@@ -1560,7 +1562,8 @@ class _ReferBottomSheetState extends State<_ReferBottomSheet> {
                 ),
               ),
             ),
-        ],
+          ],
+        ),
       ),
     );
   }

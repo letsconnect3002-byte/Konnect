@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:image/image.dart' as img;
@@ -23,6 +24,10 @@ class _CropImagePageState extends State<CropImagePage> {
   double childWidth = 300.0;
   double childHeight = 300.0;
 
+  double _containerWidth = 300.0;
+  double _containerHeight = 300.0;
+  bool _hasInitializedController = false;
+
   @override
   void initState() {
     super.initState();
@@ -44,26 +49,15 @@ class _CropImagePageState extends State<CropImagePage> {
       }
 
       final double aspect = image.width / image.height;
+      // Scale display dimensions to a max base of 800.0 for optimal performance
+      final double targetBase = 800.0;
       if (image.width >= image.height) {
-        childHeight = viewportSize;
-        childWidth = viewportSize * aspect;
+        childHeight = targetBase;
+        childWidth = targetBase * aspect;
       } else {
-        childWidth = viewportSize;
-        childHeight = viewportSize / aspect;
+        childWidth = targetBase;
+        childHeight = targetBase / aspect;
       }
-
-      double initialTx = 0.0;
-      double initialTy = 0.0;
-
-      if (childWidth > viewportSize) {
-        initialTx = -(childWidth - viewportSize) / 2;
-      }
-      if (childHeight > viewportSize) {
-        initialTy = -(childHeight - viewportSize) / 2;
-      }
-
-      _transformationController.value =
-          Matrix4.translationValues(initialTx, initialTy, 0.0);
 
       if (mounted) {
         setState(() {
@@ -101,9 +95,12 @@ class _CropImagePageState extends State<CropImagePage> {
       final double tx = matrix.row0.w; // Translation X
       final double ty = matrix.row1.w; // Translation Y
 
+      final double cutoutLeft = (_containerWidth - viewportSize) / 2;
+      final double cutoutTop = (_containerHeight - viewportSize) / 2;
+
       // Calculate translation relative to scale
-      final double childX = -tx / scale;
-      final double childY = -ty / scale;
+      final double childX = (cutoutLeft - tx) / scale;
+      final double childY = (cutoutTop - ty) / scale;
       final double childW = viewportSize / scale;
       final double childH = viewportSize / scale;
 
@@ -155,6 +152,11 @@ class _CropImagePageState extends State<CropImagePage> {
   @override
   Widget build(BuildContext context) {
     final scaffoldBg = Theme.of(context).scaffoldBackgroundColor;
+
+    final double minScale = _decodedImage != null
+        ? max(viewportSize / childWidth, viewportSize / childHeight)
+        : 1.0;
+
     return Scaffold(
       backgroundColor: scaffoldBg,
       appBar: AppBar(
@@ -162,8 +164,7 @@ class _CropImagePageState extends State<CropImagePage> {
         elevation: 0,
         flexibleSpace: const GlassmorphicFlexibleSpace(),
         leading: IconButton(
-          icon:
-              const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white),
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white),
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text(
@@ -185,32 +186,63 @@ class _CropImagePageState extends State<CropImagePage> {
               ),
             )
           else ...[
-            // Image viewport area
-            Center(
-              child: Container(
-                width: viewportSize,
-                height: viewportSize,
-                decoration: BoxDecoration(
-                  color: Colors.black,
-                  borderRadius: BorderRadius.circular(0),
-                ),
-                child: InteractiveViewer(
-                  transformationController: _transformationController,
-                  minScale: 1.0,
-                  maxScale: 4.0,
-                  boundaryMargin: EdgeInsets.zero,
-                  child: Image.memory(
-                    widget.imageBytes,
-                    width: childWidth,
-                    height: childHeight,
-                    fit: BoxFit.fill,
-                  ),
-                ),
+            // Image viewport area filling the screen above the buttons
+            Positioned.fill(
+              bottom: 180, // Leave space for bottom buttons
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  _containerWidth = constraints.maxWidth;
+                  _containerHeight = constraints.maxHeight;
+
+                  final double cutoutLeft = (_containerWidth - viewportSize) / 2;
+                  final double cutoutTop = (_containerHeight - viewportSize) / 2;
+
+                  if (!_hasInitializedController) {
+                    _hasInitializedController = true;
+                    final double initialScale = minScale;
+                    final double initialTx =
+                        (_containerWidth - childWidth * initialScale) / 2;
+                    final double initialTy =
+                        (_containerHeight - childHeight * initialScale) / 2;
+
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      final matrix = Matrix4.identity();
+                      matrix.setEntry(0, 0, initialScale);
+                      matrix.setEntry(1, 1, initialScale);
+                      matrix.setEntry(0, 3, initialTx);
+                      matrix.setEntry(1, 3, initialTy);
+                      _transformationController.value = matrix;
+                    });
+                  }
+
+                  return Container(
+                    color: Colors.black,
+                    child: InteractiveViewer(
+                      constrained: false,
+                      transformationController: _transformationController,
+                      minScale: minScale,
+                      maxScale: minScale * 8.0, // Allow up to 8x zoom from minScale
+                      boundaryMargin: EdgeInsets.symmetric(
+                        horizontal: cutoutLeft,
+                        vertical: cutoutTop,
+                      ),
+                      child: Image.memory(
+                        widget.imageBytes,
+                        width: childWidth,
+                        height: childHeight,
+                        cacheWidth: childWidth.round(),
+                        cacheHeight: childHeight.round(),
+                        fit: BoxFit.fill,
+                      ),
+                    ),
+                  );
+                },
               ),
             ),
 
-            // Semi-transparent overlay with circle crop viewport cutout
+            // Semi-transparent overlay with circle crop viewport cutout centered in same space
             Positioned.fill(
+              bottom: 180,
               child: IgnorePointer(
                 child: CustomPaint(
                   painter: CropOverlayPainter(viewportSize: viewportSize),

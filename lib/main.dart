@@ -248,11 +248,16 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
         // 2. Add Missing Supabase Status Acknowledgment in the Background Handler
         try {
-          final client = SupabaseClient(SupabaseConfig.url, SupabaseConfig.serviceRoleKey);
-          await client.from('messages').update({'status': 'delivered'}).eq('id', messageId);
-          print("PushNotifications: Background delivery status acknowledged in Supabase for $messageId.");
+          final client =
+              SupabaseClient(SupabaseConfig.url, SupabaseConfig.serviceRoleKey);
+          await client
+              .from('messages')
+              .update({'status': 'delivered'}).eq('id', messageId);
+          print(
+              "PushNotifications: Background delivery status acknowledged in Supabase for $messageId.");
         } catch (e) {
-          print("PushNotifications: Error updating remote Supabase status in background: $e");
+          print(
+              "PushNotifications: Error updating remote Supabase status in background: $e");
         }
 
         // 3. Show notification if sender is not muted
@@ -264,12 +269,14 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
             try {
               final unreadRows = await LocalDatabaseHelper.instance
                   .getUnreadMessagesForRoomBySender(roomId, senderId);
-              messageLines = unreadRows.map((r) => r['payload'] as String).toList();
+              messageLines =
+                  unreadRows.map((r) => r['payload'] as String).toList();
               if (messageLines.isEmpty) {
                 isFallback = true;
               }
             } catch (dbError) {
-              print("PushNotifications: Database read failed in background: $dbError");
+              print(
+                  "PushNotifications: Database read failed in background: $dbError");
               isFallback = true;
             }
 
@@ -285,7 +292,8 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
                   'message_id': messageId,
                 },
               );
-              print("PushNotifications: Background fallback notification displayed for messageId: $messageId.");
+              print(
+                  "PushNotifications: Background fallback notification displayed for messageId: $messageId.");
             } else {
               await showLocalNotification(
                 roomId,
@@ -296,7 +304,8 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
                   'room_id': roomId,
                 },
               );
-              print("PushNotifications: Background local notification displayed with ${messageLines.length} lines.");
+              print(
+                  "PushNotifications: Background local notification displayed with ${messageLines.length} lines.");
             }
           } else {
             print(
@@ -795,12 +804,15 @@ class _AppShellGateState extends State<AppShellGate> {
                       try {
                         final unreadRows = await LocalDatabaseHelper.instance
                             .getUnreadMessagesForRoomBySender(roomId, senderId);
-                        messageLines = unreadRows.map((r) => r['payload'] as String).toList();
+                        messageLines = unreadRows
+                            .map((r) => r['payload'] as String)
+                            .toList();
                         if (messageLines.isEmpty) {
                           isFallback = true;
                         }
                       } catch (dbError) {
-                        print("PushNotifications: Database read failed in foreground: $dbError");
+                        print(
+                            "PushNotifications: Database read failed in foreground: $dbError");
                         isFallback = true;
                       }
 
@@ -815,7 +827,8 @@ class _AppShellGateState extends State<AppShellGate> {
                             'message_id': messageId,
                           },
                         );
-                        print("PushNotifications: Foreground local fallback notification displayed for messageId: $messageId.");
+                        print(
+                            "PushNotifications: Foreground local fallback notification displayed for messageId: $messageId.");
                       } else {
                         await showLocalNotification(
                           roomId,

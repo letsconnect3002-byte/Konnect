@@ -10,6 +10,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:connect/services/image_upload_service.dart';
 import 'package:connect/Pages/crop_image_page.dart';
+import 'package:connect/Widgets/connect_hub_bottom_sheet.dart';
 import 'package:skeletonizer/skeletonizer.dart';
 
 class YetToBeBuiltProfilePage extends StatefulWidget {
@@ -117,7 +118,11 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
     _professionalBioController.addListener(_onFieldChanged);
 
     _bioFocusNode.addListener(() {
-      if (!_bioFocusNode.hasFocus) {
+      if (_bioFocusNode.hasFocus) {
+        if (!_isEditing('bio')) {
+          _setEditMode('bio', true);
+        }
+      } else {
         if (_isEditing('bio')) {
           _setEditMode('bio', false);
         }
@@ -125,7 +130,11 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
     });
 
     _professionalBioFocusNode.addListener(() {
-      if (!_professionalBioFocusNode.hasFocus) {
+      if (_professionalBioFocusNode.hasFocus) {
+        if (!_isEditing('professionalBio')) {
+          _setEditMode('professionalBio', true);
+        }
+      } else {
         if (_isEditing('professionalBio')) {
           _setEditMode('professionalBio', false);
         }
@@ -133,7 +142,11 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
     });
 
     _emailFocusNode.addListener(() {
-      if (!_emailFocusNode.hasFocus) {
+      if (_emailFocusNode.hasFocus) {
+        if (!_isEditing('email')) {
+          _setEditMode('email', true);
+        }
+      } else {
         if (_isEditing('email')) {
           _setEditMode('email', false);
         }
@@ -141,7 +154,11 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
     });
 
     _professionalEmailFocusNode.addListener(() {
-      if (!_professionalEmailFocusNode.hasFocus) {
+      if (_professionalEmailFocusNode.hasFocus) {
+        if (!_isEditing('professionalEmail')) {
+          _setEditMode('professionalEmail', true);
+        }
+      } else {
         if (_isEditing('professionalEmail')) {
           _setEditMode('professionalEmail', false);
         }
@@ -149,7 +166,11 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
     });
 
     _phoneFocusNode.addListener(() {
-      if (!_phoneFocusNode.hasFocus) {
+      if (_phoneFocusNode.hasFocus) {
+        if (!_isEditing('phoneNumber')) {
+          _setEditMode('phoneNumber', true);
+        }
+      } else {
         if (_isEditing('phoneNumber')) {
           _setEditMode('phoneNumber', false);
         }
@@ -157,7 +178,11 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
     });
 
     _professionalPhoneFocusNode.addListener(() {
-      if (!_professionalPhoneFocusNode.hasFocus) {
+      if (_professionalPhoneFocusNode.hasFocus) {
+        if (!_isEditing('professionalPhoneNumber')) {
+          _setEditMode('professionalPhoneNumber', true);
+        }
+      } else {
         if (_isEditing('professionalPhoneNumber')) {
           _setEditMode('professionalPhoneNumber', false);
         }
@@ -401,7 +426,7 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
       );
 
       if (imageFile == null) {
-        onUploadError("No image picked");
+        onUploadError("canceled");
         return;
       }
 
@@ -420,7 +445,7 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
       );
 
       if (croppedBytes == null) {
-        onUploadError("No image cropped");
+        onUploadError("canceled");
         return;
       }
 
@@ -574,7 +599,11 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                             onUploadError: (err) {
                               setModalState(() {
                                 isUploading = false;
-                                uploadError = err;
+                                if (err == "canceled") {
+                                  uploadError = null;
+                                } else {
+                                  uploadError = err;
+                                }
                               });
                             },
                           );
@@ -601,7 +630,9 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                       ),
                     ],
                     if (uploadError != null &&
-                        uploadError != "No image picked") ...[
+                        uploadError != "No image picked" &&
+                        uploadError != "No image cropped" &&
+                        uploadError != "canceled") ...[
                       const SizedBox(height: 16),
                       Text(
                         "Upload Error: $uploadError\nMake sure storage bucket 'avatars' is created and RLS is public in Supabase.",
@@ -1678,41 +1709,52 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
           right: 20,
           bottom: 16,
           width: 95,
-          child: Container(
-            padding: const EdgeInsets.symmetric(
-              horizontal: 8,
-              vertical: 4,
-            ),
-            decoration: BoxDecoration(
-              color: const Color(0xFF1E1F32),
-              borderRadius: BorderRadius.circular(6),
-              border: Border.all(
-                color: Colors.white.withValues(alpha: 0.08),
+          child: GestureDetector(
+            onTap: () {
+              HapticFeedback.lightImpact();
+              showModalBottomSheet(
+                context: context,
+                isScrollControlled: true,
+                backgroundColor: Colors.transparent,
+                builder: (context) => const ConnectHubBottomSheet(),
+              );
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 8,
+                vertical: 4,
               ),
-            ),
-            child: const Center(
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    Icons.qr_code_2_rounded,
-                    color: Color(0xFF00F2FE),
-                    size: 13,
-                  ),
-                  SizedBox(width: 4),
-                  Text(
-                    'SCAN',
-                    style: TextStyle(
-                      color: Colors.white70,
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 0.5,
-                      fontFamily: 'Inter',
+              decoration: BoxDecoration(
+                color: const Color(0xFF1E1F32),
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.08),
+                ),
+              ),
+              child: const Center(
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.qr_code_2_rounded,
+                      color: Color(0xFF00F2FE),
+                      size: 13,
                     ),
-                    maxLines: 1,
-                  ),
-                ],
+                    SizedBox(width: 4),
+                    Text(
+                      'SCAN',
+                      style: TextStyle(
+                        color: Colors.white70,
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 0.5,
+                        fontFamily: 'Inter',
+                      ),
+                      maxLines: 1,
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
