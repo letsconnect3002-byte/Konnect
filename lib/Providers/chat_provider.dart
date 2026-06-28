@@ -851,10 +851,16 @@ class ChatProvider with ChangeNotifier {
   }
 
   Future<void> refreshActiveRoomMessages() async {
-    if (activeRoomId == null) return;
-    _activeRoomMessages = List<Map<String, dynamic>>.from(
-        await _repository.getMessagesForRoomLocally(activeRoomId!));
-    await _updateLastMessageForRoomSilent(activeRoomId!);
+    final roomId = activeRoomId;
+    if (roomId == null) return;
+    
+    final messages = await _repository.getMessagesForRoomLocally(roomId);
+    if (activeRoomId != roomId) return;
+    
+    _activeRoomMessages = List<Map<String, dynamic>>.from(messages);
+    await _updateLastMessageForRoomSilent(roomId);
+    
+    if (activeRoomId != roomId) return;
     notifyListeners();
   }
 

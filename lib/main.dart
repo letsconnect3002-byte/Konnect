@@ -6,9 +6,8 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:connect/firebase_options.dart';
 import 'package:connect/Providers/LocalDatabaseHelper.dart';
 import 'package:connect/Config/supabase_config.dart';
-import 'package:connect/Pages/OtherProfilesPage.dart';
-import 'package:connect/Pages/ProfilePage.dart';
 import 'package:connect/Pages/DirectMessagesHubPage.dart';
+import 'package:connect/Pages/OtherProfilesPage.dart';
 import 'package:connect/Pages/yet_to_be_built_profile_page.dart';
 import 'package:connect/Pages/IndividualChatPage.dart';
 import 'package:connect/Pages/MonkModePage.dart';
@@ -950,17 +949,10 @@ class _AppShellState extends State<_AppShell> with WidgetsBindingObserver {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _screens = [
-      ProfilePage(
-        onSetUpProfile: () {
-          setState(() {
-            _currentIndex = 3;
-          });
-        },
-      ),
-      const DirectMessagesHubPage(),
-      const OtherProfilesPage(),
-      const YetToBeBuiltProfilePage(),
-      const MonkModePage(),
+      const DirectMessagesHubPage(), // index 0 — Home / Chats
+      const OtherProfilesPage(), // index 1 — Mandal / Connections
+      const MonkModePage(), // index 2 — Monk Mode
+      const YetToBeBuiltProfilePage(), // index 3 — My Card
     ];
     _setupNotificationTapListeners();
   }
@@ -1068,11 +1060,10 @@ class _AppShellState extends State<_AppShell> with WidgetsBindingObserver {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
-                  _buildNavItem(index: 0, icon: Icons.home_outlined),
                   _buildNavItem(
-                      index: 1, icon: Icons.chat_bubble_outline_rounded),
-                  _buildNavItem(index: 2, icon: Icons.search_rounded),
-                  _buildNavItem(index: 4, icon: Icons.self_improvement_rounded),
+                      index: 0, icon: Icons.chat_bubble_outline_rounded),
+                  _buildNavItem(index: 1, icon: Icons.people_outline_rounded),
+                  _buildNavItem(index: 2, icon: Icons.self_improvement_rounded),
                   _buildNavItem(index: 3, icon: Icons.person_outline_rounded),
                 ],
               ),
@@ -1097,8 +1088,8 @@ class _AppShellState extends State<_AppShell> with WidgetsBindingObserver {
       color: itemColor,
     );
 
-    // If it's the Chats tab (index 1) and there are unread messages, overlay a red dot badge
-    if (index == 1 && provider.totalUnreadCount > 0) {
+    // If it's the Chats tab (index 0) and there are unread messages, overlay a red dot badge
+    if (index == 0 && provider.totalUnreadCount > 0) {
       iconWidget = Stack(
         clipBehavior: Clip.none,
         children: [

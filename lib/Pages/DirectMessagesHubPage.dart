@@ -8,8 +8,8 @@ import 'package:connect/Pages/NotificationPage.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-import 'package:skeletonizer/skeletonizer.dart';
 import 'package:connect/Widgets/connect_hub_bottom_sheet.dart';
+import 'package:skeletonizer/skeletonizer.dart';
 import 'package:connect/Config/app_theme.dart';
 
 class DirectMessagesHubPage extends StatefulWidget {
@@ -124,7 +124,8 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
                   });
                   scaffoldMessenger.showSnackBar(
                     const SnackBar(
-                      content: Text("Connection removed"),
+                      content: Text("Connection removed",
+                          style: TextStyle(color: Colors.white)),
                       backgroundColor: Colors.redAccent,
                     ),
                   );
@@ -215,48 +216,12 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         flexibleSpace: const GlassmorphicFlexibleSpace(),
-        leading: Navigator.canPop(context)
-            ? IconButton(
-                icon: const Icon(Icons.arrow_back_ios_new_rounded,
-                    color: Colors.white, size: 18),
-                onPressed: () => Navigator.pop(context),
-              )
-            : null,
+        automaticallyImplyLeading: false,
         title: Text(
-          'Direct Messages',
+          'Messages',
           style: context.screenHeading,
         ),
         actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 12.0),
-            child: Center(
-              child: GestureDetector(
-                onTap: () {
-                  HapticFeedback.lightImpact();
-                  showModalBottomSheet(
-                    context: context,
-                    isScrollControlled: true,
-                    backgroundColor: Colors.transparent,
-                    builder: (context) => const ConnectHubBottomSheet(),
-                  );
-                },
-                child: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: context.surfacePrimary,
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                        color: Colors.white.withValues(alpha: 0.04)),
-                  ),
-                  child: const Icon(
-                    Icons.person_add_rounded,
-                    color: Colors.white70,
-                    size: 20,
-                  ),
-                ),
-              ),
-            ),
-          ),
           Consumer<NotificationProvider>(
             builder: (context, notifProvider, child) {
               final unread = notifProvider.unreadCount;
@@ -476,7 +441,7 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
                 left: AppDimensions.marginStandard,
                 right: AppDimensions.marginStandard,
                 top: 12,
-                bottom: 8),
+                bottom: 0),
             child: Container(
               height: 44,
               decoration: BoxDecoration(
@@ -497,12 +462,15 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
                       style:
                           context.bodyText.copyWith(color: context.textPrimary),
                       cursorColor: context.accentSecondary,
+                      textAlignVertical: TextAlignVertical.center,
                       decoration: InputDecoration(
                         hintText: 'Search connections...',
                         hintStyle: context.bodyText.copyWith(
                           color: context.textMuted,
                         ),
                         border: InputBorder.none,
+                        isDense: true,
+                        contentPadding: EdgeInsets.zero,
                       ),
                       onChanged: (val) {
                         setState(() {
@@ -523,233 +491,394 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
                     enabled: true,
                     child: _buildSkeletonChatRooms(),
                   )
-                : filteredConnections.isEmpty
-                    ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.chat_bubble_outline_rounded,
-                              color: context.textMuted,
-                              size: 40,
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              _searchQuery.isEmpty
-                                  ? "No active conversations yet"
-                                  : "No results match your search",
-                              style: context.bodyText.copyWith(
-                                color: context.textSecondary,
-                              ),
-                            ),
-                          ],
-                        ),
-                      )
-                    : ListView.separated(
-                        padding: const EdgeInsets.only(
-                            left: AppDimensions.marginStandard,
-                            right: AppDimensions.marginStandard,
-                            top: 8,
-                            bottom: 100),
-                        itemCount: filteredConnections.length,
-                        separatorBuilder: (context, index) =>
-                            const SizedBox(height: 12.0),
-                        itemBuilder: (context, index) {
-                          final connection = filteredConnections[index];
-                          final name = connection['name'] ?? 'Unknown';
-                          final avatar = _getAvatarUrl(
-                              name,
-                              connection['avatarUrl'] ??
-                                  connection['avatar_url']);
-
-                          final roomId =
-                              chatProvider.connectionRooms[connection['id']];
-
-                          final lastMsg = roomId != null
-                              ? chatProvider.lastMessagesByRoom[roomId]
-                              : null;
-
-                          final String lastMessageText =
-                              lastMsg != null ? lastMsg['payload'] ?? '' : '';
-
-                          final String msgTime = lastMsg != null
-                              ? _formatMessageTime(
-                                  lastMsg['created_at'] as String?)
-                              : '';
-
-                          final bool isUnread = lastMsg != null &&
-                              lastMsg['sender_id'] != myUserId &&
-                              lastMsg['status'] != 'read';
-
-                          final bool isTyping = roomId != null &&
-                              chatProvider.isRoomTyping(roomId);
-
-                          return Container(
-                            decoration: BoxDecoration(
-                              color: context.surfacePrimary,
-                              borderRadius: BorderRadius.circular(
-                                  AppDimensions.radiusPremiumCard / 1.5),
-                              border: Border.all(
-                                color: context.surfaceSecondary
-                                    .withValues(alpha: 0.5),
-                                width: 1.0,
-                              ),
-                            ),
-                            child: Material(
-                              color: Colors.transparent,
-                              clipBehavior: Clip.antiAlias,
-                              borderRadius: BorderRadius.circular(
-                                  AppDimensions.radiusPremiumCard),
-                              child: ListTile(
-                                onTap: () {
-                                  HapticFeedback.lightImpact();
-                                  Navigator.push(
-                                    context,
-                                    PageRouteBuilder(
-                                      pageBuilder: (context, animation,
-                                              secondaryAnimation) =>
-                                          IndividualChatPage(
-                                              connectionData: connection),
-                                      transitionsBuilder: (context, animation,
-                                          secondaryAnimation, child) {
-                                        return SlideTransition(
-                                          position: Tween<Offset>(
-                                            begin: const Offset(1.0, 0.0),
-                                            end: Offset.zero,
-                                          ).animate(CurvedAnimation(
-                                            parent: animation,
-                                            curve: Curves.easeOutCubic,
-                                          )),
-                                          child: child,
-                                        );
-                                      },
-                                      transitionDuration:
-                                          const Duration(milliseconds: 300),
-                                      reverseTransitionDuration:
-                                          const Duration(milliseconds: 250),
-                                    ),
-                                  );
-                                },
-                                onLongPress: () {
-                                  HapticFeedback.mediumImpact();
-                                  _showDeleteConfirmation(
-                                      context, connection, connectionProvider);
-                                },
-                                contentPadding: const EdgeInsets.symmetric(
-                                    horizontal: 14, vertical: 6),
-                                leading: Container(
-                                  width: 44,
-                                  height: 44,
-                                  decoration: const BoxDecoration(
-                                    shape: BoxShape.circle,
+                : (connections.isEmpty && _searchQuery.isEmpty)
+                    ? _buildOnboardingHeroCard(context)
+                    : filteredConnections.isEmpty
+                        ? Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  _searchQuery.isEmpty
+                                      ? Icons.chat_bubble_outline_rounded
+                                      : Icons.search_off_rounded,
+                                  color: context.textMuted,
+                                  size: 40,
+                                ),
+                                const SizedBox(height: 16),
+                                Text(
+                                  _searchQuery.isEmpty
+                                      ? "No ${_selectedTab == 'casual' ? 'casual' : 'professional'} conversations yet"
+                                      : "No results match your search",
+                                  style: context.bodyText.copyWith(
+                                    color: context.textSecondary,
                                   ),
-                                  child: ClipOval(
-                                    child: avatar.isNotEmpty
-                                        ? Image.network(avatar,
-                                            fit: BoxFit.cover)
-                                        : Container(
-                                            color: context.surfaceSecondary,
-                                            alignment: Alignment.center,
-                                            child: Text(
-                                              name.isNotEmpty
-                                                  ? name
-                                                      .substring(0, 1)
-                                                      .toUpperCase()
-                                                  : "?",
-                                              style: TextStyle(
-                                                  color: context.textPrimary,
-                                                  fontWeight: FontWeight.bold,
-                                                  fontSize: 15),
+                                ),
+                              ],
+                            ),
+                          )
+                        : ListView.separated(
+                            padding: const EdgeInsets.only(
+                                left: AppDimensions.marginStandard,
+                                right: AppDimensions.marginStandard,
+                                top: 8,
+                                bottom: 100),
+                            itemCount: filteredConnections.length,
+                            separatorBuilder: (context, index) =>
+                                const SizedBox(height: 5.0),
+                            itemBuilder: (context, index) {
+                              final connection = filteredConnections[index];
+                              final name = connection['name'] ?? 'Unknown';
+                              final avatar = _getAvatarUrl(
+                                  name,
+                                  connection['avatarUrl'] ??
+                                      connection['avatar_url']);
+
+                              final roomId = chatProvider
+                                  .connectionRooms[connection['id']];
+
+                              final lastMsg = roomId != null
+                                  ? chatProvider.lastMessagesByRoom[roomId]
+                                  : null;
+
+                              final String lastMessageText = lastMsg != null
+                                  ? lastMsg['payload'] ?? ''
+                                  : '';
+
+                              final String msgTime = lastMsg != null
+                                  ? _formatMessageTime(
+                                      lastMsg['created_at'] as String?)
+                                  : '';
+
+                              final bool isUnread = lastMsg != null &&
+                                  lastMsg['sender_id'] != myUserId &&
+                                  lastMsg['status'] != 'read';
+
+                              final bool isTyping = roomId != null &&
+                                  chatProvider.isRoomTyping(roomId);
+
+                              return Container(
+                                // decoration: BoxDecoration(
+                                //   color: context.surfacePrimary,
+                                //   borderRadius: BorderRadius.circular(
+                                //       AppDimensions.radiusPremiumCard / 1.5),
+                                //   border: Border.all(
+                                //     color: context.surfaceSecondary
+                                //         .withValues(alpha: 0.5),
+                                //     width: 1.0,
+                                //   ),
+                                // ),
+                                child: Material(
+                                  color: Colors.transparent,
+                                  clipBehavior: Clip.antiAlias,
+                                  borderRadius: BorderRadius.circular(
+                                      AppDimensions.radiusPremiumCard),
+                                  child: ListTile(
+                                    onTap: () {
+                                      HapticFeedback.lightImpact();
+                                      Navigator.push(
+                                        context,
+                                        PageRouteBuilder(
+                                          pageBuilder: (context, animation,
+                                                  secondaryAnimation) =>
+                                              IndividualChatPage(
+                                                  connectionData: connection),
+                                          transitionsBuilder: (context,
+                                              animation,
+                                              secondaryAnimation,
+                                              child) {
+                                            return SlideTransition(
+                                              position: Tween<Offset>(
+                                                begin: const Offset(1.0, 0.0),
+                                                end: Offset.zero,
+                                              ).animate(CurvedAnimation(
+                                                parent: animation,
+                                                curve: Curves.easeOutCubic,
+                                              )),
+                                              child: child,
+                                            );
+                                          },
+                                          transitionDuration:
+                                              const Duration(milliseconds: 300),
+                                          reverseTransitionDuration:
+                                              const Duration(milliseconds: 250),
+                                        ),
+                                      );
+                                    },
+                                    onLongPress: () {
+                                      HapticFeedback.mediumImpact();
+                                      _showDeleteConfirmation(context,
+                                          connection, connectionProvider);
+                                    },
+                                    contentPadding: const EdgeInsets.symmetric(
+                                        horizontal: 14, vertical: 0),
+                                    leading: Container(
+                                      width: 44,
+                                      height: 44,
+                                      decoration: const BoxDecoration(
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: ClipOval(
+                                        child: avatar.isNotEmpty
+                                            ? Image.network(avatar,
+                                                fit: BoxFit.cover)
+                                            : Container(
+                                                color: context.surfaceSecondary,
+                                                alignment: Alignment.center,
+                                                child: Text(
+                                                  name.isNotEmpty
+                                                      ? name
+                                                          .substring(0, 1)
+                                                          .toUpperCase()
+                                                      : "?",
+                                                  style: TextStyle(
+                                                      color:
+                                                          context.textPrimary,
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                      fontSize: 15),
+                                                ),
+                                              ),
+                                      ),
+                                    ),
+                                    title: Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Expanded(
+                                          child: Text(
+                                            name,
+                                            style: context.cardTitle.copyWith(
+                                              fontWeight: FontWeight.bold,
+                                              color: context.textPrimary,
+                                            ),
+                                            overflow: TextOverflow.ellipsis,
+                                            maxLines: 1,
+                                          ),
+                                        ),
+                                        if (msgTime.isNotEmpty) ...[
+                                          const SizedBox(width: 8),
+                                          Text(
+                                            msgTime,
+                                            style: context.captionText.copyWith(
+                                              color: isUnread
+                                                  ? context.accentSecondary
+                                                  : context.textMuted,
+                                              fontWeight: isUnread
+                                                  ? FontWeight.bold
+                                                  : FontWeight.normal,
+                                            ),
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                    subtitle: lastMessageText.isEmpty &&
+                                            !isTyping
+                                        ? null
+                                        : Padding(
+                                            padding:
+                                                const EdgeInsets.only(top: 4.0),
+                                            child: Row(
+                                              children: [
+                                                Expanded(
+                                                  child: Text(
+                                                    isTyping
+                                                        ? "typing..."
+                                                        : lastMessageText,
+                                                    maxLines: 1,
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
+                                                    style: context.bodyText
+                                                        .copyWith(
+                                                      color: isTyping
+                                                          ? context
+                                                              .accentSecondary
+                                                          : (isUnread
+                                                              ? context
+                                                                  .textPrimary
+                                                              : context
+                                                                  .textSecondary),
+                                                      fontSize: 12.5,
+                                                      fontWeight: isTyping ||
+                                                              isUnread
+                                                          ? FontWeight.w600
+                                                          : FontWeight.normal,
+                                                      fontStyle: isTyping
+                                                          ? FontStyle.italic
+                                                          : FontStyle.normal,
+                                                    ),
+                                                  ),
+                                                ),
+                                                if (isUnread)
+                                                  Container(
+                                                    margin:
+                                                        const EdgeInsets.only(
+                                                            left: 8),
+                                                    width: 8,
+                                                    height: 8,
+                                                    decoration: BoxDecoration(
+                                                      color: context
+                                                          .accentSecondary,
+                                                      shape: BoxShape.circle,
+                                                    ),
+                                                  ),
+                                              ],
                                             ),
                                           ),
                                   ),
                                 ),
-                                title: Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Expanded(
-                                      child: Text(
-                                        name,
-                                        style: context.cardTitle.copyWith(
-                                          fontWeight: FontWeight.bold,
-                                          color: context.textPrimary,
-                                        ),
-                                        overflow: TextOverflow.ellipsis,
-                                        maxLines: 1,
-                                      ),
-                                    ),
-                                    if (msgTime.isNotEmpty) ...[
-                                      const SizedBox(width: 8),
-                                      Text(
-                                        msgTime,
-                                        style: context.captionText.copyWith(
-                                          color: isUnread
-                                              ? context.accentSecondary
-                                              : context.textMuted,
-                                          fontWeight: isUnread
-                                              ? FontWeight.bold
-                                              : FontWeight.normal,
-                                        ),
-                                      ),
-                                    ],
-                                  ],
-                                ),
-                                subtitle: lastMessageText.isEmpty && !isTyping
-                                    ? null
-                                    : Padding(
-                                        padding:
-                                            const EdgeInsets.only(top: 4.0),
-                                        child: Row(
-                                          children: [
-                                            Expanded(
-                                              child: Text(
-                                                isTyping
-                                                    ? "typing..."
-                                                    : lastMessageText,
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
-                                                style:
-                                                    context.bodyText.copyWith(
-                                                  color: isTyping
-                                                      ? context.accentSecondary
-                                                      : (isUnread
-                                                          ? context.textPrimary
-                                                          : context
-                                                              .textSecondary),
-                                                  fontSize: 12.5,
-                                                  fontWeight:
-                                                      isTyping || isUnread
-                                                          ? FontWeight.w600
-                                                          : FontWeight.normal,
-                                                  fontStyle: isTyping
-                                                      ? FontStyle.italic
-                                                      : FontStyle.normal,
-                                                ),
-                                              ),
-                                            ),
-                                            if (isUnread)
-                                              Container(
-                                                margin: const EdgeInsets.only(
-                                                    left: 8),
-                                                width: 8,
-                                                height: 8,
-                                                decoration: BoxDecoration(
-                                                  color:
-                                                      context.accentSecondary,
-                                                  shape: BoxShape.circle,
-                                                ),
-                                              ),
-                                          ],
-                                        ),
-                                      ),
-                              ),
-                            ),
-                          );
-                        },
-                      ),
+                              );
+                            },
+                          ),
           ),
         ],
+      ),
+      floatingActionButton: Padding(
+        padding: const EdgeInsets.only(bottom: 70.0),
+        child: FloatingActionButton(
+          onPressed: () {
+            HapticFeedback.mediumImpact();
+            showModalBottomSheet(
+              context: context,
+              isScrollControlled: true,
+              backgroundColor: Colors.transparent,
+              builder: (context) => const ConnectHubBottomSheet(),
+            );
+          },
+          backgroundColor: context.accentSecondary,
+          elevation: 8,
+          shape: const CircleBorder(),
+          child: const Icon(
+            Icons.add_rounded,
+            color: Colors.white,
+            size: 28,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildOnboardingHeroCard(BuildContext context) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppDimensions.marginStandard,
+        vertical: 24,
+      ),
+      child: SizedBox(
+        height: MediaQuery.of(context).size.height / 2,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            // Premium hero card
+            Container(
+              padding: const EdgeInsets.all(28),
+              // decoration: BoxDecoration(
+              //   color: context.surfacePrimary,
+              //   borderRadius:
+              //       BorderRadius.circular(AppDimensions.radiusPremiumCard),
+              //   border: Border.all(
+              //     color: Colors.white.withValues(alpha: 0.06),
+              //     width: 1.0,
+              //   ),
+              //   boxShadow: [
+              //     BoxShadow(
+              //       color: context.accentSecondary.withValues(alpha: 0.08),
+              //       blurRadius: 40,
+              //       spreadRadius: 0,
+              //       offset: const Offset(0, 12),
+              //     ),
+              //   ],
+              // ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Icon container with glow
+                  Container(
+                    width: 64,
+                    height: 64,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: context.accentSecondary.withValues(alpha: 0.1),
+                      boxShadow: [
+                        BoxShadow(
+                          color:
+                              context.accentSecondary.withValues(alpha: 0.15),
+                          blurRadius: 20,
+                          spreadRadius: 4,
+                        ),
+                      ],
+                    ),
+                    child: Icon(
+                      Icons.chat_bubble_outline_rounded,
+                      color: context.accentSecondary,
+                      size: 28,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  Text(
+                    "Start Private Messaging",
+                    style: context.screenHeading.copyWith(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 20,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    "Connect with a friend by scanning their QR code or sharing your Private Key to begin.",
+                    style: context.bodyText.copyWith(
+                      color: context.textSecondary,
+                      height: 1.5,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 28),
+                  // Primary CTA
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        HapticFeedback.mediumImpact();
+                        showModalBottomSheet(
+                          context: context,
+                          isScrollControlled: true,
+                          backgroundColor: Colors.transparent,
+                          builder: (context) => const ConnectHubBottomSheet(),
+                        );
+                      },
+                      icon: const Icon(Icons.qr_code_scanner_rounded, size: 18),
+                      label: const Text("Open Connect Hub"),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: context.accentSecondary,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(
+                              AppDimensions.radiusComponent),
+                        ),
+                        elevation: 0,
+                        textStyle: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 15,
+                          fontFamily: 'Inter',
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+            // Secondary hint
+            Text(
+              "Tap + below to connect anytime",
+              style: context.captionText.copyWith(
+                color: context.textMuted,
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -1,6 +1,5 @@
 import 'package:connect/Pages/ConnectionProfilePage.dart';
 import 'package:connect/Pages/IndividualChatPage.dart';
-import 'package:connect/Pages/QrCodeScanner.dart';
 import 'package:connect/Providers/connection_provider.dart';
 import 'package:connect/Providers/chat_provider.dart';
 import 'package:connect/Providers/notification_provider.dart';
@@ -58,269 +57,6 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
         return _ReferBottomSheet(
           targetProfile: targetProfile,
           eligibleConnections: eligibleConnections,
-        );
-      },
-    );
-  }
-
-  void _showRedeemVipDialog(BuildContext context, ConnectionProvider provider) {
-    showDialog(
-      context: context,
-      builder: (context) {
-        String selectedType = 'casual';
-        final TextEditingController controller = TextEditingController();
-        bool isDialogLoading = false;
-
-        return StatefulBuilder(
-          builder: (context, setState) {
-            return AlertDialog(
-              backgroundColor: context.surfacePrimary,
-              shape: RoundedRectangleBorder(
-                borderRadius:
-                    BorderRadius.circular(AppDimensions.radiusPremiumCard),
-                side: BorderSide(color: context.surfaceSecondary, width: 1.5),
-              ),
-              title: Text(
-                "Redeem Private Key",
-                style: context.screenHeading.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              content: isDialogLoading
-                  ? SizedBox(
-                      height: 150,
-                      child: Center(
-                        child: CircularProgressIndicator(
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                              context.accentPrimary),
-                        ),
-                      ),
-                    )
-                  : Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          "Enter the 6-character VIP code to connect immediately.",
-                          style: context.bodyText.copyWith(
-                            color: context.textSecondary,
-                            fontSize: 12,
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        TextField(
-                          controller: controller,
-                          textCapitalization: TextCapitalization.characters,
-                          style: context.bodyText,
-                          decoration: InputDecoration(
-                            hintText: "MNDL-XXXXXX",
-                            hintStyle: context.bodyText
-                                .copyWith(color: context.textMuted),
-                            filled: true,
-                            fillColor: context.canvasBackground,
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(
-                                  AppDimensions.radiusComponent),
-                              borderSide:
-                                  BorderSide(color: context.surfaceSecondary),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(
-                                  AppDimensions.radiusComponent),
-                              borderSide:
-                                  BorderSide(color: context.accentPrimary),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-                        Text(
-                          "SHARE BACK YOUR CARD",
-                          style: context.captionText.copyWith(
-                            color: context.textSecondary,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 1.5,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: GestureDetector(
-                                onTap: () {
-                                  setState(() {
-                                    selectedType = 'casual';
-                                  });
-                                },
-                                child: Container(
-                                  height: 44,
-                                  alignment: Alignment.center,
-                                  decoration: BoxDecoration(
-                                    color: selectedType == 'casual'
-                                        ? context.accentSecondary
-                                            .withValues(alpha: 0.1)
-                                        : context.canvasBackground,
-                                    borderRadius: BorderRadius.circular(10),
-                                    border: Border.all(
-                                      color: selectedType == 'casual'
-                                          ? context.accentSecondary
-                                          : context.surfaceSecondary,
-                                    ),
-                                  ),
-                                  child: Text(
-                                    "Casual",
-                                    style: context.bodyText.copyWith(
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: GestureDetector(
-                                onTap: () {
-                                  setState(() {
-                                    selectedType = 'professional';
-                                  });
-                                },
-                                child: Container(
-                                  height: 44,
-                                  alignment: Alignment.center,
-                                  decoration: BoxDecoration(
-                                    color: selectedType == 'professional'
-                                        ? context.accentPrimary
-                                            .withValues(alpha: 0.1)
-                                        : context.canvasBackground,
-                                    borderRadius: BorderRadius.circular(10),
-                                    border: Border.all(
-                                      color: selectedType == 'professional'
-                                          ? context.accentPrimary
-                                          : context.surfaceSecondary,
-                                    ),
-                                  ),
-                                  child: Text(
-                                    "Professional",
-                                    style: context.bodyText.copyWith(
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-              actions: isDialogLoading
-                  ? []
-                  : [
-                      TextButton(
-                        onPressed: () => Navigator.pop(context),
-                        child: Text(
-                          "Cancel",
-                          style: TextStyle(color: context.textSecondary),
-                        ),
-                      ),
-                      ElevatedButton(
-                        onPressed: () async {
-                          final codeStr = controller.text.trim();
-                          if (codeStr.isEmpty) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                  content: Text("Please enter a VIP code")),
-                            );
-                            return;
-                          }
-
-                          setState(() {
-                            isDialogLoading = true;
-                          });
-
-                          final navigator = Navigator.of(context);
-                          final scaffoldMessenger =
-                              ScaffoldMessenger.of(context);
-                          final chatProvider =
-                              Provider.of<ChatProvider>(context, listen: false);
-                          final accentPrimaryColor = context.accentPrimary;
-                          final surfacePrimaryColor = context.surfacePrimary;
-                          final surfaceSecondaryColor =
-                              context.surfaceSecondary;
-
-                          try {
-                            await provider.redeemInviteCode(
-                                codeStr, selectedType);
-                            // Refresh connection list
-                            await provider.fetchConnections();
-
-                            await chatProvider.updateUnreadCount();
-
-                            navigator.pop(); // Dismiss dialog
-
-                            scaffoldMessenger.showSnackBar(
-                              SnackBar(
-                                content: Row(
-                                  children: [
-                                    Icon(Icons.check_circle_rounded,
-                                        color: accentPrimaryColor),
-                                    const SizedBox(width: 10),
-                                    const Expanded(
-                                      child: Text(
-                                        "Successfully connected with Private Key!",
-                                        style: TextStyle(
-                                          color: Colors.white,
-                                          fontWeight: FontWeight.bold,
-                                          fontFamily: 'Inter',
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                backgroundColor: surfacePrimaryColor,
-                                behavior: SnackBarBehavior.floating,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(14),
-                                  side: BorderSide(
-                                      color: surfaceSecondaryColor, width: 1),
-                                ),
-                              ),
-                            );
-                          } catch (e) {
-                            if (mounted) {
-                              setState(() {
-                                isDialogLoading = false;
-                              });
-                            }
-                            String errorMsg = e.toString();
-                            if (errorMsg.contains("Exception:")) {
-                              errorMsg =
-                                  errorMsg.replaceAll("Exception:", "").trim();
-                            }
-                            scaffoldMessenger.showSnackBar(
-                              SnackBar(
-                                content: Text("Failed to redeem: $errorMsg"),
-                                backgroundColor: Colors.red,
-                              ),
-                            );
-                          }
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: context.accentPrimary,
-                          foregroundColor: Colors.black,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                        ),
-                        child: Text(
-                          "Redeem",
-                          style: context.bodyText.copyWith(
-                            color: Colors.black,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ],
-            );
-          },
         );
       },
     );
@@ -630,21 +366,21 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
       child: Container(
         margin: const EdgeInsets.symmetric(
             horizontal: AppDimensions.marginStandard, vertical: 8),
-        decoration: BoxDecoration(
-          color: context.surfacePrimary,
-          borderRadius: BorderRadius.circular(AppDimensions.radiusPremiumCard),
-          border: Border.all(
-            color: context.surfaceSecondary.withValues(alpha: 0.5),
-            width: 1.0,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.3),
-              blurRadius: 16,
-              offset: const Offset(0, 8),
-            ),
-          ],
-        ),
+        // decoration: BoxDecoration(
+        //   color: context.surfacePrimary,
+        //   borderRadius: BorderRadius.circular(AppDimensions.radiusPremiumCard),
+        //   border: Border.all(
+        //     color: context.surfaceSecondary.withValues(alpha: 0.5),
+        //     width: 1.0,
+        //   ),
+        //   boxShadow: [
+        //     BoxShadow(
+        //       color: Colors.black.withValues(alpha: 0.3),
+        //       blurRadius: 16,
+        //       offset: const Offset(0, 8),
+        //     ),
+        //   ],
+        // ),
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -710,50 +446,20 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
                     ],
                   ),
                 ),
-                PopupMenuButton<int>(
-                  padding: EdgeInsets.zero,
-                  icon: Icon(Icons.more_vert_rounded,
-                      color: context.textSecondary),
-                  color: context.surfaceSecondary,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    side: BorderSide(color: context.surfaceSecondary),
-                  ),
-                  onSelected: (val) {
-                    if (val == 1) {
-                      _showDeleteConfirmation(context, profileData, provider);
-                    } else if (val == 2) {
-                      _showReferBottomSheet(context, profileData);
-                    }
+                GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () {
+                    HapticFeedback.mediumImpact();
+                    _showDeleteConfirmation(context, profileData, provider);
                   },
-                  itemBuilder: (context) => [
-                    PopupMenuItem(
-                      value: 2,
-                      child: Row(
-                        children: [
-                          Icon(Icons.share_rounded,
-                              color: context.accentSecondary, size: 18),
-                          const SizedBox(width: 8),
-                          Text("Refer to Connection",
-                              style: context.bodyText
-                                  .copyWith(color: Colors.white)),
-                        ],
-                      ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: const Icon(
+                      Icons.delete_outline_rounded,
+                      color: Colors.redAccent,
+                      size: 20,
                     ),
-                    PopupMenuItem(
-                      value: 1,
-                      child: Row(
-                        children: [
-                          const Icon(Icons.delete_outline_rounded,
-                              color: Colors.redAccent, size: 18),
-                          const SizedBox(width: 8),
-                          Text("Delete",
-                              style: context.bodyText
-                                  .copyWith(color: Colors.white)),
-                        ],
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               ],
             ),
@@ -881,14 +587,15 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
       },
       child: Container(
         margin: const EdgeInsets.symmetric(
-            horizontal: AppDimensions.marginStandard, vertical: 6),
-        decoration: BoxDecoration(
-          color: context.surfacePrimary,
-          borderRadius: BorderRadius.circular(AppDimensions.radiusPremiumCard),
-          border: Border.all(
-              color: context.surfaceSecondary.withValues(alpha: 0.5), width: 1),
-        ),
-        padding: const EdgeInsets.all(12),
+            horizontal: AppDimensions.marginStandard, vertical: 0),
+        // decoration: BoxDecoration(
+        //   // color: context.surfacePrimary,
+        //   borderRadius:
+        //       BorderRadius.circular(AppDimensions.radiusPremiumCard / 1.5),
+        //   border: Border.all(
+        //       color: context.surfaceSecondary.withValues(alpha: 0.5), width: 1),
+        // ),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         child: Row(
           children: [
             // Avatar with refined Volt Green ring
@@ -929,9 +636,7 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
 
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: hasSubtitle
-                      ? MainAxisAlignment.start
-                      : MainAxisAlignment.center,
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Text(
                       name,
@@ -950,53 +655,44 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
                         overflow: TextOverflow.ellipsis,
                       ),
                     ],
-                    const SizedBox(height: 5),
-                    _buildCardTypeBadges(profileData),
                   ],
                 );
               }(),
             ),
-            PopupMenuButton<int>(
-              padding: EdgeInsets.zero,
-              icon: Icon(Icons.more_vert_rounded,
-                  color: context.textSecondary, size: 20),
-              color: context.surfaceSecondary,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-                side: BorderSide(color: context.surfaceSecondary),
-              ),
-              onSelected: (val) {
-                if (val == 1) {
-                  _showDeleteConfirmation(context, profileData, provider);
-                } else if (val == 2) {
-                  _showReferBottomSheet(context, profileData);
-                }
-              },
-              itemBuilder: (context) => [
-                PopupMenuItem(
-                  value: 2,
-                  child: Row(
-                    children: [
-                      Icon(Icons.share_rounded,
-                          color: context.accentSecondary, size: 18),
-                      const SizedBox(width: 8),
-                      Text("Refer to Connection",
-                          style:
-                              context.bodyText.copyWith(color: Colors.white)),
-                    ],
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () {
+                    HapticFeedback.lightImpact();
+                    _showReferBottomSheet(context, profileData);
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 8.0, vertical: 4.0),
+                    child: Icon(
+                      Icons.share_rounded,
+                      color: context.accentSecondary,
+                      size: 20,
+                    ),
                   ),
                 ),
-                PopupMenuItem(
-                  value: 1,
-                  child: Row(
-                    children: [
-                      const Icon(Icons.delete_outline_rounded,
-                          color: Colors.redAccent, size: 18),
-                      const SizedBox(width: 8),
-                      Text("Delete",
-                          style:
-                              context.bodyText.copyWith(color: Colors.white)),
-                    ],
+                const SizedBox(width: 2),
+                GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () {
+                    HapticFeedback.mediumImpact();
+                    _showDeleteConfirmation(context, profileData, provider);
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 8.0, vertical: 4.0),
+                    child: const Icon(
+                      Icons.delete_outline_rounded,
+                      color: Colors.redAccent,
+                      size: 20,
+                    ),
                   ),
                 ),
               ],
@@ -1042,28 +738,12 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
                       ),
                     ],
                   ),
-                  Row(
-                    children: [
-                      _buildCircularActionButton(
-                        icon: Icons.key_rounded,
-                        onPressed: () {
-                          _showRedeemVipDialog(context, provider);
-                        },
-                      ),
-                      const SizedBox(width: 12),
-                      _buildCircularActionButton(
-                        icon: Icons.qr_code_scanner_rounded,
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const QRScannerPage(),
-                            ),
-                          );
-                        },
-                      ),
-                    ],
-                  ),
+                  // Back button (since this is now a pushed screen, not a tab)
+                  if (Navigator.canPop(context))
+                    _buildCircularActionButton(
+                      icon: Icons.arrow_back_ios_new_rounded,
+                      onPressed: () => Navigator.pop(context),
+                    ),
                 ],
               ),
             ),
@@ -1272,296 +952,298 @@ class _ReferBottomSheetState extends State<_ReferBottomSheet> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-          Text(
-            "Refer ${widget.targetProfile['name'] ?? 'Connection'}",
-            style: context.screenHeading.copyWith(
-              fontWeight: FontWeight.bold,
+            Text(
+              "Refer ${widget.targetProfile['name'] ?? 'Connection'}",
+              style: context.screenHeading.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+              textAlign: TextAlign.center,
             ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 8),
-          Text(
-            "Introduce them to another connection in your network.",
-            style: context.bodyText.copyWith(
-              color: context.textSecondary,
-              fontSize: 12.5,
+            const SizedBox(height: 8),
+            Text(
+              "Introduce them to another connection in your network.",
+              style: context.bodyText.copyWith(
+                color: context.textSecondary,
+                fontSize: 12.5,
+              ),
+              textAlign: TextAlign.center,
             ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 20),
-          Text(
-            "SELECT RECIPIENT",
-            style: context.captionText.copyWith(
-              color: context.textSecondary,
-              letterSpacing: 1.5,
+            const SizedBox(height: 20),
+            Text(
+              "SELECT RECIPIENT",
+              style: context.captionText.copyWith(
+                color: context.textSecondary,
+                letterSpacing: 1.5,
+              ),
             ),
-          ),
-          const SizedBox(height: 10),
-          if (widget.eligibleConnections.isEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 20),
-              child: Text(
-                "You need at least one other connection to make a referral.",
-                style: context.bodyText.copyWith(
-                  color: context.textMuted,
-                  fontStyle: FontStyle.italic,
+            const SizedBox(height: 10),
+            if (widget.eligibleConnections.isEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 20),
+                child: Text(
+                  "You need at least one other connection to make a referral.",
+                  style: context.bodyText.copyWith(
+                    color: context.textMuted,
+                    fontStyle: FontStyle.italic,
+                  ),
+                  textAlign: TextAlign.center,
                 ),
-                textAlign: TextAlign.center,
-              ),
-            )
-          else
-            Container(
-              constraints: BoxConstraints(
-                maxHeight: MediaQuery.of(context).size.height * 0.25,
-              ),
-              child: ListView.separated(
-                shrinkWrap: true,
-                itemCount: widget.eligibleConnections.length,
-                separatorBuilder: (context, index) =>
-                    const SizedBox(height: 8),
-                itemBuilder: (context, index) {
-                  final conn = widget.eligibleConnections[index];
-                  final connId = conn['id'] as int;
-                  final isSelected = selectedConnectionId == connId;
-                  final name = conn['name'] ?? 'Unknown';
-                  final avatar = _getAvatarUrl(name, conn['avatarUrl']);
-                  final profession = conn['profession'] ?? '';
+              )
+            else
+              Container(
+                constraints: BoxConstraints(
+                  maxHeight: MediaQuery.of(context).size.height * 0.25,
+                ),
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  itemCount: widget.eligibleConnections.length,
+                  separatorBuilder: (context, index) =>
+                      const SizedBox(height: 8),
+                  itemBuilder: (context, index) {
+                    final conn = widget.eligibleConnections[index];
+                    final connId = conn['id'] as int;
+                    final isSelected = selectedConnectionId == connId;
+                    final name = conn['name'] ?? 'Unknown';
+                    final avatar = _getAvatarUrl(name, conn['avatarUrl']);
+                    final profession = conn['profession'] ?? '';
 
-                  return GestureDetector(
-                    onTap: () {
-                      HapticFeedback.lightImpact();
-                      setState(() {
-                        selectedConnectionId = connId;
-                      });
-                    },
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 200),
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: isSelected
-                            ? context.accentSecondary
-                                .withValues(alpha: 0.08)
-                            : context.surfaceSecondary,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
+                    return GestureDetector(
+                      onTap: () {
+                        HapticFeedback.lightImpact();
+                        setState(() {
+                          selectedConnectionId = connId;
+                        });
+                      },
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
                           color: isSelected
-                              ? context.accentSecondary
+                              ? context.accentSecondary.withValues(alpha: 0.08)
                               : context.surfaceSecondary,
-                          width: 1.5,
-                        ),
-                      ),
-                      child: Row(
-                        children: [
-                          CircleAvatar(
-                            radius: 18,
-                            backgroundColor: context.surfacePrimary,
-                            backgroundImage: avatar.startsWith('http')
-                                ? NetworkImage(avatar)
-                                : null,
-                            child: avatar.startsWith('http')
-                                ? null
-                                : Text(
-                                    _getInitials(name),
-                                    style: TextStyle(
-                                      color: context.textPrimary,
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: isSelected
+                                ? context.accentSecondary
+                                : context.surfaceSecondary,
+                            width: 1.5,
                           ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment:
-                                  CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  name,
-                                  style: context.bodyText.copyWith(
-                                    fontWeight: FontWeight.bold,
-                                    color: isSelected
-                                        ? Colors.white
-                                        : context.textPrimary,
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                if (profession.isNotEmpty)
+                        ),
+                        child: Row(
+                          children: [
+                            CircleAvatar(
+                              radius: 18,
+                              backgroundColor: context.surfacePrimary,
+                              backgroundImage: avatar.startsWith('http')
+                                  ? NetworkImage(avatar)
+                                  : null,
+                              child: avatar.startsWith('http')
+                                  ? null
+                                  : Text(
+                                      _getInitials(name),
+                                      style: TextStyle(
+                                        color: context.textPrimary,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
                                   Text(
-                                    profession,
-                                    style: context.captionText.copyWith(
-                                      color: context.textSecondary,
-                                      fontWeight: FontWeight.normal,
+                                    name,
+                                    style: context.bodyText.copyWith(
+                                      fontWeight: FontWeight.bold,
+                                      color: isSelected
+                                          ? Colors.white
+                                          : context.textPrimary,
                                     ),
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                   ),
-                              ],
-                            ),
-                          ),
-                          if (isSelected)
-                            Icon(
-                              Icons.check_circle_rounded,
-                              color: context.accentSecondary,
-                              size: 20,
-                            ),
-                        ],
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
-          const SizedBox(height: 20),
-          Text(
-            "LEAVE A NOTE (OPTIONAL)",
-            style: context.captionText.copyWith(
-              color: context.textSecondary,
-              letterSpacing: 1.5,
-            ),
-          ),
-          const SizedBox(height: 10),
-          TextField(
-            controller: noteController,
-            maxLines: 3,
-            style: context.bodyText,
-            cursorColor: context.accentSecondary,
-            decoration: InputDecoration(
-              hintText: "Add a note to introduce them...",
-              hintStyle:
-                  context.bodyText.copyWith(color: context.textMuted),
-              filled: true,
-              fillColor: context.surfaceSecondary,
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(
-                    AppDimensions.radiusComponent),
-                borderSide: BorderSide(color: context.surfaceSecondary),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(
-                    AppDimensions.radiusComponent),
-                borderSide: BorderSide(color: context.accentSecondary),
-              ),
-            ),
-          ),
-          const SizedBox(height: 24),
-          if (isSending)
-            const Center(
-              child: Padding(
-                padding: EdgeInsets.symmetric(vertical: 8.0),
-                child: CircularProgressIndicator(
-                  valueColor:
-                      AlwaysStoppedAnimation<Color>(Color(0xFF7C3AED)),
-                ),
-              ),
-            )
-          else
-            ElevatedButton(
-              onPressed: selectedConnectionId == null
-                  ? null
-                  : () async {
-                      HapticFeedback.mediumImpact();
-                      setState(() {
-                        isSending = true;
-                      });
-
-                      final navigator = Navigator.of(context);
-                      final messenger = ScaffoldMessenger.of(context);
-                      final textPrimaryColor = context.textPrimary;
-
-                      try {
-                        final notifProvider =
-                            Provider.of<NotificationProvider>(context,
-                                listen: false);
-                        await notifProvider.sendReferral(
-                          toUserId: selectedConnectionId!,
-                          referredUserId: targetId,
-                          note: noteController.text.trim().isEmpty
-                              ? null
-                              : noteController.text.trim(),
-                        );
-
-                        if (mounted) {
-                          navigator.pop();
-                          messenger.showSnackBar(
-                            SnackBar(
-                              content: Row(
-                                children: [
-                                  const Icon(Icons.check_circle_rounded,
-                                      color: Colors.white),
-                                  const SizedBox(width: 8),
-                                  Text("Referral sent successfully!",
-                                      style: TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          color: textPrimaryColor)),
-                                ],
-                              ),
-                              backgroundColor: const Color(0xFF7C3AED),
-                              behavior: SnackBarBehavior.floating,
-                            ),
-                          );
-                        }
-                      } catch (e) {
-                        if (mounted) {
-                          setState(() {
-                            isSending = false;
-                          });
-
-                          String friendlyMessage = "Failed to send referral. Please try again.";
-                          final errStr = e.toString();
-                          if (errStr.contains("check constraint") || errStr.contains("23514")) {
-                            friendlyMessage = "Failed to send: unsupported database constraint. Please contact support.";
-                          } else if (errStr.contains("network") || errStr.contains("SocketException")) {
-                            friendlyMessage = "Network error. Please check your internet connection.";
-                          }
-
-                          messenger.showSnackBar(
-                            SnackBar(
-                              content: Row(
-                                children: [
-                                  const Icon(Icons.error_outline_rounded,
-                                      color: Colors.white),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Text(
-                                      friendlyMessage,
-                                      style: TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          color: textPrimaryColor),
+                                  if (profession.isNotEmpty)
+                                    Text(
+                                      profession,
+                                      style: context.captionText.copyWith(
+                                        color: context.textSecondary,
+                                        fontWeight: FontWeight.normal,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
                                     ),
-                                  ),
                                 ],
                               ),
-                              backgroundColor: Colors.redAccent,
-                              behavior: SnackBarBehavior.floating,
                             ),
-                          );
-                        }
-                      }
-                    },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: context.accentSecondary,
-                foregroundColor: Colors.white,
-                disabledBackgroundColor:
-                    context.surfaceSecondary.withValues(alpha: 0.5),
-                disabledForegroundColor: context.textMuted,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(
-                      AppDimensions.radiusComponent),
+                            if (isSelected)
+                              Icon(
+                                Icons.check_circle_rounded,
+                                color: context.accentSecondary,
+                                size: 20,
+                              ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
                 ),
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                elevation: 0,
               ),
-              child: Text(
-                "Send Referral",
-                style: context.bodyText.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: selectedConnectionId == null
-                      ? context.textMuted
-                      : Colors.white,
+            const SizedBox(height: 20),
+            Text(
+              "LEAVE A NOTE (OPTIONAL)",
+              style: context.captionText.copyWith(
+                color: context.textSecondary,
+                letterSpacing: 1.5,
+              ),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: noteController,
+              maxLines: 3,
+              style: context.bodyText,
+              cursorColor: context.accentSecondary,
+              decoration: InputDecoration(
+                hintText: "Add a note to introduce them...",
+                hintStyle: context.bodyText.copyWith(color: context.textMuted),
+                filled: true,
+                fillColor: context.surfaceSecondary,
+                enabledBorder: OutlineInputBorder(
+                  borderRadius:
+                      BorderRadius.circular(AppDimensions.radiusComponent),
+                  borderSide: BorderSide(color: context.surfaceSecondary),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius:
+                      BorderRadius.circular(AppDimensions.radiusComponent),
+                  borderSide: BorderSide(color: context.accentSecondary),
                 ),
               ),
             ),
+            const SizedBox(height: 24),
+            if (isSending)
+              const Center(
+                child: Padding(
+                  padding: EdgeInsets.symmetric(vertical: 8.0),
+                  child: CircularProgressIndicator(
+                    valueColor:
+                        AlwaysStoppedAnimation<Color>(Color(0xFF7C3AED)),
+                  ),
+                ),
+              )
+            else
+              ElevatedButton(
+                onPressed: selectedConnectionId == null
+                    ? null
+                    : () async {
+                        HapticFeedback.mediumImpact();
+                        setState(() {
+                          isSending = true;
+                        });
+
+                        final navigator = Navigator.of(context);
+                        final messenger = ScaffoldMessenger.of(context);
+                        final textPrimaryColor = context.textPrimary;
+
+                        try {
+                          final notifProvider =
+                              Provider.of<NotificationProvider>(context,
+                                  listen: false);
+                          await notifProvider.sendReferral(
+                            toUserId: selectedConnectionId!,
+                            referredUserId: targetId,
+                            note: noteController.text.trim().isEmpty
+                                ? null
+                                : noteController.text.trim(),
+                          );
+
+                          if (mounted) {
+                            navigator.pop();
+                            messenger.showSnackBar(
+                              SnackBar(
+                                content: Row(
+                                  children: [
+                                    const Icon(Icons.check_circle_rounded,
+                                        color: Colors.white),
+                                    const SizedBox(width: 8),
+                                    Text("Referral sent successfully!",
+                                        style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            color: textPrimaryColor)),
+                                  ],
+                                ),
+                                backgroundColor: const Color(0xFF7C3AED),
+                                behavior: SnackBarBehavior.floating,
+                              ),
+                            );
+                          }
+                        } catch (e) {
+                          if (mounted) {
+                            setState(() {
+                              isSending = false;
+                            });
+
+                            String friendlyMessage =
+                                "Failed to send referral. Please try again.";
+                            final errStr = e.toString();
+                            if (errStr.contains("check constraint") ||
+                                errStr.contains("23514")) {
+                              friendlyMessage =
+                                  "Failed to send: unsupported database constraint. Please contact support.";
+                            } else if (errStr.contains("network") ||
+                                errStr.contains("SocketException")) {
+                              friendlyMessage =
+                                  "Network error. Please check your internet connection.";
+                            }
+
+                            messenger.showSnackBar(
+                              SnackBar(
+                                content: Row(
+                                  children: [
+                                    const Icon(Icons.error_outline_rounded,
+                                        color: Colors.white),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        friendlyMessage,
+                                        style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            color: textPrimaryColor),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                backgroundColor: Colors.redAccent,
+                                behavior: SnackBarBehavior.floating,
+                              ),
+                            );
+                          }
+                        }
+                      },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: context.accentSecondary,
+                  foregroundColor: Colors.white,
+                  disabledBackgroundColor:
+                      context.surfaceSecondary.withValues(alpha: 0.5),
+                  disabledForegroundColor: context.textMuted,
+                  shape: RoundedRectangleBorder(
+                    borderRadius:
+                        BorderRadius.circular(AppDimensions.radiusComponent),
+                  ),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  elevation: 0,
+                ),
+                child: Text(
+                  "Send Referral",
+                  style: context.bodyText.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: selectedConnectionId == null
+                        ? context.textMuted
+                        : Colors.white,
+                  ),
+                ),
+              ),
           ],
         ),
       ),

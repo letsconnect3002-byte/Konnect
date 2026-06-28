@@ -28,13 +28,13 @@ class _ConnectHubBottomSheetState extends State<ConnectHubBottomSheet>
   QrImage? _qrImage;
   bool _qrGenerationError = false;
   String _selectedShareType = 'casual';
+  bool _qrGenerated = false;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
     _tabController.addListener(_onTabChanged);
-    _initializeQrCode();
   }
 
   @override
@@ -46,9 +46,6 @@ class _ConnectHubBottomSheetState extends State<ConnectHubBottomSheet>
   }
 
   void _onTabChanged() {
-    if (_tabController.index == 1 && _generatedInviteCode == null) {
-      _generateInviteCode();
-    }
     setState(() {});
   }
 
@@ -310,20 +307,50 @@ class _ConnectHubBottomSheetState extends State<ConnectHubBottomSheet>
 
           // QR Display Module
           Center(
-            child: qrImage != null && !_qrGenerationError
-                ? SizedBox(
-                    width: 160,
-                    height: 160,
-                    child: PrettyQrView(
-                      qrImage: qrImage,
-                      decoration: PrettyQrDecoration(
-                        shape: PrettyQrSmoothSymbol(
-                          color: context.textPrimary,
+            child: !_qrGenerated
+                ? Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.qr_code_2_rounded,
+                        color: context.textMuted.withValues(alpha: 0.15),
+                        size: 80,
+                      ),
+                      const SizedBox(height: 12),
+                      ElevatedButton(
+                        onPressed: () => _showQrOptionsBottomSheet(context),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: context.accentPrimary,
+                          foregroundColor: Colors.black,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 8),
+                          elevation: 0,
+                        ),
+                        child: const Text(
+                          "Generate QR",
+                          style: TextStyle(
+                              fontWeight: FontWeight.bold, fontSize: 13),
                         ),
                       ),
-                    ),
+                    ],
                   )
-                : const CircularProgressIndicator(),
+                : qrImage != null && !_qrGenerationError
+                    ? SizedBox(
+                        width: 160,
+                        height: 160,
+                        child: PrettyQrView(
+                          qrImage: qrImage,
+                          decoration: PrettyQrDecoration(
+                            shape: PrettyQrSmoothSymbol(
+                              color: context.textPrimary,
+                            ),
+                          ),
+                        ),
+                      )
+                    : const CircularProgressIndicator(),
           ),
         ],
       ),
@@ -428,9 +455,13 @@ class _ConnectHubBottomSheetState extends State<ConnectHubBottomSheet>
                       const SizedBox(height: 24),
                       ElevatedButton(
                         onPressed: () {
-                          setState(() {});
+                          setState(() {
+                            _qrGenerated = true;
+                          });
                           _initializeQrCode();
-                          _generateInviteCode();
+                          if (_generatedInviteCode != null) {
+                            _generateInviteCode();
+                          }
                           Navigator.pop(context);
                         },
                         style: ElevatedButton.styleFrom(
@@ -874,69 +905,71 @@ class _ConnectHubBottomSheetState extends State<ConnectHubBottomSheet>
           ),
           const SizedBox(height: 16),
 
-          // Active sharing type chip/card below QR code
-          Center(
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                color: context.surfacePrimary,
-                borderRadius:
-                    BorderRadius.circular(AppDimensions.radiusPremiumCard),
-                border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.04),
+          if (_qrGenerated) ...[
+            // Active sharing type chip/card below QR code
+            Center(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: context.surfacePrimary,
+                  borderRadius:
+                      BorderRadius.circular(AppDimensions.radiusPremiumCard),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.04),
+                  ),
                 ),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Glowing dot indicator
-                  Container(
-                    width: 8,
-                    height: 8,
-                    decoration: BoxDecoration(
-                      color: context.accentPrimary,
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: context.accentPrimary.withValues(alpha: 0.4),
-                          blurRadius: 6,
-                          spreadRadius: 2,
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    "Sharing: ${_selectedShareType.toUpperCase()}",
-                    style: context.bodyText
-                        .copyWith(fontWeight: FontWeight.w600, fontSize: 13),
-                  ),
-                  const SizedBox(width: 12),
-                  // Vertical divider
-                  Container(
-                    width: 1,
-                    height: 14,
-                    color: Colors.white.withValues(alpha: 0.12),
-                  ),
-                  const SizedBox(width: 12),
-                  // Change action
-                  GestureDetector(
-                    onTap: () => _showQrOptionsBottomSheet(context),
-                    child: Text(
-                      "Change",
-                      style: TextStyle(
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Glowing dot indicator
+                    Container(
+                      width: 8,
+                      height: 8,
+                      decoration: BoxDecoration(
                         color: context.accentPrimary,
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                        fontFamily: 'Inter',
-                        decoration: TextDecoration.underline,
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: context.accentPrimary.withValues(alpha: 0.4),
+                            blurRadius: 6,
+                            spreadRadius: 2,
+                          ),
+                        ],
                       ),
                     ),
-                  ),
-                ],
+                    const SizedBox(width: 8),
+                    Text(
+                      "Sharing: ${_selectedShareType.toUpperCase()}",
+                      style: context.bodyText
+                          .copyWith(fontWeight: FontWeight.w600, fontSize: 13),
+                    ),
+                    const SizedBox(width: 12),
+                    // Vertical divider
+                    Container(
+                      width: 1,
+                      height: 14,
+                      color: Colors.white.withValues(alpha: 0.12),
+                    ),
+                    const SizedBox(width: 12),
+                    // Change action
+                    GestureDetector(
+                      onTap: () => _showQrOptionsBottomSheet(context),
+                      child: Text(
+                        "Change",
+                        style: TextStyle(
+                          color: context.accentPrimary,
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          fontFamily: 'Inter',
+                          decoration: TextDecoration.underline,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
-          ),
+          ],
           const SizedBox(height: 20),
 
           // Invite Code text and share action buttons
@@ -953,30 +986,65 @@ class _ConnectHubBottomSheetState extends State<ConnectHubBottomSheet>
             ),
             child: Column(
               children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    _isGeneratingCode
-                        ? const SizedBox(
-                            width: 14,
-                            height: 14,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor:
-                                  AlwaysStoppedAnimation<Color>(Colors.white),
-                            ),
-                          )
-                        : Text(
-                            _generatedInviteCode ?? "Generating code...",
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontFamily: 'Inter',
-                              fontWeight: FontWeight.bold,
-                              fontSize: 15,
-                              letterSpacing: 1.2,
-                            ),
+                if (_isGeneratingCode)
+                  const Center(
+                    child: SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.5,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      ),
+                    ),
+                  )
+                else if (_generatedInviteCode == null)
+                  Center(
+                    child: Column(
+                      children: [
+                        Text(
+                          "No active Private Key generated",
+                          style: TextStyle(
+                            color: context.textMuted,
+                            fontSize: 13,
+                            fontFamily: 'Inter',
                           ),
-                    if (_generatedInviteCode != null) ...[
+                        ),
+                        const SizedBox(height: 12),
+                        ElevatedButton(
+                          onPressed: _generateInviteCode,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: context.accentPrimary,
+                            foregroundColor: Colors.black,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 18, vertical: 10),
+                            elevation: 0,
+                          ),
+                          child: const Text(
+                            "Generate Private Key",
+                            style: TextStyle(
+                                fontWeight: FontWeight.bold, fontSize: 13),
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                else
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        _generatedInviteCode!,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontFamily: 'Inter',
+                          fontWeight: FontWeight.bold,
+                          fontSize: 15,
+                          letterSpacing: 1.2,
+                        ),
+                      ),
                       const SizedBox(width: 8),
                       GestureDetector(
                         onTap: _copyToClipboard,
@@ -994,8 +1062,7 @@ class _ConnectHubBottomSheetState extends State<ConnectHubBottomSheet>
                         ),
                       ),
                     ],
-                  ],
-                ),
+                  ),
                 const SizedBox(height: 14),
                 Row(
                   children: [

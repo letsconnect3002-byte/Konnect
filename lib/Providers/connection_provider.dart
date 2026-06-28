@@ -100,9 +100,11 @@ class ConnectionProvider with ChangeNotifier {
     }
   }
 
-  Future<List<Map<String, dynamic>>> fetchConnections() async {
-    _state = UserConnectionLoading();
-    notifyListeners();
+  Future<List<Map<String, dynamic>>> fetchConnections({bool silent = false}) async {
+    if (!silent) {
+      _state = UserConnectionLoading();
+      notifyListeners();
+    }
     final list = await getOtherProfiles();
     _setLoadedState(list);
     notifyListeners();
@@ -115,7 +117,7 @@ class ConnectionProvider with ChangeNotifier {
 
     _connectionsSubscription = _repository.subscribeToConnections((payload) async {
       print("Realtime connection change detected: ${payload.toString()}");
-      await fetchConnections();
+      await fetchConnections(silent: true);
     });
 
     fetchConnections();

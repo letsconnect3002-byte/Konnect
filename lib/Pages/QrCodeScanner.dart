@@ -193,7 +193,8 @@ class _QRScannerPageState extends State<QRScannerPage> {
                   backgroundColor: Colors.transparent,
                   elevation: 0,
                   child: GlassmorphicContainer(
-                    borderRadius: BorderRadius.circular(AppDimensions.radiusPremiumCard),
+                    borderRadius:
+                        BorderRadius.circular(AppDimensions.radiusPremiumCard),
                     child: Padding(
                       padding: const EdgeInsets.symmetric(
                           vertical: 24, horizontal: 16),
@@ -393,7 +394,9 @@ class _ProfileCardState extends State<ProfileCard> {
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  _isAlreadyConnected ? "Updating connection..." : "Saving connection...",
+                  _isAlreadyConnected
+                      ? "Updating connection..."
+                      : "Saving connection...",
                   style: context.bodyText.copyWith(fontWeight: FontWeight.bold),
                 ),
               ],
@@ -979,7 +982,8 @@ class _ProfileCardState extends State<ProfileCard> {
                             colors: _shareBackType == 'casual'
                                 ? [
                                     context.accentSecondary,
-                                    context.accentSecondary.withValues(alpha: 0.8)
+                                    context.accentSecondary
+                                        .withValues(alpha: 0.8)
                                   ]
                                 : [
                                     context.accentPrimary,
@@ -988,7 +992,8 @@ class _ProfileCardState extends State<ProfileCard> {
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
                           ),
-                    color: _isAlreadyConnected ? context.surfaceSecondary : null,
+                    color:
+                        _isAlreadyConnected ? context.surfaceSecondary : null,
                     boxShadow: _isAlreadyConnected
                         ? null
                         : [
@@ -1023,7 +1028,7 @@ class _ProfileCardState extends State<ProfileCard> {
                             ? context.textMuted
                             : (_shareBackType == 'casual'
                                 ? Colors.white
-                                : Colors.black),
+                                : Colors.white),
                         fontWeight: FontWeight.bold,
                         fontSize: 15,
                         fontFamily: 'Inter',

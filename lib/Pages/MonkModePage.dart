@@ -809,19 +809,19 @@ class _MonkModePageState extends State<MonkModePage> {
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                               ),
-                              if (!monkMode.enabled) ...[
-                                const SizedBox(height: 2),
-                                Text(
-                                  "Inactive (default is allowed all when Monk Mode is off)",
-                                  style: context.captionText.copyWith(
-                                    color: context.textMuted,
-                                    fontSize: 9,
-                                    fontWeight: FontWeight.normal,
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ],
+                              // if (!monkMode.enabled) ...[
+                              //   const SizedBox(height: 2),
+                              //   Text(
+                              //     "Inactive (default is allowed all when Monk Mode is off)",
+                              //     style: context.captionText.copyWith(
+                              //       color: context.textMuted,
+                              //       fontSize: 9,
+                              //       fontWeight: FontWeight.normal,
+                              //     ),
+                              //     maxLines: 1,
+                              //     overflow: TextOverflow.ellipsis,
+                              //   ),
+                              // ],
                             ],
                           ),
                         ),
@@ -919,7 +919,7 @@ class _MonkModePageState extends State<MonkModePage> {
                                   physics: const BouncingScrollPhysics(),
                                   padding: const EdgeInsets.only(bottom: 100),
                                   separatorBuilder: (context, index) =>
-                                      const SizedBox(height: 8),
+                                      const SizedBox(height: 2),
                                   itemBuilder: (context, index) {
                                     final profile = filteredProfiles[index];
                                     final id = profile['id'] as int;
@@ -935,21 +935,21 @@ class _MonkModePageState extends State<MonkModePage> {
                                       opacity: monkMode.enabled ? 1.0 : 0.7,
                                       child: Container(
                                         padding: const EdgeInsets.symmetric(
-                                            horizontal: 16, vertical: 12),
-                                        decoration: BoxDecoration(
-                                          color: context.surfacePrimary,
-                                          borderRadius: BorderRadius.circular(
-                                              AppDimensions.radiusComponent),
-                                          border: Border.all(
-                                            color:
-                                                (monkMode.enabled && isBlocked)
-                                                    ? Colors.redAccent
-                                                        .withValues(alpha: 0.15)
-                                                    : context.surfaceSecondary
-                                                        .withValues(alpha: 0.5),
-                                            width: 1.0,
-                                          ),
-                                        ),
+                                            horizontal: 16, vertical: 8),
+                                        // decoration: BoxDecoration(
+                                        //   color: context.surfacePrimary,
+                                        //   borderRadius: BorderRadius.circular(
+                                        //       AppDimensions.radiusComponent),
+                                        //   border: Border.all(
+                                        //     color:
+                                        //         (monkMode.enabled && isBlocked)
+                                        //             ? Colors.redAccent
+                                        //                 .withValues(alpha: 0.15)
+                                        //             : context.surfaceSecondary
+                                        //                 .withValues(alpha: 0.5),
+                                        //     width: 1.0,
+                                        //   ),
+                                        // ),
                                         child: Row(
                                           children: [
                                             // Avatar

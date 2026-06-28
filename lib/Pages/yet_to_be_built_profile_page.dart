@@ -11,6 +11,8 @@ import 'package:image_picker/image_picker.dart';
 import 'package:connect/services/image_upload_service.dart';
 import 'package:connect/Pages/crop_image_page.dart';
 import 'package:connect/Widgets/connect_hub_bottom_sheet.dart';
+import 'package:connect/Pages/NotificationPage.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:skeletonizer/skeletonizer.dart';
 
 class YetToBeBuiltProfilePage extends StatefulWidget {
@@ -773,7 +775,11 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                     const SizedBox(height: 16),
 
                     _buildSaveButton(),
-                    const SizedBox(height: 0),
+                    const SizedBox(height: 32),
+
+                    // QUICK ACTIONS — absorbed from ProfilePage
+                    _buildQuickActionsSection(),
+                    const SizedBox(height: 16),
                   ],
                 ),
               ),
@@ -1184,6 +1190,201 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
         ),
       ),
     );
+  }
+
+  Widget _buildQuickActionsSection() {
+    final provider = Provider.of<ProfileProvider>(context, listen: false);
+    final hasProfile = provider.userId != null &&
+        provider.name.trim().isNotEmpty;
+
+    Widget actionTile({
+      required IconData icon,
+      required String label,
+      required String subtitle,
+      required VoidCallback? onTap,
+      bool disabled = false,
+      Color? iconColor,
+    }) =>
+        Opacity(
+          opacity: disabled ? 0.4 : 1.0,
+          child: GestureDetector(
+            onTap: disabled ? null : onTap,
+            child: Container(
+              height: 76,
+              decoration: BoxDecoration(
+                color: context.surfacePrimary,
+                borderRadius:
+                    BorderRadius.circular(AppDimensions.radiusPremiumCard),
+                border: Border.all(color: context.borderMuted, width: 1.0),
+              ),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: context.surfaceSecondary,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      icon,
+                      color: iconColor ?? context.accentPrimary,
+                      size: 20,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          label,
+                          style: context.cardTitle.copyWith(fontSize: 14),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          subtitle,
+                          style: context.captionText.copyWith(
+                            color: context.textMuted,
+                            fontWeight: FontWeight.w400,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    '↗',
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.5),
+                      fontSize: 14,
+                      fontFamily: 'Inter',
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'QUICK ACTIONS',
+          style: context.captionText.copyWith(
+            color: context.textSecondary,
+            fontSize: 14.0,
+            letterSpacing: 1.5,
+          ),
+        ),
+        const SizedBox(height: 12),
+        actionTile(
+          icon: Icons.person_add_rounded,
+          label: 'Connect Hub',
+          subtitle: 'Scan QR, Show QR, or Add Code',
+          onTap: () {
+            HapticFeedback.lightImpact();
+            showModalBottomSheet(
+              context: context,
+              isScrollControlled: true,
+              backgroundColor: Colors.transparent,
+              builder: (context) => const ConnectHubBottomSheet(),
+            );
+          },
+        ),
+        const SizedBox(height: 12),
+        actionTile(
+          icon: Icons.share_rounded,
+          label: 'Share Link',
+          subtitle: 'Send your Private Key',
+          disabled: !hasProfile,
+          onTap: () => _shareProfileLink(provider),
+        ),
+        const SizedBox(height: 12),
+        actionTile(
+          icon: Icons.notifications_outlined,
+          label: 'Notifications',
+          subtitle: 'View your notifications',
+          onTap: () {
+            HapticFeedback.lightImpact();
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const NotificationPage(),
+              ),
+            );
+          },
+        ),
+      ],
+    );
+  }
+
+  void _shareProfileLink(ProfileProvider profileProvider) async {
+    if (profileProvider.userId == null) return;
+
+    // Show a progress dialog while generating VIP code
+    if (mounted) {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => Dialog(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          child: GlassmorphicContainer(
+            borderRadius: BorderRadius.circular(AppDimensions.radiusPremiumCard),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  CircularProgressIndicator(
+                    valueColor:
+                        AlwaysStoppedAnimation<Color>(context.accentPrimary),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    "Generating Private Key...",
+                    style: context.cardTitle,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    try {
+      final code = await profileProvider.generateInviteCode('casual');
+
+      if (mounted) {
+        Navigator.pop(context); // Dismiss loading dialog
+      }
+
+      final shareMessage =
+          "Hey, I'm inviting you to my private circle on Mandala. Download the app here: joinmandala.in and use my single-use Private code to connect: *$code*.";
+
+      await SharePlus.instance.share(ShareParams(text: shareMessage));
+    } catch (e) {
+      if (mounted) {
+        Navigator.pop(context); // Dismiss loading dialog
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("Error generating VIP code: $e"),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   Widget _buildFrontBackToggle() {
