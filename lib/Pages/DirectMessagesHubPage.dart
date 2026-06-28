@@ -23,6 +23,7 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
   String _selectedTab = 'casual';
+  bool _isTabAutoSelected = false;
 
   @override
   void initState() {
@@ -151,6 +152,21 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
             chatProvider.state is ChatLoading;
     final connections = connectionProvider.connections;
     final myUserId = profileProvider.userId;
+
+    // Dynamically auto-select tab on first load once connections are loaded
+    if (!_isTabAutoSelected && connectionProvider.state is UserConnectionLoaded) {
+      _isTabAutoSelected = true;
+      final casualList = connections.where((c) => _getCardTypesForConnection(c).contains('casual')).toList();
+      final professionalList = connections.where((c) => _getCardTypesForConnection(c).contains('professional')).toList();
+
+      if (casualList.isEmpty && professionalList.isNotEmpty) {
+        _selectedTab = 'professional';
+      } else if (professionalList.isEmpty && casualList.isNotEmpty) {
+        _selectedTab = 'casual';
+      } else {
+        _selectedTab = 'casual';
+      }
+    }
 
     if (chatProvider.lastError != null) {
       final AppError error = chatProvider.lastError!;
