@@ -253,7 +253,7 @@ class SupabaseChatRepository implements ChatRepository {
         .from('messages')
         .select()
         .filter('room_id', 'in', '(${roomIds.join(',')})')
-        .eq('status', 'sent')
+        .inFilter('status', ['sent', 'delivered'])
         .neq('sender_id', myUserId);
     return List<Map<String, dynamic>>.from(response as List);
   }

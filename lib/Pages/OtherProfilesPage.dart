@@ -1102,6 +1102,8 @@ class _ReferBottomSheetState extends State<_ReferBottomSheet> {
             TextField(
               controller: noteController,
               maxLines: 3,
+              maxLength: 69,
+              maxLengthEnforcement: MaxLengthEnforcement.enforced,
               style: context.bodyText,
               cursorColor: context.accentSecondary,
               decoration: InputDecoration(

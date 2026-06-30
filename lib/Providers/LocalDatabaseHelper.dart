@@ -92,6 +92,22 @@ class LocalDatabaseHelper {
     }
   }
 
+  /// Status rank used to prevent downgrading (e.g., 'read' → 'delivered').
+  static int _statusRank(String status) {
+    switch (status) {
+      case 'pending':
+        return 0;
+      case 'sent':
+        return 1;
+      case 'delivered':
+        return 2;
+      case 'read':
+        return 3;
+      default:
+        return -1;
+    }
+  }
+
   Future<void> insertMessage(
     String id,
     String roomId,
@@ -106,6 +122,30 @@ class LocalDatabaseHelper {
     final db = await database;
     final timeStr = createdAt ?? DateTime.now().toUtc().toIso8601String();
 
+    // Check if message already exists locally
+    final existing = await db.query(
+      'messages',
+      columns: ['id', 'status'],
+      where: 'id = ?',
+      whereArgs: [id],
+      limit: 1,
+    );
+
+    if (existing.isNotEmpty) {
+      // Message already exists — only upgrade status, never downgrade
+      final currentStatus = existing.first['status'] as String? ?? 'sent';
+      if (_statusRank(status) > _statusRank(currentStatus)) {
+        await db.update(
+          'messages',
+          {'status': status},
+          where: 'id = ?',
+          whereArgs: [id],
+        );
+      }
+      return;
+    }
+
+    // New message — insert it
     await db.insert(
       'messages',
       {
@@ -119,7 +159,7 @@ class LocalDatabaseHelper {
         'reply_to_message_payload': replyToMessagePayload,
         'reply_to_message_sender_name': replyToMessageSenderName,
       },
-      conflictAlgorithm: ConflictAlgorithm.ignore, // Upsert idempotency helper
+      conflictAlgorithm: ConflictAlgorithm.ignore,
     );
   }
 

@@ -154,10 +154,15 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
     final myUserId = profileProvider.userId;
 
     // Dynamically auto-select tab on first load once connections are loaded
-    if (!_isTabAutoSelected && connectionProvider.state is UserConnectionLoaded) {
+    if (!_isTabAutoSelected &&
+        connectionProvider.state is UserConnectionLoaded) {
       _isTabAutoSelected = true;
-      final casualList = connections.where((c) => _getCardTypesForConnection(c).contains('casual')).toList();
-      final professionalList = connections.where((c) => _getCardTypesForConnection(c).contains('professional')).toList();
+      final casualList = connections
+          .where((c) => _getCardTypesForConnection(c).contains('casual'))
+          .toList();
+      final professionalList = connections
+          .where((c) => _getCardTypesForConnection(c).contains('professional'))
+          .toList();
 
       if (casualList.isEmpty && professionalList.isNotEmpty) {
         _selectedTab = 'professional';

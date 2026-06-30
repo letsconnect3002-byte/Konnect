@@ -139,6 +139,10 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
         _isRoomLoading = false;
       });
       WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
+
+      // Background safety net: sync full room history from Supabase to recover
+      // any messages missed by the realtime subscription.
+      _provider.syncRoomHistory(roomId);
     } catch (e) {
       print("Error initializing room in IndividualChatPage: $e");
       if (mounted) {

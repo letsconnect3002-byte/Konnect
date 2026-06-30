@@ -21,10 +21,10 @@ serve(async (req) => {
     // 1. Initialize Supabase Client with Service Role Key (bypasses RLS)
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-    // 2. Fetch the sender's profile name to display in the notification title
+    // 2. Fetch the sender's profile name and avatar_url to display in the notification and banner
     const { data: senderProfile } = await supabase
       .from("profiles")
-      .select("name")
+      .select("name, avatar_url")
       .eq("id", senderId)
       .single()
 
@@ -66,6 +66,7 @@ serve(async (req) => {
 
     // 6. Send high-priority background notification + system notification to each device token
     const results = []
+    let anySuccess = false
     for (const row of tokens) {
       const fcmToken = row.fcm_token
 
@@ -83,22 +84,12 @@ serve(async (req) => {
             sender_id: String(senderId),
             sender_name: senderName,
             payload: msgPayload,
+            sender_avatar: senderProfile?.avatar_url || "",
             notification_id: String(notificationId),
           },
           android: {
             priority: "high",
           },
-          // apns: {
-          //   headers: {
-          //     "apns-priority": "5",
-          //     "apns-push-type": "background",
-          //   },
-          //   payload: {
-          //     aps: {
-          //       "content-available": 1,
-          //     },
-          //   },
-          // },
           apns: {
             headers: {
               "apns-priority": "10",         // 10 = immediate delivery (required for alert type)
@@ -142,6 +133,24 @@ serve(async (req) => {
         console.error(`Failed to send push notification to token ${fcmToken}:`, responseText)
       } else {
         console.log(`Successfully sent push notification to token: ${fcmToken}`)
+        anySuccess = true
+      }
+    }
+
+    // If the push notification was successfully sent to at least one of the recipient's devices,
+    // update the message status to 'delivered' in the database. This acts as the source-of-truth
+    // status update for cases where the recipient's app is closed/force-killed (especially on iOS).
+    if (anySuccess) {
+      const { error: updateError } = await supabase
+        .from("messages")
+        .update({ status: "delivered" })
+        .eq("id", messageId)
+        .eq("status", "sent")
+
+      if (updateError) {
+        console.error(`Failed to update message ${messageId} status to 'delivered' in Edge Function:`, updateError)
+      } else {
+        console.log(`Successfully updated message ${messageId} status to 'delivered' via Edge Function.`)
       }
     }
 

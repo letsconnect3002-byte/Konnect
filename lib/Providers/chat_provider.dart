@@ -4,7 +4,7 @@ import 'package:connect/Repositories/chat_repository.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
-import 'package:audioplayers/audioplayers.dart';
+import 'package:just_audio/just_audio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 sealed class ChatState {}
@@ -25,8 +25,12 @@ class ChatError extends ChatState {
 
 class ChatProvider with ChangeNotifier {
   final ChatRepository _repository;
-  final AudioPlayer _sendPlayer = AudioPlayer();
-  final AudioPlayer _receivePlayer = AudioPlayer();
+  final AudioPlayer _sendPlayer = AudioPlayer(handleInterruptions: false);
+  final AudioPlayer _receivePlayer = AudioPlayer(handleInterruptions: false);
+
+  /// Guard flag to prevent overlapping sync operations from running
+  /// concurrently and causing race conditions with local message storage.
+  bool _isSyncing = false;
 
   bool _soundEffectsEnabled = true;
   bool get soundEffectsEnabled => _soundEffectsEnabled;
@@ -53,11 +57,20 @@ class ChatProvider with ChangeNotifier {
     }
   }
 
+  Future<void> _preloadSounds() async {
+    try {
+      await _sendPlayer.setAsset('assets/message_audio/Send Sound.mp3');
+      await _receivePlayer.setAsset('assets/message_audio/Receive Sound.mp3');
+    } catch (e) {
+      print("Error preloading chat sounds: $e");
+    }
+  }
+
   Future<void> _playSendSound() async {
     if (!_soundEffectsEnabled) return;
     try {
-      await _sendPlayer.stop();
-      await _sendPlayer.play(AssetSource('message_audio/Send Sound.mp3'));
+      await _sendPlayer.seek(Duration.zero);
+      _sendPlayer.play();
     } catch (e) {
       print("Error playing send sound: $e");
     }
@@ -66,8 +79,8 @@ class ChatProvider with ChangeNotifier {
   Future<void> _playReceiveSound() async {
     if (!_soundEffectsEnabled) return;
     try {
-      await _receivePlayer.stop();
-      await _receivePlayer.play(AssetSource('message_audio/Receive Sound.mp3'));
+      await _receivePlayer.seek(Duration.zero);
+      _receivePlayer.play();
     } catch (e) {
       print("Error playing receive sound: $e");
     }
@@ -76,31 +89,7 @@ class ChatProvider with ChangeNotifier {
   ChatProvider({ChatRepository? chatRepository})
       : _repository = chatRepository ?? SupabaseChatRepository() {
     _loadSoundEffectsPreference();
-    _configureAudioContext();
-  }
-
-  void _configureAudioContext() {
-    try {
-      final AudioContext audioContext = AudioContext(
-        iOS: AudioContextIOS(
-          category: AVAudioSessionCategory.playback,
-          options: const {
-            AVAudioSessionOptions.defaultToSpeaker,
-            AVAudioSessionOptions.mixWithOthers,
-          },
-        ),
-        android: AudioContextAndroid(
-          isSpeakerphoneOn: true,
-          stayAwake: true,
-          contentType: AndroidContentType.sonification,
-          usageType: AndroidUsageType.assistanceSonification,
-          audioFocus: AndroidAudioFocus.none,
-        ),
-      );
-      AudioPlayer.global.setAudioContext(audioContext);
-    } catch (e) {
-      print("Error setting audio context: $e");
-    }
+    _preloadSounds();
   }
 
   int? _userId;
@@ -559,7 +548,6 @@ class ChatProvider with ChangeNotifier {
       onSubscribeStatus: (status) async {
         if (status == RealtimeSubscribeStatus.subscribed) {
           await syncOutgoingMessageStatuses();
-          await fetchPendingMessages();
           await updateUnreadCount();
         }
       },
@@ -632,6 +620,8 @@ class ChatProvider with ChangeNotifier {
   Future<void> syncOutgoingMessageStatuses() async {
     final myUserId = _userId;
     if (myUserId == null) return;
+    if (_isSyncing) return;
+    _isSyncing = true;
 
     try {
       final unreadSent =
@@ -702,10 +692,11 @@ class ChatProvider with ChangeNotifier {
         notifyListeners();
       }
       await updateUnreadCount();
-      await syncIncomingMessageStatuses();
     } catch (e) {
       print("Error syncing outgoing message statuses: $e");
       _setError(e);
+    } finally {
+      _isSyncing = false;
     }
   }
 
@@ -745,6 +736,8 @@ class ChatProvider with ChangeNotifier {
   Future<void> fetchPendingMessages() async {
     final myUserId = _userId;
     if (myUserId == null) return;
+    if (_isSyncing) return;
+    _isSyncing = true;
 
     try {
       final roomIds = await _repository.fetchUserRoomIds(myUserId);
@@ -790,6 +783,8 @@ class ChatProvider with ChangeNotifier {
     } catch (e) {
       print("Error fetching pending messages: $e");
       _setError(e);
+    } finally {
+      _isSyncing = false;
     }
   }
 
@@ -920,25 +915,11 @@ class ChatProvider with ChangeNotifier {
     if (myUserId == null) return;
 
     try {
-      final unreadIncoming =
-          await _repository.getUnreadIncomingMessagesLocally(myUserId);
-
-      if (unreadIncoming.isNotEmpty) {
-        final messageIds =
-            unreadIncoming.map((m) => m['id'] as String).toList();
-        final existing =
-            await _repository.fetchSupabaseMessageStatuses(messageIds);
-
-        final Set<String> existingIds = {
-          for (final row in existing) row['id'] as String
-        };
-
-        for (final localId in messageIds) {
-          if (!existingIds.contains(localId)) {
-            await _repository.deleteMessageLocally(localId);
-          }
-        }
-      }
+      // NOTE: We intentionally do NOT delete local messages that are missing
+      // from the server. A missing server record could be caused by a network
+      // hiccup, a concurrent upsert, or a transient Supabase state — not
+      // necessarily a deliberate sender deletion. Legitimate deletions are
+      // handled exclusively by the realtime onDelete handler.
 
       for (final roomId in connectionRooms.values) {
         await _updateLastMessageForRoomSilent(roomId);

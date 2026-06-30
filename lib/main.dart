@@ -14,13 +14,19 @@ import 'package:connect/Pages/MonkModePage.dart';
 import 'package:connect/Providers/profile_provider.dart';
 import 'package:connect/Providers/connection_provider.dart';
 import 'package:connect/Providers/chat_provider.dart';
+import 'package:connect/Widgets/in_app_notification_banner.dart';
+import 'package:connect/Pages/YourNetworkPage.dart';
+import 'package:connect/Pages/NotificationPage.dart';
 import 'package:connect/Repositories/profile_repository.dart';
 import 'package:connect/Repositories/connection_repository.dart';
 import 'package:connect/Repositories/chat_repository.dart';
 import 'package:connect/Providers/notification_provider.dart';
 import 'package:connect/Repositories/notification_repository.dart';
 import 'package:connect/Providers/monk_mode_provider.dart';
+import 'package:connect/Providers/network_provider.dart';
+import 'package:connect/Repositories/network_repository.dart';
 import 'package:timezone/data/latest.dart' as tz;
+import 'package:audio_session/audio_session.dart' as session;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -130,10 +136,20 @@ Future<void> cancelLocalNotification(String roomId) async {
 
 String? pendingNotificationPayload;
 int? targetChatSenderId;
+bool targetOpenNotificationsPage = false;
 
 void handleLocalNotificationClickPayload(String payload) {
   try {
     final data = jsonDecode(payload);
+    final action = data['action'] as String?;
+    if (action == 'connection_notification') {
+      navigatorKey.currentState?.push(
+        MaterialPageRoute(
+          builder: (routeContext) => const NotificationPage(),
+        ),
+      );
+      return;
+    }
     final senderIdStr = data['sender_id'] as String?;
     if (senderIdStr != null) {
       final senderId = int.tryParse(senderIdStr);
@@ -371,6 +387,26 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Explicitly configure native AudioSession via audio_session package to mix with other apps
+  try {
+    final audioSession = await session.AudioSession.instance;
+    await audioSession.configure(session.AudioSessionConfiguration(
+      avAudioSessionCategory: session.AVAudioSessionCategory.ambient,
+      avAudioSessionCategoryOptions: session.AVAudioSessionCategoryOptions.mixWithOthers,
+      avAudioSessionMode: session.AVAudioSessionMode.defaultMode,
+      avAudioSessionRouteSharingPolicy: session.AVAudioSessionRouteSharingPolicy.defaultPolicy,
+      androidAudioAttributes: const session.AndroidAudioAttributes(
+        contentType: session.AndroidAudioContentType.sonification,
+        usage: session.AndroidAudioUsage.assistanceSonification,
+      ),
+      androidAudioFocusGainType: session.AndroidAudioFocusGainType.gainTransientMayDuck,
+    ));
+    print("AudioSession: Configured native ambient mixing successfully.");
+  } catch (e) {
+    print("AudioSession: Error configuring native audio session: $e");
+  }
+
   tz.initializeTimeZones();
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
@@ -432,10 +468,17 @@ void main() async {
     if (localDetails?.didNotificationLaunchApp ?? false) {
       final localPayload = localDetails?.notificationResponse?.payload;
       if (localPayload != null) {
-        final data = jsonDecode(localPayload);
-        final senderIdStr = data['sender_id'] as String?;
-        if (senderIdStr != null) {
-          targetChatSenderId = int.tryParse(senderIdStr);
+        try {
+          final data = jsonDecode(localPayload);
+          final action = data['action'] as String?;
+          final senderIdStr = data['sender_id'] as String?;
+          if (action == 'connection_notification') {
+            targetOpenNotificationsPage = true;
+          } else if (senderIdStr != null) {
+            targetChatSenderId = int.tryParse(senderIdStr);
+          }
+        } catch (e) {
+          print("Error parsing local notification payload on startup: $e");
         }
       }
     }
@@ -443,8 +486,11 @@ void main() async {
     final fcmMessage = await FirebaseMessaging.instance.getInitialMessage();
     if (fcmMessage != null) {
       final data = fcmMessage.data;
+      final action = data['action'] as String?;
       final senderIdStr = data['sender_id'] as String?;
-      if (senderIdStr != null) {
+      if (action == 'connection_notification') {
+        targetOpenNotificationsPage = true;
+      } else if (senderIdStr != null) {
         targetChatSenderId = int.tryParse(senderIdStr);
       }
     }
@@ -508,6 +554,19 @@ class MyApp extends StatelessWidget {
               connectionProvider.connections,
             );
             return chatProvider;
+          },
+        ),
+        ChangeNotifierProxyProvider<ConnectionProvider, NetworkProvider>(
+          create: (_) => NetworkProvider(
+            networkRepository: SupabaseNetworkRepository(),
+          ),
+          update: (_, connectionProvider, networkProvider) {
+            networkProvider!.updateFromConnectionProvider(
+              connectionProvider.userId,
+              connectionProvider.connections.length,
+              connectionProvider.state is UserConnectionLoaded,
+            );
+            return networkProvider;
           },
         ),
       ],
@@ -625,7 +684,18 @@ class _AppShellGateState extends State<AppShellGate> {
       // Chat rooms, push tokens, and unread counts load in the background.
       if (mounted) setState(() => _initialized = true);
 
-      if (targetChatSenderId != null) {
+      if (targetOpenNotificationsPage) {
+        targetOpenNotificationsPage = false;
+        pendingNotificationPayload = null;
+
+        navigatorKey.currentState?.push(
+          PageRouteBuilder(
+            pageBuilder: (context, anim, secAnim) => const NotificationPage(),
+            transitionDuration: Duration.zero,
+            reverseTransitionDuration: Duration.zero,
+          ),
+        );
+      } else if (targetChatSenderId != null) {
         final targetId = targetChatSenderId!;
         targetChatSenderId = null;
         pendingNotificationPayload = null;
@@ -678,9 +748,9 @@ class _AppShellGateState extends State<AppShellGate> {
       // inside the onMessage handler. Leaving these enabled causes duplicate
       // notifications on certain Android OEM skins and iOS.
       await messaging.setForegroundNotificationPresentationOptions(
-        alert: true,
-        badge: true,
-        sound: true,
+        alert: false,
+        badge: false,
+        sound: false,
       );
 
       // Fetch the token (FCM can generate tokens on Android even if notification permission is denied)
@@ -798,53 +868,22 @@ class _AppShellGateState extends State<AppShellGate> {
                       print(
                           "PushNotifications: Foreground notification suppressed because sender $senderId is muted.");
                     } else {
-                      List<String> messageLines = [];
-                      bool isFallback = false;
-                      try {
-                        final unreadRows = await LocalDatabaseHelper.instance
-                            .getUnreadMessagesForRoomBySender(roomId, senderId);
-                        messageLines = unreadRows
-                            .map((r) => r['payload'] as String)
-                            .toList();
-                        if (messageLines.isEmpty) {
-                          isFallback = true;
-                        }
-                      } catch (dbError) {
-                        print(
-                            "PushNotifications: Database read failed in foreground: $dbError");
-                        isFallback = true;
-                      }
-
-                      if (isFallback) {
-                        await showLocalNotification(
-                          messageId, // Using messageId instead of roomId so it's individual and doesn't collapse
-                          senderName,
-                          [payload],
-                          {
-                            'sender_id': senderIdStr,
-                            'room_id': roomId,
-                            'message_id': messageId,
-                          },
+                      final overlayState = navigatorKey.currentState?.overlay;
+                      if (overlayState != null) {
+                        InAppNotificationBanner.show(
+                          overlayState: overlayState,
+                          senderId: senderId,
+                          senderName: senderName,
+                          avatarUrl: data['sender_avatar'] ?? '',
+                          message: payload,
                         );
                         print(
-                            "PushNotifications: Foreground local fallback notification displayed for messageId: $messageId.");
-                      } else {
-                        await showLocalNotification(
-                          roomId,
-                          senderName,
-                          messageLines,
-                          {
-                            'sender_id': senderIdStr,
-                            'room_id': roomId,
-                          },
-                        );
-                        print(
-                            "PushNotifications: Foreground local notification displayed with ${messageLines.length} lines.");
+                            "PushNotifications: Foreground in-app notification banner displayed for messageId: $messageId.");
                       }
                     }
                   } catch (e) {
                     print(
-                        "PushNotifications: Error showing local notification in foreground: $e");
+                        "PushNotifications: Error showing in-app notification banner in foreground: $e");
                   }
                 }
               }
@@ -907,6 +946,31 @@ class _AppShellGateState extends State<AppShellGate> {
                     "PushNotifications: Error updating providers after delete: $e");
               }
             }
+          } else if (action == 'connection_notification') {
+            final title = message.notification?.title ?? 'New Notification';
+            final body = message.notification?.body ?? 'You have a new update.';
+            final actorIdStr = data['actor_id'] as String?;
+            final actorAvatar = data['actor_avatar'] as String? ?? '';
+            final actorId = actorIdStr != null ? (int.tryParse(actorIdStr) ?? 0) : 0;
+
+            final overlayState = navigatorKey.currentState?.overlay;
+            if (overlayState != null) {
+              InAppNotificationBanner.show(
+                overlayState: overlayState,
+                senderId: actorId,
+                senderName: title,
+                avatarUrl: actorAvatar,
+                message: body,
+                onTap: () {
+                  navigatorKey.currentState?.push(
+                    MaterialPageRoute(
+                      builder: (routeContext) => const NotificationPage(),
+                    ),
+                  );
+                },
+              );
+              print("PushNotifications: Foreground connection notification banner displayed.");
+            }
           }
         } catch (e) {
           print("PushNotifications: Error in foreground message handler: $e");
@@ -951,8 +1015,9 @@ class _AppShellState extends State<_AppShell> with WidgetsBindingObserver {
     _screens = [
       const DirectMessagesHubPage(), // index 0 — Home / Chats
       const OtherProfilesPage(), // index 1 — Mandal / Connections
-      const MonkModePage(), // index 2 — Monk Mode
-      const YetToBeBuiltProfilePage(), // index 3 — My Card
+      const YourNetworkPage(), // index 2 — Your Network
+      const MonkModePage(), // index 3 — Monk Mode
+      const YetToBeBuiltProfilePage(), // index 4 — My Card
     ];
     _setupNotificationTapListeners();
   }
@@ -1063,8 +1128,9 @@ class _AppShellState extends State<_AppShell> with WidgetsBindingObserver {
                   _buildNavItem(
                       index: 0, icon: Icons.chat_bubble_outline_rounded),
                   _buildNavItem(index: 1, icon: Icons.people_outline_rounded),
-                  _buildNavItem(index: 2, icon: Icons.self_improvement_rounded),
-                  _buildNavItem(index: 3, icon: Icons.person_outline_rounded),
+                  _buildNavItem(index: 2, icon: Icons.search_rounded),
+                  _buildNavItem(index: 3, icon: Icons.self_improvement_rounded),
+                  _buildNavItem(index: 4, icon: Icons.person_outline_rounded),
                 ],
               ),
             ),

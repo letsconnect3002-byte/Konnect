@@ -14,6 +14,8 @@ abstract class NotificationRepository {
     String? note,
   });
   Future<void> markAsSeen(String notificationId);
+  Future<void> updateNotificationNote(String notificationId, String newNote);
+  Future<List<Map<String, dynamic>>> getSentReferralRequests(int senderUserId);
   Future<void> markAllAsSeen(int userId);
   Future<void> deleteNotification(String notificationId);
   Future<void> deleteNotificationsBetweenUsers(int idA, int idB);
@@ -80,6 +82,23 @@ class SupabaseNotificationRepository implements NotificationRepository {
   }
 
   @override
+  Future<void> updateNotificationNote(String notificationId, String newNote) async {
+    await _client
+        .from('connection_notifications')
+        .update({'note': newNote, 'is_seen': true}).eq('id', notificationId);
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> getSentReferralRequests(int senderUserId) async {
+    final response = await _client
+        .from('connection_notifications')
+        .select('id, user_id, referred_user_id, note, is_seen')
+        .eq('other_user_id', senderUserId)
+        .eq('type', 'referral');
+    return List<Map<String, dynamic>>.from(response);
+  }
+
+  @override
   Future<void> markAllAsSeen(int userId) async {
     await _client
         .from('connection_notifications')
@@ -98,6 +117,7 @@ class SupabaseNotificationRepository implements NotificationRepository {
 
   @override
   Future<void> deleteNotificationsBetweenUsers(int idA, int idB) async {
+    // Delete normal connection notifications
     await _client
         .from('connection_notifications')
         .delete()
@@ -108,6 +128,30 @@ class SupabaseNotificationRepository implements NotificationRepository {
         .delete()
         .eq('user_id', idB)
         .eq('other_user_id', idA);
+
+    // Delete referral notifications where one is requester and other is target
+    await _client
+        .from('connection_notifications')
+        .delete()
+        .eq('other_user_id', idA)
+        .eq('referred_user_id', idB);
+    await _client
+        .from('connection_notifications')
+        .delete()
+        .eq('other_user_id', idB)
+        .eq('referred_user_id', idA);
+
+    // Delete referral notifications where one is connector and other is target
+    await _client
+        .from('connection_notifications')
+        .delete()
+        .eq('user_id', idA)
+        .eq('referred_user_id', idB);
+    await _client
+        .from('connection_notifications')
+        .delete()
+        .eq('user_id', idB)
+        .eq('referred_user_id', idA);
   }
 
   @override

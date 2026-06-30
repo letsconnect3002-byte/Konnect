@@ -184,6 +184,63 @@ class NotificationProvider with ChangeNotifier {
     }
   }
 
+  Future<void> sendReferralRequest({
+    required int toUserId,
+    required int referredUserId,
+    String? note,
+  }) async {
+    final myUserId = _userId;
+    if (myUserId == null) return;
+    try {
+      final requestNote = note != null && note.isNotEmpty
+          ? '[REFERRAL_REQUEST]:$note'
+          : '[REFERRAL_REQUEST]';
+      await _repository.insertReferralNotification(
+        userId: toUserId,
+        otherUserId: myUserId,
+        referredUserId: referredUserId,
+        note: requestNote,
+      );
+    } catch (e) {
+      print("Error sending referral request: $e");
+      _setError(e);
+      rethrow;
+    }
+  }
+
+  Future<void> markReferralRequestActioned(String notificationId, String currentNote) async {
+    try {
+      final String actionedNote = currentNote.replaceFirst('[REFERRAL_REQUEST]', '[REFERRAL_REQUEST_ACTIONED]');
+      await _repository.updateNotificationNote(notificationId, actionedNote);
+      
+      // Update local state for immediate visual feedback
+      final index = notifications.indexWhere((n) => n['id'] == notificationId);
+      if (index != -1) {
+        final updated = List<Map<String, dynamic>>.from(notifications);
+        updated[index] = Map<String, dynamic>.from(updated[index])
+          ..['note'] = actionedNote
+          ..['is_seen'] = true;
+        _setLoadedState(updated);
+        notifyListeners();
+      }
+    } catch (e) {
+      print("Error marking referral request actioned: $e");
+      _setError(e);
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getSentReferralRequests() async {
+    final myUserId = _userId;
+    if (myUserId == null) return [];
+    try {
+      return await _repository.getSentReferralRequests(myUserId);
+    } catch (e) {
+      print("Error fetching sent referral requests: $e");
+      _setError(e);
+      return [];
+    }
+  }
+
   @override
   void dispose() {
     unsubscribeFromNotifications();

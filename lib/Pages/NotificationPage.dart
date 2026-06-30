@@ -197,7 +197,7 @@ class _NotificationPageState extends State<NotificationPage> {
       NotificationProvider provider) {
     if (items.isEmpty) return const SizedBox.shrink();
     return Container(
-      margin: const EdgeInsets.only(bottom: 20),
+      margin: const EdgeInsets.only(bottom: 0),
       // decoration: BoxDecoration(
       //   color: const Color(0xFF131422),
       //   borderRadius: BorderRadius.circular(24),
@@ -210,7 +210,7 @@ class _NotificationPageState extends State<NotificationPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 6),
             child: Text(
               title,
               style: const TextStyle(
@@ -230,7 +230,7 @@ class _NotificationPageState extends State<NotificationPage> {
               return _buildNotificationItem(item, provider);
             },
           ),
-          const SizedBox(height: 12),
+          // const SizedBox(height: 12),
         ],
       ),
     );
@@ -248,6 +248,14 @@ class _NotificationPageState extends State<NotificationPage> {
         _getRelativeTime(notification['created_at'] as String?);
     final bool isUnseen = notification['is_seen'] == false;
 
+    final String? rawNote = notification['note'] as String?;
+    final bool isReferralRequest = type == 'referral' &&
+        rawNote != null &&
+        (rawNote.startsWith('[REFERRAL_REQUEST]') ||
+            rawNote.startsWith('[REFERRAL_REQUEST_ACTIONED]'));
+    final bool isRequestActioned =
+        rawNote != null && rawNote.startsWith('[REFERRAL_REQUEST_ACTIONED]');
+    final bool isNormalReferral = type == 'referral' && !isReferralRequest;
     final bool isReferral = type == 'referral';
     final bool isQr = type == 'qr_code';
     final bool isReferralConnect = type == 'referral_connect';
@@ -261,7 +269,20 @@ class _NotificationPageState extends State<NotificationPage> {
     final String referredAvatarUrl =
         referredUser['avatar_url'] ?? referredUser['avatarUrl'] ?? '';
     final String referredProfession = referredUser['profession'] ?? '';
-    final String? note = notification['note'] as String?;
+
+    String? displayNote;
+    if (rawNote != null) {
+      if (rawNote.startsWith('[REFERRAL_REQUEST_ACTIONED]:')) {
+        displayNote = rawNote.substring('[REFERRAL_REQUEST_ACTIONED]:'.length);
+      } else if (rawNote.startsWith('[REFERRAL_REQUEST]:')) {
+        displayNote = rawNote.substring('[REFERRAL_REQUEST]:'.length);
+      } else if (rawNote == '[REFERRAL_REQUEST]' ||
+          rawNote == '[REFERRAL_REQUEST_ACTIONED]') {
+        displayNote = null;
+      } else {
+        displayNote = rawNote;
+      }
+    }
 
     final connectionProvider =
         Provider.of<ConnectionProvider>(context, listen: false);
@@ -315,7 +336,7 @@ class _NotificationPageState extends State<NotificationPage> {
             );
           },
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
             child: Row(
               children: [
                 Container(
@@ -370,9 +391,11 @@ class _NotificationPageState extends State<NotificationPage> {
                                   color: Colors.white,
                                 ),
                               ),
-                              const TextSpan(
-                                text: " referred ",
-                                style: TextStyle(color: Colors.white70),
+                              TextSpan(
+                                text: isReferralRequest
+                                    ? " asked to be introduced to "
+                                    : " referred ",
+                                style: const TextStyle(color: Colors.white70),
                               ),
                               TextSpan(
                                 text: referredName,
@@ -381,10 +404,11 @@ class _NotificationPageState extends State<NotificationPage> {
                                   color: Colors.white,
                                 ),
                               ),
-                              const TextSpan(
-                                text: " to you",
-                                style: TextStyle(color: Colors.white70),
-                              ),
+                              if (!isReferralRequest)
+                                const TextSpan(
+                                  text: " to you",
+                                  style: TextStyle(color: Colors.white70),
+                                ),
                               if (timeStr.isNotEmpty)
                                 TextSpan(
                                   text: " • $timeStr",
@@ -432,47 +456,169 @@ class _NotificationPageState extends State<NotificationPage> {
                             ],
                           ),
                         ),
-                      if (isReferral && note != null && note.isNotEmpty) ...[
-                        const SizedBox(height: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 8),
-                          decoration: BoxDecoration(
-                            color:
-                                context.surfaceSecondary.withValues(alpha: 0.5),
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(
-                                color: Colors.white.withValues(alpha: 0.03)),
-                          ),
-                          child: Text(
-                            "\"$note\"",
-                            style: context.bodyText.copyWith(
-                              color: context.textSecondary,
-                              fontStyle: FontStyle.italic,
-                              fontSize: 12.0,
-                            ),
+                      if (isReferral &&
+                          displayNote != null &&
+                          displayNote.isNotEmpty) ...[
+                        const SizedBox(height: 4),
+                        GestureDetector(
+                          onTap: () => _showNotificationDetails(
+                              context, notification, displayNote),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.chat_bubble_outline_rounded,
+                                size: 11,
+                                color: context.accentSecondary,
+                              ),
+                              const SizedBox(width: 4),
+                              Expanded(
+                                child: Text(
+                                  "Note attached • View details",
+                                  style: TextStyle(
+                                    color: context.accentSecondary,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                    fontFamily: 'Inter',
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ],
-                      // const SizedBox(height: 2),
-                      // Text(
-                      //   profession,
-                      //   style: const TextStyle(
-                      //     color: Color(0xFF5C5E78),
-                      //     fontSize: 11.5,
-                      //     fontFamily: 'Inter',
-                      //   ),
-                      // ),
+                      if (isReferralRequest) ...[
+                        const SizedBox(height: 8),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.start,
+                          children: [
+                            SizedBox(
+                              width: 76,
+                              height: 30,
+                              child: Builder(
+                                builder: (context) {
+                                  if (!isRequestActioned) {
+                                    return Container(
+                                      decoration: BoxDecoration(
+                                        gradient: LinearGradient(
+                                          colors: [
+                                            context.accentSecondary,
+                                            context.accentSecondary
+                                                .withValues(alpha: 0.7)
+                                          ],
+                                        ),
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                      child: ElevatedButton(
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: Colors.transparent,
+                                          foregroundColor: Colors.white,
+                                          shadowColor: Colors.transparent,
+                                          padding: EdgeInsets.zero,
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius:
+                                                BorderRadius.circular(10),
+                                          ),
+                                        ),
+                                        onPressed: () {
+                                          HapticFeedback.lightImpact();
+                                          _showNotificationDetails(
+                                            context,
+                                            notification,
+                                            displayNote,
+                                            startWithNoteInput: true,
+                                          );
+                                        },
+                                        child: const Text(
+                                          "Introduce",
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.bold,
+                                            fontFamily: 'Inter',
+                                          ),
+                                        ),
+                                      ),
+                                    );
+                                  } else {
+                                    return ElevatedButton(
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor:
+                                            const Color(0xFF1F2030),
+                                        foregroundColor:
+                                            const Color(0xFF8B8C9E),
+                                        shadowColor: Colors.transparent,
+                                        padding: EdgeInsets.zero,
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(10),
+                                          side: BorderSide(
+                                            color: Colors.white
+                                                .withValues(alpha: 0.03),
+                                            width: 1,
+                                          ),
+                                        ),
+                                      ),
+                                      onPressed: null,
+                                      child: const Text(
+                                        "Introduced",
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w600,
+                                          fontFamily: 'Inter',
+                                        ),
+                                      ),
+                                    );
+                                  }
+                                },
+                              ),
+                            ),
+                            if (displayNote != null &&
+                                displayNote.isNotEmpty) ...[
+                              const SizedBox(width: 12),
+                              GestureDetector(
+                                onTap: () => _showNotificationDetails(
+                                    context, notification, displayNote),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 12, vertical: 6),
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(
+                                      color: context.accentSecondary
+                                          .withValues(alpha: 0.3),
+                                      width: 1,
+                                    ),
+                                  ),
+                                  child: Text(
+                                    "Details",
+                                    style: TextStyle(
+                                      color: context.accentSecondary,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                      fontFamily: 'Inter',
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ],
                     ],
                   ),
                 ),
-                const SizedBox(width: 8),
-                SizedBox(
-                  width: 76,
-                  height: 30,
-                  child: isReferral
-                      ? (isAlreadyConnected
-                          ? ElevatedButton(
+                if (!isReferralRequest) ...[
+                  const SizedBox(width: 8),
+                  SizedBox(
+                    width: 76,
+                    height: 30,
+                    child: Builder(
+                      builder: (context) {
+                        if (isNormalReferral) {
+                          if (isAlreadyConnected) {
+                            return ElevatedButton(
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: const Color(0xFF1F2030),
                                 foregroundColor: const Color(0xFF8B8C9E),
@@ -511,8 +657,9 @@ class _NotificationPageState extends State<NotificationPage> {
                                   fontFamily: 'Inter',
                                 ),
                               ),
-                            )
-                          : Container(
+                            );
+                          } else {
+                            return Container(
                               decoration: BoxDecoration(
                                 gradient: LinearGradient(
                                   colors: [
@@ -560,9 +707,11 @@ class _NotificationPageState extends State<NotificationPage> {
                                   ),
                                 ),
                               ),
-                            ))
-                      : (isUnseen
-                          ? Container(
+                            );
+                          }
+                        } else {
+                          if (isUnseen) {
+                            return Container(
                               decoration: BoxDecoration(
                                 gradient: LinearGradient(
                                   colors: isQr
@@ -573,7 +722,8 @@ class _NotificationPageState extends State<NotificationPage> {
                                       : (type == 'referral_connect'
                                           ? [
                                               context.accentSecondary,
-                                              context.accentSecondary.withValues(alpha: 0.7)
+                                              context.accentSecondary
+                                                  .withValues(alpha: 0.7)
                                             ]
                                           : [
                                               const Color(0xFF8B5CF6),
@@ -619,8 +769,9 @@ class _NotificationPageState extends State<NotificationPage> {
                                   ),
                                 ),
                               ),
-                            )
-                          : ElevatedButton(
+                            );
+                          } else {
+                            return ElevatedButton(
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: const Color(0xFF1F2030),
                                 foregroundColor: const Color(0xFF8B8C9E),
@@ -659,8 +810,13 @@ class _NotificationPageState extends State<NotificationPage> {
                                   fontFamily: 'Inter',
                                 ),
                               ),
-                            )),
-                ),
+                            );
+                          }
+                        }
+                      },
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -762,6 +918,514 @@ class _NotificationPageState extends State<NotificationPage> {
           ),
         );
       },
+    );
+  }
+
+  void _showNotificationDetails(BuildContext context,
+      Map<String, dynamic> notification, String? noteText,
+      {bool startWithNoteInput = false}) {
+    HapticFeedback.mediumImpact();
+    final otherUser = notification['other_user'] as Map<String, dynamic>? ?? {};
+    final referredUser =
+        notification['referred_user'] as Map<String, dynamic>? ?? {};
+    final String type = notification['type'] ?? 'referral';
+
+    final String requesterName = otherUser['name'] ?? 'Unknown User';
+    final String requesterProfession = otherUser['profession'] ?? '';
+    final String requesterAvatar =
+        otherUser['avatar_url'] ?? otherUser['avatarUrl'] ?? '';
+
+    final String targetName = referredUser['name'] ?? 'Unknown User';
+    final String targetProfession = referredUser['profession'] ?? '';
+    final String targetAvatar =
+        referredUser['avatar_url'] ?? referredUser['avatarUrl'] ?? '';
+
+    final notificationProvider =
+        Provider.of<NotificationProvider>(context, listen: false);
+    final connectionProvider =
+        Provider.of<ConnectionProvider>(context, listen: false);
+    final isAlreadyConnected = referredUser['id'] != null &&
+        connectionProvider.connections
+            .any((c) => c['id'] == referredUser['id']);
+
+    final rawNote = notification['note'] as String?;
+    final bool isReferralRequest = type == 'referral' &&
+        rawNote != null &&
+        (rawNote.startsWith('[REFERRAL_REQUEST]') ||
+            rawNote.startsWith('[REFERRAL_REQUEST_ACTIONED]'));
+
+    bool showNoteInput = startWithNoteInput;
+    final controller = TextEditingController(
+      text: "Hey $targetName, I'd like to introduce you to $requesterName.",
+    );
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            final currentNote = notification['note'] as String?;
+            final isRequestActioned = currentNote != null &&
+                currentNote.startsWith('[REFERRAL_REQUEST_ACTIONED]');
+            return Dialog(
+              backgroundColor: Colors.transparent,
+              insetPadding:
+                  const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+              child: GestureDetector(
+                onTap: () => FocusScope.of(context).unfocus(),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1E202C),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.08),
+                      width: 1,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.5),
+                        blurRadius: 20,
+                        offset: const Offset(0, 10),
+                      ),
+                    ],
+                  ),
+                  padding: const EdgeInsets.all(24),
+                  child: SingleChildScrollView(
+                    physics: const BouncingScrollPhysics(),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        // Header with Close Icon
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              isReferralRequest
+                                  ? "Introduction Request"
+                                  : "Referral Details",
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                fontFamily: 'Outfit',
+                              ),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.close_rounded,
+                                  color: Colors.white60, size: 20),
+                              onPressed: () => Navigator.pop(context),
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 20),
+
+                        // Connection flow visual card
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF13141F),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.03),
+                            ),
+                          ),
+                          child: Column(
+                            children: [
+                              // Requester details
+                              _buildProfileRow(
+                                  context,
+                                  requesterName,
+                                  requesterProfession,
+                                  requesterAvatar,
+                                  isReferralRequest ? "Requester" : "Referrer"),
+
+                              // Connection arrow
+                              Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                child: Row(
+                                  children: [
+                                    const SizedBox(width: 20),
+                                    Container(
+                                      height: 24,
+                                      width: 2,
+                                      color: context.accentSecondary
+                                          .withValues(alpha: 0.4),
+                                    ),
+                                    const SizedBox(width: 16),
+                                    Icon(
+                                      Icons.arrow_downward_rounded,
+                                      size: 16,
+                                      color: context.accentSecondary,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      isReferralRequest
+                                          ? "wants to connect with"
+                                          : "referred to you",
+                                      style: TextStyle(
+                                        color: context.textMuted,
+                                        fontSize: 11,
+                                        fontStyle: FontStyle.italic,
+                                        fontFamily: 'Inter',
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+
+                              // Target details
+                              _buildProfileRow(
+                                  context,
+                                  targetName,
+                                  targetProfession,
+                                  targetAvatar,
+                                  isReferralRequest ? "Target" : "Referred"),
+                            ],
+                          ),
+                        ),
+
+                        if (noteText != null && noteText.isNotEmpty) ...[
+                          const SizedBox(height: 20),
+                          Text(
+                            "MESSAGE FROM SENDER",
+                            style: TextStyle(
+                              color: context.textSecondary,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 1.2,
+                              fontFamily: 'Inter',
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF13141F),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: Colors.white.withValues(alpha: 0.03),
+                              ),
+                            ),
+                            child: Text(
+                              "\"$noteText\"",
+                              style: const TextStyle(
+                                color: Colors.white70,
+                                fontSize: 13,
+                                fontStyle: FontStyle.italic,
+                                fontFamily: 'Inter',
+                                height: 1.4,
+                              ),
+                            ),
+                          ),
+                        ],
+
+                        if (isReferralRequest && showNoteInput && !isRequestActioned) ...[
+                          const SizedBox(height: 20),
+                          const Text(
+                            "YOUR INTRODUCTION NOTE",
+                            style: TextStyle(
+                              color: Colors.white60,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 1.2,
+                              fontFamily: 'Inter',
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          TextField(
+                            controller: controller,
+                            maxLines: 3,
+                            maxLength: 69,
+                            maxLengthEnforcement: MaxLengthEnforcement.enforced,
+                            style: const TextStyle(color: Colors.white, fontSize: 13),
+                            decoration: InputDecoration(
+                              filled: true,
+                              fillColor: const Color(0xFF131422),
+                              hintText: "Add your message...",
+                              hintStyle: const TextStyle(color: Colors.white30, fontSize: 13),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10),
+                                borderSide: BorderSide(
+                                  color: Colors.white.withValues(alpha: 0.05),
+                                ),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10),
+                                borderSide: const BorderSide(color: Color(0xFF7C3AED)),
+                              ),
+                            ),
+                          ),
+                        ],
+
+                        const SizedBox(height: 24),
+
+                        // Action buttons
+                        Row(
+                          children: [
+                            Expanded(
+                              child: OutlinedButton(
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: Colors.white70,
+                                  side: BorderSide(
+                                      color: Colors.white.withValues(alpha: 0.1)),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  padding: const EdgeInsets.symmetric(vertical: 14),
+                                ),
+                                onPressed: (showNoteInput && !isRequestActioned)
+                                    ? () {
+                                        setDialogState(() {
+                                          showNoteInput = false;
+                                        });
+                                      }
+                                    : () => Navigator.pop(context),
+                                child: Text((showNoteInput && !isRequestActioned) ? "Cancel" : "Close"),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Builder(builder: (context) {
+                                if (isReferralRequest) {
+                                  return Container(
+                                    decoration: !isRequestActioned
+                                        ? BoxDecoration(
+                                            gradient: LinearGradient(
+                                              colors: [
+                                                context.accentSecondary,
+                                                context.accentSecondary.withValues(alpha: 0.7)
+                                              ],
+                                            ),
+                                            borderRadius: BorderRadius.circular(12),
+                                          )
+                                        : null,
+                                    child: ElevatedButton(
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: isRequestActioned
+                                            ? const Color(0xFF1F2030)
+                                            : Colors.transparent,
+                                        foregroundColor: isRequestActioned
+                                            ? const Color(0xFF8B8C9E)
+                                            : Colors.white,
+                                        shadowColor: Colors.transparent,
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(12),
+                                        ),
+                                        padding: const EdgeInsets.symmetric(
+                                            vertical: 14),
+                                      ),
+                                      onPressed: isRequestActioned
+                                          ? null
+                                          : () {
+                                              HapticFeedback.lightImpact();
+                                              if (!showNoteInput) {
+                                                setDialogState(() {
+                                                  showNoteInput = true;
+                                                });
+                                              } else {
+                                                final noteToSend = controller.text.trim();
+                                                notificationProvider.sendReferral(
+                                                  toUserId: referredUser['id'],
+                                                  referredUserId: otherUser['id'],
+                                                  note: noteToSend,
+                                                ).then((_) {
+                                                  notificationProvider.markReferralRequestActioned(
+                                                    notification['id'],
+                                                    rawNote,
+                                                  );
+                                                  setDialogState(() {
+                                                    final newNote = rawNote.replaceFirst(
+                                                        '[REFERRAL_REQUEST]',
+                                                        '[REFERRAL_REQUEST_ACTIONED]');
+                                                    notification['note'] = newNote;
+                                                    showNoteInput = false;
+                                                  });
+                                                  ScaffoldMessenger.of(context).showSnackBar(
+                                                    const SnackBar(
+                                                      content: Text("Introduction request approved and sent!"),
+                                                      backgroundColor: Color(0xFF7C3AED),
+                                                      behavior: SnackBarBehavior.floating,
+                                                    ),
+                                                  );
+                                                }).catchError((err) {
+                                                  ScaffoldMessenger.of(context).showSnackBar(
+                                                    SnackBar(content: Text("Error: $err")),
+                                                  );
+                                                });
+                                              }
+                                            },
+                                      child: Text(isRequestActioned
+                                          ? "Introduced"
+                                          : (showNoteInput ? "Send Intro" : "Introduce")),
+                                    ),
+                                  );
+                                } else {
+                                  // isNormalReferral
+                                  if (isAlreadyConnected) {
+                                    return ElevatedButton(
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: const Color(0xFF1F2030),
+                                        foregroundColor: const Color(0xFF8B8C9E),
+                                        shadowColor: Colors.transparent,
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(12),
+                                        ),
+                                        padding: const EdgeInsets.symmetric(
+                                            vertical: 14),
+                                      ),
+                                      onPressed: () {
+                                        HapticFeedback.lightImpact();
+                                        Navigator.pop(context);
+                                        final chatProfileMap = {
+                                          'id': referredUser['id'],
+                                          'name': targetName,
+                                          'profession': targetProfession,
+                                          'avatarUrl': targetAvatar,
+                                          'avatar_url': targetAvatar,
+                                        };
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (context) =>
+                                                IndividualChatPage(
+                                                    connectionData: chatProfileMap),
+                                          ),
+                                        );
+                                      },
+                                      child: const Text("Message"),
+                                    );
+                                  } else {
+                                    return Container(
+                                      decoration: BoxDecoration(
+                                        gradient: LinearGradient(
+                                          colors: [
+                                            context.accentSecondary,
+                                            context.accentSecondary
+                                                .withValues(alpha: 0.7)
+                                          ],
+                                        ),
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: ElevatedButton(
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: Colors.transparent,
+                                          foregroundColor: Colors.white,
+                                          shadowColor: Colors.transparent,
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(12),
+                                          ),
+                                          padding: const EdgeInsets.symmetric(
+                                              vertical: 14),
+                                        ),
+                                        onPressed: () {
+                                          HapticFeedback.lightImpact();
+                                          connectionProvider
+                                              .connectUsers(
+                                            notificationProvider.userId!,
+                                            referredUser['id'],
+                                            connectionType: 'referral_connect',
+                                          )
+                                              .then((_) {
+                                            notificationProvider
+                                                .markAsSeen(notification['id']);
+                                            Navigator.pop(context);
+                                          }).catchError((err) {
+                                            ScaffoldMessenger.of(context)
+                                                .showSnackBar(
+                                              SnackBar(
+                                                  content: Text("Error: $err")),
+                                            );
+                                          });
+                                        },
+                                        child: const Text("Connect"),
+                                      ),
+                                    );
+                                  }
+                                }
+                              }),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildProfileRow(BuildContext context, String name, String profession,
+      String avatar, String role) {
+    return Row(
+      children: [
+        CircleAvatar(
+          radius: 18,
+          backgroundColor: context.surfacePrimary,
+          backgroundImage:
+              avatar.startsWith('http') ? NetworkImage(avatar) : null,
+          child: avatar.startsWith('http')
+              ? null
+              : Text(
+                  _getInitials(name),
+                  style: TextStyle(
+                    color: context.textPrimary,
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                name,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                  fontFamily: 'Outfit',
+                ),
+              ),
+              if (profession.isNotEmpty)
+                Text(
+                  profession,
+                  style: TextStyle(
+                    color: context.textSecondary,
+                    fontSize: 11,
+                    fontFamily: 'Inter',
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+            ],
+          ),
+        ),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.05),
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: Text(
+            role.toUpperCase(),
+            style: const TextStyle(
+              color: Colors.white60,
+              fontSize: 9,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 0.5,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

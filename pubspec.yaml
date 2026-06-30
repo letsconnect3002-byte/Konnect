@@ -16,7 +16,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 1.0.0+2
+version: 1.0.0+3
 
 environment:
   sdk: ^3.5.2
@@ -59,8 +59,9 @@ dependencies:
   share_plus: ^13.1.0
   skeletonizer: ^2.1.3
   google_fonts: ^6.2.1
-  audioplayers: ^6.8.0
   url_launcher: ^6.3.2
+  audio_session: ^0.2.4
+  just_audio: ^0.10.6
   # flutter_launcher_icons: ^0.14.1
   # flutter_native_splash: ^2.4.2
   # image_gallery_saver: ^2.0.3
@@ -68,10 +69,10 @@ dependencies:
 flutter_icons:
   android: true
   ios: true
-  image_path_android: 'assets/icons/Mandala Icon iOS-2.png'
-  image_path_ios: 'assets/icons/Mandala Icon iOS-2.png'
+  image_path_android: 'assets/icons/Mandala Icon 2.png'
+  image_path_ios: 'assets/icons/Mandala Icon IOS-2.png'
   adaptive_icon_background: "#000000"
-  adaptive_icon_foreground: 'assets/icons/Mandala Icon iOS-2.png' 
+  adaptive_icon_foreground: 'assets/icons/Mandala Icon 2.png' 
 
 dev_dependencies:
   flutter_test:
@@ -110,6 +111,8 @@ flutter:
     - assets/icons/Mandala Icon 1.png
     - assets/icons/Mandala Icon 1.svg
     - assets/icons/Mandala Icon 2.png
+    - assets/icons/Mandala Icon IOS.png
+    - assets/icons/Mandala Icon IOS-2.png
     - assets/icons/Google-Sign-in.png
     - assets/icons/twitter.png
     - assets/icons/linkedin.png
