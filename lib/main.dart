@@ -602,6 +602,25 @@ class MyApp extends StatelessWidget {
             ],
           );
         },
+        onGenerateRoute: (settings) {
+          if (settings.name != null &&
+              (settings.name!.startsWith('/?code=') ||
+                  settings.name!.startsWith('/login-callback') ||
+                  settings.name!.contains('code='))) {
+            return MaterialPageRoute(
+              builder: (context) => Scaffold(
+                backgroundColor: context.canvasBackground,
+                body: Center(
+                  child: CircularProgressIndicator(
+                    valueColor:
+                        AlwaysStoppedAnimation<Color>(context.accentPrimary),
+                  ),
+                ),
+              ),
+            );
+          }
+          return null;
+        },
         home: const AuthGate(),
       ),
     );
