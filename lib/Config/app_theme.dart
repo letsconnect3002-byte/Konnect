@@ -25,14 +25,15 @@ class AppColors {
   static const Color textMuted =
       Color(0xFF4E515A); // Dark grey for placeholders and structural indicators
 
-  static const Color accentPrimary = Color.fromARGB(
-      255, 30, 215, 96); // Neon Volt Green (Volt scan neon fill start color)
+  static const Color accentPrimary =
+      Color(0xFF0064E0); // Experimental Blue Accent
   static const Color accentSecondary =
-      Color.fromARGB(255, 30, 215, 96); // Neon Electric Violet
+      Color(0xFF0064E0); // Experimental Blue Accent
 
   static const Color felineColor10 = Color(0xFF000000);
   static const Color felineColor20 = Color(0xFF0A0A0C);
-  static const Color felineColor30 = Color.fromARGB(255, 32, 32, 32);
+  static const Color felineColor30 =
+      Color(0xFF00183D); // Experimental deep midnight blue background
 }
 
 /// AppGradients contains high-fidelity accent gradients instead of flat primary colors.

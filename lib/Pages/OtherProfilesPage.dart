@@ -527,7 +527,7 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
                     child: Text(
                       "Message",
                       style: context.bodyText.copyWith(
-                        color: Colors.black,
+                        color: Colors.white,
                         fontWeight: FontWeight.bold,
                       ),
                     ),

@@ -393,14 +393,17 @@ void main() async {
     final audioSession = await session.AudioSession.instance;
     await audioSession.configure(session.AudioSessionConfiguration(
       avAudioSessionCategory: session.AVAudioSessionCategory.ambient,
-      avAudioSessionCategoryOptions: session.AVAudioSessionCategoryOptions.mixWithOthers,
+      avAudioSessionCategoryOptions:
+          session.AVAudioSessionCategoryOptions.mixWithOthers,
       avAudioSessionMode: session.AVAudioSessionMode.defaultMode,
-      avAudioSessionRouteSharingPolicy: session.AVAudioSessionRouteSharingPolicy.defaultPolicy,
+      avAudioSessionRouteSharingPolicy:
+          session.AVAudioSessionRouteSharingPolicy.defaultPolicy,
       androidAudioAttributes: const session.AndroidAudioAttributes(
         contentType: session.AndroidAudioContentType.sonification,
         usage: session.AndroidAudioUsage.assistanceSonification,
       ),
-      androidAudioFocusGainType: session.AndroidAudioFocusGainType.gainTransientMayDuck,
+      androidAudioFocusGainType:
+          session.AndroidAudioFocusGainType.gainTransientMayDuck,
     ));
     print("AudioSession: Configured native ambient mixing successfully.");
   } catch (e) {
@@ -970,7 +973,8 @@ class _AppShellGateState extends State<AppShellGate> {
             final body = message.notification?.body ?? 'You have a new update.';
             final actorIdStr = data['actor_id'] as String?;
             final actorAvatar = data['actor_avatar'] as String? ?? '';
-            final actorId = actorIdStr != null ? (int.tryParse(actorIdStr) ?? 0) : 0;
+            final actorId =
+                actorIdStr != null ? (int.tryParse(actorIdStr) ?? 0) : 0;
 
             final overlayState = navigatorKey.currentState?.overlay;
             if (overlayState != null) {
@@ -988,7 +992,8 @@ class _AppShellGateState extends State<AppShellGate> {
                   );
                 },
               );
-              print("PushNotifications: Foreground connection notification banner displayed.");
+              print(
+                  "PushNotifications: Foreground connection notification banner displayed.");
             }
           }
         } catch (e) {

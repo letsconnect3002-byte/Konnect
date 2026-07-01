@@ -5,6 +5,9 @@ import 'package:provider/provider.dart';
 import 'package:connect/Providers/connection_provider.dart';
 import 'package:connect/Providers/notification_provider.dart';
 import 'package:connect/Providers/network_provider.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'dart:ui';
 
 class YourNetworkPage extends StatefulWidget {
   const YourNetworkPage({super.key});
@@ -131,6 +134,331 @@ class _YourNetworkPageState extends State<YourNetworkPage> {
           eligibleConnections: eligibleConnections,
         );
       },
+    );
+  }
+
+  void _showProfilePreviewBottomSheet(
+      BuildContext context, Map<String, dynamic> item) {
+    HapticFeedback.mediumImpact();
+
+    final int targetUserId = item["id"] ?? 0;
+    final String name = item["name"] ?? '';
+    final String profession = item["profession"] ?? '';
+    final String company = item["company"] ?? '';
+    final String avatarUrl = item["avatar_url"] ?? item["avatarUrl"] ?? '';
+    final int degreeInt = item["degree"] is int ? item["degree"] : 2;
+    final String degree = degreeInt == 2 ? "2nd" : "3rd";
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 16.0, sigmaY: 16.0),
+          child: Container(
+            padding: const EdgeInsets.only(top: 8, bottom: 24, left: 24, right: 24),
+            decoration: BoxDecoration(
+              color: const Color(0xFF16181C).withValues(alpha: 0.85),
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(24),
+              ),
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.08),
+                width: 1.0,
+              ),
+            ),
+            child: FutureBuilder<Map<String, dynamic>?>(
+              future: () async {
+                try {
+                  final response = await Supabase.instance.client
+                      .from('profiles')
+                      .select('linkedin, twitter, instagram, spotify')
+                      .eq('id', targetUserId)
+                      .single();
+                  return response as Map<String, dynamic>?;
+                } catch (e) {
+                  print("Error fetching profile preview: $e");
+                  return null;
+                }
+              }(),
+              builder: (context, snapshot) {
+                final isLoading = snapshot.connectionState == ConnectionState.waiting;
+                final data = snapshot.data;
+
+                final linkedin = data?['linkedin'] as String? ?? '';
+                final twitter = data?['twitter'] as String? ?? '';
+                final instagram = data?['instagram'] as String? ?? '';
+                final spotify = data?['spotify'] as String? ?? '';
+
+                final hasSocials = linkedin.isNotEmpty ||
+                    twitter.isNotEmpty ||
+                    instagram.isNotEmpty ||
+                    spotify.isNotEmpty;
+
+                return Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // Top drag handle
+                    Center(
+                      child: Container(
+                        width: 38,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: Colors.white24,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+
+                    // Avatar + Degree Badge + Name + Title
+                    Row(
+                      children: [
+                        Container(
+                          width: 56,
+                          height: 56,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: degree == "2nd"
+                                  ? const Color(0xFF3B82F6).withValues(alpha: 0.4)
+                                  : const Color(0xFF8B5CF6).withValues(alpha: 0.4),
+                              width: 2.0,
+                            ),
+                          ),
+                          child: ClipOval(
+                            child: avatarUrl.startsWith('http')
+                                ? Image.network(
+                                    avatarUrl,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (context, error, stackTrace) =>
+                                        Container(
+                                      color: context.surfaceSecondary,
+                                      alignment: Alignment.center,
+                                      child: Text(
+                                        name.isNotEmpty
+                                            ? name.substring(0, 1).toUpperCase()
+                                            : '?',
+                                        style: TextStyle(
+                                          color: context.textPrimary,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 20,
+                                          fontFamily: 'Outfit',
+                                        ),
+                                      ),
+                                    ),
+                                  )
+                                : Container(
+                                    color: context.surfaceSecondary,
+                                    alignment: Alignment.center,
+                                    child: Text(
+                                      name.isNotEmpty
+                                          ? name.substring(0, 1).toUpperCase()
+                                          : '?',
+                                      style: TextStyle(
+                                        color: context.textPrimary,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 20,
+                                        fontFamily: 'Outfit',
+                                      ),
+                                    ),
+                                  ),
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Flexible(
+                                    child: Text(
+                                      name,
+                                      style: TextStyle(
+                                        color: context.textPrimary,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 18,
+                                        fontFamily: 'Outfit',
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 7, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: degree == "2nd"
+                                          ? const Color(0xFF3B82F6)
+                                              .withValues(alpha: 0.12)
+                                          : const Color(0xFF8B5CF6)
+                                              .withValues(alpha: 0.12),
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: Text(
+                                      degree,
+                                      style: TextStyle(
+                                        color: degree == "2nd"
+                                            ? const Color(0xFF60A5FA)
+                                            : const Color(0xFFA78BFA),
+                                        fontSize: 9.5,
+                                        fontWeight: FontWeight.bold,
+                                        fontFamily: 'Inter',
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                "$profession • $company",
+                                style: TextStyle(
+                                  color: context.textSecondary,
+                                  fontSize: 14,
+                                  fontFamily: 'Inter',
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+                    Divider(
+                      color: Colors.white.withValues(alpha: 0.08),
+                      height: 1,
+                    ),
+                    const SizedBox(height: 20),
+
+                    // Socials Section
+                    if (isLoading)
+                      const Center(
+                        child: Padding(
+                          padding: EdgeInsets.symmetric(vertical: 16),
+                          child: CircularProgressIndicator(
+                            strokeWidth: 3,
+                          ),
+                        ),
+                      )
+                    else if (!hasSocials)
+                      Center(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          child: Text(
+                            "No social links added",
+                            style: TextStyle(
+                              color: context.textMuted,
+                              fontSize: 14,
+                              fontFamily: 'Inter',
+                            ),
+                          ),
+                        ),
+                      )
+                    else
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          if (linkedin.isNotEmpty)
+                            _buildSocialIcon(
+                              'assets/icons/linkedin.png',
+                              linkedin,
+                            ),
+                          if (twitter.isNotEmpty)
+                            _buildSocialIcon(
+                              'assets/icons/twitter.png',
+                              twitter,
+                            ),
+                          if (instagram.isNotEmpty)
+                            _buildSocialIcon(
+                              'assets/icons/instagram.png',
+                              instagram,
+                            ),
+                          if (spotify.isNotEmpty)
+                            _buildSocialIcon(
+                              'assets/icons/spotify.png',
+                              spotify,
+                            ),
+                        ],
+                      ),
+                    const SizedBox(height: 24),
+
+                    // Close Button
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.white.withValues(alpha: 0.05),
+                        foregroundColor: context.textPrimary,
+                        surfaceTintColor: Colors.transparent,
+                        shadowColor: Colors.transparent,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          side: BorderSide(
+                            color: Colors.white.withValues(alpha: 0.08),
+                          ),
+                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                      ),
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text(
+                        "Close",
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          fontFamily: 'Inter',
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildSocialIcon(String assetPath, String url) {
+    return GestureDetector(
+      onTap: () async {
+        try {
+          final uri = Uri.parse(url);
+          if (await canLaunchUrl(uri)) {
+            HapticFeedback.lightImpact();
+            await launchUrl(uri, mode: LaunchMode.externalApplication);
+          } else {
+            print("Could not launch url: $url");
+          }
+        } catch (e) {
+          print("Error launching url: $e");
+        }
+      },
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 12),
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.03),
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: Colors.white.withValues(alpha: 0.06),
+          ),
+        ),
+        child: Image.asset(
+          assetPath,
+          width: 24,
+          height: 24,
+          errorBuilder: (context, error, stackTrace) => const Icon(
+            Icons.link,
+            color: Colors.white70,
+            size: 24,
+          ),
+        ),
+      ),
     );
   }
 
@@ -504,27 +832,46 @@ class _YourNetworkPageState extends State<YourNetworkPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Circle Profile Avatar
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.08),
-                    width: 1.0,
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () => _showProfilePreviewBottomSheet(context, item),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Circle Profile Avatar
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.08),
+                      width: 1.0,
+                    ),
                   ),
-                ),
-                child: ClipOval(
-                  child: avatarUrl.startsWith('http')
-                      ? Image.network(
-                          avatarUrl,
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) =>
-                              Container(
+                  child: ClipOval(
+                    child: avatarUrl.startsWith('http')
+                        ? Image.network(
+                            avatarUrl,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) =>
+                                Container(
+                              color: context.surfaceSecondary,
+                              alignment: Alignment.center,
+                              child: Text(
+                                name.isNotEmpty
+                                    ? name.substring(0, 1).toUpperCase()
+                                    : '?',
+                                style: TextStyle(
+                                  color: context.textPrimary,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                  fontFamily: 'Outfit',
+                                ),
+                              ),
+                            ),
+                          )
+                        : Container(
                             color: context.surfaceSecondary,
                             alignment: Alignment.center,
                             child: Text(
@@ -534,93 +881,78 @@ class _YourNetworkPageState extends State<YourNetworkPage> {
                               style: TextStyle(
                                 color: context.textPrimary,
                                 fontWeight: FontWeight.bold,
-                                fontSize: 16,
-                                fontFamily: 'Outfit',
+                                  fontSize: 16,
+                                  fontFamily: 'Outfit',
                               ),
                             ),
                           ),
-                        )
-                      : Container(
-                          color: context.surfaceSecondary,
-                          alignment: Alignment.center,
-                          child: Text(
-                            name.isNotEmpty
-                                ? name.substring(0, 1).toUpperCase()
-                                : '?',
-                            style: TextStyle(
-                              color: context.textPrimary,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                              fontFamily: 'Outfit',
-                            ),
-                          ),
-                        ),
+                  ),
                 ),
-              ),
-              const SizedBox(width: 12),
+                const SizedBox(width: 12),
 
-              // Name and Job details
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Expanded(
-                          child: Text(
-                            name,
-                            style: TextStyle(
-                              color: context.textPrimary,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 15,
-                              fontFamily: 'Outfit',
+                // Name and Job details
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              name,
+                              style: TextStyle(
+                                color: context.textPrimary,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 15,
+                                fontFamily: 'Outfit',
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
                           ),
-                        ),
-                        // Connection Degree Badge (e.g. 2nd, 3rd)
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 3),
-                          decoration: BoxDecoration(
-                            color: degree == "2nd"
-                                ? const Color(0xFF3B82F6)
-                                    .withValues(alpha: 0.12)
-                                : const Color(0xFF8B5CF6)
-                                    .withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Text(
-                            degree,
-                            style: TextStyle(
+                          // Connection Degree Badge (e.g. 2nd, 3rd)
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
                               color: degree == "2nd"
-                                  ? const Color(0xFF60A5FA)
-                                  : const Color(0xFFA78BFA),
-                              fontSize: 10.5,
-                              fontWeight: FontWeight.bold,
-                              fontFamily: 'Inter',
+                                  ? const Color(0xFF3B82F6)
+                                      .withValues(alpha: 0.12)
+                                  : const Color(0xFF8B5CF6)
+                                      .withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              degree,
+                              style: TextStyle(
+                                color: degree == "2nd"
+                                    ? const Color(0xFF60A5FA)
+                                    : const Color(0xFFA78BFA),
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.bold,
+                                fontFamily: 'Inter',
+                              ),
                             ),
                           ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      "$profession • $company",
-                      style: TextStyle(
-                        color: context.textSecondary,
-                        fontSize: 12.5,
-                        fontFamily: 'Inter',
+                        ],
                       ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
+                      const SizedBox(height: 3),
+                      Text(
+                        "$profession • $company",
+                        style: TextStyle(
+                          color: context.textSecondary,
+                          fontSize: 12.5,
+                          fontFamily: 'Inter',
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
           const SizedBox(height: 12),
 

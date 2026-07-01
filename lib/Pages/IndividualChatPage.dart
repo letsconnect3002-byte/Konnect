@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:connect/Pages/ConnectionProfilePage.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:connect/Providers/profile_provider.dart';
 import 'package:connect/Providers/chat_provider.dart';
 import 'package:provider/provider.dart';
@@ -43,6 +44,7 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
   String? _highlightedMessageId;
   bool _showScrollToBottom = false;
   int _previousMessageCount = 0;
+  final Set<String> _animatedMessageIds = {};
 
   @override
   void initState() {
@@ -374,6 +376,15 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
     }
     _previousMessageCount = messages.length;
 
+    if (_animatedMessageIds.isEmpty && messages.isNotEmpty && !_isRoomLoading) {
+      for (final msg in messages) {
+        final id = msg['id'] as String?;
+        if (id != null) {
+          _animatedMessageIds.add(id);
+        }
+      }
+    }
+
     return Scaffold(
       backgroundColor: context.canvasBackground,
       appBar: AppBar(
@@ -515,7 +526,8 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
                 child: Switch.adaptive(
                   value: provider.soundEffectsEnabled,
                   activeThumbColor: context.accentPrimary,
-                  activeTrackColor: context.accentPrimary.withValues(alpha: 0.3),
+                  activeTrackColor:
+                      context.accentPrimary.withValues(alpha: 0.3),
                   inactiveThumbColor: context.textMuted,
                   inactiveTrackColor: context.surfaceSecondary,
                   onChanged: (val) {
@@ -529,156 +541,200 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
           ),
         ],
       ),
-      body: Column(
+      body: Stack(
         children: [
-          Expanded(
-            child: (_isRoomLoading || _isProfileLoading)
-                ? Center(
-                    child: CircularProgressIndicator(
-                      valueColor:
-                          AlwaysStoppedAnimation<Color>(context.accentPrimary),
-                    ),
-                  )
-                : Stack(
-                    children: [
-                      ListView.builder(
-                        controller: _scrollController,
-                        reverse: true,
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 20),
-                        itemCount: messages.length + (isOtherTyping ? 1 : 0),
-                        itemBuilder: (context, index) {
-                          if (isOtherTyping && index == 0) {
-                            return _buildTypingIndicator();
-                          }
+          Positioned.fill(
+            child: Image.asset(
+              'assets/background/message background.png',
+              fit: BoxFit.cover,
+            ),
+          ),
+          Positioned.fill(
+            child: Opacity(
+              opacity: 0.85,
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: context.felineBackgroundGradient,
+                ),
+              ),
+            ),
+          ),
+          Column(
+            children: [
+              Expanded(
+                child: (_isRoomLoading || _isProfileLoading)
+                    ? Center(
+                        child: CircularProgressIndicator(
+                          valueColor:
+                              AlwaysStoppedAnimation<Color>(context.accentPrimary),
+                        ),
+                      )
+                    : Stack(
+                        children: [
+                          ListView.builder(
+                            controller: _scrollController,
+                            reverse: true,
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 20),
+                            itemCount: messages.length + (isOtherTyping ? 1 : 0),
+                            itemBuilder: (context, index) {
+                              if (isOtherTyping && index == 0) {
+                                  return _buildTypingIndicator();
+                              }
 
-                          final int msgIndex = isOtherTyping
-                              ? messages.length - index
-                              : messages.length - 1 - index;
+                              final int msgIndex = isOtherTyping
+                                  ? messages.length - index
+                                  : messages.length - 1 - index;
 
-                          final msg = messages[msgIndex];
-                          final msgId = msg['id'] as String;
-                          final key = _messageKeys.putIfAbsent(
-                              msgId, () => GlobalKey());
-                          final isMe = msg['sender_id'] == _myUserId;
-                          final timeString =
-                              _formatMessageTime(msg['created_at'] as String);
-                          final status = msg['status'] as String?;
-                          final replyToId =
-                              msg['reply_to_message_id'] as String?;
-                          final replyToPayload =
-                              msg['reply_to_message_payload'] as String?;
-                          final replyToSenderName =
-                              msg['reply_to_message_sender_name'] as String?;
-                          final isHighlighted = msgId == _highlightedMessageId;
+                              final msg = messages[msgIndex];
+                              final msgId = msg['id'] as String;
+                              final key = _messageKeys.putIfAbsent(
+                                  msgId, () => GlobalKey());
+                              final isMe = msg['sender_id'] == _myUserId;
+                              final timeString =
+                                  _formatMessageTime(msg['created_at'] as String);
+                              final status = msg['status'] as String?;
+                              final replyToId =
+                                  msg['reply_to_message_id'] as String?;
+                              final replyToPayload =
+                                  msg['reply_to_message_payload'] as String?;
+                              final replyToSenderName =
+                                  msg['reply_to_message_sender_name'] as String?;
+                              final isHighlighted = msgId == _highlightedMessageId;
 
-                          Offset tapPosition = Offset.zero;
+                              Offset tapPosition = Offset.zero;
 
-                          final prevCreatedAt = msgIndex > 0
-                              ? (messages[msgIndex - 1]['created_at']
-                                      as String? ??
-                                  '')
-                              : '';
-                          final currentCreatedAt =
-                              msg['created_at'] as String? ?? '';
-                          final showDateHeader = msgIndex == 0 ||
-                              _isDifferentDay(prevCreatedAt, currentCreatedAt);
+                              final prevCreatedAt = msgIndex > 0
+                                  ? (messages[msgIndex - 1]['created_at']
+                                          as String? ??
+                                      '')
+                                  : '';
+                              final currentCreatedAt =
+                                  msg['created_at'] as String? ?? '';
+                              final showDateHeader = msgIndex == 0 ||
+                                  _isDifferentDay(prevCreatedAt, currentCreatedAt);
 
-                          final bubbleWidget = SwipeToReply(
-                            key: key,
-                            onReply: () {
-                              _setReplyMessage(msg, isMe);
-                              _messageFocusNode.requestFocus();
-                            },
-                            child: GestureDetector(
-                              onTapDown: (details) {
-                                tapPosition = details.globalPosition;
-                              },
-                              onLongPress: () {
-                                _messageFocusNode.unfocus();
-                                _showContextMenu(
-                                    context, tapPosition, msg, isMe);
-                              },
-                              child: _buildMessageBubble(
-                                text: msg['payload'] ?? '',
-                                time: timeString,
-                                isMe: isMe,
-                                status: status,
-                                replyToId: replyToId,
-                                replyToPayload: replyToPayload,
-                                replyToSenderName: replyToSenderName,
-                                isHighlighted: isHighlighted,
-                              ),
-                            ),
-                          );
+                              final hasAlreadyAnimated =
+                                  _animatedMessageIds.contains(msgId);
+                              if (!hasAlreadyAnimated) {
+                                _animatedMessageIds.add(msgId);
+                              }
 
-                          if (showDateHeader) {
-                            final dateText =
-                                _formatMessageDateHeader(currentCreatedAt);
-                            return Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                _buildDateHeader(dateText),
-                                bubbleWidget,
-                              ],
-                            );
-                          }
-
-                          return bubbleWidget;
-                        },
-                      ),
-                      // ── Scroll-to-bottom FAB ──
-                      Positioned(
-                        right: 16,
-                        bottom: 16,
-                        child: AnimatedScale(
-                          scale: _showScrollToBottom ? 1.0 : 0.0,
-                          duration: const Duration(milliseconds: 250),
-                          curve: Curves.easeOutBack,
-                          child: AnimatedOpacity(
-                            opacity: _showScrollToBottom ? 1.0 : 0.0,
-                            duration: const Duration(milliseconds: 200),
-                            child: GestureDetector(
-                              onTap: _scrollToBottom,
-                              behavior: HitTestBehavior.opaque,
-                              child: Container(
-                                width: 42,
-                                height: 42,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: context.accentSecondary,
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: context.accentSecondary
-                                          .withValues(alpha: 0.35),
-                                      blurRadius: 10,
-                                      offset: const Offset(0, 4),
-                                    ),
-                                  ],
-                                ),
-                                child: Container(
-                                  margin: const EdgeInsets.all(1.5),
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    color: context
-                                        .surfacePrimary, // Blend with dark background
+                              final childWidget = SwipeToReply(
+                                key: key,
+                                onReply: () {
+                                  _setReplyMessage(msg, isMe);
+                                  _messageFocusNode.requestFocus();
+                                },
+                                child: GestureDetector(
+                                  onTapDown: (details) {
+                                    tapPosition = details.globalPosition;
+                                  },
+                                  onLongPress: () {
+                                    _messageFocusNode.unfocus();
+                                    _showContextMenu(
+                                        context, tapPosition, msg, isMe);
+                                  },
+                                  child: _buildMessageBubble(
+                                    text: msg['payload'] ?? '',
+                                    time: timeString,
+                                    isMe: isMe,
+                                    status: status,
+                                    replyToId: replyToId,
+                                    replyToPayload: replyToPayload,
+                                    replyToSenderName: replyToSenderName,
+                                    isHighlighted: isHighlighted,
                                   ),
-                                  child: const Icon(
-                                    Icons.keyboard_arrow_down_rounded,
-                                    color: Colors.white,
-                                    size: 24,
+                                ),
+                              );
+
+                              final bubbleWidget = RepaintBoundary(
+                                key: ValueKey('${msgId}_bubble'),
+                                child: hasAlreadyAnimated
+                                    ? childWidget
+                                    : childWidget
+                                        .animate()
+                                        .fadeIn(
+                                            duration: 150.ms,
+                                            curve: Curves.easeOut)
+                                        .scale(
+                                          duration: 200.ms,
+                                          curve: Curves.easeOutBack,
+                                          alignment: isMe
+                                              ? Alignment.bottomRight
+                                              : Alignment.bottomLeft,
+                                        ),
+                              );
+
+                              if (showDateHeader) {
+                                final dateText =
+                                    _formatMessageDateHeader(currentCreatedAt);
+                                return Column(
+                                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                                  children: [
+                                    _buildDateHeader(dateText),
+                                    bubbleWidget,
+                                  ],
+                                );
+                              }
+
+                              return bubbleWidget;
+                            },
+                          ),
+                          // ── Scroll-to-bottom FAB ──
+                          Positioned(
+                            right: 16,
+                            bottom: 16,
+                            child: AnimatedScale(
+                              scale: _showScrollToBottom ? 1.0 : 0.0,
+                              duration: const Duration(milliseconds: 250),
+                              curve: Curves.easeOutBack,
+                              child: AnimatedOpacity(
+                                opacity: _showScrollToBottom ? 1.0 : 0.0,
+                                duration: const Duration(milliseconds: 200),
+                                child: GestureDetector(
+                                  onTap: _scrollToBottom,
+                                  behavior: HitTestBehavior.opaque,
+                                  child: Container(
+                                    width: 42,
+                                    height: 42,
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      color: context.accentSecondary,
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: context.accentSecondary
+                                              .withValues(alpha: 0.35),
+                                          blurRadius: 10,
+                                          offset: const Offset(0, 4),
+                                        ),
+                                      ],
+                                    ),
+                                    child: Container(
+                                      margin: const EdgeInsets.all(1.5),
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        color: context
+                                            .surfacePrimary, // Blend with dark background
+                                      ),
+                                      child: const Icon(
+                                        Icons.keyboard_arrow_down_rounded,
+                                        color: Colors.white,
+                                        size: 24,
+                                      ),
+                                    ),
                                   ),
                                 ),
                               ),
                             ),
                           ),
-                        ),
+                        ],
                       ),
-                    ],
-                  ),
+              ),
+              _buildReplyPreview(),
+              _buildInputBar(),
+            ],
           ),
-          _buildReplyPreview(),
-          _buildInputBar(),
         ],
       ),
     );
@@ -731,8 +787,7 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
                 ),
                 decoration: BoxDecoration(
                   borderRadius: bubbleRadius,
-                  color:
-                      isMe ? context.surfaceSecondary : context.surfacePrimary,
+                  color: isMe ? context.accentPrimary : context.surfacePrimary,
                   border: Border.all(
                     color: isMe
                         ? context.accentSecondary.withValues(alpha: 0.5)
@@ -779,7 +834,7 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
                             style: context.captionText.copyWith(
                               color: status == 'error'
                                   ? Colors.redAccent
-                                  : context.textMuted,
+                                  : const Color.fromARGB(133, 255, 255, 255),
                               fontSize: 9.5,
                               fontWeight: FontWeight.normal,
                             ),
@@ -854,11 +909,12 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
       height: 12,
       child: Stack(
         children: [
-          Icon(Icons.check_rounded, size: 12, color: Color(0xFF00F2FE)),
+          Icon(Icons.check_rounded,
+              size: 12, color: Color.fromARGB(255, 255, 255, 255)),
           Positioned(
             left: 5,
-            child:
-                Icon(Icons.check_rounded, size: 12, color: Color(0xFF00F2FE)),
+            child: Icon(Icons.check_rounded,
+                size: 12, color: Color.fromARGB(255, 255, 255, 255)),
           ),
         ],
       ),
@@ -950,7 +1006,7 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
                 ),
                 child: const Icon(
                   Icons.send_rounded,
-                  color: Colors.black, // contrasting black icon label
+                  color: Colors.white, // contrasting black icon label
                   size: 18,
                 ),
               ),

@@ -424,7 +424,7 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
                               "Professional",
                               style: TextStyle(
                                 color: _selectedTab == 'professional'
-                                    ? Colors.black
+                                    ? Colors.white
                                     : context.textSecondary,
                                 fontWeight: FontWeight.bold,
                                 fontSize: 14,
