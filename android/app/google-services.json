@@ -14,6 +14,22 @@
       },
       "oauth_client": [
         {
+          "client_id": "698580767225-mu80gbpg4v44jbehsfl0tjeacgq3uv22.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.india.jana",
+            "certificate_hash": "8a059bc484a7d7ba9650243e2dd885dee8179f54"
+          }
+        },
+        {
+          "client_id": "698580767225-nlptd9tkc7jq3lq82r29sc3lr6hc7d2q.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.india.jana",
+            "certificate_hash": "397036d9c1f4fe3f7d08e59e1f27cb91c57d89b4"
+          }
+        },
+        {
           "client_id": "698580767225-p4frff5103v3t7aaoh01ahlphafbopsp.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
@@ -37,6 +53,13 @@
             {
               "client_id": "698580767225-9ib3bsce1hd9a9c266ck4ilrdkj1sa4n.apps.googleusercontent.com",
               "client_type": 3
+            },
+            {
+              "client_id": "698580767225-lbmollstcmlhu2qdndma602hae616m6f.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.india.jana"
+              }
             }
           ]
         }

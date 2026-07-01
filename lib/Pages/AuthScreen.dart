@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/gestures.dart';
@@ -192,21 +193,25 @@ class _AuthScreenState extends State<AuthScreen> {
 
     try {
       // Initialize GoogleSignIn (singleton)
+      final targetClientId = Platform.isIOS
+          ? '698580767225-lbmollstcmlhu2qdndma602hae616m6f.apps.googleusercontent.com'
+          : null;
+      final targetServerClientId = '698580767225-9ib3bsce1hd9a9c266ck4ilrdkj1sa4n.apps.googleusercontent.com';
+      
       debugPrint(
-          '[Google Sign-In] Initializing GoogleSignIn.instance with serverClientId...');
+          '[Google Sign-In] Initializing GoogleSignIn.instance with clientId: $targetClientId and serverClientId: $targetServerClientId');
       await GoogleSignIn.instance.initialize(
-        serverClientId:
-            '698580767225-9ib3bsce1hd9a9c266ck4ilrdkj1sa4n.apps.googleusercontent.com',
+        clientId: targetClientId,
+        serverClientId: targetServerClientId,
       );
       debugPrint(
           '[Google Sign-In] GoogleSignIn.instance.initialize completed successfully.');
 
-      // Await the native authenticate() method with timeout
+      // Await the native authenticate() method
       debugPrint(
           '[Google Sign-In] Requesting native authentication via GoogleSignIn.instance.authenticate()...');
       final GoogleSignInAccount googleUser = await GoogleSignIn.instance
-          .authenticate()
-          .timeout(const Duration(seconds: 5));
+          .authenticate();
       debugPrint('[Google Sign-In] authenticate() returned: $googleUser');
 
       // Retrieve the corresponding GoogleSignInAuthentication object
@@ -237,10 +242,6 @@ class _AuthScreenState extends State<AuthScreen> {
       if (mounted) {
         setState(() => _isLoading = false);
       }
-    } on TimeoutException catch (e) {
-      debugPrint(
-          '[Google Sign-In] Native authentication timed out: $e. Activating web OAuth fallback.');
-      useFallback = true;
     } on PlatformException catch (e) {
       debugPrint(
           '[Google Sign-In] PlatformException caught: $e. Activating web OAuth fallback.');
@@ -251,10 +252,18 @@ class _AuthScreenState extends State<AuthScreen> {
       useFallback = true;
     } on GoogleSignInException catch (e) {
       debugPrint(
-          '[Google Sign-In] GoogleSignInException caught: code=${e.code}, description=${e.description}');
+          '[Google Sign-In] GoogleSignInException caught!');
+      debugPrint(
+          '[Google Sign-In]   - Exception type: ${e.runtimeType}');
+      debugPrint(
+          '[Google Sign-In]   - Error code: ${e.code}');
+      debugPrint(
+          '[Google Sign-In]   - Error description: ${e.description}');
+      debugPrint(
+          '[Google Sign-In]   - Full toString(): ${e.toString()}');
       if (e.code == GoogleSignInExceptionCode.canceled) {
         debugPrint(
-            '[Google Sign-In] User cancelled Google Sign-In. Not falling back.');
+            '[Google Sign-In] User cancelled Google Sign-In (Code 16 or cancellation). Not falling back.');
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
