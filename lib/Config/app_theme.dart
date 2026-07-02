@@ -1,6 +1,5 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'package:flutter/cupertino.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:connect/Providers/profile_provider.dart';
@@ -155,9 +154,72 @@ class AppTheme {
       ),
       pageTransitionsTheme: const PageTransitionsTheme(
         builders: {
-          TargetPlatform.android: ZoomPageTransitionsBuilder(),
-          TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
+          TargetPlatform.android: SubtlePageTransitionsBuilder(),
+          TargetPlatform.iOS: SubtlePageTransitionsBuilder(),
+          TargetPlatform.macOS: SubtlePageTransitionsBuilder(),
+          TargetPlatform.windows: SubtlePageTransitionsBuilder(),
         },
+      ),
+    );
+  }
+}
+
+class SubtlePageTransitionsBuilder extends PageTransitionsBuilder {
+  const SubtlePageTransitionsBuilder();
+
+  @override
+  Widget buildTransitions<T>(
+    PageRoute<T> route,
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+    Widget child,
+  ) {
+    // Entrance: subtle slide from right (8% offset) and fade
+    final primarySlide = Tween<Offset>(
+      begin: const Offset(0.08, 0.0),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(
+      parent: animation,
+      curve: Curves.easeOutCubic,
+    ));
+
+    final primaryFade = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: animation,
+      curve: Curves.easeOut,
+    ));
+
+    // Exit (when pushing another page on top): subtle slide to the left (4% offset) and fade down
+    final secondarySlide = Tween<Offset>(
+      begin: Offset.zero,
+      end: const Offset(-0.04, 0.0),
+    ).animate(CurvedAnimation(
+      parent: secondaryAnimation,
+      curve: Curves.easeOutCubic,
+    ));
+
+    final secondaryFade = Tween<double>(
+      begin: 1.0,
+      end: 0.85,
+    ).animate(CurvedAnimation(
+      parent: secondaryAnimation,
+      curve: Curves.easeOut,
+    ));
+
+    return SlideTransition(
+      position: primarySlide,
+      child: FadeTransition(
+        opacity: primaryFade,
+        child: SlideTransition(
+          position: secondarySlide,
+          child: FadeTransition(
+            opacity: secondaryFade,
+            child: child,
+          ),
+        ),
       ),
     );
   }

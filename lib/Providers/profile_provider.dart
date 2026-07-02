@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:math';
 
+import 'package:connect/Providers/LocalDatabaseHelper.dart';
 import 'package:connect/Models/profile_card_type.dart';
 import 'package:connect/Models/app_error.dart';
 import 'package:connect/Models/custom_link.dart';
@@ -41,6 +42,22 @@ class ProfileProvider with ChangeNotifier {
   Future<void> loadBackgroundBlurPref() async {
     final prefs = await SharedPreferences.getInstance();
     _blurBackground = prefs.getBool('blur_background') ?? true;
+    notifyListeners();
+  }
+
+  String _defaultCardVisibility = 'casual'; // 'casual', 'professional', or 'both'
+  String get defaultCardVisibility => _defaultCardVisibility;
+
+  Future<void> setDefaultCardVisibility(String val) async {
+    _defaultCardVisibility = val;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('default_card_visibility', val);
+  }
+
+  Future<void> loadDefaultCardVisibilityPref() async {
+    final prefs = await SharedPreferences.getInstance();
+    _defaultCardVisibility = prefs.getString('default_card_visibility') ?? 'casual';
     notifyListeners();
   }
 
@@ -808,5 +825,43 @@ class ProfileProvider with ChangeNotifier {
       _setError(e);
       rethrow;
     }
+  }
+
+  Future<void> deleteAccount() async {
+    final myUserId = userId;
+    final ownerUuid = Supabase.instance.client.auth.currentUser?.id;
+    if (myUserId == null || ownerUuid == null) {
+      throw Exception("User session not found");
+    }
+
+    final client = Supabase.instance.client;
+
+    // Delete in order to prevent foreign key constraint violations
+    // 1. Delete network_stats
+    await client.from('network_stats').delete().eq('user_id', myUserId);
+
+    // 2. Delete referral_requests where user is requester, target, or via
+    await client.from('referral_requests').delete().eq('requester_id', myUserId);
+    await client.from('referral_requests').delete().eq('target_id', myUserId);
+    await client.from('referral_requests').delete().eq('via_user_id', myUserId);
+
+    // 3. Delete profiles row — this cascades deletes user_connections, room_participants,
+    // messages, user_push_tokens, invite_codes, and connection_notifications!
+    await client.from('profiles').delete().eq('id', myUserId);
+
+    // 4. Wipe local databases
+    await LocalDatabaseHelper.instance.clearDatabase();
+
+    // 5. Clear SharedPreferences keys
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('owner_id');
+    await prefs.remove('default_card_visibility');
+    await prefs.remove('blur_background');
+
+    // 6. Clear fields in Provider
+    clearFields();
+
+    // 7. Sign out of auth
+    await client.auth.signOut();
   }
 }

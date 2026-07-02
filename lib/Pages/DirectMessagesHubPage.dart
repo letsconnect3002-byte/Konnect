@@ -599,30 +599,10 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
                                       HapticFeedback.lightImpact();
                                       Navigator.push(
                                         context,
-                                        PageRouteBuilder(
-                                          pageBuilder: (context, animation,
-                                                  secondaryAnimation) =>
+                                        MaterialPageRoute(
+                                          builder: (context) =>
                                               IndividualChatPage(
                                                   connectionData: connection),
-                                          transitionsBuilder: (context,
-                                              animation,
-                                              secondaryAnimation,
-                                              child) {
-                                            return SlideTransition(
-                                              position: Tween<Offset>(
-                                                begin: const Offset(1.0, 0.0),
-                                                end: Offset.zero,
-                                              ).animate(CurvedAnimation(
-                                                parent: animation,
-                                                curve: Curves.easeOutCubic,
-                                              )),
-                                              child: child,
-                                            );
-                                          },
-                                          transitionDuration:
-                                              const Duration(milliseconds: 300),
-                                          reverseTransitionDuration:
-                                              const Duration(milliseconds: 250),
                                         ),
                                       );
                                     },

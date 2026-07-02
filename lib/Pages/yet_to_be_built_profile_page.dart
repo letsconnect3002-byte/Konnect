@@ -2,17 +2,15 @@ import 'package:connect/Config/app_theme.dart';
 import 'package:connect/Models/profile_card_type.dart';
 import 'package:connect/Models/custom_link.dart';
 import 'package:connect/Providers/profile_provider.dart';
+import 'package:connect/Pages/SettingsPage.dart';
 import 'package:connect/Widgets/card_field_input.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:connect/services/image_upload_service.dart';
 import 'package:connect/Pages/crop_image_page.dart';
 import 'package:connect/Widgets/connect_hub_bottom_sheet.dart';
-import 'package:connect/Pages/NotificationPage.dart';
-import 'package:share_plus/share_plus.dart';
 import 'package:skeletonizer/skeletonizer.dart';
 
 class YetToBeBuiltProfilePage extends StatefulWidget {
@@ -775,11 +773,11 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                     const SizedBox(height: 16),
 
                     _buildSaveButton(),
-                    const SizedBox(height: 32),
+                    // const SizedBox(height: 32),
 
-                    // QUICK ACTIONS — absorbed from ProfilePage
-                    _buildQuickActionsSection(),
-                    const SizedBox(height: 16),
+                    // // QUICK ACTIONS — absorbed from ProfilePage
+                    // _buildQuickActionsSection(),
+                    // const SizedBox(height: 16),
                   ],
                 ),
               ),
@@ -1192,201 +1190,6 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
     );
   }
 
-  Widget _buildQuickActionsSection() {
-    final provider = Provider.of<ProfileProvider>(context, listen: false);
-    final hasProfile = provider.userId != null &&
-        provider.name.trim().isNotEmpty;
-
-    Widget actionTile({
-      required IconData icon,
-      required String label,
-      required String subtitle,
-      required VoidCallback? onTap,
-      bool disabled = false,
-      Color? iconColor,
-    }) =>
-        Opacity(
-          opacity: disabled ? 0.4 : 1.0,
-          child: GestureDetector(
-            onTap: disabled ? null : onTap,
-            child: Container(
-              height: 76,
-              decoration: BoxDecoration(
-                color: context.surfacePrimary,
-                borderRadius:
-                    BorderRadius.circular(AppDimensions.radiusPremiumCard),
-                border: Border.all(color: context.borderMuted, width: 1.0),
-              ),
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: context.surfaceSecondary,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      icon,
-                      color: iconColor ?? context.accentPrimary,
-                      size: 20,
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          label,
-                          style: context.cardTitle.copyWith(fontSize: 14),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          subtitle,
-                          style: context.captionText.copyWith(
-                            color: context.textMuted,
-                            fontWeight: FontWeight.w400,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    '↗',
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.5),
-                      fontSize: 14,
-                      fontFamily: 'Inter',
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'QUICK ACTIONS',
-          style: context.captionText.copyWith(
-            color: context.textSecondary,
-            fontSize: 14.0,
-            letterSpacing: 1.5,
-          ),
-        ),
-        const SizedBox(height: 12),
-        actionTile(
-          icon: Icons.person_add_rounded,
-          label: 'Connect Hub',
-          subtitle: 'Scan QR, Show QR, or Add Code',
-          onTap: () {
-            HapticFeedback.lightImpact();
-            showModalBottomSheet(
-              context: context,
-              isScrollControlled: true,
-              backgroundColor: Colors.transparent,
-              builder: (context) => const ConnectHubBottomSheet(),
-            );
-          },
-        ),
-        const SizedBox(height: 12),
-        actionTile(
-          icon: Icons.share_rounded,
-          label: 'Share Link',
-          subtitle: 'Send your Private Key',
-          disabled: !hasProfile,
-          onTap: () => _shareProfileLink(provider),
-        ),
-        const SizedBox(height: 12),
-        actionTile(
-          icon: Icons.notifications_outlined,
-          label: 'Notifications',
-          subtitle: 'View your notifications',
-          onTap: () {
-            HapticFeedback.lightImpact();
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const NotificationPage(),
-              ),
-            );
-          },
-        ),
-      ],
-    );
-  }
-
-  void _shareProfileLink(ProfileProvider profileProvider) async {
-    if (profileProvider.userId == null) return;
-
-    // Show a progress dialog while generating VIP code
-    if (mounted) {
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) => Dialog(
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          child: GlassmorphicContainer(
-            borderRadius: BorderRadius.circular(AppDimensions.radiusPremiumCard),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  CircularProgressIndicator(
-                    valueColor:
-                        AlwaysStoppedAnimation<Color>(context.accentPrimary),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    "Generating Private Key...",
-                    style: context.cardTitle,
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      );
-    }
-
-    try {
-      final code = await profileProvider.generateInviteCode('casual');
-
-      if (mounted) {
-        Navigator.pop(context); // Dismiss loading dialog
-      }
-
-      final shareMessage =
-          "Hey, I'm inviting you to my private circle on Mandala. Download the app here: joinmandala.in and use my single-use Private code to connect: *$code*.";
-
-      await SharePlus.instance.share(ShareParams(text: shareMessage));
-    } catch (e) {
-      if (mounted) {
-        Navigator.pop(context); // Dismiss loading dialog
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text("Error generating VIP code: $e"),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
-  }
-
   Widget _buildFrontBackToggle() {
     return Container(
       height: 32,
@@ -1505,7 +1308,6 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
   }
 
   Widget _buildHeader(BuildContext context) {
-    final provider = Provider.of<ProfileProvider>(context, listen: false);
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 12.0, horizontal: 16.0),
       decoration: BoxDecoration(
@@ -1563,17 +1365,15 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
               ),
             ],
           ),
-          // Menu Button (Sign Out popup)
-          PopupMenuButton<String>(
-            color: context.surfacePrimary,
-            offset: const Offset(0, 48),
-            padding: EdgeInsets.zero,
-            shape: RoundedRectangleBorder(
-              borderRadius:
-                  BorderRadius.circular(AppDimensions.radiusComponent),
-              side: BorderSide(
-                  color: context.textMuted.withValues(alpha: 0.2), width: 1.5),
-            ),
+          GestureDetector(
+            onTap: () {
+              HapticFeedback.lightImpact();
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const SettingsPage()),
+              );
+            },
+            behavior: HitTestBehavior.opaque,
             child: Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
@@ -1581,67 +1381,11 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                 shape: BoxShape.circle,
               ),
               child: const Icon(
-                Icons.more_vert_rounded,
+                Icons.settings_rounded,
                 color: Colors.white,
                 size: 16,
               ),
             ),
-            onSelected: (value) async {
-              if (value == 'sign_out') {
-                HapticFeedback.mediumImpact();
-                final messenger = ScaffoldMessenger.of(context);
-                final signOutAccentColor = context.accentSecondary;
-                try {
-                  await Supabase.instance.client.auth.signOut();
-                  provider.clearFields();
-                  messenger.showSnackBar(
-                    SnackBar(
-                      content: const Text("Signed out successfully"),
-                      backgroundColor: signOutAccentColor,
-                      behavior: SnackBarBehavior.floating,
-                    ),
-                  );
-                } catch (e) {
-                  print("Error signing out: $e");
-                }
-              }
-            },
-            itemBuilder: (context) => [
-              PopupMenuItem<String>(
-                value: 'sign_out',
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(6),
-                        decoration: BoxDecoration(
-                          color: Colors.redAccent.withValues(alpha: 0.15),
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          Icons.logout_rounded,
-                          color: Colors.redAccent,
-                          size: 14,
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      const Text(
-                        'Sign Out',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                          fontFamily: 'Inter',
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
           ),
         ],
       ),

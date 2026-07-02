@@ -516,7 +516,9 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider<ProfileProvider>(
           create: (_) => ProfileProvider(
             profileRepository: SupabaseProfileRepository(),
-          )..loadBackgroundBlurPref(),
+          )
+            ..loadBackgroundBlurPref()
+            ..loadDefaultCardVisibilityPref(),
         ),
         ChangeNotifierProxyProvider<ProfileProvider, MonkModeProvider>(
           create: (_) => MonkModeProvider(),
