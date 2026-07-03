@@ -297,7 +297,7 @@ class _MonkModePageState extends State<MonkModePage> {
                         },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: context.accentPrimary,
-                    foregroundColor: Colors.black,
+                    foregroundColor: Colors.white,
                     disabledBackgroundColor:
                         context.surfaceSecondary.withValues(alpha: 0.5),
                     disabledForegroundColor: context.textMuted,
@@ -308,7 +308,7 @@ class _MonkModePageState extends State<MonkModePage> {
                   child: Text(
                     "Set",
                     style: context.bodyText.copyWith(
-                      color: isDurationZero ? context.textMuted : Colors.black,
+                      color: isDurationZero ? context.textMuted : Colors.white,
                       fontWeight: FontWeight.bold,
                     ),
                   ),

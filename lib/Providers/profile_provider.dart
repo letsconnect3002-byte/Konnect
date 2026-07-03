@@ -57,7 +57,12 @@ class ProfileProvider with ChangeNotifier {
 
   Future<void> loadDefaultCardVisibilityPref() async {
     final prefs = await SharedPreferences.getInstance();
-    _defaultCardVisibility = prefs.getString('default_card_visibility') ?? 'casual';
+    String val = prefs.getString('default_card_visibility') ?? 'casual';
+    if (val == 'both') {
+      val = 'casual';
+      await prefs.setString('default_card_visibility', 'casual');
+    }
+    _defaultCardVisibility = val;
     notifyListeners();
   }
 
@@ -82,6 +87,11 @@ class ProfileProvider with ChangeNotifier {
   bool monkModeEnabled = false;
   String? monkModeDeactivateAt;
   List<int> monkModeBlockedIds = [];
+
+  // Quick Identity fields
+  String vibeTag = '';
+  List<String> interestTags = [];
+  bool quickSetupComplete = false;
 
   String? _ownerId;
   int? _lastKnownUserId;
@@ -135,6 +145,9 @@ class ProfileProvider with ChangeNotifier {
     monkModeEnabled = false;
     monkModeDeactivateAt = null;
     monkModeBlockedIds = [];
+    vibeTag = '';
+    interestTags = [];
+    quickSetupComplete = false;
   }
 
   // Which card(s) each field appears on (Casual / Professional).
@@ -145,9 +158,6 @@ class ProfileProvider with ChangeNotifier {
       fieldAssignments.putIfAbsent(
         field,
         () {
-          if (field == 'email' || field == 'phoneNumber' || field == 'bio') {
-            return FieldCardAssignment(casual: true, professional: true);
-          }
           if (field == 'name' || field == 'avatarUrl') {
             return FieldCardAssignment(casual: true, professional: true);
           }
@@ -159,10 +169,17 @@ class ProfileProvider with ChangeNotifier {
 
   bool isFieldOnCard(String field, ProfileCardType card) {
     _ensureDefaultFieldAssignments();
-    fieldAssignments.putIfAbsent(
-        field, () => FieldCardAssignment(casual: false, professional: true));
+    if (field == 'vibeTag' || field == 'interestTags') {
+      return card == ProfileCardType.casual;
+    }
     final assignment = fieldAssignments[field];
-    if (assignment == null) return card == ProfileCardType.professional;
+    if (assignment == null) {
+      if (card == ProfileCardType.casual) {
+        return field == 'name' || field == 'avatarUrl';
+      } else {
+        return true;
+      }
+    }
     return card == ProfileCardType.casual
         ? assignment.casual
         : assignment.professional;
@@ -351,6 +368,14 @@ class ProfileProvider with ChangeNotifier {
       case 'spotify':
         spotify = value;
         break;
+      case 'vibeTag':
+      case 'vibe_tag':
+        vibeTag = value;
+        break;
+      case 'interestTags':
+      case 'interest_tags':
+        interestTags = value.split(',').map((t) => t.trim()).where((t) => t.isNotEmpty).toList();
+        break;
     }
     notifyListeners();
   }
@@ -370,11 +395,19 @@ class ProfileProvider with ChangeNotifier {
       dbField = 'professional_bio';
     } else if (field == 'avatarUrl') {
       dbField = 'avatar_url';
+    } else if (field == 'vibeTag' || field == 'vibe_tag') {
+      dbField = 'vibe_tag';
+    } else if (field == 'interestTags' || field == 'interest_tags') {
+      dbField = 'interest_tags';
     }
 
     try {
-      await _repository.updateProfileField(id, dbField, value);
-      print("Updated field $field in database to $value");
+      dynamic dbValue = value;
+      if (dbField == 'interest_tags') {
+        dbValue = value.split(',').map((t) => t.trim()).where((t) => t.isNotEmpty).toList();
+      }
+      await _repository.updateProfileField(id, dbField, dbValue);
+      print("Updated field $field in database to $dbValue");
     } catch (e) {
       print("Error updating profile field: $e");
       _setError(e);
@@ -554,6 +587,15 @@ class ProfileProvider with ChangeNotifier {
           monkModeBlockedIds = [];
         }
 
+        vibeTag = response['vibe_tag'] ?? '';
+        final List<dynamic>? interestsRaw = response['interest_tags'];
+        if (interestsRaw != null) {
+          interestTags = interestsRaw.map((e) => e.toString()).toList();
+        } else {
+          interestTags = [];
+        }
+        quickSetupComplete = response['quick_setup_complete'] == true;
+
         customLinks = [];
         if (response['custom_links'] != null) {
           try {
@@ -586,6 +628,9 @@ class ProfileProvider with ChangeNotifier {
         profileData["monkModeEnabled"] = monkModeEnabled;
         profileData["monkModeDeactivateAt"] = monkModeDeactivateAt;
         profileData["monkModeBlockedIds"] = monkModeBlockedIds;
+        profileData["vibeTag"] = vibeTag;
+        profileData["interestTags"] = interestTags;
+        profileData["quickSetupComplete"] = quickSetupComplete;
 
         _setLoadedState(id, true);
 
@@ -654,6 +699,9 @@ class ProfileProvider with ChangeNotifier {
           'monk_mode_enabled': monkModeEnabled,
           'monk_mode_deactivate_at': monkModeDeactivateAt,
           'monk_mode_blocked_ids': monkModeBlockedIds,
+          'vibe_tag': vibeTag,
+          'interest_tags': interestTags,
+          'quick_setup_complete': quickSetupComplete,
         });
 
         _setLoadedState(insertedId, true);
@@ -693,6 +741,9 @@ class ProfileProvider with ChangeNotifier {
       'monk_mode_enabled': monkModeEnabled,
       'monk_mode_deactivate_at': monkModeDeactivateAt,
       'monk_mode_blocked_ids': monkModeBlockedIds,
+      'vibe_tag': vibeTag,
+      'interest_tags': interestTags,
+      'quick_setup_complete': quickSetupComplete,
     };
 
     try {
@@ -738,6 +789,9 @@ class ProfileProvider with ChangeNotifier {
     monkModeEnabled = false;
     monkModeDeactivateAt = null;
     monkModeBlockedIds = [];
+    vibeTag = '';
+    interestTags = [];
+    quickSetupComplete = false;
     _state = ProfileInitial();
     notifyListeners();
   }
@@ -825,6 +879,25 @@ class ProfileProvider with ChangeNotifier {
       _setError(e);
       rethrow;
     }
+  }
+
+  Future<void> setQuickSetupComplete(bool val) async {
+    quickSetupComplete = val;
+    notifyListeners();
+    final currentUserId = userId;
+    if (currentUserId != null) {
+      try {
+        await _repository.updateProfileField(currentUserId, 'quick_setup_complete', val);
+      } catch (e) {
+        print("Error saving quickSetupComplete: $e");
+      }
+    }
+  }
+
+  void setVibeAndInterests(String vibe, List<String> interests) {
+    vibeTag = vibe;
+    interestTags = interests;
+    notifyListeners();
   }
 
   Future<void> deleteAccount() async {

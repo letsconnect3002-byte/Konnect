@@ -828,9 +828,20 @@ class ChatProvider with ChangeNotifier {
           }
         } else {
           final localStatus = localMsg['status'] as String? ?? 'sent';
-          if (_statusRank(serverStatus) > _statusRank(localStatus)) {
-            await _repository.updateMessageStatusLocally(msgId, serverStatus);
-          }
+          final targetStatus = _statusRank(serverStatus) > _statusRank(localStatus) ? serverStatus : localStatus;
+          
+          await _repository.insertMessageLocally(
+            msgId,
+            roomId,
+            senderId,
+            localMsg['payload'] as String,
+            status: targetStatus,
+            createdAt: msg['created_at'] as String?,
+            replyToMessageId: msg['reply_to_message_id'] as String?,
+            replyToMessagePayload: msg['reply_to_message_payload'] as String?,
+            replyToMessageSenderName:
+                msg['reply_to_message_sender_name'] as String?,
+          );
         }
       }
 

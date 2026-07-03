@@ -519,7 +519,7 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: context.accentPrimary,
-                      foregroundColor: Colors.black,
+                      foregroundColor: Colors.white,
                       shape: const StadiumBorder(),
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       elevation: 0,

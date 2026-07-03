@@ -9,6 +9,7 @@ import 'package:provider/provider.dart';
 import 'package:connect/Utils/profile_field_filter.dart';
 import 'package:skeletonizer/skeletonizer.dart';
 import 'package:connect/Config/app_theme.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class ConnectionProfilePage extends StatefulWidget {
   final Map<String, dynamic> profileData;
@@ -36,6 +37,7 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
   late String _bio;
   late String _professionalBio;
   late String _avatarUrl;
+  late String _vibeTag;
   late String _instagram;
   late String _linkedin;
   late String _twitter;
@@ -79,6 +81,19 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
 
   Future<void> _loadProfileData() async {
     final data = widget.profileData;
+    final String permission = (data['sharedCard'] ??
+            data['shared_card'] ??
+            data['sharedCardPermission'] ??
+            data['shared_card_permission'] ??
+            'both')
+        .toString();
+    _sharedCardPermission = permission;
+    if (permission == 'casual') {
+      _selectedPreviewCardType = 'casual';
+    } else if (permission == 'professional') {
+      _selectedPreviewCardType = 'professional';
+    }
+
     _fieldAssignments = data['field_assignments'] is Map<String, dynamic>
         ? data['field_assignments'] as Map<String, dynamic>
         : (data['field_assignments'] is String
@@ -99,6 +114,7 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
     _professionalBio =
         data['professionalBio'] ?? data['professional_bio'] ?? '';
     _avatarUrl = data['avatarUrl'] ?? data['avatar_url'] ?? '';
+    _vibeTag = data['vibe_tag'] ?? data['vibeTag'] ?? '';
     _instagram = data['instagram'] ?? '';
     _linkedin = data['linkedin'] ?? '';
     _twitter = data['twitter'] ?? '';
@@ -161,6 +177,11 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
         final details = await profileProvider.fetchConnectionDetails(idToFetch);
         final response = details['profile'] as Map<String, dynamic>?;
         _sharedCardPermission = details['sharedCardPermission'] as String;
+        if (_sharedCardPermission == 'casual') {
+          _selectedPreviewCardType = 'casual';
+        } else if (_sharedCardPermission == 'professional') {
+          _selectedPreviewCardType = 'professional';
+        }
         _mySharedCardToThem = details['mySharedCardToThem'] as String;
 
         if (response != null && mounted) {
@@ -176,6 +197,7 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
             _fieldAssignments = fieldAssignments;
             _name = response['name'] ?? '';
             _avatarUrl = response['avatar_url'] ?? '';
+            _vibeTag = response['vibe_tag'] ?? response['vibeTag'] ?? '';
             _profession = response['profession'] ?? '';
             _company = response['company'] ?? '';
             _email = ProfileFieldFilter.getVisibleValue(
@@ -1130,17 +1152,11 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
   }) {
     if (value.trim().isEmpty) return const SizedBox.shrink();
     return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-      decoration: BoxDecoration(
-        color: context.surfacePrimary,
-        borderRadius: BorderRadius.circular(AppDimensions.radiusPremiumCard),
-        border:
-            Border.all(color: context.surfaceSecondary.withValues(alpha: 0.5)),
-      ),
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
         children: [
-          Icon(icon, color: context.accentPrimary, size: 20),
+          Icon(icon, color: context.accentSecondary, size: 18),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -1148,19 +1164,29 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
               children: [
                 Text(
                   label,
-                  style: context.captionText,
+                  style: TextStyle(
+                    color: context.textSecondary,
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    fontFamily: 'Inter',
+                  ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 2),
                 Text(
                   value,
-                  style: context.bodyText.copyWith(fontWeight: FontWeight.bold),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    fontFamily: 'Inter',
+                  ),
                 ),
               ],
             ),
           ),
           IconButton(
             icon: Icon(Icons.content_copy_rounded,
-                color: context.textSecondary, size: 18),
+                color: context.textMuted.withValues(alpha: 0.5), size: 16),
             onPressed: () {
               final scaffoldMessenger = ScaffoldMessenger.of(context);
               final surfaceSecondaryColor = context.surfaceSecondary;
@@ -1183,63 +1209,360 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
     );
   }
 
-  Widget _buildSocialCard({
-    required String title,
-    required String handle,
-    required Widget logo,
-  }) {
-    if (handle.trim().isEmpty) return const SizedBox.shrink();
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-      decoration: BoxDecoration(
-        color: context.surfacePrimary,
-        borderRadius: BorderRadius.circular(AppDimensions.radiusPremiumCard),
-        border:
-            Border.all(color: context.surfaceSecondary.withValues(alpha: 0.5)),
-      ),
-      child: Row(
-        children: [
-          logo,
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: context.captionText,
+  Widget _buildCasualSocialCard(
+      String platform, String name, String assetPath, String handle) {
+    return GestureDetector(
+      onTap: () {
+        HapticFeedback.lightImpact();
+        _showSocialActionSheet(context, platform, name, handle, assetPath);
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 0),
+        child: Row(
+          children: [
+            Container(
+              width: 32,
+              height: 32,
+              decoration: BoxDecoration(
+                color: const Color(0xFF00F2FE).withValues(alpha: 0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Center(
+                child: Image.asset(
+                  assetPath,
+                  width: 16,
+                  height: 16,
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  handle,
-                  style: context.bodyText.copyWith(fontWeight: FontWeight.bold),
-                ),
-              ],
+              ),
             ),
-          ),
-          IconButton(
-            icon: Icon(Icons.content_copy_rounded,
-                color: context.textSecondary, size: 18),
-            onPressed: () {
-              final scaffoldMessenger = ScaffoldMessenger.of(context);
-              final surfaceSecondaryColor = context.surfaceSecondary;
-              Clipboard.setData(ClipboardData(text: handle)).then((_) {
-                scaffoldMessenger.showSnackBar(
-                  SnackBar(
-                    content: Text("Copied $title handle to clipboard!"),
-                    backgroundColor: surfaceSecondaryColor,
-                    behavior: SnackBarBehavior.floating,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    name,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
-                );
-              });
-            },
-          ),
-        ],
+                  const SizedBox(height: 2),
+                  Text(
+                    handle,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Color(0xFF00F2FE),
+                      fontSize: 10,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
+    );
+  }
+
+  String _getSocialUrl(String platform, String handle) {
+    final cleaned = handle.trim();
+    if (cleaned.startsWith('http://') || cleaned.startsWith('https://')) {
+      return cleaned;
+    }
+    switch (platform.toLowerCase()) {
+      case 'linkedin':
+        return 'https://linkedin.com/in/$cleaned';
+      case 'twitter':
+      case 'x':
+        return 'https://x.com/$cleaned';
+      case 'instagram':
+        return 'https://instagram.com/$cleaned';
+      case 'spotify':
+        if (cleaned.contains('spotify.com')) return cleaned;
+        return 'https://open.spotify.com/user/$cleaned';
+      default:
+        return cleaned;
+    }
+  }
+
+  void _showSocialActionSheet(
+    BuildContext context,
+    String platform,
+    String displayName,
+    String handle,
+    String assetPath,
+  ) {
+    final url = _getSocialUrl(platform, handle);
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      barrierColor: Colors.black.withValues(alpha: 0.5),
+      builder: (sheetContext) {
+        return Container(
+          decoration: BoxDecoration(
+            color: const Color(0xFF151624),
+            borderRadius: const BorderRadius.only(
+              topLeft: Radius.circular(24),
+              topRight: Radius.circular(24),
+            ),
+            border: Border.all(
+              color: Colors.white.withValues(alpha: 0.08),
+              width: 1,
+            ),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Center(
+                child: Container(
+                  width: 36,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.white24,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
+              Row(
+                children: [
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF00F2FE).withValues(alpha: 0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Center(
+                      child: Image.asset(
+                        assetPath,
+                        width: 20,
+                        height: 20,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          displayName,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          '@$handle',
+                          style: const TextStyle(
+                            color: Color(0xFF8FA39E),
+                            fontSize: 13,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.05),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        url,
+                        style: const TextStyle(
+                          color: Color(0xFF00F2FE),
+                          fontSize: 13,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () async {
+                        await Clipboard.setData(ClipboardData(text: url));
+                        if (sheetContext.mounted) {
+                          Navigator.pop(sheetContext);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Copied link to clipboard!'),
+                              backgroundColor: Color(0xFF1E1F32),
+                              duration: Duration(seconds: 2),
+                            ),
+                          );
+                        }
+                      },
+                      icon: const Icon(Icons.copy_rounded,
+                          color: Colors.white70, size: 18),
+                      label: const Text(
+                        "Copy Link",
+                        style: TextStyle(
+                            color: Colors.white70, fontWeight: FontWeight.bold),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        side: BorderSide(
+                            color: Colors.white.withValues(alpha: 0.15)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF00F2FE), Color(0xFF4FACFE)],
+                        ),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: ElevatedButton.icon(
+                        onPressed: () async {
+                          final uri = Uri.parse(url);
+                          if (await canLaunchUrl(uri)) {
+                            await launchUrl(uri,
+                                mode: LaunchMode.externalApplication);
+                          } else {
+                            if (sheetContext.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('Could not launch $url'),
+                                  backgroundColor: Colors.redAccent,
+                                ),
+                              );
+                            }
+                          }
+                          if (sheetContext.mounted) Navigator.pop(sheetContext);
+                        },
+                        icon: const Icon(Icons.open_in_new_rounded,
+                            color: Colors.white, size: 18),
+                        label: const Text(
+                          "Open Account",
+                          style: TextStyle(
+                              color: Colors.white, fontWeight: FontWeight.bold),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.transparent,
+                          shadowColor: Colors.transparent,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildSocialGridSection(Map<String, String> fields) {
+    final linkedin = fields['linkedin']?.trim() ?? '';
+    final twitter = fields['twitter']?.trim() ?? '';
+    final instagram = fields['instagram']?.trim() ?? '';
+    final spotify = fields['spotify']?.trim() ?? '';
+
+    final List<Map<String, String>> activeSocials = [];
+    if (linkedin.isNotEmpty) {
+      activeSocials.add({
+        'platform': 'linkedin',
+        'name': 'LinkedIn',
+        'asset': 'assets/icons/linkedin.png',
+        'handle': linkedin
+      });
+    }
+    if (twitter.isNotEmpty) {
+      activeSocials.add({
+        'platform': 'twitter',
+        'name': 'X (Twitter)',
+        'asset': 'assets/icons/twitter.png',
+        'handle': twitter
+      });
+    }
+    if (instagram.isNotEmpty) {
+      activeSocials.add({
+        'platform': 'instagram',
+        'name': 'Instagram',
+        'asset': 'assets/icons/instagram.png',
+        'handle': instagram
+      });
+    }
+    if (spotify.isNotEmpty) {
+      activeSocials.add({
+        'platform': 'spotify',
+        'name': 'Spotify',
+        'asset': 'assets/icons/spotify.png',
+        'handle': spotify
+      });
+    }
+
+    if (activeSocials.isEmpty) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const SizedBox(height: 24),
+        Text(
+          'SOCIAL PROFILES',
+          style: context.captionText.copyWith(
+            color: context.textSecondary,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 1.5,
+          ),
+        ),
+        GridView.count(
+          padding: EdgeInsets.only(top: 10),
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          crossAxisCount: 2,
+          mainAxisSpacing: 10,
+          crossAxisSpacing: 10,
+          childAspectRatio: 2.8,
+          children: activeSocials.map((social) {
+            return _buildCasualSocialCard(
+              social['platform']!,
+              social['name']!,
+              social['asset']!,
+              social['handle']!,
+            );
+          }).toList(),
+        ),
+      ],
     );
   }
 
@@ -1250,7 +1573,7 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
         color: context.surfacePrimary,
         borderRadius: BorderRadius.circular(30.0),
         border: Border.all(
-          color: context.surfaceSecondary,
+          color: context.textMuted.withValues(alpha: 0.2),
           width: 1.0,
         ),
       ),
@@ -1275,38 +1598,42 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
               ),
             ),
           ),
-          Column(
-            children: [
-              Text(
-                _name,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 18.0,
-                  fontWeight: FontWeight.bold,
-                  fontFamily: 'Inter',
+          Expanded(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'Connection Profile',
+                  textAlign: TextAlign.center,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 18.0,
+                    fontWeight: FontWeight.bold,
+                    fontFamily: 'Inter',
+                  ),
                 ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                'Digital Card',
-                style: TextStyle(
-                  color: context.textSecondary,
-                  fontSize: 12.0,
-                  fontFamily: 'Inter',
+                const SizedBox(height: 2),
+                Text(
+                  _sharedCardPermission == 'casual'
+                      ? 'Casual Access'
+                      : (_sharedCardPermission == 'professional'
+                          ? 'Professional Access'
+                          : 'Digital Card'),
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: context.textSecondary,
+                    fontSize: 12.0,
+                    fontFamily: 'Inter',
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
           SizedBox(
             width: 32,
             height: 32,
-            // decoration: const BoxDecoration(
-            //     shape: BoxShape.circle, color: Colors.white10),
-            // child: const Icon(
-            //   Icons.badge_outlined,
-            //   color: Colors.white54,
-            //   size: 14,
-            // ),
           ),
         ],
       ),
@@ -1315,59 +1642,9 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
 
   @override
   Widget build(BuildContext context) {
-    // Mock social media logos matching profile page
-    final linkedinLogo = Container(
-      width: 36,
-      height: 36,
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.08),
-        shape: BoxShape.circle,
-      ),
-      // padding: const EdgeInsets.all(8),
-      child: Image.asset(
-        'assets/icons/linkedin.png',
-        fit: BoxFit.contain,
-      ),
-    );
-    final twitterLogo = Container(
-      width: 36,
-      height: 36,
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.08),
-        shape: BoxShape.circle,
-      ),
-      // padding: const EdgeInsets.all(8),
-      child: Image.asset(
-        'assets/icons/twitter.png',
-        fit: BoxFit.contain,
-      ),
-    );
-    final instagramLogo = Container(
-      width: 36,
-      height: 36,
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.08),
-        shape: BoxShape.circle,
-      ),
-      // padding: const EdgeInsets.all(8),
-      child: Image.asset(
-        'assets/icons/instagram.png',
-        fit: BoxFit.contain,
-      ),
-    );
-    final spotifyLogo = Container(
-      width: 36,
-      height: 36,
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.08),
-        shape: BoxShape.circle,
-      ),
-      padding: const EdgeInsets.all(8),
-      child: Image.asset(
-        'assets/icons/spotify.png',
-        fit: BoxFit.contain,
-      ),
-    );
+    final currentPreviewCardType = _sharedCardPermission == 'both'
+        ? _selectedPreviewCardType
+        : _sharedCardPermission;
 
     return Scaffold(
       backgroundColor: context.canvasBackground,
@@ -1438,21 +1715,150 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: _buildFrontBackToggle(),
-                      ),
-                      const SizedBox(height: 16),
-
-                      if (_sharedCardPermission == 'both') ...[
-                        _buildPreviewTabSelector(),
+                      if (_sharedCardPermission != 'casual') ...[
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: _buildFrontBackToggle(),
+                        ),
                         const SizedBox(height: 16),
+
+                        if (_sharedCardPermission == 'both') ...[
+                          _buildPreviewTabSelector(),
+                          const SizedBox(height: 16),
+                        ],
+                        // Business card graphic
+                        _buildDigitalCard(),
+                        const SizedBox(height: 24),
+                        _buildAccessControlSection(),
+                        const SizedBox(height: 32),
                       ],
-                      // Business card graphic
-                      _buildDigitalCard(),
+                      // Section: Identity (Photo, Name, Vibe)
+                      Container(
+                        padding: const EdgeInsets.fromLTRB(0, 0, 0, 0),
+                        child: Row(
+                          children: [
+                            // Avatar
+                            Container(
+                              width: 72,
+                              height: 72,
+                              padding: const EdgeInsets.all(3),
+                              decoration: const BoxDecoration(
+                                shape: BoxShape.circle,
+                                gradient: LinearGradient(
+                                  colors: [
+                                    Color(0xFFEC4899),
+                                    Color(0xFF00F2FE)
+                                  ],
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                ),
+                              ),
+                              child: ClipOval(
+                                child: (_avatarUrl.isNotEmpty &&
+                                        _avatarUrl.startsWith('http'))
+                                    ? Image.network(_avatarUrl,
+                                        fit: BoxFit.cover)
+                                    : Container(
+                                        color: const Color(0xFF1E1F32),
+                                        alignment: Alignment.center,
+                                        child: Text(
+                                          _name.isNotEmpty
+                                              ? _name
+                                                  .substring(0, 1)
+                                                  .toUpperCase()
+                                              : "?",
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 24,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ),
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            // Name and Vibe
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    _name,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.w900,
+                                      fontFamily: 'Inter',
+                                      letterSpacing: 0.5,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  if (_vibeTag.isNotEmpty)
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 10, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFF00F2FE)
+                                            .withValues(alpha: 0.1),
+                                        borderRadius: BorderRadius.circular(16),
+                                        border: Border.all(
+                                          color: const Color(0xFF00F2FE)
+                                              .withValues(alpha: 0.25),
+                                          width: 1.0,
+                                        ),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          const Icon(Icons.flash_on_rounded,
+                                              color: Color(0xFF00F2FE),
+                                              size: 10),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            _vibeTag,
+                                            style: const TextStyle(
+                                              color: Color(0xFF00F2FE),
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.bold,
+                                              fontFamily: 'Inter',
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                       const SizedBox(height: 24),
-                      _buildAccessControlSection(),
-                      const SizedBox(height: 32),
+
+                      // Section: My Story (Bio)
+                      if ((_previewFields['bio'] ?? '').trim().isNotEmpty) ...[
+                        Text(
+                          'MY STORY',
+                          style: context.captionText.copyWith(
+                            color: context.textSecondary,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 1.5,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Container(
+                          padding: const EdgeInsets.fromLTRB(1, 8, 8, 8),
+                          child: Text(
+                            _previewFields['bio']!,
+                            style: context.bodyText.copyWith(
+                              color: Colors.white.withValues(alpha: 0.7),
+                              height: 1.5,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                      ],
 
                       // DETAILS DISPLAY HEADER
                       Text(
@@ -1463,17 +1869,9 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
                           letterSpacing: 1.5,
                         ),
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 12),
 
-                      // Read-only Details (filtered by shared card permission)
-                      _buildReadOnlyField(
-                        label: 'Full Name',
-                        value: _name,
-                        icon: Icons.person_outline_rounded,
-                      ),
-                      // Profession & Company are professional details
-                      if (_sharedCardPermission == 'professional' ||
-                          _sharedCardPermission == 'both') ...[
+                      if (currentPreviewCardType == 'professional') ...[
                         _buildReadOnlyField(
                           label: 'Profession',
                           value: _profession,
@@ -1485,72 +1883,25 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
                           icon: Icons.apartment_rounded,
                         ),
                       ],
-                      // When 'both', show casual & professional variants separately
-                      if (_sharedCardPermission == 'both')
-                        ..._buildBothFields(
-                          casualFields: _casualFields,
-                          professionalFields: _professionalFields,
-                          linkedinLogo: linkedinLogo,
-                          twitterLogo: twitterLogo,
-                          instagramLogo: instagramLogo,
-                          spotifyLogo: spotifyLogo,
-                        )
-                      else ...[
-                        _buildReadOnlyField(
-                          label: 'Email Address',
-                          value: _activeFields['email'] ?? '',
-                          icon: Icons.email_outlined,
-                        ),
-                        _buildReadOnlyField(
-                          label: 'Phone Number',
-                          value: _activeFields['phoneNumber'] ?? '',
-                          icon: Icons.phone_android_outlined,
-                        ),
-                        _buildReadOnlyField(
-                          label: 'Bio',
-                          value: _activeFields['bio'] ?? '',
-                          icon: Icons.description_outlined,
-                        ),
 
-                        // Social media block — only show if at least one handle exists
-                        if ([
-                          _activeFields['linkedin'] ?? '',
-                          _activeFields['twitter'] ?? '',
-                          _activeFields['instagram'] ?? '',
-                          _activeFields['spotify'] ?? '',
-                        ].any((v) => v.trim().isNotEmpty)) ...[
-                          const SizedBox(height: 16),
-                          Text(
-                            'SOCIAL HANDLES',
-                            style: context.captionText.copyWith(
-                              color: context.textSecondary,
-                              fontWeight: FontWeight.bold,
-                              letterSpacing: 1.5,
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          _buildSocialCard(
-                            title: 'LinkedIn',
-                            handle: _activeFields['linkedin'] ?? '',
-                            logo: linkedinLogo,
-                          ),
-                          _buildSocialCard(
-                            title: 'Twitter',
-                            handle: _activeFields['twitter'] ?? '',
-                            logo: twitterLogo,
-                          ),
-                          _buildSocialCard(
-                            title: 'Instagram',
-                            handle: _activeFields['instagram'] ?? '',
-                            logo: instagramLogo,
-                          ),
-                          _buildSocialCard(
-                            title: 'Spotify',
-                            handle: _activeFields['spotify'] ?? '',
-                            logo: spotifyLogo,
-                          ),
-                        ],
-                      ],
+                      _buildReadOnlyField(
+                        label: currentPreviewCardType == 'casual'
+                            ? 'Email Address'
+                            : 'Professional Email',
+                        value: _previewFields['email'] ?? '',
+                        icon: Icons.email_outlined,
+                      ),
+
+                      _buildReadOnlyField(
+                        label: currentPreviewCardType == 'casual'
+                            ? 'Phone Number'
+                            : 'Professional Phone',
+                        value: _previewFields['phoneNumber'] ?? '',
+                        icon: Icons.phone_android_outlined,
+                      ),
+
+                      // SOCIAL SECTIONS
+                      _buildSocialGridSection(_previewFields),
 
                       // CUSTOM LINKS
                       ..._buildCustomLinksList(_fieldAssignments),
@@ -1614,7 +1965,7 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: context.accentPrimary,
-                    foregroundColor: Colors.black,
+                    foregroundColor: Colors.white,
                     shape: const StadiumBorder(),
                     padding: const EdgeInsets.symmetric(vertical: 16.0),
                     elevation: 0,
@@ -1622,7 +1973,7 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
                   child: Text(
                     "Message",
                     style: context.bodyText.copyWith(
-                      color: Colors.black,
+                      color: Colors.white,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
@@ -1638,116 +1989,18 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
   /// Builds the detail + social widgets when the shared card permission is
   /// 'both'. Deduplicates identical values across casual/professional and
   /// only renders fields that actually have data.
-  List<Widget> _buildBothFields({
-    required Map<String, String> casualFields,
-    required Map<String, String> professionalFields,
-    required Widget linkedinLogo,
-    required Widget twitterLogo,
-    required Widget instagramLogo,
-    required Widget spotifyLogo,
-  }) {
-    final widgets = <Widget>[];
-
-    // --- Helper to emit one or two rows for a given field key. ---
-    void addField(String key, String label, IconData icon) {
-      final casual = casualFields[key]?.trim() ?? '';
-      final professional = professionalFields[key]?.trim() ?? '';
-      if (casual.isEmpty && professional.isEmpty) return;
-      // If both have data and they differ, show separately.
-      if (casual.isNotEmpty &&
-          professional.isNotEmpty &&
-          casual != professional) {
-        widgets.add(_buildReadOnlyField(
-          label: '$label (Casual)',
-          value: casual,
-          icon: icon,
-        ));
-        widgets.add(_buildReadOnlyField(
-          label: '$label (Professional)',
-          value: professional,
-          icon: icon,
-        ));
-      } else {
-        // Show whichever is available (or the shared value).
-        widgets.add(_buildReadOnlyField(
-          label: label,
-          value: casual.isNotEmpty ? casual : professional,
-          icon: icon,
-        ));
-      }
-    }
-
-    addField('email', 'Email Address', Icons.email_outlined);
-    addField('phoneNumber', 'Phone Number', Icons.phone_android_outlined);
-    addField('bio', 'Bio', Icons.description_outlined);
-
-    // --- Helper to emit social card row. ---
-    void addSocial(String key, String title, Widget logo) {
-      final casual = casualFields[key]?.trim() ?? '';
-      final professional = professionalFields[key]?.trim() ?? '';
-      if (casual.isEmpty && professional.isEmpty) return;
-      if (casual.isNotEmpty &&
-          professional.isNotEmpty &&
-          casual != professional) {
-        widgets.add(_buildSocialCard(
-          title: '$title (Casual)',
-          handle: casual,
-          logo: logo,
-        ));
-        widgets.add(_buildSocialCard(
-          title: '$title (Professional)',
-          handle: professional,
-          logo: logo,
-        ));
-      } else {
-        widgets.add(_buildSocialCard(
-          title: title,
-          handle: casual.isNotEmpty ? casual : professional,
-          logo: logo,
-        ));
-      }
-    }
-
-    // Only add the social header if at least one handle exists.
-    final hasAnySocial = [
-      casualFields['linkedin'],
-      professionalFields['linkedin'],
-      casualFields['twitter'],
-      professionalFields['twitter'],
-      casualFields['instagram'],
-      professionalFields['instagram'],
-      casualFields['spotify'],
-      professionalFields['spotify'],
-    ].any((v) => (v ?? '').trim().isNotEmpty);
-
-    if (hasAnySocial) {
-      widgets.add(const SizedBox(height: 16));
-      widgets.add(Text(
-        'SOCIAL HANDLES',
-        style: context.captionText.copyWith(
-          color: context.textSecondary,
-          fontWeight: FontWeight.bold,
-          letterSpacing: 1.5,
-        ),
-      ));
-      widgets.add(const SizedBox(height: 16));
-      addSocial('linkedin', 'LinkedIn', linkedinLogo);
-      addSocial('twitter', 'Twitter', twitterLogo);
-      addSocial('instagram', 'Instagram', instagramLogo);
-      addSocial('spotify', 'Spotify', spotifyLogo);
-    }
-
-    return widgets;
-  }
 
   List<Widget> _buildCustomLinksList(dynamic fieldAssignments) {
     final widgets = <Widget>[];
 
-    // Filter links based on visibility
+    final isCasual = _selectedPreviewCardType == 'casual';
+    final currentTypeStr = isCasual ? 'casual' : 'professional';
+
+    // Filter links based on visibility on the CURRENT active card preview
     final visibleLinks = _customLinks.where((link) {
       final String linkId = link['id'] ?? '';
       return ProfileFieldFilter.isFieldVisible(
-          linkId, _sharedCardPermission, fieldAssignments);
+          linkId, currentTypeStr, fieldAssignments);
     }).toList();
 
     if (visibleLinks.isEmpty) return widgets;
@@ -1766,41 +2019,11 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
     for (final link in visibleLinks) {
       final String name = link['name'] ?? '';
       final String url = link['url'] ?? '';
-      final String id = link['id'] ?? '';
 
-      String label = name;
-      if (_sharedCardPermission == 'both') {
-        final assignments =
-            ProfileFieldFilter.parseFieldAssignments(fieldAssignments);
-        final assignment = assignments != null ? assignments[id] : null;
-        final isC = assignment != null && assignment['c'] == true;
-        final isP = assignment != null && assignment['p'] == true;
-        if (isC && !isP) {
-          label = '$name (Casual)';
-        } else if (isP && !isC) {
-          label = '$name (Professional)';
-        }
-      }
-
-      final globeLogo = Container(
-        width: 36,
-        height: 36,
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.08),
-          shape: BoxShape.circle,
-        ),
-        padding: const EdgeInsets.all(8),
-        child: Icon(
-          Icons.language_rounded,
-          color: context.accentSecondary,
-          size: 20,
-        ),
-      );
-
-      widgets.add(_buildSocialCard(
-        title: label,
-        handle: url,
-        logo: globeLogo,
+      widgets.add(_buildReadOnlyField(
+        label: name,
+        value: url,
+        icon: Icons.link_rounded,
       ));
     }
 
@@ -1933,7 +2156,6 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
         children: [
           _buildPillItem('casual', 'Casual'),
           _buildPillItem('professional', 'Professional'),
-          _buildPillItem('both', 'Both'),
         ],
       ),
     );
@@ -1954,7 +2176,7 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
           child: Text(
             label,
             style: TextStyle(
-              color: isSelected ? Colors.black : context.textSecondary,
+              color: isSelected ? Colors.white : context.textSecondary,
               fontWeight: FontWeight.bold,
               fontSize: 11,
               fontFamily: 'Inter',

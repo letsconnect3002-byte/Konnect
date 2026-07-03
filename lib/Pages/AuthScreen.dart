@@ -1107,7 +1107,7 @@ class _AuthScreenState extends State<AuthScreen> {
       child: ElevatedButton(
         style: ElevatedButton.styleFrom(
           backgroundColor: context.accentPrimary,
-          foregroundColor: Colors.black,
+          foregroundColor: Colors.white,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppDimensions.radiusPill),
           ),
@@ -1116,7 +1116,7 @@ class _AuthScreenState extends State<AuthScreen> {
         child: Text(
           _isSignIn ? "I'm in" : "I'm in",
           style: context.cardTitle.copyWith(
-            color: Colors.black,
+            color: Colors.white,
             fontWeight: FontWeight.bold,
           ),
         ),
@@ -1174,7 +1174,7 @@ class _AuthScreenState extends State<AuthScreen> {
       child: ElevatedButton(
         style: ElevatedButton.styleFrom(
           backgroundColor: context.accentPrimary,
-          foregroundColor: Colors.black,
+          foregroundColor: Colors.white,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppDimensions.radiusPill),
           ),
@@ -1187,7 +1187,7 @@ class _AuthScreenState extends State<AuthScreen> {
         child: Text(
           "Verify Code",
           style: context.cardTitle.copyWith(
-            color: Colors.black,
+            color: Colors.white,
             fontWeight: FontWeight.bold,
           ),
         ),
@@ -1211,7 +1211,7 @@ class _AuthScreenState extends State<AuthScreen> {
       child: ElevatedButton(
         style: ElevatedButton.styleFrom(
           backgroundColor: context.accentPrimary,
-          foregroundColor: Colors.black,
+          foregroundColor: Colors.white,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppDimensions.radiusPill),
           ),
@@ -1224,7 +1224,7 @@ class _AuthScreenState extends State<AuthScreen> {
         child: Text(
           "Verify Code",
           style: context.cardTitle.copyWith(
-            color: Colors.black,
+            color: Colors.white,
             fontWeight: FontWeight.bold,
           ),
         ),
@@ -1248,7 +1248,7 @@ class _AuthScreenState extends State<AuthScreen> {
       child: ElevatedButton(
         style: ElevatedButton.styleFrom(
           backgroundColor: context.accentPrimary,
-          foregroundColor: Colors.black,
+          foregroundColor: Colors.white,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppDimensions.radiusPill),
           ),
@@ -1261,7 +1261,7 @@ class _AuthScreenState extends State<AuthScreen> {
         child: Text(
           "Send Recovery Code",
           style: context.cardTitle.copyWith(
-            color: Colors.black,
+            color: Colors.white,
             fontWeight: FontWeight.bold,
           ),
         ),

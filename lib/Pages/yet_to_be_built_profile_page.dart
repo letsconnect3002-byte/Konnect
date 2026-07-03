@@ -1,20 +1,24 @@
+import 'dart:async';
 import 'package:connect/Config/app_theme.dart';
 import 'package:connect/Models/profile_card_type.dart';
-import 'package:connect/Models/custom_link.dart';
 import 'package:connect/Providers/profile_provider.dart';
 import 'package:connect/Pages/SettingsPage.dart';
-import 'package:connect/Widgets/card_field_input.dart';
+import 'package:connect/Pages/edit_profile_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:connect/Widgets/connect_hub_bottom_sheet.dart';
+import 'package:connect/services/analytics_service.dart';
+import 'package:skeletonizer/skeletonizer.dart';
+import 'package:flutter_animate/flutter_animate.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:connect/services/image_upload_service.dart';
 import 'package:connect/Pages/crop_image_page.dart';
-import 'package:connect/Widgets/connect_hub_bottom_sheet.dart';
-import 'package:skeletonizer/skeletonizer.dart';
 
 class YetToBeBuiltProfilePage extends StatefulWidget {
-  const YetToBeBuiltProfilePage({super.key});
+  final bool isEditingMode;
+  const YetToBeBuiltProfilePage({super.key, this.isEditingMode = false});
 
   @override
   State<YetToBeBuiltProfilePage> createState() =>
@@ -29,46 +33,18 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
   bool _isSaving = false;
   ProfileCardType _previewCard = ProfileCardType.casual;
   bool _showFront = true;
-  static const String _defaultAvatarUrl = '';
-  String _avatarUrl = _defaultAvatarUrl;
+
+  // Onboarding UI state variables
+  int _onboardingStep = 0;
+  final PageController _onboardingPageController = PageController();
+  final ScrollController _onboardingScrollController = ScrollController();
+  String _selectedVibe = '';
+  final Set<String> _selectedInterests = {};
 
   late TextEditingController _nameController;
-  late TextEditingController _professionController;
-  late TextEditingController _companyController;
-  late TextEditingController _emailController;
-  late TextEditingController _professionalEmailController;
-  late TextEditingController _phoneController;
-  late TextEditingController _professionalPhoneController;
-  late TextEditingController _bioController;
-  late TextEditingController _professionalBioController;
-  late FocusNode _bioFocusNode;
-  late FocusNode _professionalBioFocusNode;
-  late FocusNode _emailFocusNode;
-  late FocusNode _professionalEmailFocusNode;
-  late FocusNode _phoneFocusNode;
-  late FocusNode _professionalPhoneFocusNode;
-  String _casualCountryCode = '+91';
-  String _professionalCountryCode = '+91';
-
-  final Map<String, bool> _editMode = {
-    'name': false,
-    'profession': false,
-    'company': false,
-    'email': false,
-    'professionalEmail': false,
-    'phoneNumber': false,
-    'professionalPhoneNumber': false,
-    'bio': false,
-    'professionalBio': false,
-  };
-
-  bool _isEditing(String field) => _editMode[field] ?? false;
-
-  void _setEditMode(String field, bool value) {
-    if (_editMode[field] != value) {
-      setState(() => _editMode[field] = value);
-    }
-  }
+  final TextEditingController _customVibeController = TextEditingController();
+  final TextEditingController _customInterestController =
+      TextEditingController();
 
   @override
   void initState() {
@@ -79,216 +55,695 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
     _isLoading = !provider.hasData;
 
     _nameController = TextEditingController(text: provider.name);
-    _professionController = TextEditingController(text: provider.profession);
-    _companyController = TextEditingController(text: provider.company);
-    _emailController = TextEditingController(text: provider.email);
-    _professionalEmailController =
-        TextEditingController(text: provider.professionalEmail);
-
-    final casualPhoneParsed = _parsePhone(provider.phoneNumber);
-    _casualCountryCode = casualPhoneParsed['code']!;
-    _phoneController =
-        TextEditingController(text: casualPhoneParsed['number']!);
-
-    final profPhoneParsed = _parsePhone(provider.professionalPhoneNumber);
-    _professionalCountryCode = profPhoneParsed['code']!;
-    _professionalPhoneController =
-        TextEditingController(text: profPhoneParsed['number']!);
-
-    _bioController = TextEditingController(text: provider.bio);
-    _professionalBioController =
-        TextEditingController(text: provider.professionalBio);
-
-    _bioFocusNode = FocusNode();
-    _professionalBioFocusNode = FocusNode();
-    _emailFocusNode = FocusNode();
-    _professionalEmailFocusNode = FocusNode();
-    _phoneFocusNode = FocusNode();
-    _professionalPhoneFocusNode = FocusNode();
-
-    // Setup real-time card preview listeners
-    _nameController.addListener(_onFieldChanged);
-    _professionController.addListener(_onFieldChanged);
-    _companyController.addListener(_onFieldChanged);
-    _emailController.addListener(_onFieldChanged);
-    _professionalEmailController.addListener(_onFieldChanged);
-    _phoneController.addListener(_onFieldChanged);
-    _professionalPhoneController.addListener(_onFieldChanged);
-    _bioController.addListener(_onFieldChanged);
-    _professionalBioController.addListener(_onFieldChanged);
-
-    _bioFocusNode.addListener(() {
-      if (_bioFocusNode.hasFocus) {
-        if (!_isEditing('bio')) {
-          _setEditMode('bio', true);
-        }
-      } else {
-        if (_isEditing('bio')) {
-          _setEditMode('bio', false);
-        }
-      }
-    });
-
-    _professionalBioFocusNode.addListener(() {
-      if (_professionalBioFocusNode.hasFocus) {
-        if (!_isEditing('professionalBio')) {
-          _setEditMode('professionalBio', true);
-        }
-      } else {
-        if (_isEditing('professionalBio')) {
-          _setEditMode('professionalBio', false);
-        }
-      }
-    });
-
-    _emailFocusNode.addListener(() {
-      if (_emailFocusNode.hasFocus) {
-        if (!_isEditing('email')) {
-          _setEditMode('email', true);
-        }
-      } else {
-        if (_isEditing('email')) {
-          _setEditMode('email', false);
-        }
-      }
-    });
-
-    _professionalEmailFocusNode.addListener(() {
-      if (_professionalEmailFocusNode.hasFocus) {
-        if (!_isEditing('professionalEmail')) {
-          _setEditMode('professionalEmail', true);
-        }
-      } else {
-        if (_isEditing('professionalEmail')) {
-          _setEditMode('professionalEmail', false);
-        }
-      }
-    });
-
-    _phoneFocusNode.addListener(() {
-      if (_phoneFocusNode.hasFocus) {
-        if (!_isEditing('phoneNumber')) {
-          _setEditMode('phoneNumber', true);
-        }
-      } else {
-        if (_isEditing('phoneNumber')) {
-          _setEditMode('phoneNumber', false);
-        }
-      }
-    });
-
-    _professionalPhoneFocusNode.addListener(() {
-      if (_professionalPhoneFocusNode.hasFocus) {
-        if (!_isEditing('professionalPhoneNumber')) {
-          _setEditMode('professionalPhoneNumber', true);
-        }
-      } else {
-        if (_isEditing('professionalPhoneNumber')) {
-          _setEditMode('professionalPhoneNumber', false);
-        }
-      }
-    });
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadInitialData();
+      if (widget.isEditingMode) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => const EditProfilePage()),
+        );
+      }
     });
   }
 
   @override
   void dispose() {
-    _nameController.removeListener(_onFieldChanged);
-    _professionController.removeListener(_onFieldChanged);
-    _companyController.removeListener(_onFieldChanged);
-    _emailController.removeListener(_onFieldChanged);
-    _professionalEmailController.removeListener(_onFieldChanged);
-    _phoneController.removeListener(_onFieldChanged);
-    _professionalPhoneController.removeListener(_onFieldChanged);
-    _bioController.removeListener(_onFieldChanged);
-    _professionalBioController.removeListener(_onFieldChanged);
-
     _nameController.dispose();
-    _professionController.dispose();
-    _companyController.dispose();
-    _emailController.dispose();
-    _professionalEmailController.dispose();
-    _phoneController.dispose();
-    _professionalPhoneController.dispose();
-    _bioController.dispose();
-    _professionalBioController.dispose();
-    _bioFocusNode.dispose();
-    _professionalBioFocusNode.dispose();
-    _emailFocusNode.dispose();
-    _professionalEmailFocusNode.dispose();
-    _phoneFocusNode.dispose();
-    _professionalPhoneFocusNode.dispose();
+    _onboardingPageController.dispose();
+    _onboardingScrollController.dispose();
+    _customVibeController.dispose();
+    _customInterestController.dispose();
     super.dispose();
   }
 
-  Map<String, String> _parsePhone(String rawPhone) {
-    final codes = [
-      '+1',
-      '+91',
-      '+44',
-      '+61',
-      '+81',
-      '+49',
-      '+33',
-      '+65',
-      '+971',
-      '+966',
-      '+27',
-      '+55',
-      '+86',
-      '+7',
-      '+52',
-      '+39',
-      '+34',
-      '+31',
-      '+82'
-    ];
-    codes.sort((a, b) => b.length.compareTo(a.length));
+  // Onboarding Wizard Methods
 
-    String cleaned = rawPhone.trim();
-    for (final code in codes) {
-      if (cleaned.startsWith(code)) {
-        String rest = cleaned.substring(code.length).trim();
-        return {'code': code, 'number': rest};
+  void _nextStep() {
+    if (_onboardingStep < 2) {
+      setState(() {
+        _onboardingStep++;
+      });
+      _onboardingPageController.animateToPage(
+        _onboardingStep,
+        duration: const Duration(milliseconds: 450),
+        curve: Curves.easeOutCubic,
+      );
+    }
+  }
+
+  void _prevStep() {
+    if (_onboardingStep > 0) {
+      setState(() {
+        _onboardingStep--;
+      });
+      _onboardingPageController.animateToPage(
+        _onboardingStep,
+        duration: const Duration(milliseconds: 450),
+        curve: Curves.easeOutCubic,
+      );
+    }
+  }
+
+  Future<void> _finishQuickIdentity(
+      {required bool openProfessionalEditor}) async {
+    HapticFeedback.mediumImpact();
+    setState(() => _isSaving = true);
+    try {
+      final provider = Provider.of<ProfileProvider>(context, listen: false);
+      provider.name = _nameController.text.trim();
+      provider.vibeTag = _selectedVibe;
+      provider.interestTags = _selectedInterests.toList();
+      provider.quickSetupComplete = true;
+
+      await provider.saveOrUpdateProfile();
+
+      AnalyticsService.logEvent('quick_identity_complete');
+
+      if (!mounted) return;
+
+      if (openProfessionalEditor) {
+        AnalyticsService.logEvent('full_profile_started');
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) =>
+                const YetToBeBuiltProfilePage(isEditingMode: true),
+          ),
+        );
+      } else {
+        // Just let the profile page viewer rebuild in place.
+      }
+    } catch (e) {
+      debugPrint("Error finishing onboarding: $e");
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+            content: Text("Error completing onboarding: $e"),
+            backgroundColor: Colors.red),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isSaving = false);
       }
     }
-    return {'code': '+91', 'number': cleaned};
   }
 
-  void _onFieldChanged() {
-    if (mounted) {
-      setState(() {});
+  Widget _buildQuickIdentityWizard() {
+    return Scaffold(
+      backgroundColor: const Color(0xFF0F101A),
+      body: SafeArea(
+        child: Stack(
+          children: [
+            PageView(
+              controller: _onboardingPageController,
+              physics: const NeverScrollableScrollPhysics(),
+              children: [
+                _buildStepNameVibe(),
+                _buildStepInterests(),
+                _buildStepDone(),
+              ],
+            ),
+            if (_isSaving)
+              Container(
+                color: Colors.black.withOpacity(0.6),
+                child: Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const CircularProgressIndicator(
+                          valueColor:
+                              AlwaysStoppedAnimation<Color>(Color(0xFF00F2FE))),
+                      const SizedBox(height: 16),
+                      Text(
+                        "Setting up your vibe...",
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.9),
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          fontFamily: 'Inter',
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStepNameVibe() {
+    final List<String> defaultVibes = [
+      "Night owl",
+      "Early bird",
+      "Music head",
+      "Bookworm",
+      "Gamer"
+    ];
+    final List<String> vibes = [...defaultVibes, "Others"];
+
+    final bool isCustomVibe =
+        _selectedVibe.isNotEmpty && !defaultVibes.contains(_selectedVibe);
+    final String activeChipSelection = isCustomVibe ? "Others" : _selectedVibe;
+
+    return SingleChildScrollView(
+      controller: _onboardingScrollController,
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.all(24.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Row(
+            children: [
+              SizedBox(width: 40),
+              Expanded(
+                child: Text(
+                  "IDENTITY",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Colors.white38,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 1.5,
+                    fontSize: 11,
+                  ),
+                ),
+              ),
+              SizedBox(width: 40),
+            ],
+          ),
+          const SizedBox(height: 24),
+          const Text(
+            "What should they call you?",
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 28,
+              fontWeight: FontWeight.w900,
+              fontFamily: 'Inter',
+            ),
+          ),
+          const SizedBox(height: 36),
+          TextField(
+            controller: _nameController,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 32,
+              fontWeight: FontWeight.bold,
+              fontFamily: 'Inter',
+            ),
+            decoration: InputDecoration(
+              hintText: "Your name",
+              hintStyle: TextStyle(color: Colors.white.withOpacity(0.2)),
+              enabledBorder: const UnderlineInputBorder(
+                borderSide: BorderSide(color: Colors.white24, width: 2),
+              ),
+              focusedBorder: const UnderlineInputBorder(
+                borderSide: BorderSide(color: Color(0xFF00F2FE), width: 2),
+              ),
+              border: const UnderlineInputBorder(
+                borderSide: BorderSide(color: Colors.white24),
+              ),
+            ),
+            onChanged: (_) => setState(() {}),
+          ),
+          const SizedBox(height: 24),
+          const Text(
+            "CHOOSE A VIBE",
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: Colors.white38,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 1.5,
+              fontSize: 11,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            alignment: WrapAlignment.center,
+            children: vibes.map((vibe) {
+              final isSelected = activeChipSelection == vibe;
+              return ChoiceChip(
+                label: Text(
+                  vibe,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                selected: isSelected,
+                selectedColor: const Color(0xFF00F2FE),
+                backgroundColor: const Color(0xFF1E1F32),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
+                  side: BorderSide(
+                      color: isSelected
+                          ? const Color(0xFF00F2FE)
+                          : Colors.white10),
+                ),
+                onSelected: (selected) {
+                  HapticFeedback.lightImpact();
+                  setState(() {
+                    if (vibe == 'Others') {
+                      _selectedVibe = selected ? 'Others' : '';
+                      if (!selected) {
+                        _customVibeController.clear();
+                      } else {
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          if (_onboardingScrollController.hasClients) {
+                            _onboardingScrollController.animateTo(
+                              _onboardingScrollController
+                                  .position.maxScrollExtent,
+                              duration: const Duration(milliseconds: 300),
+                              curve: Curves.easeOut,
+                            );
+                          }
+                        });
+                      }
+                    } else {
+                      _selectedVibe = selected ? vibe : '';
+                      _customVibeController.clear();
+                    }
+                  });
+                },
+              );
+            }).toList(),
+          ),
+          if (activeChipSelection == 'Others') ...[
+            const SizedBox(height: 24),
+            TextField(
+              controller: _customVibeController,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                fontFamily: 'Inter',
+              ),
+              decoration: InputDecoration(
+                hintText: "Enter your custom vibe",
+                hintStyle: TextStyle(color: Colors.white.withOpacity(0.2)),
+                enabledBorder: const UnderlineInputBorder(
+                  borderSide: BorderSide(color: Colors.white24, width: 1.5),
+                ),
+                focusedBorder: const UnderlineInputBorder(
+                  borderSide: BorderSide(color: Color(0xFF00F2FE), width: 1.5),
+                ),
+              ),
+              onChanged: (_) => setState(() {}),
+            ),
+          ],
+          const SizedBox(height: 32),
+          ElevatedButton(
+            onPressed: (_nameController.text.trim().isNotEmpty &&
+                    _selectedVibe.isNotEmpty &&
+                    (_selectedVibe != 'Others' ||
+                        _customVibeController.text.trim().isNotEmpty))
+                ? () {
+                    HapticFeedback.lightImpact();
+                    final finalVibe = _selectedVibe == 'Others'
+                        ? _customVibeController.text.trim()
+                        : _selectedVibe;
+                    _selectedVibe = finalVibe;
+                    AnalyticsService.logEvent(
+                        'quick_identity_name_vibe', {'vibe': finalVibe});
+                    _nextStep();
+                  }
+                : null,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF0064E0),
+              disabledBackgroundColor: Colors.white10,
+              foregroundColor: Colors.white,
+              disabledForegroundColor: Colors.white24,
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16)),
+            ),
+            child: const Text(
+              "Continue",
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStepInterests() {
+    final List<String> defaultInterests = [
+      "Tech",
+      "Art",
+      "Travel",
+      "Fitness",
+      "Movies",
+      "Coffee",
+      "Music",
+      "Food",
+      "Sports",
+      "Reading"
+    ];
+
+    // Combine default interests, any custom interests in _selectedInterests, and "Others"
+    final List<String> displayInterests = [
+      ...defaultInterests,
+      ..._selectedInterests
+          .where((i) => !defaultInterests.contains(i) && i != 'Others'),
+      "Others"
+    ];
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(24.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              IconButton(
+                icon: const Icon(Icons.arrow_back_ios_new_rounded,
+                    color: Colors.white54, size: 20),
+                onPressed: _prevStep,
+              ),
+              const Expanded(
+                child: Text(
+                  "INTERESTS",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Colors.white38,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 1.5,
+                    fontSize: 11,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 40),
+            ],
+          ),
+          const SizedBox(height: 24),
+          const Text(
+            "Pick your interests.",
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 28,
+              fontWeight: FontWeight.w900,
+              fontFamily: 'Inter',
+            ),
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            "Select 3 or more topics you love talking about.",
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: Colors.white54,
+              fontSize: 14,
+              fontFamily: 'Inter',
+            ),
+          ),
+          const SizedBox(height: 36),
+          Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            alignment: WrapAlignment.center,
+            children: displayInterests.map((interest) {
+              final isSelected = _selectedInterests.contains(interest);
+              return FilterChip(
+                label: Text(
+                  interest,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                selected: isSelected,
+                selectedColor: const Color(0xFF00F2FE),
+                backgroundColor: const Color(0xFF1E1F32),
+                checkmarkColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
+                  side: BorderSide(
+                      color: isSelected
+                          ? const Color(0xFF00F2FE)
+                          : Colors.white10),
+                ),
+                onSelected: (selected) {
+                  HapticFeedback.lightImpact();
+                  setState(() {
+                    if (interest == 'Others') {
+                      if (selected) {
+                        _selectedInterests.add('Others');
+                      } else {
+                        _selectedInterests.remove('Others');
+                        _customInterestController.clear();
+                      }
+                    } else {
+                      if (selected) {
+                        _selectedInterests.add(interest);
+                      } else {
+                        _selectedInterests.remove(interest);
+                      }
+                    }
+                  });
+                },
+              );
+            }).toList(),
+          ),
+          if (_selectedInterests.contains('Others')) ...[
+            const SizedBox(height: 24),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _customInterestController,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontFamily: 'Inter',
+                    ),
+                    decoration: InputDecoration(
+                      hintText: "Add custom interest...",
+                      hintStyle:
+                          TextStyle(color: Colors.white.withOpacity(0.3)),
+                      enabledBorder: const UnderlineInputBorder(
+                        borderSide: BorderSide(color: Colors.white24),
+                      ),
+                      focusedBorder: const UnderlineInputBorder(
+                        borderSide: BorderSide(color: Color(0xFF00F2FE)),
+                      ),
+                    ),
+                    onSubmitted: (_) => _addCustomInterest(),
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.add_circle_outline_rounded,
+                      color: Color(0xFF00F2FE), size: 28),
+                  onPressed: _addCustomInterest,
+                ),
+              ],
+            ),
+          ],
+          const SizedBox(height: 20),
+          Text(
+            "${_selectedInterests.where((i) => i != 'Others').length} selected",
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: _selectedInterests.where((i) => i != 'Others').length >= 3
+                  ? const Color(0xFF00F2FE)
+                  : Colors.white38,
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 60),
+          ElevatedButton(
+            onPressed: _selectedInterests.where((i) => i != 'Others').length >=
+                    3
+                ? () {
+                    HapticFeedback.lightImpact();
+                    // Remove "Others" placeholder chip from the final saved interests list
+                    final finalInterests =
+                        _selectedInterests.where((i) => i != 'Others').toList();
+                    _selectedInterests.clear();
+                    _selectedInterests.addAll(finalInterests);
+
+                    AnalyticsService.logEvent('quick_identity_interests',
+                        {'interests': finalInterests});
+                    _nextStep();
+                  }
+                : null,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF0064E0),
+              disabledBackgroundColor: Colors.white10,
+              foregroundColor: Colors.white,
+              disabledForegroundColor: Colors.white24,
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16)),
+            ),
+            child: const Text(
+              "All Done",
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _addCustomInterest() {
+    final text = _customInterestController.text.trim();
+    if (text.isNotEmpty) {
+      setState(() {
+        _selectedInterests.add(text);
+        _customInterestController.clear();
+      });
     }
   }
 
-  bool _isDataChanged() {
-    if (!mounted) return false;
-    final provider = Provider.of<ProfileProvider>(context, listen: false);
-
-    final String casualPhoneText = _phoneController.text.trim();
-    final String casualPhoneToCompare = casualPhoneText.isNotEmpty
-        ? '$_casualCountryCode $casualPhoneText'
-        : '';
-
-    final String profPhoneText = _professionalPhoneController.text.trim();
-    final String profPhoneToCompare = profPhoneText.isNotEmpty
-        ? '$_professionalCountryCode $profPhoneText'
-        : '';
-
-    return _nameController.text.trim() != provider.name ||
-        _professionController.text.trim() != provider.profession ||
-        _companyController.text.trim() != provider.company ||
-        _emailController.text.trim() != provider.email ||
-        _professionalEmailController.text.trim() !=
-            provider.professionalEmail ||
-        casualPhoneToCompare != provider.phoneNumber ||
-        profPhoneToCompare != provider.professionalPhoneNumber ||
-        _bioController.text.trim() != provider.bio ||
-        _professionalBioController.text.trim() != provider.professionalBio ||
-        _avatarUrl != provider.avatarUrl;
+  Widget _buildStepDone() {
+    return Padding(
+      padding: const EdgeInsets.all(24.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Spacer(),
+          Center(
+            child: Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1E1F32).withOpacity(0.8),
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: Colors.white.withOpacity(0.08)),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 96,
+                    height: 96,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF00F2FE), Color(0xFF0064E0)],
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF00F2FE).withOpacity(0.15),
+                          blurRadius: 6,
+                          spreadRadius: 1,
+                        ),
+                      ],
+                    ),
+                    child: Builder(builder: (context) {
+                      final provider =
+                          Provider.of<ProfileProvider>(context, listen: false);
+                      return (provider.avatarUrl.isNotEmpty &&
+                              provider.avatarUrl.startsWith('http'))
+                          ? ClipOval(
+                              child: Image.network(provider.avatarUrl,
+                                  fit: BoxFit.cover),
+                            )
+                          : Center(
+                              child: Text(
+                                _nameController.text.isNotEmpty
+                                    ? _nameController.text
+                                        .substring(0, 1)
+                                        .toUpperCase()
+                                    : "?",
+                                style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 36,
+                                    fontWeight: FontWeight.bold),
+                              ),
+                            );
+                    }),
+                  )
+                      .animate()
+                      .scale(duration: 400.ms, curve: Curves.easeOutBack),
+                  const SizedBox(height: 20),
+                  Text(
+                    _nameController.text,
+                    style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        fontFamily: 'Inter'),
+                  ).animate().fadeIn(delay: 200.ms, duration: 300.ms),
+                  const SizedBox(height: 6),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF00F2FE).withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      _selectedVibe,
+                      style: const TextStyle(
+                          color: Color(0xFF00F2FE),
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold),
+                    ),
+                  ).animate().fadeIn(delay: 300.ms, duration: 300.ms),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 32),
+          const Text(
+            "You are ready to connect!",
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 24,
+              fontWeight: FontWeight.w900,
+              fontFamily: 'Inter',
+            ),
+          ).animate().fadeIn(delay: 450.ms),
+          const SizedBox(height: 8),
+          const Text(
+            "Scan others to connect or show your card to share details instantly.",
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: Colors.white54,
+              fontSize: 14,
+              fontFamily: 'Inter',
+            ),
+          ).animate().fadeIn(delay: 500.ms),
+          const Spacer(),
+          ElevatedButton(
+            onPressed: () =>
+                _finishQuickIdentity(openProfessionalEditor: false),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF00F2FE),
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16)),
+            ),
+            child: const Text(
+              "Continue",
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextButton(
+            onPressed: () => _finishQuickIdentity(openProfessionalEditor: true),
+            child: const Text(
+              "Add Professional Details",
+              style: TextStyle(
+                color: Colors.white54,
+                fontWeight: FontWeight.w600,
+                fontSize: 14,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _loadInitialData() async {
@@ -325,347 +780,24 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
 
   void _populateControllers(ProfileProvider provider) {
     _nameController.text = provider.name;
-    _professionController.text = provider.profession;
-    _companyController.text = provider.company;
-    _emailController.text = provider.email;
-    _professionalEmailController.text = provider.professionalEmail;
-
-    final casualPhoneParsed = _parsePhone(provider.phoneNumber);
-    _casualCountryCode = casualPhoneParsed['code']!;
-    _phoneController.text = casualPhoneParsed['number']!;
-
-    final profPhoneParsed = _parsePhone(provider.professionalPhoneNumber);
-    _professionalCountryCode = profPhoneParsed['code']!;
-    _professionalPhoneController.text = profPhoneParsed['number']!;
-
-    _bioController.text = provider.bio;
-    _professionalBioController.text = provider.professionalBio;
-    _avatarUrl =
-        provider.avatarUrl.isNotEmpty ? provider.avatarUrl : _defaultAvatarUrl;
-  }
-
-  Future<void> _saveProfile() async {
-    FocusScope.of(context).unfocus();
-    setState(() => _isSaving = true);
-
-    final provider = Provider.of<ProfileProvider>(context, listen: false);
-    try {
-      provider.setValue('name', _nameController.text.trim());
-      provider.setValue('profession', _professionController.text.trim());
-      provider.setValue('company', _companyController.text.trim());
-      provider.setValue('email', _emailController.text.trim());
-      provider.setValue(
-          'professionalEmail', _professionalEmailController.text.trim());
-
-      final String casualPhoneText = _phoneController.text.trim();
-      final String casualPhoneToSave = casualPhoneText.isNotEmpty
-          ? '$_casualCountryCode $casualPhoneText'
-          : '';
-      provider.setValue('phoneNumber', casualPhoneToSave);
-
-      final String profPhoneText = _professionalPhoneController.text.trim();
-      final String profPhoneToSave = profPhoneText.isNotEmpty
-          ? '$_professionalCountryCode $profPhoneText'
-          : '';
-      provider.setValue('professionalPhoneNumber', profPhoneToSave);
-
-      provider.setValue('bio', _bioController.text.trim());
-      provider.setValue(
-          'professionalBio', _professionalBioController.text.trim());
-      provider.setValue('avatarUrl', _avatarUrl);
-
-      await provider.saveOrUpdateProfile();
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                const Icon(Icons.check_circle_rounded, color: Colors.white),
-                const SizedBox(width: 8),
-                Text("Profile saved successfully!",
-                    style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: context.textPrimary)),
-              ],
-            ),
-            backgroundColor: const Color(0xFF7C3AED),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      }
-    } catch (e) {
-      print("Error saving profile: $e");
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text("Error saving profile: $e"),
-            backgroundColor: Colors.redAccent,
-          ),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isSaving = false);
-      }
+    _selectedVibe = provider.vibeTag;
+    final List<String> defaultVibes = [
+      "Night owl",
+      "Early bird",
+      "Music head",
+      "Bookworm",
+      "Gamer"
+    ];
+    if (_selectedVibe.isNotEmpty && !defaultVibes.contains(_selectedVibe)) {
+      _customVibeController.text = _selectedVibe;
     }
-  }
-
-  Future<void> _pickAndUploadImage({
-    required StateSetter setModalState,
-    required Function(String) onUploadSuccess,
-    required Function(String) onUploadError,
-  }) async {
-    final provider = Provider.of<ProfileProvider>(context, listen: false);
-    final picker = ImagePicker();
-    try {
-      final XFile? imageFile = await picker.pickImage(
-        source: ImageSource.gallery,
-        maxWidth: 1024,
-        maxHeight: 1024,
-      );
-
-      if (imageFile == null) {
-        onUploadError("canceled");
-        return;
-      }
-
-      setModalState(() {});
-
-      final bytes = await imageFile.readAsBytes();
-
-      if (!mounted) return;
-
-      // Navigate to the beautiful custom crop screen
-      final Uint8List? croppedBytes = await Navigator.push<Uint8List>(
-        context,
-        MaterialPageRoute(
-          builder: (context) => CropImagePage(imageBytes: bytes),
-        ),
-      );
-
-      if (croppedBytes == null) {
-        onUploadError("canceled");
-        return;
-      }
-
-      // Re-trigger loading state in bottom sheet UI
-      setModalState(() {});
-
-      final compressedBytes =
-          await ImageUploadService.compressImageTo10Kb(croppedBytes);
-
-      final String publicUrl = await ImageUploadService.uploadAvatarImage(
-        provider.userId,
-        compressedBytes,
-      );
-
-      onUploadSuccess(publicUrl);
-    } catch (e) {
-      print("Error picking/uploading image: $e");
-      onUploadError(e.toString());
-    }
-  }
-
-  void _showPhotoPicker() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: context.surfacePrimary,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(
-            top: Radius.circular(AppDimensions.radiusPremiumCard)),
-      ),
-      builder: (context) {
-        bool isUploading = false;
-        String? uploadError;
-
-        return StatefulBuilder(
-          builder: (context, setModalState) {
-            return SingleChildScrollView(
-              physics: const BouncingScrollPhysics(),
-              child: Padding(
-                padding: EdgeInsets.only(
-                  left: AppDimensions.marginStandard,
-                  right: AppDimensions.marginStandard,
-                  top: 24.0,
-                  bottom: 24.0 + MediaQuery.of(context).viewInsets.bottom,
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Text(
-                      "Profile Photo",
-                      style: context.screenHeading,
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 24),
-                    Center(
-                      child: Container(
-                        width: 120,
-                        height: 120,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          gradient: LinearGradient(
-                            colors: [
-                              const Color(0xFF00F2FE),
-                              context.accentSecondary
-                            ],
-                          ),
-                        ),
-                        padding: const EdgeInsets.all(3),
-                        child: CircleAvatar(
-                          radius: 57,
-                          backgroundImage: (_avatarUrl.isNotEmpty &&
-                                  _avatarUrl.startsWith('http'))
-                              ? NetworkImage(_avatarUrl)
-                              : null,
-                          backgroundColor: context.surfaceSecondary,
-                          child: (_avatarUrl.isNotEmpty &&
-                                  _avatarUrl.startsWith('http'))
-                              ? null
-                              : Text(
-                                  _nameController.text.isNotEmpty
-                                      ? _nameController.text
-                                          .substring(0, 1)
-                                          .toUpperCase()
-                                      : "?",
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 38,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    if (isUploading) ...[
-                      const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 20),
-                        child: Center(
-                          child: CircularProgressIndicator(
-                            valueColor: AlwaysStoppedAnimation<Color>(
-                                Color(0xFF00F2FE)),
-                          ),
-                        ),
-                      ),
-                    ] else ...[
-                      GlassmorphicButton(
-                        onPressed: () {
-                          setModalState(() {
-                            isUploading = true;
-                            uploadError = null;
-                          });
-                          _pickAndUploadImage(
-                            setModalState: setModalState,
-                            onUploadSuccess: (publicUrl) {
-                              if (mounted) {
-                                setState(() {
-                                  _avatarUrl = publicUrl;
-                                });
-                                // Immediately persist to provider + database
-                                final provider = Provider.of<ProfileProvider>(
-                                    context,
-                                    listen: false);
-                                provider.setValue('avatarUrl', publicUrl);
-                                if (provider.userId != null) {
-                                  provider.updateProfileField(
-                                      'avatarUrl', publicUrl, provider.userId!);
-                                } else {
-                                  provider.saveOrUpdateProfile();
-                                }
-                              }
-                              Navigator.pop(
-                                  context); // Auto-dismiss sheet on success
-
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: const Text(
-                                    "Profile photo updated and saved!",
-                                    style: TextStyle(
-                                        fontFamily: 'Inter',
-                                        fontWeight: FontWeight.bold),
-                                  ),
-                                  backgroundColor: context.accentSecondary,
-                                  behavior: SnackBarBehavior.floating,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                ),
-                              );
-                            },
-                            onUploadError: (err) {
-                              setModalState(() {
-                                isUploading = false;
-                                if (err == "canceled") {
-                                  uploadError = null;
-                                } else {
-                                  uploadError = err;
-                                }
-                              });
-                            },
-                          );
-                        },
-                        borderRadius: BorderRadius.circular(
-                            AppDimensions.radiusComponent),
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: const [
-                            Icon(Icons.photo_library_rounded,
-                                color: Colors.white, size: 18),
-                            SizedBox(width: 8),
-                            Text(
-                              "Upload from Gallery",
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 14,
-                                fontFamily: 'Inter',
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                    if (uploadError != null &&
-                        uploadError != "No image picked" &&
-                        uploadError != "No image cropped" &&
-                        uploadError != "canceled") ...[
-                      const SizedBox(height: 16),
-                      Text(
-                        "Upload Error: $uploadError\nMake sure storage bucket 'avatars' is created and RLS is public in Supabase.",
-                        style: const TextStyle(
-                            color: Colors.redAccent,
-                            fontSize: 11,
-                            fontFamily: 'Inter'),
-                        textAlign: TextAlign.center,
-                      ),
-                    ],
-                    const SizedBox(height: 16),
-                    TextButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: Text(
-                        "Cancel",
-                        style: context.bodyText.copyWith(
-                          color: context.textMuted,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-        );
-      },
-    );
   }
 
   @override
   Widget build(BuildContext context) {
+    // Rebuild card preview when Casual/Professional field toggles change.
+    final provider = context.watch<ProfileProvider>();
+
     if (_isLoading) {
       return Skeletonizer(
         enabled: true,
@@ -681,15 +813,13 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  _buildSkeletonHeader(),
+                  _buildHeader(context),
                   const SizedBox(height: 28),
-                  _buildSkeletonCardSection(),
+                  _buildCardTypeTabs(),
+                  const SizedBox(height: 20),
+                  _buildCasualSocialProfile(),
                   const SizedBox(height: 32),
-                  _buildSkeletonEditorForm(),
-                  const SizedBox(height: 32),
-                  _buildSkeletonSocialLinks(),
-                  const SizedBox(height: 16),
-                  _buildSkeletonSaveButton(),
+                  _buildProfileDetailsSection(),
                 ],
               ),
             ),
@@ -698,8 +828,9 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
       );
     }
 
-    // Rebuild card preview when Casual/Professional field toggles change.
-    context.watch<ProfileProvider>();
+    if (!widget.isEditingMode && !provider.quickSetupComplete) {
+      return _buildQuickIdentityWizard();
+    }
 
     return GestureDetector(
       onTap: () {
@@ -708,483 +839,75 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
       child: Scaffold(
         backgroundColor: context.canvasBackground,
         body: SafeArea(
-          child: Stack(
-            children: [
-              SingleChildScrollView(
-                padding: const EdgeInsets.only(
-                    left: AppDimensions.marginStandard,
-                    right: AppDimensions.marginStandard,
-                    top: 16.0,
-                    bottom: 100.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    // Top Header Capsule
-                    _buildHeader(context),
-                    const SizedBox(height: 28),
-
-                    // YOUR CARDS — Casual / Professional + Front / Back
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'YOUR CARDS',
-                          style: context.captionText.copyWith(
-                            color: context.textSecondary,
-                            fontSize: 14.0,
-                            letterSpacing: 1.5,
-                          ),
-                        ),
-                        _buildFrontBackToggle(),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    _buildCardTypeTabs(),
-                    const SizedBox(height: 16),
-
-                    // Premium Glowing Gradient Border Business Card
-                    _buildDigitalCard(),
-                    const SizedBox(height: 32),
-
-                    // EDIT DETAILS Header
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'EDIT DETAILS',
-                          style: context.captionText.copyWith(
-                            color: context.textSecondary,
-                            fontSize: 14.0,
-                            letterSpacing: 1.5,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Editor Container
-                    _buildEditorForm(),
-                    const SizedBox(height: 32),
-
-                    _buildSocialLinksSection(),
-                    const SizedBox(height: 32),
-
-                    _buildCustomLinksSection(),
-                    const SizedBox(height: 16),
-
-                    _buildSaveButton(),
-                    // const SizedBox(height: 32),
-
-                    // // QUICK ACTIONS — absorbed from ProfilePage
-                    // _buildQuickActionsSection(),
-                    // const SizedBox(height: 16),
-                  ],
-                ),
-              ),
-              if (_isSaving)
-                Container(
-                  color: Colors.black.withValues(alpha: 0.5),
-                  child: Center(
-                    child: CircularProgressIndicator(
-                      valueColor: AlwaysStoppedAnimation<Color>(
-                          context.accentSecondary),
-                    ),
-                  ),
-                ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSocialLinksSection() {
-    final provider = Provider.of<ProfileProvider>(context);
-
-    // LinkedIn
-    final linkedinLogo = Container(
-      width: 36,
-      height: 36,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        shape: BoxShape.circle,
-      ),
-      // padding: const EdgeInsets.all(8),
-      child: Image.asset(
-        'assets/icons/linkedin.png',
-        fit: BoxFit.contain,
-      ),
-    );
-
-    // Twitter
-    final twitterLogo = Container(
-      width: 36,
-      height: 36,
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.08),
-        shape: BoxShape.circle,
-      ),
-      // padding: const EdgeInsets.all(8),
-      child: Image.asset(
-        'assets/icons/twitter.png',
-        fit: BoxFit.contain,
-      ),
-    );
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Row(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.only(
+                left: AppDimensions.marginStandard,
+                right: AppDimensions.marginStandard,
+                top: 16.0,
+                bottom: 100.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Icon(Icons.link_rounded,
-                    color: context.accentSecondary, size: 18),
-                const SizedBox(width: 8),
-                Text(
-                  'SOCIAL LINKS',
-                  style: context.captionText.copyWith(
-                    color: context.textSecondary,
-                    fontSize: 14.0,
-                    letterSpacing: 1.5,
+                // Top Header Capsule
+                _buildHeader(context),
+                const SizedBox(height: 28),
+
+                _buildCardTypeTabs(),
+                const SizedBox(height: 20),
+
+                if (_previewCard == ProfileCardType.casual) ...[
+                  _buildCasualSocialProfile(),
+                  const SizedBox(height: 32),
+                  _buildProfileDetailsSection(),
+                ] else ...[
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'YOUR CARD',
+                        style: context.captionText.copyWith(
+                          color: context.textSecondary,
+                          fontSize: 14.0,
+                          letterSpacing: 1.5,
+                        ),
+                      ),
+                      _buildFrontBackToggle(),
+                    ],
                   ),
-                ),
+                  const SizedBox(height: 16),
+                  _buildDigitalCard(),
+                  const SizedBox(height: 32),
+                  // Section: My Story (Professional Bio)
+                  _buildSectionHeader(
+                      'MY STORY', _showEditProfessionalBioSheet),
+                  const SizedBox(height: 0),
+                  Container(
+                    padding: const EdgeInsets.fromLTRB(1, 8, 8, 8),
+                    // decoration: BoxDecoration(
+                    //   color: context.surfacePrimary,
+                    //   borderRadius: BorderRadius.circular(16),
+                    //   border: Border.all(
+                    //       color: context.textMuted.withValues(alpha: 0.15)),
+                    // ),
+                    child: Text(
+                      provider.professionalBio.trim().isEmpty
+                          ? 'No professional bio added yet. Tap edit to write a summary for your professional network!'
+                          : provider.professionalBio.trim(),
+                      style: context.bodyText.copyWith(
+                        color: provider.professionalBio.trim().isEmpty
+                            ? context.textMuted
+                            : context.textPrimary,
+                        height: 1.4,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 32),
+                  _buildProfileDetailsSection(),
+                ],
               ],
             ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        _buildSocialCard(
-          fieldKey: 'linkedin',
-          title: 'LinkedIn',
-          handle: provider.linkedin,
-          logo: linkedinLogo,
-          onEdit: () =>
-              _showEditSocialDialog('LinkedIn', 'linkedin', provider.linkedin),
-        ),
-        _buildSocialCard(
-          fieldKey: 'twitter',
-          title: 'X (Former Twitter)',
-          handle: provider.twitter,
-          logo: twitterLogo,
-          onEdit: () =>
-              _showEditSocialDialog('Twitter', 'twitter', provider.twitter),
-        ),
-        _buildSocialCard(
-          fieldKey: 'instagram',
-          title: 'Instagram',
-          handle: provider.instagram,
-          logo: Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              shape: BoxShape.circle,
-            ),
-            // padding: const EdgeInsets.all(8),
-            child: Image.asset(
-              'assets/icons/instagram.png',
-              fit: BoxFit.contain,
-            ),
           ),
-          onEdit: () => _showEditSocialDialog(
-              'Instagram', 'instagram', provider.instagram),
-        ),
-        _buildSocialCard(
-          fieldKey: 'spotify',
-          title: 'Spotify',
-          handle: provider.spotify,
-          logo: Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              shape: BoxShape.circle,
-            ),
-            // padding: const EdgeInsets.all(8),
-            child: Image.asset(
-              'assets/icons/spotify.png',
-              fit: BoxFit.contain,
-            ),
-          ),
-          onEdit: () =>
-              _showEditSocialDialog('Spotify', 'spotify', provider.spotify),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildSocialCard({
-    required String fieldKey,
-    required String title,
-    required String handle,
-    required Widget logo,
-    required VoidCallback onEdit,
-  }) {
-    final provider = context.watch<ProfileProvider>();
-    final assignment = provider.fieldAssignments[fieldKey] ??
-        FieldCardAssignment(casual: false, professional: true);
-    final hasHandle = handle.isNotEmpty;
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: context.surfacePrimary,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: context.textMuted.withValues(alpha: 0.2)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            children: [
-              logo,
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  title,
-                  style: context.bodyText.copyWith(
-                    color: context.textPrimary,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-              GestureDetector(
-                onTap: () => provider.toggleFieldOnCard(
-                    fieldKey, ProfileCardType.casual),
-                child: Container(
-                  width: 32,
-                  height: 32,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: assignment.casual
-                        ? context.accentSecondary
-                        : context.surfaceSecondary,
-                    border: Border.all(
-                      color: assignment.casual
-                          ? context.accentSecondary
-                          : context.textMuted.withValues(alpha: 0.2),
-                    ),
-                  ),
-                  child: Icon(
-                    Icons.person_outline_rounded,
-                    size: 16,
-                    color: assignment.casual ? Colors.white : context.textMuted,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              GestureDetector(
-                onTap: () => provider.toggleFieldOnCard(
-                    fieldKey, ProfileCardType.professional),
-                child: Container(
-                  width: 32,
-                  height: 32,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: assignment.professional
-                        ? context.accentSecondary
-                        : context.surfaceSecondary,
-                    border: Border.all(
-                      color: assignment.professional
-                          ? context.accentSecondary
-                          : context.textMuted.withValues(alpha: 0.2),
-                    ),
-                  ),
-                  child: Icon(
-                    Icons.work_outline_rounded,
-                    size: 16,
-                    color: assignment.professional
-                        ? Colors.white
-                        : context.textMuted,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          GestureDetector(
-            onTap: onEdit,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-              decoration: BoxDecoration(
-                color: context.surfaceSecondary,
-                borderRadius:
-                    BorderRadius.circular(AppDimensions.radiusComponent),
-                border: Border.all(
-                  color: context.textMuted.withValues(alpha: 0.2),
-                ),
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      hasHandle ? handle : 'Tap to add $title',
-                      style: TextStyle(
-                        color: hasHandle
-                            ? context.accentSecondary
-                            : context.textMuted,
-                        fontSize: 14,
-                        fontWeight:
-                            hasHandle ? FontWeight.w600 : FontWeight.normal,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  Icon(Icons.edit_rounded,
-                      color: context.textSecondary, size: 18),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showEditSocialDialog(String title, String field, String currentValue) {
-    final controller = TextEditingController(text: currentValue);
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          backgroundColor: context.surfacePrimary,
-          shape: RoundedRectangleBorder(
-            borderRadius:
-                BorderRadius.circular(AppDimensions.radiusPremiumCard),
-            side: BorderSide(
-                color: context.textMuted.withValues(alpha: 0.2), width: 1.0),
-          ),
-          title: Text(
-            "Edit $title",
-            style: context.cardTitle.copyWith(
-              color: context.textPrimary,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          content: TextField(
-            controller: controller,
-            style: TextStyle(color: context.textPrimary),
-            cursorColor: context.accentPrimary,
-            decoration: InputDecoration(
-              hintText: "Enter your $title handle or link",
-              hintStyle: TextStyle(color: context.textMuted),
-              filled: true,
-              fillColor: context.surfaceSecondary,
-              focusedBorder: OutlineInputBorder(
-                borderRadius:
-                    BorderRadius.circular(AppDimensions.radiusComponent),
-                borderSide: BorderSide(color: context.accentPrimary, width: 1),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius:
-                    BorderRadius.circular(AppDimensions.radiusComponent),
-                borderSide:
-                    BorderSide(color: context.textMuted.withValues(alpha: 0.2)),
-              ),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: Text("Cancel",
-                  style: TextStyle(color: context.textSecondary)),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                final newValue = controller.text.trim();
-                await _updateSocialLink(field, newValue);
-                if (context.mounted) Navigator.pop(context);
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: context.accentSecondary,
-                shape: RoundedRectangleBorder(
-                  borderRadius:
-                      BorderRadius.circular(AppDimensions.radiusComponent),
-                ),
-              ),
-              child: const Text("Save",
-                  style: TextStyle(
-                      color: Colors.white, fontWeight: FontWeight.bold)),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  Future<void> _updateSocialLink(String field, String value) async {
-    final provider = Provider.of<ProfileProvider>(context, listen: false);
-    try {
-      if (provider.userId != null) {
-        await provider.updateProfileField(field, value, provider.userId!);
-      } else {
-        provider.setValue(field, value);
-      }
-      if (mounted) setState(() {});
-    } catch (e) {
-      print("Error updating social link: $e");
-    }
-  }
-
-  Widget _buildSaveButton() {
-    final hasChanges = _isDataChanged();
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 300),
-      width: double.infinity,
-      height: 52,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        gradient: hasChanges
-            ? LinearGradient(
-                colors: [context.accentPrimary, context.accentSecondary],
-                begin: Alignment.centerLeft,
-                end: Alignment.centerRight,
-              )
-            : null,
-        color: hasChanges ? null : context.surfaceSecondary,
-        boxShadow: hasChanges
-            ? [
-                BoxShadow(
-                  color: context.accentSecondary.withValues(alpha: 0.35),
-                  blurRadius: 12,
-                  offset: const Offset(0, 4),
-                )
-              ]
-            : [],
-      ),
-      child: ElevatedButton(
-        onPressed: (hasChanges && !_isSaving) ? _saveProfile : null,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.transparent,
-          shadowColor: Colors.transparent,
-          disabledBackgroundColor: Colors.transparent,
-          disabledForegroundColor: Colors.white24,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.check_circle_outline_rounded,
-              color: hasChanges ? Colors.white : Colors.white24,
-              size: 20,
-            ),
-            const SizedBox(width: 8),
-            Text(
-              'Save Changes',
-              style: TextStyle(
-                color: hasChanges ? Colors.white : Colors.white30,
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ],
         ),
       ),
     );
@@ -1321,33 +1044,10 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          // Back Button
-          GestureDetector(
-            onTap: () {
-              if (Navigator.canPop(context)) {
-                Navigator.pop(context);
-              }
-            },
-            child: Container(
-                padding: const EdgeInsets.all(8),
-                decoration: const BoxDecoration(
-                  // color: Color(0xFF1C1D2A),
-                  shape: BoxShape.circle,
-                ),
-                child: SizedBox(
-                  width: 16,
-                  height: 16,
-                )
-
-                // const Icon(
-                //   Icons.arrow_back_ios_new_rounded,
-                //   color: Colors.white,
-                //   size: 16,
-                // ),
-                ),
-          ),
-          // Titles
+          const SizedBox(width: 30),
+          // Center: Titles
           Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
               Text(
                 'My Profile',
@@ -1365,6 +1065,7 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
               ),
             ],
           ),
+
           GestureDetector(
             onTap: () {
               HapticFeedback.lightImpact();
@@ -1387,8 +1088,522 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
               ),
             ),
           ),
+
+          // Right: spacer to balance layout (editing is now per-section)
+          // const SizedBox(width: 32),
         ],
       ),
+    );
+  }
+
+  Widget _buildCasualSocialProfile() {
+    final provider = context.watch<ProfileProvider>();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const SizedBox(height: 16),
+        // Section: Identity (Photo, Name, Vibe)
+        // _buildSectionHeader('IDENTITY', _showEditIdentitySheet),
+        const SizedBox(height: 0),
+        Container(
+          padding: const EdgeInsets.fromLTRB(0, 0, 0, 0),
+          // decoration: BoxDecoration(
+          //   color: context.surfacePrimary,
+          //   borderRadius: BorderRadius.circular(16),
+          //   border: Border.all(color: context.textMuted.withValues(alpha: 0.15)),
+          // ),
+          child: Row(
+            children: [
+              // Avatar
+              GestureDetector(
+                onTap: _showEditIdentitySheet,
+                child: Stack(
+                  children: [
+                    Container(
+                      width: 72,
+                      height: 72,
+                      padding: const EdgeInsets.all(3),
+                      decoration: const BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: LinearGradient(
+                          colors: [Color(0xFFEC4899), Color(0xFF00F2FE)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                      ),
+                      child: ClipOval(
+                        child: (provider.avatarUrl.isNotEmpty &&
+                                provider.avatarUrl.startsWith('http'))
+                            ? Image.network(provider.avatarUrl,
+                                fit: BoxFit.cover)
+                            : Container(
+                                color: const Color(0xFF1E1F32),
+                                alignment: Alignment.center,
+                                child: Text(
+                                  _nameController.text.isNotEmpty
+                                      ? _nameController.text
+                                          .substring(0, 1)
+                                          .toUpperCase()
+                                      : "?",
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 24,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                      ),
+                    ),
+                    Positioned(
+                      bottom: 0,
+                      right: 0,
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF0064E0),
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                              color: const Color(0xFF0F101A), width: 1.5),
+                        ),
+                        child: const Icon(
+                          Icons.edit_rounded,
+                          color: Colors.white,
+                          size: 10,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 16),
+              // Name and Vibe
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _nameController.text.trim().isEmpty
+                          ? 'Jordan Miller'
+                          : _nameController.text.trim(),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w900,
+                        fontFamily: 'Inter',
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF00F2FE).withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color:
+                              const Color(0xFF00F2FE).withValues(alpha: 0.25),
+                          width: 1.0,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.flash_on_rounded,
+                              color: Color(0xFF00F2FE), size: 10),
+                          const SizedBox(width: 4),
+                          Text(
+                            _selectedVibe.isNotEmpty
+                                ? _selectedVibe
+                                : (provider.vibeTag.isNotEmpty
+                                    ? provider.vibeTag
+                                    : 'Early bird'),
+                            style: const TextStyle(
+                              color: Color(0xFF00F2FE),
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              fontFamily: 'Inter',
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 24),
+
+        // Section: My Story (Bio)
+        _buildSectionHeader('MY STORY', _showEditBioSheet),
+        const SizedBox(height: 0),
+        Container(
+          padding: const EdgeInsets.fromLTRB(1, 8, 8, 8),
+          decoration: BoxDecoration(
+              // color: context.surfacePrimary,
+              // borderRadius: BorderRadius.circular(16),
+              // border:
+              //     Border.all(color: context.textMuted.withValues(alpha: 0.15)),
+              ),
+          child: Text(
+            provider.bio.trim().isEmpty
+                ? 'No bio added yet. Tap edit to tell others about yourself!'
+                : provider.bio.trim(),
+            style: context.bodyText.copyWith(
+              color: provider.bio.trim().isEmpty
+                  ? context.textMuted
+                  : context.textPrimary,
+              height: 1.4,
+              fontSize: 14,
+            ),
+          ),
+        ),
+        const SizedBox(height: 24),
+
+        // Section: Interests
+        _buildSectionHeader('INTERESTS', _showEditInterestsSheet),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: (provider.interestTags.isNotEmpty
+                  ? provider.interestTags
+                  : (_selectedInterests.isNotEmpty
+                      ? _selectedInterests.toList()
+                      : ['Tech', 'Design', 'Music']))
+              .map((interest) => Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      // color: Colors.white.withValues(alpha: 0.05),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.15),
+                      ),
+                    ),
+                    child: Text(
+                      interest,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ))
+              .toList(),
+        ),
+        const SizedBox(height: 28),
+
+        // Section: Social Profiles
+        _buildSectionHeader('SOCIAL PROFILES', _showEditSocialSheet),
+        const SizedBox(height: 10),
+        GridView.count(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          crossAxisCount: 2,
+          mainAxisSpacing: 10,
+          crossAxisSpacing: 10,
+          childAspectRatio: 2.8,
+          children: [
+            _buildCasualSocialCard(
+                'linkedin', 'LinkedIn', 'assets/icons/linkedin.png'),
+            _buildCasualSocialCard(
+                'twitter', 'X (Twitter)', 'assets/icons/twitter.png'),
+            _buildCasualSocialCard(
+                'instagram', 'Instagram', 'assets/icons/instagram.png'),
+            _buildCasualSocialCard(
+                'spotify', 'Spotify', 'assets/icons/spotify.png'),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCasualSocialCard(
+      String platform, String name, String assetPath) {
+    final provider = Provider.of<ProfileProvider>(context, listen: false);
+    String handle = '';
+    if (platform == 'linkedin')
+      handle = provider.linkedin;
+    else if (platform == 'twitter')
+      handle = provider.twitter;
+    else if (platform == 'instagram')
+      handle = provider.instagram;
+    else if (platform == 'spotify') handle = provider.spotify;
+    final hasLink = handle.isNotEmpty;
+    final isVisible = _fieldVisible(platform);
+
+    return GestureDetector(
+      onTap: hasLink
+          ? () {
+              HapticFeedback.lightImpact();
+              _showSocialActionSheet(
+                  context, platform, name, handle, assetPath);
+            }
+          : null,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 8),
+        decoration: BoxDecoration(
+            // color: context.surfacePrimary,
+            // borderRadius: BorderRadius.circular(12),
+            // border: Border.all(
+            //   color: hasLink
+            //       ? (isVisible
+            //           ? const Color(0xFF00F2FE).withValues(alpha: 0.3)
+            //           : context.textMuted.withValues(alpha: 0.2))
+            //       : context.textMuted.withValues(alpha: 0.15),
+            // ),
+            ),
+        child: Row(
+          children: [
+            Container(
+              width: 32,
+              height: 32,
+              decoration: BoxDecoration(
+                color: hasLink
+                    ? (isVisible
+                        ? const Color(0xFF00F2FE).withValues(alpha: 0.1)
+                        : Colors.white.withValues(alpha: 0.03))
+                    : Colors.white.withValues(alpha: 0.05),
+                shape: BoxShape.circle,
+              ),
+              child: Center(
+                child: Opacity(
+                  opacity: hasLink ? (isVisible ? 1.0 : 0.4) : 0.35,
+                  child: Image.asset(
+                    assetPath,
+                    width: 16,
+                    height: 16,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    name,
+                    style: TextStyle(
+                      color: hasLink ? Colors.white : context.textMuted,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          hasLink ? handle : 'Not connected',
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: hasLink
+                                ? (isVisible
+                                    ? const Color(0xFF00F2FE)
+                                    : context.textMuted.withValues(alpha: 0.7))
+                                : context.textMuted.withValues(alpha: 0.7),
+                            fontSize: 10,
+                          ),
+                        ),
+                      ),
+                      if (hasLink && !isVisible) ...[
+                        const SizedBox(width: 4),
+                        Icon(
+                          Icons.visibility_off_rounded,
+                          color: context.textMuted.withValues(alpha: 0.5),
+                          size: 11,
+                        ),
+                      ],
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildProfileDetailsSection() {
+    final provider = Provider.of<ProfileProvider>(context);
+
+    // Filter fields depending on Casual / Professional type
+    final isCasual = _previewCard == ProfileCardType.casual;
+
+    // View Mode: show details in a gorgeous, readable card
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _buildSectionHeader('PROFILE DETAILS', _showEditDetailsSheet),
+        const SizedBox(height: 12),
+        Container(
+          padding: const EdgeInsets.all(0),
+          // decoration: BoxDecoration(
+          //   color: context.surfacePrimary,
+          //   borderRadius: BorderRadius.circular(16),
+          //   border:
+          //       Border.all(color: context.textMuted.withValues(alpha: 0.15)),
+          // ),
+          child: Column(
+            children: [
+              // Work section (Only for Professional)
+              if (!isCasual) ...[
+                _buildDetailRow(
+                  icon: Icons.work_rounded,
+                  label: 'Profession',
+                  value: provider.profession.trim().isEmpty
+                      ? 'Not set'
+                      : provider.profession.trim(),
+                ),
+                const Divider(color: Colors.transparent, height: 20),
+                _buildDetailRow(
+                  icon: Icons.business_rounded,
+                  label: 'Company',
+                  value: provider.company.trim().isEmpty
+                      ? 'Not set'
+                      : provider.company.trim(),
+                ),
+                const Divider(color: Colors.transparent, height: 20),
+              ],
+
+              // Email
+              _buildDetailRow(
+                icon: Icons.email_rounded,
+                label: isCasual ? 'Casual Email' : 'Professional Email',
+                value: isCasual
+                    ? (provider.email.trim().isEmpty
+                        ? 'Not set'
+                        : provider.email.trim())
+                    : (provider.professionalEmail.trim().isEmpty
+                        ? 'Not set'
+                        : provider.professionalEmail.trim()),
+              ),
+              const Divider(color: Colors.transparent, height: 20),
+
+              // Phone
+              _buildDetailRow(
+                icon: Icons.phone_rounded,
+                label: isCasual ? 'Casual Phone' : 'Professional Phone',
+                value: isCasual
+                    ? (provider.phoneNumber.trim().isEmpty
+                        ? 'Not set'
+                        : provider.phoneNumber.trim())
+                    : (provider.professionalPhoneNumber.trim().isEmpty
+                        ? 'Not set'
+                        : provider.professionalPhoneNumber.trim()),
+              ),
+            ],
+          ),
+        ),
+
+        // Social handles listed in view mode (Only for Professional card since Casual has a grid!)
+        if (!isCasual) ...[
+          const SizedBox(height: 24),
+          _buildSectionHeader('SOCIAL PROFILES', _showEditSocialSheet),
+          const SizedBox(height: 12),
+          GridView.count(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            crossAxisCount: 2,
+            mainAxisSpacing: 10,
+            crossAxisSpacing: 10,
+            childAspectRatio: 2.8,
+            children: [
+              _buildCasualSocialCard(
+                  'linkedin', 'LinkedIn', 'assets/icons/linkedin.png'),
+              _buildCasualSocialCard(
+                  'twitter', 'X (Twitter)', 'assets/icons/twitter.png'),
+              _buildCasualSocialCard(
+                  'instagram', 'Instagram', 'assets/icons/instagram.png'),
+              _buildCasualSocialCard(
+                  'spotify', 'Spotify', 'assets/icons/spotify.png'),
+            ],
+          ),
+        ],
+
+        // Custom links listed in view mode
+        const SizedBox(height: 24),
+        _buildSectionHeader('CUSTOM LINKS', _showEditCustomLinksSheet),
+        const SizedBox(height: 12),
+        Container(
+          padding: const EdgeInsets.all(0),
+          // decoration: BoxDecoration(
+          //   color: context.surfacePrimary,
+          //   borderRadius: BorderRadius.circular(16),
+          //   border:
+          //       Border.all(color: context.textMuted.withValues(alpha: 0.15)),
+          // ),
+          child: provider.customLinks.isEmpty
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8.0),
+                    child: Text(
+                      'No custom links added yet. Tap edit to add links!',
+                      textAlign: TextAlign.center,
+                      style: context.bodyText
+                          .copyWith(color: context.textMuted, fontSize: 13),
+                    ),
+                  ),
+                )
+              : Column(
+                  children: provider.customLinks.map((link) {
+                    final isLast = provider.customLinks.last == link;
+                    return Padding(
+                      padding: EdgeInsets.only(bottom: isLast ? 0.0 : 12.0),
+                      child: _buildDetailRow(
+                        icon: Icons.link_rounded,
+                        label: link.name,
+                        value: link.url,
+                      ),
+                    );
+                  }).toList(),
+                ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDetailRow({
+    required IconData icon,
+    required String label,
+    required String value,
+  }) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Icon(icon, color: context.accentSecondary, size: 18),
+        const SizedBox(width: 12),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                color: context.textSecondary,
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              value,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 
@@ -1513,7 +1728,426 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
     }
   }
 
+  Widget _buildCasualFrontCard(double W) {
+    final H = W / 1.58;
+    final provider = context.watch<ProfileProvider>();
+
+    return Container(
+      width: W,
+      height: H,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(context.radiusPremiumCard),
+        gradient: LinearGradient(
+          colors: [
+            const Color(0xFF1E0F38), // Deep cyber purple
+            const Color(0xFF0F1A30), // Deep blue
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      ),
+      child: Stack(
+        children: [
+          // Glowing background circles
+          Positioned(
+            right: -20,
+            top: -20,
+            child: Container(
+              width: 100,
+              height: 100,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: const Color(0xFFEC4899).withValues(alpha: 0.15),
+              ),
+            ),
+          ),
+          Positioned(
+            left: -10,
+            bottom: -10,
+            child: Container(
+              width: 120,
+              height: 120,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: const Color(0xFF00F2FE).withValues(alpha: 0.15),
+              ),
+            ),
+          ),
+
+          // Main Row: Left Avatar, Right Details
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              // 1. Glowing Avatar Container
+              Container(
+                width: H * 0.55,
+                height: H * 0.55,
+                padding: const EdgeInsets.all(3),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFFEC4899), Color(0xFF00F2FE)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF00F2FE).withValues(alpha: 0.15),
+                      blurRadius: 4,
+                      spreadRadius: 0.5,
+                    )
+                  ],
+                ),
+                child: ClipOval(
+                  child: (provider.avatarUrl.isNotEmpty &&
+                          provider.avatarUrl.startsWith('http'))
+                      ? Image.network(provider.avatarUrl, fit: BoxFit.cover)
+                      : Container(
+                          color: const Color(0xFF121324),
+                          alignment: Alignment.center,
+                          child: Text(
+                            provider.name.isNotEmpty
+                                ? provider.name.substring(0, 1).toUpperCase()
+                                : "?",
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                ),
+              ),
+              const SizedBox(width: 16),
+
+              // 2. Right details (Name, Vibe, Interests)
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    // Name
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        provider.name.trim().isEmpty
+                            ? 'Jordan Miller'
+                            : provider.name.trim(),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          fontFamily: 'Inter',
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+
+                    // Vibe Badge
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF00F2FE).withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color:
+                              const Color(0xFF00F2FE).withValues(alpha: 0.35),
+                          width: 1.0,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.flash_on_rounded,
+                              color: Color(0xFF00F2FE), size: 10),
+                          const SizedBox(width: 4),
+                          Text(
+                            _selectedVibe.isNotEmpty
+                                ? _selectedVibe
+                                : (provider.vibeTag.isNotEmpty
+                                    ? provider.vibeTag
+                                    : 'Early bird'),
+                            style: const TextStyle(
+                              color: Color(0xFF00F2FE),
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              fontFamily: 'Inter',
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+
+                    // Interests Wrap
+                    Wrap(
+                      spacing: 4,
+                      runSpacing: 4,
+                      children: (provider.interestTags.isNotEmpty
+                              ? provider.interestTags
+                              : (_selectedInterests.isNotEmpty
+                                  ? _selectedInterests.toList()
+                                  : ['Tech', 'Design']))
+                          .take(3)
+                          .map((interest) => Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.07),
+                                  borderRadius: BorderRadius.circular(4),
+                                  border: Border.all(
+                                    color: Colors.white.withValues(alpha: 0.15),
+                                  ),
+                                ),
+                                child: Text(
+                                  interest,
+                                  style: const TextStyle(
+                                    color: Colors.white70,
+                                    fontSize: 8,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ))
+                          .toList(),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+
+          // 3. Scan Badge on bottom right
+          Positioned(
+            right: 0,
+            bottom: 0,
+            child: GestureDetector(
+              onTap: () {
+                HapticFeedback.lightImpact();
+                showModalBottomSheet(
+                  context: context,
+                  isScrollControlled: true,
+                  backgroundColor: Colors.transparent,
+                  builder: (context) => const ConnectHubBottomSheet(),
+                );
+              },
+              child: Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.08),
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.15),
+                  ),
+                ),
+                child: const Icon(
+                  Icons.qr_code_2_rounded,
+                  color: Color(0xFF00F2FE),
+                  size: 16,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCasualBackCard(double W) {
+    final H = W / 1.58;
+    final provider = context.watch<ProfileProvider>();
+
+    return Container(
+      width: W,
+      height: H,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(context.radiusPremiumCard),
+        gradient: LinearGradient(
+          colors: [
+            const Color(0xFF1E0F38),
+            const Color(0xFF0F1A30),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      ),
+      child: Stack(
+        children: [
+          // Background glow
+          Positioned(
+            left: -20,
+            top: -20,
+            child: Container(
+              width: 100,
+              height: 100,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: const Color(0xFF00F2FE).withValues(alpha: 0.15),
+              ),
+            ),
+          ),
+
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              // Header: Name and Vibe
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        provider.name.trim().isEmpty
+                            ? 'Jordan Miller'
+                            : provider.name.trim(),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          fontFamily: 'Inter',
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        _selectedVibe.isNotEmpty
+                            ? _selectedVibe
+                            : (provider.vibeTag.isNotEmpty
+                                ? provider.vibeTag
+                                : 'Early bird'),
+                        style: const TextStyle(
+                          color: Color(0xFF00F2FE),
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                  Image.asset(
+                    'assets/icons/Mandala Icon 1.png',
+                    width: 20,
+                    height: 20,
+                    color: const Color(0xFF00F2FE),
+                  ),
+                ],
+              ),
+
+              // Center: Social Handles Row
+              Center(
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    _buildCasualSocialIcon(
+                        'linkedin', 'assets/icons/linkedin.png'),
+                    const SizedBox(width: 12),
+                    _buildCasualSocialIcon(
+                        'twitter', 'assets/icons/twitter.png'),
+                    const SizedBox(width: 12),
+                    _buildCasualSocialIcon(
+                        'instagram', 'assets/icons/instagram.png'),
+                    const SizedBox(width: 12),
+                    _buildCasualSocialIcon(
+                        'spotify', 'assets/icons/spotify.png'),
+                  ],
+                ),
+              ),
+
+              // Footer: Interests Wrap
+              Wrap(
+                spacing: 4,
+                runSpacing: 4,
+                children: (provider.interestTags.isNotEmpty
+                        ? provider.interestTags
+                        : (_selectedInterests.isNotEmpty
+                            ? _selectedInterests.toList()
+                            : ['Tech', 'Design']))
+                    .take(3)
+                    .map((interest) => Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.07),
+                            borderRadius: BorderRadius.circular(4),
+                            border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.15),
+                            ),
+                          ),
+                          child: Text(
+                            interest,
+                            style: const TextStyle(
+                              color: Colors.white70,
+                              fontSize: 8,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ))
+                    .toList(),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCasualSocialIcon(String platform, String assetPath) {
+    final provider = Provider.of<ProfileProvider>(context, listen: false);
+    String handle = '';
+    if (platform == 'linkedin')
+      handle = provider.linkedin;
+    else if (platform == 'twitter')
+      handle = provider.twitter;
+    else if (platform == 'instagram')
+      handle = provider.instagram;
+    else if (platform == 'spotify') handle = provider.spotify;
+    final hasLink = handle.isNotEmpty;
+
+    final displayName = platform[0].toUpperCase() + platform.substring(1);
+    return GestureDetector(
+      onTap: hasLink
+          ? () {
+              HapticFeedback.lightImpact();
+              _showSocialActionSheet(
+                  context, platform, displayName, handle, assetPath);
+            }
+          : null,
+      child: Container(
+        width: 36,
+        height: 36,
+        decoration: BoxDecoration(
+          color: hasLink
+              ? const Color(0xFF00F2FE).withValues(alpha: 0.15)
+              : Colors.white.withValues(alpha: 0.05),
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: hasLink
+                ? const Color(0xFF00F2FE).withValues(alpha: 0.4)
+                : Colors.white.withValues(alpha: 0.1),
+          ),
+        ),
+        child: Center(
+          child: Opacity(
+            opacity: hasLink ? 1.0 : 0.25,
+            child: Image.asset(
+              assetPath,
+              width: 16,
+              height: 16,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildUnifiedFrontCard(double cardWidth) {
+    if (_previewCard == ProfileCardType.casual) {
+      return _buildCasualFrontCard(cardWidth);
+    }
+    final provider = context.watch<ProfileProvider>();
     final W = cardWidth;
 
     return Stack(
@@ -1562,9 +2196,9 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                   fontFamily: 'Inter',
                 ),
                 child: Text(
-                  _companyController.text.trim().isEmpty
+                  provider.company.trim().isEmpty
                       ? 'CONNECT'
-                      : _companyController.text.trim().toUpperCase(),
+                      : provider.company.trim().toUpperCase(),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -1610,9 +2244,9 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                       fontFamily: 'Inter',
                     ),
                     child: Text(
-                      _nameController.text.trim().isEmpty
+                      provider.name.trim().isEmpty
                           ? 'Jordan Miller'
-                          : _nameController.text.trim(),
+                          : provider.name.trim(),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -1709,6 +2343,10 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
   }
 
   Widget _buildUnifiedBackCard(double cardWidth) {
+    if (_previewCard == ProfileCardType.casual) {
+      return _buildCasualBackCard(cardWidth);
+    }
+    final provider = context.watch<ProfileProvider>();
     final isCasualData = _previewCard == ProfileCardType.casual;
     final W = cardWidth;
 
@@ -1740,44 +2378,42 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                     ),
                   ),
                   child: ClipOval(
-                    child:
-                        (_avatarUrl.isNotEmpty && _avatarUrl.startsWith('http'))
-                            ? Image.network(
-                                _avatarUrl,
-                                fit: BoxFit.cover,
-                                errorBuilder: (_, __, ___) => Container(
-                                  color: context.surfaceSecondary,
-                                  alignment: Alignment.center,
-                                  child: Text(
-                                    _nameController.text.isNotEmpty
-                                        ? _nameController.text
-                                            .substring(0, 1)
-                                            .toUpperCase()
-                                        : "?",
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                              )
-                            : Container(
-                                color: context.surfaceSecondary,
-                                alignment: Alignment.center,
-                                child: Text(
-                                  _nameController.text.isNotEmpty
-                                      ? _nameController.text
-                                          .substring(0, 1)
-                                          .toUpperCase()
-                                      : "?",
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.bold,
-                                  ),
+                    child: (provider.avatarUrl.isNotEmpty &&
+                            provider.avatarUrl.startsWith('http'))
+                        ? Image.network(
+                            provider.avatarUrl,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => Container(
+                              color: context.surfaceSecondary,
+                              alignment: Alignment.center,
+                              child: Text(
+                                provider.name.isNotEmpty
+                                    ? provider.name
+                                        .substring(0, 1)
+                                        .toUpperCase()
+                                    : "?",
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
                                 ),
                               ),
+                            ),
+                          )
+                        : Container(
+                            color: context.surfaceSecondary,
+                            alignment: Alignment.center,
+                            child: Text(
+                              provider.name.isNotEmpty
+                                  ? provider.name.substring(0, 1).toUpperCase()
+                                  : "?",
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
                   ),
                 ),
               if (_fieldVisible('avatarUrl'))
@@ -1806,14 +2442,15 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                             fontFamily: 'Inter',
                           ),
                           child: Text(
-                            _nameController.text.trim().isEmpty
+                            provider.name.trim().isEmpty
                                 ? 'Jordan Miller'
-                                : _nameController.text.trim(),
+                                : provider.name.trim(),
                             maxLines: 1,
                           ),
                         ),
                       ),
-                    if (_fieldVisible('profession')) ...[
+                    if (_fieldVisible('profession') ||
+                        _previewCard == ProfileCardType.casual) ...[
                       const SizedBox(height: 2),
                       FittedBox(
                         fit: BoxFit.scaleDown,
@@ -1828,9 +2465,15 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                             fontFamily: 'Inter',
                           ),
                           child: Text(
-                            _professionController.text.trim().isEmpty
-                                ? 'Product Designer'
-                                : _professionController.text.trim(),
+                            _previewCard == ProfileCardType.casual
+                                ? (_selectedVibe.isNotEmpty
+                                    ? _selectedVibe
+                                    : (provider.vibeTag.isNotEmpty
+                                        ? provider.vibeTag
+                                        : 'Casual Vibe'))
+                                : (provider.profession.trim().isEmpty
+                                    ? 'Product Designer'
+                                    : provider.profession.trim()),
                             maxLines: 1,
                           ),
                         ),
@@ -1887,9 +2530,9 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
               if (_fieldVisible('company')) ...[
                 _buildUnifiedCardRow(
                   Icons.apartment_rounded,
-                  _companyController.text.trim().isEmpty
+                  provider.company.trim().isEmpty
                       ? 'Design Studio Inc.'
-                      : _companyController.text.trim(),
+                      : provider.company.trim(),
                   false,
                 ),
                 const SizedBox(height: 5),
@@ -1898,9 +2541,9 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                 if (_fieldVisible('email')) ...[
                   _buildUnifiedCardRow(
                     Icons.email_outlined,
-                    _emailController.text.trim().isEmpty
+                    provider.email.trim().isEmpty
                         ? 'jordan@designstudio.com'
-                        : _emailController.text.trim(),
+                        : provider.email.trim(),
                     false,
                   ),
                   const SizedBox(height: 5),
@@ -1908,18 +2551,18 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                 if (_fieldVisible('phoneNumber'))
                   _buildUnifiedCardRow(
                     Icons.phone_rounded,
-                    _phoneController.text.trim().isEmpty
+                    provider.phoneNumber.trim().isEmpty
                         ? '+1 (555) 123-4567'
-                        : '$_casualCountryCode ${_phoneController.text.trim()}',
+                        : provider.phoneNumber.trim(),
                     false,
                   ),
               ] else ...[
                 if (_fieldVisible('email')) ...[
                   _buildUnifiedCardRow(
                     Icons.email_outlined,
-                    _professionalEmailController.text.trim().isEmpty
+                    provider.professionalEmail.trim().isEmpty
                         ? 'jordan@designstudio.com'
-                        : _professionalEmailController.text.trim(),
+                        : provider.professionalEmail.trim(),
                     false,
                   ),
                   const SizedBox(height: 5),
@@ -1927,9 +2570,9 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                 if (_fieldVisible('phoneNumber'))
                   _buildUnifiedCardRow(
                     Icons.phone_rounded,
-                    _professionalPhoneController.text.trim().isEmpty
+                    provider.professionalPhoneNumber.trim().isEmpty
                         ? '+1 (555) 123-4567'
-                        : '$_professionalCountryCode ${_professionalPhoneController.text.trim()}',
+                        : provider.professionalPhoneNumber.trim(),
                     false,
                   ),
               ],
@@ -1945,25 +2588,52 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
           right: (W * 0.5) + 10,
           top: 80,
           height: 60,
-          child: _fieldVisible('bio')
-              ? Text(
-                  isCasualData
-                      ? (_bioController.text.trim().isEmpty
-                          ? 'Creating delightful user experiences through thoughtful design and innovation.'
-                          : _bioController.text.trim())
-                      : (_professionalBioController.text.trim().isEmpty
-                          ? 'Senior Product Designer with 8+ years of experience crafting intuitive digital solutions.'
-                          : _professionalBioController.text.trim()),
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.55),
-                    fontSize: 12,
-                    height: 1.25,
-                    fontFamily: 'Inter',
-                  ),
-                  maxLines: 3,
-                  overflow: TextOverflow.ellipsis,
+          child: isCasualData
+              ? Wrap(
+                  spacing: 4,
+                  runSpacing: 4,
+                  children: (provider.interestTags.isNotEmpty
+                          ? provider.interestTags
+                          : (_selectedInterests.isNotEmpty
+                              ? _selectedInterests.toList()
+                              : ['Connect', 'Explore', 'Inspire']))
+                      .map((interest) => Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color:
+                                  context.accentPrimary.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(4),
+                              border: Border.all(
+                                color: context.accentPrimary
+                                    .withValues(alpha: 0.3),
+                              ),
+                            ),
+                            child: Text(
+                              interest,
+                              style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w600),
+                            ),
+                          ))
+                      .toList(),
                 )
-              : const SizedBox.shrink(),
+              : (_fieldVisible('bio')
+                  ? Text(
+                      provider.professionalBio.trim().isEmpty
+                          ? 'Senior Product Designer with 8+ years of experience crafting intuitive digital solutions.'
+                          : provider.professionalBio.trim(),
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.55),
+                        fontSize: 12,
+                        height: 1.25,
+                        fontFamily: 'Inter',
+                      ),
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
+                    )
+                  : const SizedBox.shrink()),
         ),
 
         // 5. Bottom Accent Line
@@ -2036,1770 +2706,1824 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
     );
   }
 
-  Widget _buildProfilePhotoSection() {
-    final provider = context.watch<ProfileProvider>();
-    final assignment = provider.fieldAssignments['avatarUrl'] ??
-        FieldCardAssignment(casual: false, professional: true);
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: context.surfacePrimary,
-        borderRadius: BorderRadius.circular(AppDimensions.radiusComponent),
-        border: Border.all(color: context.textMuted.withValues(alpha: 0.2)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.image_outlined,
-                  color: context.accentSecondary, size: 18),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  'Profile Photo',
-                  style: context.bodyText.copyWith(
-                    color: context.textPrimary,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-              _buildLocalCardToggle(
-                icon: Icons.person_outline_rounded,
-                isActive: assignment.casual,
-                activeColor: context.accentSecondary,
-                onTap: () => provider.toggleFieldOnCard(
-                    'avatarUrl', ProfileCardType.casual),
-              ),
-              const SizedBox(width: 8),
-              _buildLocalCardToggle(
-                icon: Icons.work_outline_rounded,
-                isActive: assignment.professional,
-                activeColor: context.accentSecondary,
-                onTap: () => provider.toggleFieldOnCard(
-                    'avatarUrl', ProfileCardType.professional),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(1.0),
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.15),
-                    width: 1.0,
-                  ),
-                ),
-                child: ClipOval(
-                  child:
-                      (_avatarUrl.isNotEmpty && _avatarUrl.startsWith('http'))
-                          ? Image.network(
-                              _avatarUrl,
-                              width: 72,
-                              height: 72,
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => Container(
-                                width: 72,
-                                height: 72,
-                                color: context.surfaceSecondary,
-                                alignment: Alignment.center,
-                                child: Text(
-                                  _nameController.text.isNotEmpty
-                                      ? _nameController.text
-                                          .substring(0, 1)
-                                          .toUpperCase()
-                                      : "?",
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 24,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                            )
-                          : Container(
-                              width: 72,
-                              height: 72,
-                              color: context.surfaceSecondary,
-                              alignment: Alignment.center,
-                              child: Text(
-                                _nameController.text.isNotEmpty
-                                    ? _nameController.text
-                                        .substring(0, 1)
-                                        .toUpperCase()
-                                    : "?",
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 24,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: GestureDetector(
-                  onTap: _showPhotoPicker,
-                  child: Container(
-                    height: 52,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: context.surfaceSecondary,
-                      borderRadius:
-                          BorderRadius.circular(AppDimensions.radiusComponent),
-                      border: Border.all(
-                        color: context.textMuted.withValues(alpha: 0.2),
-                      ),
-                    ),
-                    child: const Text(
-                      'Change Photo',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 15,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildLocalCardToggle({
-    required IconData icon,
-    required bool isActive,
-    required Color activeColor,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 32,
-        height: 32,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: isActive ? activeColor : context.surfaceSecondary,
-          border: Border.all(
-            color: isActive
-                ? activeColor
-                : context.textMuted.withValues(alpha: 0.2),
-          ),
-        ),
-        child: Icon(
-          icon,
-          size: 16,
-          color: isActive ? Colors.white : context.textMuted,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildEditorForm() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        _buildProfilePhotoSection(),
-        CardFieldInput(
-          fieldKey: 'name',
-          label: 'Full Name',
-          hint: 'Jordan Miller',
-          icon: Icons.person_outline_rounded,
-          controller: _nameController,
-          showToggles: false,
-          isEditing: _isEditing('name'),
-          onEditingChanged: (val) => _setEditMode('name', val),
-        ),
-        CardFieldInput(
-          fieldKey: 'profession',
-          label: 'Profession',
-          hint: 'Product Designer',
-          icon: Icons.work_outline_rounded,
-          controller: _professionController,
-          isEditing: _isEditing('profession'),
-          onEditingChanged: (val) => _setEditMode('profession', val),
-        ),
-        CardFieldInput(
-          fieldKey: 'company',
-          label: 'Company',
-          hint: 'Design Studio Inc.',
-          icon: Icons.apartment_rounded,
-          controller: _companyController,
-          isEditing: _isEditing('company'),
-          onEditingChanged: (val) => _setEditMode('company', val),
-        ),
-        _buildEmailSection(),
-        _buildPhoneSection(),
-        _buildBioSection(),
-      ],
-    );
-  }
-
-  String _getFlagForCode(String code) {
-    switch (code) {
-      case '+971':
-        return '🇦🇪';
-      case '+1':
-        return '🇺🇸';
-      case '+55':
-        return '🇧🇷';
-      case '+52':
-        return '🇲🇽';
-      case '+44':
-        return '🇬🇧';
-      case '+49':
-        return '🇩🇪';
-      case '+33':
-        return '🇫🇷';
-      case '+39':
-        return '🇮🇹';
-      case '+34':
-        return '🇪🇸';
-      case '+31':
-        return '🇳🇱';
-      case '+91':
-        return '🇮🇳';
-      case '+86':
-        return '🇨🇳';
-      case '+65':
-        return '🇸🇬';
-      case '+81':
-        return '🇯🇵';
-      case '+82':
-        return '🇰🇷';
-      case '+966':
-        return '🇸🇦';
+  String _getSocialUrl(String platform, String handle) {
+    final cleaned = handle.trim();
+    if (cleaned.startsWith('http://') || cleaned.startsWith('https://')) {
+      return cleaned;
+    }
+    switch (platform.toLowerCase()) {
+      case 'linkedin':
+        return 'https://linkedin.com/in/$cleaned';
+      case 'twitter':
+      case 'x':
+        return 'https://x.com/$cleaned';
+      case 'instagram':
+        return 'https://instagram.com/$cleaned';
+      case 'spotify':
+        if (cleaned.contains('spotify.com')) return cleaned;
+        return 'https://open.spotify.com/user/$cleaned';
       default:
-        return '🏳️';
+        return cleaned;
     }
   }
 
-  void _showCountryPicker(
-      BuildContext context, ValueChanged<String?> onCountryCodeChanged) {
-    showModalBottomSheet<String>(
+  void _showSocialActionSheet(
+    BuildContext context,
+    String platform,
+    String displayName,
+    String handle,
+    String assetPath,
+  ) {
+    final url = _getSocialUrl(platform, handle);
+
+    showModalBottomSheet(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: context.surfacePrimary,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(
-            top: Radius.circular(context.radiusPremiumCard)),
-      ),
-      builder: (context) {
-        return const _CountryCodePickerSheet();
-      },
-    ).then((selectedCode) {
-      if (selectedCode != null) {
-        onCountryCodeChanged(selectedCode);
-      }
-    });
-  }
-
-  Widget _buildEmailSection() {
-    final provider = context.watch<ProfileProvider>();
-    final assignment = provider.fieldAssignments['email'] ??
-        FieldCardAssignment(casual: true, professional: true);
-
-    final isCasualEditing = _isEditing('email');
-    final isCasualFilled = _emailController.text.isNotEmpty;
-    final casualReadOnly = isCasualFilled && !isCasualEditing;
-
-    final isProfEditing = _isEditing('professionalEmail');
-    final isProfFilled = _professionalEmailController.text.isNotEmpty;
-    final profReadOnly = isProfFilled && !isProfEditing;
-
-    // Autofocus when edit mode is toggled on
-    if (isCasualEditing && !_emailFocusNode.hasFocus) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted && !_emailFocusNode.hasFocus) {
-          _emailFocusNode.requestFocus();
-        }
-      });
-    }
-    if (isProfEditing && !_professionalEmailFocusNode.hasFocus) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted && !_professionalEmailFocusNode.hasFocus) {
-          _professionalEmailFocusNode.requestFocus();
-        }
-      });
-    }
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: context.surfacePrimary,
-        borderRadius: BorderRadius.circular(AppDimensions.radiusComponent),
-        border: Border.all(color: context.textMuted.withValues(alpha: 0.2)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // Header Row with Card Toggles
-          Row(
-            children: [
-              Icon(Icons.email_outlined,
-                  color: context.accentSecondary, size: 18),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  'Email Address',
-                  style: context.bodyText.copyWith(
-                    color: context.textPrimary,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-              _buildLocalCardToggle(
-                icon: Icons.person_outline_rounded,
-                isActive: assignment.casual,
-                activeColor: context.accentSecondary,
-                onTap: () =>
-                    provider.toggleFieldOnCard('email', ProfileCardType.casual),
-              ),
-              const SizedBox(width: 8),
-              _buildLocalCardToggle(
-                icon: Icons.work_outline_rounded,
-                isActive: assignment.professional,
-                activeColor: context.accentSecondary,
-                onTap: () => provider.toggleFieldOnCard(
-                    'email', ProfileCardType.professional),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-
-          // Casual Email Section Header
-          Row(
-            children: [
-              Icon(Icons.person_outline_rounded,
-                  color: context.accentPrimary, size: 16),
-              const SizedBox(width: 6),
-              Text(
-                'Casual Email',
-                style: context.captionText.copyWith(
-                  color: context.textSecondary,
-                  fontSize: 12,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          TextFormField(
-            controller: _emailController,
-            focusNode: _emailFocusNode,
-            readOnly: casualReadOnly,
-            keyboardType: TextInputType.emailAddress,
-            style: context.bodyText.copyWith(color: context.textPrimary),
-            cursorColor: context.accentPrimary,
-            decoration: InputDecoration(
-              hintText: 'jordan@designstudio.com',
-              hintStyle: context.bodyText.copyWith(
-                color: context.textMuted,
-              ),
-              suffixIcon: isCasualFilled
-                  ? GestureDetector(
-                      onTap: () {
-                        if (isCasualEditing) {
-                          _setEditMode('email', false);
-                          _emailFocusNode.unfocus();
-                        } else {
-                          _setEditMode('email', true);
-                        }
-                      },
-                      child: Icon(
-                        isCasualEditing
-                            ? Icons.check_circle_outline_rounded
-                            : Icons.edit_rounded,
-                        color: isCasualEditing
-                            ? const Color(0xFF10B981)
-                            : context.textMuted,
-                        size: 18,
-                      ),
-                    )
-                  : Icon(
-                      Icons.edit_rounded,
-                      color: context.textMuted,
-                      size: 16,
-                    ),
-              filled: true,
-              fillColor: context.surfaceSecondary,
-              contentPadding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              border: OutlineInputBorder(
-                borderRadius:
-                    BorderRadius.circular(AppDimensions.radiusComponent),
-                borderSide: BorderSide.none,
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius:
-                    BorderRadius.circular(AppDimensions.radiusComponent),
-                borderSide: BorderSide(
-                  color: context.textMuted.withValues(alpha: 0.1),
-                ),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius:
-                    BorderRadius.circular(AppDimensions.radiusComponent),
-                borderSide: BorderSide(
-                  color: context.accentPrimary,
-                  width: 1,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          // Professional Email Section Header
-          Row(
-            children: [
-              Icon(Icons.work_outline_rounded,
-                  color: context.accentSecondary, size: 16),
-              const SizedBox(width: 6),
-              Text(
-                'Professional Email',
-                style: context.captionText.copyWith(
-                  color: context.textSecondary,
-                  fontSize: 12,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          TextFormField(
-            controller: _professionalEmailController,
-            focusNode: _professionalEmailFocusNode,
-            readOnly: profReadOnly,
-            keyboardType: TextInputType.emailAddress,
-            style: context.bodyText.copyWith(color: context.textPrimary),
-            cursorColor: context.accentPrimary,
-            decoration: InputDecoration(
-              hintText: 'jordan@company.com',
-              hintStyle: context.bodyText.copyWith(
-                color: context.textMuted,
-              ),
-              suffixIcon: isProfFilled
-                  ? GestureDetector(
-                      onTap: () {
-                        if (isProfEditing) {
-                          _setEditMode('professionalEmail', false);
-                          _professionalEmailFocusNode.unfocus();
-                        } else {
-                          _setEditMode('professionalEmail', true);
-                        }
-                      },
-                      child: Icon(
-                        isProfEditing
-                            ? Icons.check_circle_outline_rounded
-                            : Icons.edit_rounded,
-                        color: isProfEditing
-                            ? const Color(0xFF10B981)
-                            : context.textMuted,
-                        size: 18,
-                      ),
-                    )
-                  : Icon(
-                      Icons.edit_rounded,
-                      color: context.textMuted,
-                      size: 16,
-                    ),
-              filled: true,
-              fillColor: context.surfaceSecondary,
-              contentPadding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              border: OutlineInputBorder(
-                borderRadius:
-                    BorderRadius.circular(AppDimensions.radiusComponent),
-                borderSide: BorderSide.none,
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius:
-                    BorderRadius.circular(AppDimensions.radiusComponent),
-                borderSide: BorderSide(
-                  color: context.textMuted.withValues(alpha: 0.1),
-                ),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius:
-                    BorderRadius.circular(AppDimensions.radiusComponent),
-                borderSide: BorderSide(
-                  color: context.accentSecondary,
-                  width: 1,
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPhoneSection() {
-    final provider = context.watch<ProfileProvider>();
-    final assignment = provider.fieldAssignments['phoneNumber'] ??
-        FieldCardAssignment(casual: true, professional: true);
-
-    final isCasualEditing = _isEditing('phoneNumber');
-    final isCasualFilled = _phoneController.text.isNotEmpty;
-    final casualReadOnly = isCasualFilled && !isCasualEditing;
-
-    final isProfEditing = _isEditing('professionalPhoneNumber');
-    final isProfFilled = _professionalPhoneController.text.isNotEmpty;
-    final profReadOnly = isProfFilled && !isProfEditing;
-
-    // Autofocus when edit mode is toggled on
-    if (isCasualEditing && !_phoneFocusNode.hasFocus) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted && !_phoneFocusNode.hasFocus) {
-          _phoneFocusNode.requestFocus();
-        }
-      });
-    }
-    if (isProfEditing && !_professionalPhoneFocusNode.hasFocus) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted && !_professionalPhoneFocusNode.hasFocus) {
-          _professionalPhoneFocusNode.requestFocus();
-        }
-      });
-    }
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: context.surfacePrimary,
-        borderRadius: BorderRadius.circular(AppDimensions.radiusComponent),
-        border: Border.all(color: context.textMuted.withValues(alpha: 0.2)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // Header Row with Card Toggles
-          Row(
-            children: [
-              Icon(Icons.phone_android_outlined,
-                  color: context.accentSecondary, size: 18),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  'Phone Number',
-                  style: context.bodyText.copyWith(
-                    color: context.textPrimary,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-              _buildLocalCardToggle(
-                icon: Icons.person_outline_rounded,
-                isActive: assignment.casual,
-                activeColor: context.accentSecondary,
-                onTap: () => provider.toggleFieldOnCard(
-                    'phoneNumber', ProfileCardType.casual),
-              ),
-              const SizedBox(width: 8),
-              _buildLocalCardToggle(
-                icon: Icons.work_outline_rounded,
-                isActive: assignment.professional,
-                activeColor: context.accentSecondary,
-                onTap: () => provider.toggleFieldOnCard(
-                    'phoneNumber', ProfileCardType.professional),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-
-          // Casual Phone Number Section Header
-          Row(
-            children: [
-              Icon(Icons.person_outline_rounded,
-                  color: context.accentPrimary, size: 16),
-              const SizedBox(width: 6),
-              Text(
-                'Casual Phone Number',
-                style: context.captionText.copyWith(
-                  color: context.textSecondary,
-                  fontSize: 12,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              // Selector calling code button
-              GestureDetector(
-                onTap: casualReadOnly
-                    ? null
-                    : () => _showCountryPicker(context, (val) {
-                          if (val != null) {
-                            setState(() => _casualCountryCode = val);
-                          }
-                        }),
-                child: Container(
-                  height: 48,
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  decoration: BoxDecoration(
-                    color: context.surfaceSecondary,
-                    borderRadius:
-                        BorderRadius.circular(AppDimensions.radiusComponent),
-                    border: Border.all(
-                      color: context.textMuted.withValues(alpha: 0.1),
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        '${_getFlagForCode(_casualCountryCode)} $_casualCountryCode',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      Icon(
-                        Icons.keyboard_arrow_down_rounded,
-                        color: context.textSecondary,
-                        size: 18,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: TextFormField(
-                  controller: _phoneController,
-                  focusNode: _phoneFocusNode,
-                  readOnly: casualReadOnly,
-                  keyboardType: TextInputType.phone,
-                  style: context.bodyText.copyWith(color: context.textPrimary),
-                  cursorColor: context.accentPrimary,
-                  decoration: InputDecoration(
-                    hintText: '(555) 123-4567',
-                    hintStyle: context.bodyText.copyWith(
-                      color: context.textMuted,
-                    ),
-                    suffixIcon: isCasualFilled
-                        ? GestureDetector(
-                            onTap: () {
-                              if (isCasualEditing) {
-                                _setEditMode('phoneNumber', false);
-                                _phoneFocusNode.unfocus();
-                              } else {
-                                _setEditMode('phoneNumber', true);
-                              }
-                            },
-                            child: Icon(
-                              isCasualEditing
-                                  ? Icons.check_circle_outline_rounded
-                                  : Icons.edit_rounded,
-                              color: isCasualEditing
-                                  ? const Color(0xFF10B981)
-                                  : context.textMuted,
-                              size: 18,
-                            ),
-                          )
-                        : Icon(
-                            Icons.edit_rounded,
-                            color: context.textMuted,
-                            size: 16,
-                          ),
-                    filled: true,
-                    fillColor: context.surfaceSecondary,
-                    contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 12),
-                    border: OutlineInputBorder(
-                      borderRadius:
-                          BorderRadius.circular(AppDimensions.radiusComponent),
-                      borderSide: BorderSide.none,
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius:
-                          BorderRadius.circular(AppDimensions.radiusComponent),
-                      borderSide: BorderSide(
-                        color: context.textMuted.withValues(alpha: 0.1),
-                      ),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius:
-                          BorderRadius.circular(AppDimensions.radiusComponent),
-                      borderSide: BorderSide(
-                        color: context.accentPrimary,
-                        width: 1,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-
-          // Professional Phone Number Section Header
-          Row(
-            children: [
-              Icon(Icons.work_outline_rounded,
-                  color: context.accentSecondary, size: 16),
-              const SizedBox(width: 6),
-              Text(
-                'Professional Phone Number',
-                style: context.captionText.copyWith(
-                  color: context.textSecondary,
-                  fontSize: 12,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              // Selector calling code button
-              GestureDetector(
-                onTap: profReadOnly
-                    ? null
-                    : () => _showCountryPicker(context, (val) {
-                          if (val != null) {
-                            setState(() => _professionalCountryCode = val);
-                          }
-                        }),
-                child: Container(
-                  height: 48,
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  decoration: BoxDecoration(
-                    color: context.surfaceSecondary,
-                    borderRadius:
-                        BorderRadius.circular(AppDimensions.radiusComponent),
-                    border: Border.all(
-                      color: context.textMuted.withValues(alpha: 0.1),
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        '${_getFlagForCode(_professionalCountryCode)} $_professionalCountryCode',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      Icon(
-                        Icons.keyboard_arrow_down_rounded,
-                        color: context.textSecondary,
-                        size: 18,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: TextFormField(
-                  controller: _professionalPhoneController,
-                  focusNode: _professionalPhoneFocusNode,
-                  readOnly: profReadOnly,
-                  keyboardType: TextInputType.phone,
-                  style: context.bodyText.copyWith(color: context.textPrimary),
-                  cursorColor: context.accentPrimary,
-                  decoration: InputDecoration(
-                    hintText: '(555) 987-6543',
-                    hintStyle: context.bodyText.copyWith(
-                      color: context.textMuted,
-                    ),
-                    suffixIcon: isProfFilled
-                        ? GestureDetector(
-                            onTap: () {
-                              if (isProfEditing) {
-                                _setEditMode('professionalPhoneNumber', false);
-                                _professionalPhoneFocusNode.unfocus();
-                              } else {
-                                _setEditMode('professionalPhoneNumber', true);
-                              }
-                            },
-                            child: Icon(
-                              isProfEditing
-                                  ? Icons.check_circle_outline_rounded
-                                  : Icons.edit_rounded,
-                              color: isProfEditing
-                                  ? const Color(0xFF10B981)
-                                  : context.textMuted,
-                              size: 18,
-                            ),
-                          )
-                        : Icon(
-                            Icons.edit_rounded,
-                            color: context.textMuted,
-                            size: 16,
-                          ),
-                    filled: true,
-                    fillColor: context.surfaceSecondary,
-                    contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 12),
-                    border: OutlineInputBorder(
-                      borderRadius:
-                          BorderRadius.circular(AppDimensions.radiusComponent),
-                      borderSide: BorderSide.none,
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius:
-                          BorderRadius.circular(AppDimensions.radiusComponent),
-                      borderSide: BorderSide(
-                        color: context.textMuted.withValues(alpha: 0.1),
-                      ),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius:
-                          BorderRadius.circular(AppDimensions.radiusComponent),
-                      borderSide: BorderSide(
-                        color: context.accentSecondary,
-                        width: 1,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildBioSection() {
-    final provider = context.watch<ProfileProvider>();
-    final assignment = provider.fieldAssignments['bio'] ??
-        FieldCardAssignment(casual: false, professional: true);
-
-    final isBioEditing = _isEditing('bio');
-    final isBioFilled = _bioController.text.isNotEmpty;
-    final bioReadOnly = isBioFilled && !isBioEditing;
-
-    final isProfBioEditing = _isEditing('professionalBio');
-    final isProfBioFilled = _professionalBioController.text.isNotEmpty;
-    final profBioReadOnly = isProfBioFilled && !isProfBioEditing;
-
-    // Autofocus when edit mode is toggled on
-    if (isBioEditing && !_bioFocusNode.hasFocus) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted && !_bioFocusNode.hasFocus) {
-          _bioFocusNode.requestFocus();
-        }
-      });
-    }
-
-    if (isProfBioEditing && !_professionalBioFocusNode.hasFocus) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted && !_professionalBioFocusNode.hasFocus) {
-          _professionalBioFocusNode.requestFocus();
-        }
-      });
-    }
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: context.surfacePrimary,
-        borderRadius: BorderRadius.circular(AppDimensions.radiusComponent),
-        border: Border.all(color: context.textMuted.withValues(alpha: 0.2)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.description_outlined,
-                  color: context.accentSecondary, size: 18),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  'Bio',
-                  style: context.bodyText.copyWith(
-                    color: context.textPrimary,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-              _buildLocalCardToggle(
-                icon: Icons.person_outline_rounded,
-                isActive: assignment.casual,
-                activeColor: context.accentSecondary,
-                onTap: () =>
-                    provider.toggleFieldOnCard('bio', ProfileCardType.casual),
-              ),
-              const SizedBox(width: 8),
-              _buildLocalCardToggle(
-                icon: Icons.work_outline_rounded,
-                isActive: assignment.professional,
-                activeColor: context.accentSecondary,
-                onTap: () => provider.toggleFieldOnCard(
-                    'bio', ProfileCardType.professional),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          // Casual Card Bio
-          Row(
-            children: [
-              Icon(Icons.person_outline_rounded,
-                  color: context.accentPrimary, size: 16),
-              const SizedBox(width: 6),
-              Text(
-                'Casual Card Bio',
-                style: context.captionText.copyWith(
-                  color: context.textSecondary,
-                  fontSize: 12,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          TextFormField(
-            controller: _bioController,
-            focusNode: _bioFocusNode,
-            readOnly: bioReadOnly,
-            maxLines: 3,
-            style: context.bodyText.copyWith(color: context.textPrimary),
-            cursorColor: context.accentPrimary,
-            decoration: InputDecoration(
-              hintText:
-                  'Creating delightful user experiences through thoughtful design and innovation.',
-              hintStyle: context.bodyText.copyWith(
-                color: context.textMuted,
-              ),
-              suffixIcon: isBioFilled
-                  ? GestureDetector(
-                      onTap: () {
-                        if (isBioEditing) {
-                          _setEditMode('bio', false);
-                          _bioFocusNode.unfocus();
-                        } else {
-                          _setEditMode('bio', true);
-                        }
-                      },
-                      child: Icon(
-                        isBioEditing
-                            ? Icons.check_circle_outline_rounded
-                            : Icons.edit_rounded,
-                        color: isBioEditing
-                            ? const Color(0xFF10B981)
-                            : context.textMuted,
-                        size: 18,
-                      ),
-                    )
-                  : Icon(
-                      Icons.edit_rounded,
-                      color: context.textMuted,
-                      size: 16,
-                    ),
-              filled: true,
-              fillColor: context.surfaceSecondary,
-              contentPadding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              border: OutlineInputBorder(
-                borderRadius:
-                    BorderRadius.circular(AppDimensions.radiusComponent),
-                borderSide: BorderSide.none,
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius:
-                    BorderRadius.circular(AppDimensions.radiusComponent),
-                borderSide: BorderSide(
-                  color: context.textMuted.withValues(alpha: 0.1),
-                ),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius:
-                    BorderRadius.circular(AppDimensions.radiusComponent),
-                borderSide: BorderSide(
-                  color: context.accentPrimary,
-                  width: 1,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-          // Professional Card Bio
-          Row(
-            children: [
-              Icon(Icons.work_outline_rounded,
-                  color: context.accentSecondary, size: 16),
-              const SizedBox(width: 6),
-              Text(
-                'Professional Card Bio',
-                style: context.captionText.copyWith(
-                  color: context.textSecondary,
-                  fontSize: 12,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          TextFormField(
-            controller: _professionalBioController,
-            focusNode: _professionalBioFocusNode,
-            readOnly: profBioReadOnly,
-            maxLines: 3,
-            style: context.bodyText.copyWith(color: context.textPrimary),
-            cursorColor: context.accentPrimary,
-            decoration: InputDecoration(
-              hintText:
-                  'Senior Product Designer with 8+ years of experience crafting intuitive digital solutions.',
-              hintStyle: context.bodyText.copyWith(
-                color: context.textMuted,
-              ),
-              suffixIcon: isProfBioFilled
-                  ? GestureDetector(
-                      onTap: () {
-                        if (isProfBioEditing) {
-                          _setEditMode('professionalBio', false);
-                          _professionalBioFocusNode.unfocus();
-                        } else {
-                          _setEditMode('professionalBio', true);
-                        }
-                      },
-                      child: Icon(
-                        isProfBioEditing
-                            ? Icons.check_circle_outline_rounded
-                            : Icons.edit_rounded,
-                        color: isProfBioEditing
-                            ? const Color(0xFF10B981)
-                            : context.textMuted,
-                        size: 18,
-                      ),
-                    )
-                  : Icon(
-                      Icons.edit_rounded,
-                      color: context.textMuted,
-                      size: 16,
-                    ),
-              filled: true,
-              fillColor: context.surfaceSecondary,
-              contentPadding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              border: OutlineInputBorder(
-                borderRadius:
-                    BorderRadius.circular(AppDimensions.radiusComponent),
-                borderSide: BorderSide.none,
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius:
-                    BorderRadius.circular(AppDimensions.radiusComponent),
-                borderSide: BorderSide(
-                  color: context.textMuted.withValues(alpha: 0.1),
-                ),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius:
-                    BorderRadius.circular(AppDimensions.radiusComponent),
-                borderSide: BorderSide(
-                  color: context.accentSecondary,
-                  width: 1,
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSkeletonHeader() {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 12.0, horizontal: 16.0),
-      decoration: BoxDecoration(
-        color: context.surfacePrimary,
-        borderRadius: BorderRadius.circular(30.0),
-        border: Border.all(
-          color: context.surfaceSecondary,
-          width: 1.0,
-        ),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Container(
-            width: 32,
-            height: 32,
-            decoration: const BoxDecoration(
-                shape: BoxShape.circle, color: Colors.white10),
-          ),
-          Column(
-            children: [
-              Text(
-                'My Profile',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 18.0,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              SizedBox(height: 2),
-              Text(
-                'Digital Card',
-                style: TextStyle(
-                  color: context.textSecondary,
-                  fontSize: 12.0,
-                ),
-              ),
-            ],
-          ),
-          Container(
-            width: 32,
-            height: 32,
-            decoration: const BoxDecoration(
-                shape: BoxShape.circle, color: Colors.white10),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSkeletonCardSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              'YOUR CARDS',
-              style: TextStyle(
-                color: context.textSecondary,
-                fontSize: 14.0,
-                fontWeight: FontWeight.bold,
-                letterSpacing: 1.5,
-              ),
-            ),
-            Container(
-                width: 80,
-                height: 24,
-                decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(12),
-                    color: Colors.white10)),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(
-                child: Container(
-                    height: 36,
-                    decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(10),
-                        color: Colors.white10))),
-            const SizedBox(width: 12),
-            Expanded(
-                child: Container(
-                    height: 36,
-                    decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(10),
-                        color: Colors.white10))),
-          ],
-        ),
-        const SizedBox(height: 16),
-        Container(
-          height: 180,
+      backgroundColor: Colors.transparent,
+      barrierColor: Colors.black.withValues(alpha: 0.5),
+      builder: (sheetContext) {
+        return Container(
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(24),
-            color: context.surfaceSecondary,
-          ),
-          padding: const EdgeInsets.all(24),
-          child: Row(
-            children: [
-              Container(
-                width: 64,
-                height: 64,
-                decoration: const BoxDecoration(
-                    shape: BoxShape.circle, color: Colors.white10),
-              ),
-              const SizedBox(width: 16),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text("Jane Doe",
-                      style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold)),
-                  SizedBox(height: 6),
-                  Text("Software Engineer",
-                      style: TextStyle(color: Colors.white70, fontSize: 13)),
-                  SizedBox(height: 6),
-                  Text("Tech Corp",
-                      style: TextStyle(color: Colors.white30, fontSize: 11)),
-                ],
-              )
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildSkeletonEditorForm() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'EDIT DETAILS',
-          style: TextStyle(
-            color: context.textSecondary,
-            fontSize: 14.0,
-            fontWeight: FontWeight.bold,
-            letterSpacing: 1.5,
-          ),
-        ),
-        const SizedBox(height: 16),
-        for (int i = 0; i < 4; i++)
-          Container(
-            height: 56,
-            margin: const EdgeInsets.only(bottom: 12),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(16),
-              color: context.surfacePrimary,
+            color: const Color(0xFF151624),
+            borderRadius: const BorderRadius.only(
+              topLeft: Radius.circular(24),
+              topRight: Radius.circular(24),
+            ),
+            border: Border.all(
+              color: Colors.white.withValues(alpha: 0.08),
+              width: 1,
             ),
           ),
-      ],
-    );
-  }
-
-  Widget _buildSkeletonSocialLinks() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-      children: [
-        for (int i = 0; i < 3; i++)
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-                shape: BoxShape.circle, color: context.surfacePrimary),
-          ),
-      ],
-    );
-  }
-
-  Widget _buildSkeletonSaveButton() {
-    return Container(
-      height: 54,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        color: context.accentSecondary,
-      ),
-    );
-  }
-
-  Widget _buildCustomLinksSection() {
-    final provider = Provider.of<ProfileProvider>(context);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.add_link_rounded,
-                    color: context.accentSecondary, size: 18),
-                const SizedBox(width: 8),
-                Text(
-                  'CUSTOM LINKS',
-                  style: context.captionText.copyWith(
-                    color: context.textSecondary,
-                    fontSize: 14.0,
-                    letterSpacing: 1.5,
-                  ),
-                ),
-              ],
-            ),
-            TextButton.icon(
-              onPressed: () => _showCustomLinkDialog(),
-              icon: Icon(Icons.add_circle_outline_rounded,
-                  color: context.accentSecondary, size: 18),
-              label: Text(
-                "Add New",
-                style: TextStyle(
-                  color: context.accentSecondary,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 12,
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        if (provider.customLinks.isEmpty)
-          Container(
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              color: context.surfacePrimary,
-              borderRadius: BorderRadius.circular(16),
-              border:
-                  Border.all(color: context.textMuted.withValues(alpha: 0.2)),
-            ),
-            child: Center(
-              child: Text(
-                "No custom links added yet. Tap 'Add New' to share websites, portfolios, or other links.",
-                textAlign: TextAlign.center,
-                style: context.bodyText.copyWith(
-                  color: context.textMuted,
-                  fontSize: 13,
-                ),
-              ),
-            ),
-          )
-        else
-          ...provider.customLinks.map((link) {
-            final globeLogo = Container(
-              width: 36,
-              height: 36,
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                Icons.language_rounded,
-                color: context.accentSecondary,
-                size: 20,
-              ),
-            );
-
-            return _buildSocialCard(
-              fieldKey: link.id,
-              title: link.name,
-              handle: link.url,
-              logo: globeLogo,
-              onEdit: () => _showCustomLinkDialog(existingLink: link),
-            );
-          }),
-      ],
-    );
-  }
-
-  void _showCustomLinkDialog({CustomLink? existingLink}) {
-    final nameController =
-        TextEditingController(text: existingLink?.name ?? '');
-    final urlController = TextEditingController(text: existingLink?.url ?? '');
-
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          backgroundColor: context.surfacePrimary,
-          shape: RoundedRectangleBorder(
-            borderRadius:
-                BorderRadius.circular(AppDimensions.radiusPremiumCard),
-            side: BorderSide(
-              color: context.textMuted.withValues(alpha: 0.2),
-              width: 1.0,
-            ),
-          ),
-          title: Text(
-            existingLink == null ? "Add Custom Link" : "Edit Custom Link",
-            style: context.cardTitle.copyWith(
-              color: context.textPrimary,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          content: Column(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+          child: Column(
             mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              TextField(
-                controller: nameController,
-                style: TextStyle(color: context.textPrimary),
-                cursorColor: context.accentPrimary,
-                decoration: InputDecoration(
-                  hintText: "Link Name (e.g., Portfolio, Website)",
-                  hintStyle: TextStyle(color: context.textMuted),
-                  filled: true,
-                  fillColor: context.surfaceSecondary,
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius:
-                        BorderRadius.circular(AppDimensions.radiusComponent),
-                    borderSide:
-                        BorderSide(color: context.accentPrimary, width: 1),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius:
-                        BorderRadius.circular(AppDimensions.radiusComponent),
-                    borderSide: BorderSide(
-                        color: context.textMuted.withValues(alpha: 0.2)),
+              Center(
+                child: Container(
+                  width: 36,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.white24,
+                    borderRadius: BorderRadius.circular(2),
                   ),
                 ),
+              ),
+              const SizedBox(height: 24),
+              Row(
+                children: [
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF00F2FE).withValues(alpha: 0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Center(
+                      child: Image.asset(
+                        assetPath,
+                        width: 20,
+                        height: 20,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          displayName,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          '@$handle',
+                          style: const TextStyle(
+                            color: Color(0xFF8FA39E),
+                            fontSize: 13,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.05),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        url,
+                        style: const TextStyle(
+                          color: Color(0xFF00F2FE),
+                          fontSize: 13,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () async {
+                        await Clipboard.setData(ClipboardData(text: url));
+                        if (sheetContext.mounted) {
+                          Navigator.pop(sheetContext);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                  'Copied $displayName link to clipboard!'),
+                              backgroundColor: const Color(0xFF1E1F32),
+                              duration: const Duration(seconds: 2),
+                            ),
+                          );
+                        }
+                      },
+                      icon: const Icon(Icons.copy_rounded,
+                          color: Colors.white70, size: 18),
+                      label: const Text(
+                        "Copy Link",
+                        style: TextStyle(
+                            color: Colors.white70, fontWeight: FontWeight.bold),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        side: BorderSide(
+                            color: Colors.white.withValues(alpha: 0.15)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF00F2FE), Color(0xFF4FACFE)],
+                        ),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: ElevatedButton.icon(
+                        onPressed: () async {
+                          final uri = Uri.parse(url);
+                          if (await canLaunchUrl(uri)) {
+                            await launchUrl(uri,
+                                mode: LaunchMode.externalApplication);
+                          } else {
+                            if (sheetContext.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('Could not launch $url'),
+                                  backgroundColor: Colors.redAccent,
+                                ),
+                              );
+                            }
+                          }
+                          if (sheetContext.mounted) Navigator.pop(sheetContext);
+                        },
+                        icon: const Icon(Icons.open_in_new_rounded,
+                            color: Colors.white, size: 18),
+                        label: const Text(
+                          "Open Account",
+                          style: TextStyle(
+                              color: Colors.white, fontWeight: FontWeight.bold),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.transparent,
+                          shadowColor: Colors.transparent,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: 12),
-              TextField(
-                controller: urlController,
-                style: TextStyle(color: context.textPrimary),
-                cursorColor: context.accentPrimary,
-                decoration: InputDecoration(
-                  hintText: "URL (e.g., https://mywebsite.com)",
-                  hintStyle: TextStyle(color: context.textMuted),
-                  filled: true,
-                  fillColor: context.surfaceSecondary,
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius:
-                        BorderRadius.circular(AppDimensions.radiusComponent),
-                    borderSide:
-                        BorderSide(color: context.accentPrimary, width: 1),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius:
-                        BorderRadius.circular(AppDimensions.radiusComponent),
-                    borderSide: BorderSide(
-                        color: context.textMuted.withValues(alpha: 0.2)),
-                  ),
-                ),
-              ),
             ],
           ),
-          actions: [
-            if (existingLink != null)
-              TextButton(
-                onPressed: () async {
-                  final provider =
-                      Provider.of<ProfileProvider>(context, listen: false);
-                  await provider.removeCustomLink(
-                      existingLink.id, provider.userId);
-                  if (context.mounted) Navigator.pop(context);
-                },
-                child: const Text("Delete",
-                    style: TextStyle(color: Colors.redAccent)),
-              ),
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: Text("Cancel",
-                  style: TextStyle(color: context.textSecondary)),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                final nameVal = nameController.text.trim();
-                final urlVal = urlController.text.trim();
-                if (nameVal.isEmpty || urlVal.isEmpty) return;
-
-                final provider =
-                    Provider.of<ProfileProvider>(context, listen: false);
-                if (existingLink == null) {
-                  await provider.addCustomLink(
-                      nameVal, urlVal, provider.userId);
-                } else {
-                  await provider.editCustomLink(
-                      existingLink.id, nameVal, urlVal, provider.userId);
-                }
-                if (context.mounted) Navigator.pop(context);
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: context.accentSecondary,
-                shape: RoundedRectangleBorder(
-                  borderRadius:
-                      BorderRadius.circular(AppDimensions.radiusComponent),
-                ),
-              ),
-              child: const Text("Save",
-                  style: TextStyle(
-                      color: Colors.white, fontWeight: FontWeight.bold)),
-            ),
-          ],
         );
       },
     );
   }
-}
 
-class CountryInfo {
-  final String name;
-  final String code;
-  final String flag;
-  final String region;
-
-  const CountryInfo({
-    required this.name,
-    required this.code,
-    required this.flag,
-    required this.region,
-  });
-}
-
-class _CountryCodePickerSheet extends StatefulWidget {
-  const _CountryCodePickerSheet();
-
-  @override
-  State<_CountryCodePickerSheet> createState() =>
-      _CountryCodePickerSheetState();
-}
-
-class _CountryCodePickerSheetState extends State<_CountryCodePickerSheet> {
-  final TextEditingController _searchController = TextEditingController();
-  String _searchQuery = '';
-
-  static const List<CountryInfo> _allCountries = [
-    // Dubai
-    CountryInfo(
-        name: 'United Arab Emirates',
-        code: '+971',
-        flag: '🇦🇪',
-        region: 'Dubai'),
-    // America
-    CountryInfo(
-        name: 'United States', code: '+1', flag: '🇺🇸', region: 'America'),
-    CountryInfo(name: 'Canada', code: '+1', flag: '🇨🇦', region: 'America'),
-    CountryInfo(name: 'Brazil', code: '+55', flag: '🇧🇷', region: 'America'),
-    CountryInfo(name: 'Mexico', code: '+52', flag: '🇲🇽', region: 'America'),
-    // Europe
-    CountryInfo(
-        name: 'United Kingdom', code: '+44', flag: '🇬🇧', region: 'Europe'),
-    CountryInfo(name: 'Germany', code: '+49', flag: '🇩🇪', region: 'Europe'),
-    CountryInfo(name: 'France', code: '+33', flag: '🇫🇷', region: 'Europe'),
-    CountryInfo(name: 'Italy', code: '+39', flag: '🇮🇹', region: 'Europe'),
-    CountryInfo(name: 'Spain', code: '+34', flag: '🇪🇸', region: 'Europe'),
-    CountryInfo(
-        name: 'Netherlands', code: '+31', flag: '🇳🇱', region: 'Europe'),
-    // Asia
-    CountryInfo(name: 'India', code: '+91', flag: '🇮🇳', region: 'Asia'),
-    CountryInfo(name: 'China', code: '+86', flag: '🇨🇳', region: 'Asia'),
-    CountryInfo(name: 'Singapore', code: '+65', flag: '🇸🇬', region: 'Asia'),
-    CountryInfo(name: 'Japan', code: '+81', flag: '🇯🇵', region: 'Asia'),
-    CountryInfo(name: 'South Korea', code: '+82', flag: '🇰🇷', region: 'Asia'),
-    CountryInfo(
-        name: 'Saudi Arabia', code: '+966', flag: '🇸🇦', region: 'Asia'),
-  ];
-
-  @override
-  void dispose() {
-    _searchController.dispose();
-    super.dispose();
+  Widget _buildSectionHeader(String title, VoidCallback onEdit) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          title,
+          style: context.captionText.copyWith(
+            color: context.textSecondary,
+            fontSize: 12.0,
+            letterSpacing: 1.5,
+          ),
+        ),
+        GestureDetector(
+          onTap: () {
+            HapticFeedback.lightImpact();
+            onEdit();
+          },
+          behavior: HitTestBehavior.opaque,
+          child: Container(
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+              color: context.accentSecondary.withValues(alpha: 0.1),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              Icons.edit_rounded,
+              color: context.accentSecondary,
+              size: 13,
+            ),
+          ),
+        ),
+      ],
+    );
   }
+
+  void _showEditBioSheet() {
+    final provider = Provider.of<ProfileProvider>(context, listen: false);
+    final controller = TextEditingController(text: provider.bio);
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      barrierColor: Colors.black.withValues(alpha: 0.5),
+      builder: (sheetCtx) {
+        return Padding(
+          padding: EdgeInsets.only(
+              bottom: MediaQuery.of(sheetCtx).viewInsets.bottom),
+          child: Container(
+            decoration: const BoxDecoration(
+              color: Color(0xFF151624),
+              borderRadius: BorderRadius.only(
+                topLeft: Radius.circular(24),
+                topRight: Radius.circular(24),
+              ),
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Center(
+                  child: Container(
+                    width: 36,
+                    height: 4,
+                    decoration: BoxDecoration(
+                        color: Colors.white24,
+                        borderRadius: BorderRadius.circular(2)),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                const Text('Edit My Story',
+                    style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold)),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: controller,
+                  maxLines: 5,
+                  style: const TextStyle(color: Colors.white, fontSize: 14),
+                  decoration: InputDecoration(
+                    hintText: 'Tell the world about yourself...',
+                    hintStyle:
+                        TextStyle(color: Colors.white.withValues(alpha: 0.3)),
+                    filled: true,
+                    fillColor: Colors.white.withValues(alpha: 0.05),
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none),
+                    focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(
+                            color: Color(0xFF00F2FE), width: 1)),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                _buildSheetSaveButton(() async {
+                  final uid = provider.userId;
+                  if (uid != null) {
+                    await provider.updateProfileField(
+                        'bio', controller.text.trim(), uid);
+                  }
+                  if (sheetCtx.mounted) Navigator.pop(sheetCtx);
+                }),
+                const SizedBox(height: 8),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _showEditProfessionalBioSheet() {
+    final provider = Provider.of<ProfileProvider>(context, listen: false);
+    final controller = TextEditingController(text: provider.professionalBio);
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      barrierColor: Colors.black.withValues(alpha: 0.5),
+      builder: (sheetCtx) {
+        return Padding(
+          padding: EdgeInsets.only(
+              bottom: MediaQuery.of(sheetCtx).viewInsets.bottom),
+          child: Container(
+            decoration: const BoxDecoration(
+              color: Color(0xFF151624),
+              borderRadius: BorderRadius.only(
+                topLeft: Radius.circular(24),
+                topRight: Radius.circular(24),
+              ),
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Center(
+                  child: Container(
+                    width: 36,
+                    height: 4,
+                    decoration: BoxDecoration(
+                        color: Colors.white24,
+                        borderRadius: BorderRadius.circular(2)),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                const Text('Edit Professional Story',
+                    style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold)),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: controller,
+                  maxLines: 5,
+                  style: const TextStyle(color: Colors.white, fontSize: 14),
+                  decoration: InputDecoration(
+                    hintText:
+                        'Summarize your professional experience & goals...',
+                    hintStyle:
+                        TextStyle(color: Colors.white.withValues(alpha: 0.3)),
+                    filled: true,
+                    fillColor: Colors.white.withValues(alpha: 0.05),
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none),
+                    focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(
+                            color: Color(0xFF00F2FE), width: 1)),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                _buildSheetSaveButton(() async {
+                  final uid = provider.userId;
+                  if (uid != null) {
+                    await provider.updateProfileField(
+                        'professionalBio', controller.text.trim(), uid);
+                  }
+                  if (sheetCtx.mounted) Navigator.pop(sheetCtx);
+                }),
+                const SizedBox(height: 8),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _showEditInterestsSheet() {
+    final provider = Provider.of<ProfileProvider>(context, listen: false);
+    final currentInterests = Set<String>.from(provider.interestTags.isNotEmpty
+        ? provider.interestTags
+        : _selectedInterests);
+    final customController = TextEditingController();
+
+    final List<String> defaultInterests = [
+      "Tech",
+      "Art",
+      "Travel",
+      "Fitness",
+      "Movies",
+      "Coffee",
+      "Music",
+      "Food",
+      "Sports",
+      "Reading"
+    ];
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      barrierColor: Colors.black.withValues(alpha: 0.5),
+      builder: (sheetCtx) {
+        return StatefulBuilder(
+          builder: (ctx, setSheetState) {
+            final displayInterests = [
+              ...defaultInterests,
+              ...currentInterests
+                  .where((i) => !defaultInterests.contains(i) && i != 'Others'),
+              'Others',
+            ];
+
+            return Padding(
+              padding:
+                  EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+              child: Container(
+                constraints: BoxConstraints(
+                    maxHeight: MediaQuery.of(ctx).size.height * 0.7),
+                decoration: const BoxDecoration(
+                  color: Color(0xFF151624),
+                  borderRadius: BorderRadius.only(
+                      topLeft: Radius.circular(24),
+                      topRight: Radius.circular(24)),
+                ),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Center(
+                          child: Container(
+                              width: 36,
+                              height: 4,
+                              decoration: BoxDecoration(
+                                  color: Colors.white24,
+                                  borderRadius: BorderRadius.circular(2)))),
+                      const SizedBox(height: 20),
+                      const Text('Edit Interests',
+                          style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 16),
+                      Wrap(
+                        spacing: 10,
+                        runSpacing: 10,
+                        children: displayInterests.map((interest) {
+                          final isSelected =
+                              currentInterests.contains(interest);
+                          return FilterChip(
+                            label: Text(interest,
+                                style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 13)),
+                            selected: isSelected,
+                            selectedColor: const Color(0xFF00F2FE),
+                            backgroundColor: const Color(0xFF1E1F32),
+                            checkmarkColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(20),
+                                side: BorderSide(
+                                    color: isSelected
+                                        ? const Color(0xFF00F2FE)
+                                        : Colors.white10)),
+                            onSelected: (selected) {
+                              HapticFeedback.lightImpact();
+                              setSheetState(() {
+                                if (interest == 'Others') {
+                                  if (selected) {
+                                    currentInterests.add('Others');
+                                  } else {
+                                    currentInterests.remove('Others');
+                                    customController.clear();
+                                  }
+                                } else {
+                                  if (selected) {
+                                    currentInterests.add(interest);
+                                  } else {
+                                    currentInterests.remove(interest);
+                                  }
+                                }
+                              });
+                            },
+                          );
+                        }).toList(),
+                      ),
+                      if (currentInterests.contains('Others')) ...[
+                        const SizedBox(height: 16),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextField(
+                                controller: customController,
+                                style: const TextStyle(
+                                    color: Colors.white, fontSize: 14),
+                                decoration: InputDecoration(
+                                  hintText: 'Add custom interest...',
+                                  hintStyle: TextStyle(
+                                      color:
+                                          Colors.white.withValues(alpha: 0.3)),
+                                  enabledBorder: const UnderlineInputBorder(
+                                      borderSide:
+                                          BorderSide(color: Colors.white24)),
+                                  focusedBorder: const UnderlineInputBorder(
+                                      borderSide:
+                                          BorderSide(color: Color(0xFF00F2FE))),
+                                ),
+                                onSubmitted: (_) {
+                                  final t = customController.text.trim();
+                                  if (t.isNotEmpty) {
+                                    setSheetState(() {
+                                      currentInterests.add(t);
+                                      customController.clear();
+                                    });
+                                  }
+                                },
+                              ),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.add_circle_outline_rounded,
+                                  color: Color(0xFF00F2FE), size: 26),
+                              onPressed: () {
+                                final t = customController.text.trim();
+                                if (t.isNotEmpty) {
+                                  setSheetState(() {
+                                    currentInterests.add(t);
+                                    customController.clear();
+                                  });
+                                }
+                              },
+                            ),
+                          ],
+                        ),
+                      ],
+                      const SizedBox(height: 20),
+                      _buildSheetSaveButton(() async {
+                        final finalList = currentInterests
+                            .where((i) => i != 'Others')
+                            .toList();
+                        provider.setVibeAndInterests(
+                            provider.vibeTag, finalList);
+                        final uid = provider.userId;
+                        if (uid != null) {
+                          await provider.updateProfileField(
+                              'interest_tags', finalList.join(','), uid);
+                        }
+                        setState(() {
+                          _selectedInterests.clear();
+                          _selectedInterests.addAll(finalList);
+                        });
+                        if (sheetCtx.mounted) Navigator.pop(sheetCtx);
+                      }),
+                      const SizedBox(height: 8),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _showEditSocialSheet() {
+    final provider = Provider.of<ProfileProvider>(context, listen: false);
+    final linkedinC = TextEditingController(text: provider.linkedin);
+    final twitterC = TextEditingController(text: provider.twitter);
+    final instagramC = TextEditingController(text: provider.instagram);
+    final spotifyC = TextEditingController(text: provider.spotify);
+    final isCasual = _previewCard == ProfileCardType.casual;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      barrierColor: Colors.black.withValues(alpha: 0.5),
+      builder: (sheetCtx) {
+        return StatefulBuilder(
+          builder: (BuildContext context, StateSetter setModalState) {
+            return Padding(
+              padding: EdgeInsets.only(
+                  bottom: MediaQuery.of(sheetCtx).viewInsets.bottom),
+              child: Container(
+                decoration: const BoxDecoration(
+                  color: Color(0xFF151624),
+                  borderRadius: BorderRadius.only(
+                      topLeft: Radius.circular(24),
+                      topRight: Radius.circular(24)),
+                ),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Center(
+                          child: Container(
+                              width: 36,
+                              height: 4,
+                              decoration: BoxDecoration(
+                                  color: Colors.white24,
+                                  borderRadius: BorderRadius.circular(2)))),
+                      const SizedBox(height: 20),
+                      const Text('Edit Social Profiles & Visibility',
+                          style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Configure which social profiles show on your active ${isCasual ? "Casual" : "Work"} Card.',
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.5),
+                          fontSize: 12,
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      _buildSocialEditRow(
+                          platform: 'linkedin',
+                          label: 'LinkedIn',
+                          controller: linkedinC,
+                          assetPath: 'assets/icons/linkedin.png',
+                          provider: provider,
+                          setModalState: setModalState),
+                      _buildSocialEditRow(
+                          platform: 'twitter',
+                          label: 'X (Twitter)',
+                          controller: twitterC,
+                          assetPath: 'assets/icons/twitter.png',
+                          provider: provider,
+                          setModalState: setModalState),
+                      _buildSocialEditRow(
+                          platform: 'instagram',
+                          label: 'Instagram',
+                          controller: instagramC,
+                          assetPath: 'assets/icons/instagram.png',
+                          provider: provider,
+                          setModalState: setModalState),
+                      _buildSocialEditRow(
+                          platform: 'spotify',
+                          label: 'Spotify',
+                          controller: spotifyC,
+                          assetPath: 'assets/icons/spotify.png',
+                          provider: provider,
+                          setModalState: setModalState),
+                      const SizedBox(height: 16),
+                      _buildSheetSaveButton(() async {
+                        final uid = provider.userId;
+                        if (uid != null) {
+                          await provider.updateProfileField(
+                              'linkedin', linkedinC.text.trim(), uid);
+                          await provider.updateProfileField(
+                              'twitter', twitterC.text.trim(), uid);
+                          await provider.updateProfileField(
+                              'instagram', instagramC.text.trim(), uid);
+                          await provider.updateProfileField(
+                              'spotify', spotifyC.text.trim(), uid);
+                        }
+                        if (sheetCtx.mounted) Navigator.pop(sheetCtx);
+                      }),
+                      const SizedBox(height: 8),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _showEditCustomLinksSheet() {
+    final provider = Provider.of<ProfileProvider>(context, listen: false);
+    final nameController = TextEditingController();
+    final urlController = TextEditingController();
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      barrierColor: Colors.black.withValues(alpha: 0.5),
+      builder: (sheetCtx) {
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            final links = provider.customLinks;
+
+            return Padding(
+              padding: EdgeInsets.only(
+                  bottom: MediaQuery.of(sheetCtx).viewInsets.bottom),
+              child: Container(
+                decoration: const BoxDecoration(
+                  color: Color(0xFF151624),
+                  borderRadius: BorderRadius.only(
+                    topLeft: Radius.circular(24),
+                    topRight: Radius.circular(24),
+                  ),
+                ),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 36,
+                        height: 4,
+                        decoration: BoxDecoration(
+                            color: Colors.white24,
+                            borderRadius: BorderRadius.circular(2)),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    const Text('Edit Custom Links',
+                        style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 16),
+
+                    // List of existing links
+                    if (links.isEmpty)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 16.0),
+                        child: Text(
+                          "No custom links added yet. Use the fields below to add new ones.",
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.4),
+                            fontSize: 13,
+                          ),
+                        ),
+                      )
+                    else
+                      ConstrainedBox(
+                        constraints: const BoxConstraints(maxHeight: 200),
+                        child: ListView.builder(
+                          shrinkWrap: true,
+                          itemCount: links.length,
+                          itemBuilder: (context, index) {
+                            final link = links[index];
+                            return Container(
+                              margin: const EdgeInsets.only(bottom: 10),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 14, vertical: 10),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.03),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                    color:
+                                        Colors.white.withValues(alpha: 0.05)),
+                              ),
+                              child: Row(
+                                children: [
+                                  const Icon(Icons.link_rounded,
+                                      color: Color(0xFF00F2FE), size: 20),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          link.name,
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.w600,
+                                            fontSize: 14,
+                                          ),
+                                        ),
+                                        Text(
+                                          link.url,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                            color: Colors.white
+                                                .withValues(alpha: 0.4),
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(
+                                        Icons.delete_outline_rounded,
+                                        color: Colors.redAccent,
+                                        size: 20),
+                                    onPressed: () async {
+                                      await provider.removeCustomLink(
+                                          link.id, provider.userId);
+                                      setSheetState(() {});
+                                    },
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+
+                    const Divider(color: Colors.white10, height: 24),
+                    const Text('Add New Link',
+                        style: TextStyle(
+                            color: Colors.white70,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 12),
+
+                    // Name Field
+                    TextField(
+                      controller: nameController,
+                      style: const TextStyle(color: Colors.white, fontSize: 14),
+                      decoration: InputDecoration(
+                        hintText: 'Link Name (e.g., Portfolio, Website)',
+                        hintStyle: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.3)),
+                        filled: true,
+                        fillColor: Colors.white.withValues(alpha: 0.05),
+                        border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide.none),
+                        focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(
+                                color: Color(0xFF00F2FE), width: 1)),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+
+                    // URL Field
+                    TextField(
+                      controller: urlController,
+                      style: const TextStyle(color: Colors.white, fontSize: 14),
+                      decoration: InputDecoration(
+                        hintText: 'URL (e.g., https://mywebsite.com)',
+                        hintStyle: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.3)),
+                        filled: true,
+                        fillColor: Colors.white.withValues(alpha: 0.05),
+                        border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide.none),
+                        focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(
+                                color: Color(0xFF00F2FE), width: 1)),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Add Button
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF0064E0),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
+                      ),
+                      onPressed: () async {
+                        final name = nameController.text.trim();
+                        final url = urlController.text.trim();
+                        if (name.isNotEmpty && url.isNotEmpty) {
+                          await provider.addCustomLink(
+                              name, url, provider.userId);
+                          nameController.clear();
+                          urlController.clear();
+                          setSheetState(() {});
+                        }
+                      },
+                      child: const Text('Add Link',
+                          style: TextStyle(fontWeight: FontWeight.bold)),
+                    ),
+
+                    const SizedBox(height: 24),
+
+                    // Done/Close Button
+                    _buildSheetSaveButton(() {
+                      Navigator.pop(sheetCtx);
+                    }),
+                    const SizedBox(height: 8),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<void> _pickAndUploadImage({
+    required StateSetter setModalState,
+    required Function(String) onUploadSuccess,
+    required Function(String) onUploadError,
+  }) async {
+    final provider = Provider.of<ProfileProvider>(context, listen: false);
+    final picker = ImagePicker();
+    try {
+      final XFile? imageFile = await picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 1024,
+        maxHeight: 1024,
+      );
+
+      if (imageFile == null) {
+        onUploadError("canceled");
+        return;
+      }
+
+      setModalState(() {});
+
+      final bytes = await imageFile.readAsBytes();
+
+      if (!mounted) return;
+
+      final Uint8List? croppedBytes = await Navigator.push<Uint8List>(
+        context,
+        MaterialPageRoute(
+          builder: (context) => CropImagePage(imageBytes: bytes),
+        ),
+      );
+
+      if (croppedBytes == null) {
+        onUploadError("canceled");
+        return;
+      }
+
+      setModalState(() {});
+
+      final compressedBytes =
+          await ImageUploadService.compressImageTo10Kb(croppedBytes);
+
+      final String publicUrl = await ImageUploadService.uploadAvatarImage(
+        provider.userId,
+        compressedBytes,
+      );
+
+      onUploadSuccess(publicUrl);
+    } catch (e) {
+      print("Error picking/uploading image: $e");
+      onUploadError(e.toString());
+    }
+  }
+
+  void _showPhotoPicker() {
+    final provider = Provider.of<ProfileProvider>(context, listen: false);
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: const Color(0xFF151624),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (sheetCtx) {
+        bool isUploading = false;
+        String? uploadError;
+
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            final avatarUrl = provider.avatarUrl;
+            return SingleChildScrollView(
+              physics: const BouncingScrollPhysics(),
+              child: Padding(
+                padding: EdgeInsets.only(
+                  left: 24,
+                  right: 24,
+                  top: 24.0,
+                  bottom: 24.0 + MediaQuery.of(context).viewInsets.bottom,
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 36,
+                        height: 4,
+                        decoration: BoxDecoration(
+                            color: Colors.white24,
+                            borderRadius: BorderRadius.circular(2)),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    const Text(
+                      "Profile Photo",
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 24),
+                    Center(
+                      child: Container(
+                        width: 120,
+                        height: 120,
+                        decoration: const BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: LinearGradient(
+                            colors: [Color(0xFF00F2FE), Color(0xFF0064E0)],
+                          ),
+                        ),
+                        padding: const EdgeInsets.all(3),
+                        child: ClipOval(
+                          child: (avatarUrl.isNotEmpty &&
+                                  avatarUrl.startsWith('http'))
+                              ? Image.network(avatarUrl, fit: BoxFit.cover)
+                              : Container(
+                                  color: const Color(0xFF1E1F32),
+                                  alignment: Alignment.center,
+                                  child: Text(
+                                    _nameController.text.isNotEmpty
+                                        ? _nameController.text
+                                            .substring(0, 1)
+                                            .toUpperCase()
+                                        : "?",
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 38,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    if (isUploading) ...[
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 20),
+                        child: Center(
+                          child: CircularProgressIndicator(
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                                Color(0xFF00F2FE)),
+                          ),
+                        ),
+                      ),
+                    ] else ...[
+                      ElevatedButton.icon(
+                        icon: const Icon(Icons.photo_library_rounded,
+                            color: Colors.white, size: 18),
+                        label: const Text(
+                          "Upload from Gallery",
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF0064E0),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12)),
+                        ),
+                        onPressed: () {
+                          setModalState(() {
+                            isUploading = true;
+                            uploadError = null;
+                          });
+                          _pickAndUploadImage(
+                            setModalState: setModalState,
+                            onUploadSuccess: (publicUrl) async {
+                              if (mounted) {
+                                final uid = provider.userId;
+                                if (uid != null) {
+                                  await provider.updateProfileField(
+                                      'avatarUrl', publicUrl, uid);
+                                }
+                              }
+                              if (sheetCtx.mounted) Navigator.pop(sheetCtx);
+
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: const Text(
+                                    "Profile photo updated and saved!",
+                                    style:
+                                        TextStyle(fontWeight: FontWeight.bold),
+                                  ),
+                                  backgroundColor: const Color(0xFF0064E0),
+                                  behavior: SnackBarBehavior.floating,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                ),
+                              );
+                            },
+                            onUploadError: (err) {
+                              setModalState(() {
+                                isUploading = false;
+                                if (err == "canceled") {
+                                  uploadError = null;
+                                } else {
+                                  uploadError = err;
+                                }
+                              });
+                            },
+                          );
+                        },
+                      ),
+                    ],
+                    if (uploadError != null) ...[
+                      const SizedBox(height: 12),
+                      Text(
+                        uploadError!,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                            color: Colors.redAccent, fontSize: 13),
+                      ),
+                    ],
+                    const SizedBox(height: 12),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _showEditIdentitySheet() {
+    final provider = Provider.of<ProfileProvider>(context, listen: false);
+    final nameC = TextEditingController(text: provider.name);
+
+    final List<String> defaultVibes = [
+      "Night owl",
+      "Early bird",
+      "Music head",
+      "Bookworm",
+      "Gamer"
+    ];
+
+    final currentVibe =
+        provider.vibeTag.isNotEmpty ? provider.vibeTag : 'Early bird';
+    final bool isCustomVibe = !defaultVibes.contains(currentVibe);
+
+    String tempSelectedVibe = isCustomVibe ? 'Others' : currentVibe;
+    final tempCustomVibeController =
+        TextEditingController(text: isCustomVibe ? currentVibe : '');
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      barrierColor: Colors.black.withValues(alpha: 0.5),
+      builder: (sheetCtx) {
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            final avatarUrl = provider.avatarUrl;
+            final vibes = [...defaultVibes, "Others"];
+
+            return Padding(
+              padding: EdgeInsets.only(
+                  bottom: MediaQuery.of(sheetCtx).viewInsets.bottom),
+              child: Container(
+                decoration: const BoxDecoration(
+                  color: Color(0xFF151624),
+                  borderRadius: BorderRadius.only(
+                    topLeft: Radius.circular(24),
+                    topRight: Radius.circular(24),
+                  ),
+                ),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Center(
+                        child: Container(
+                          width: 36,
+                          height: 4,
+                          decoration: BoxDecoration(
+                              color: Colors.white24,
+                              borderRadius: BorderRadius.circular(2)),
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      const Text('Edit Profile Identity',
+                          style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 20),
+
+                      // Avatar Edit Section
+                      Center(
+                        child: GestureDetector(
+                          onTap: () {
+                            _showPhotoPicker();
+                            Future.delayed(const Duration(seconds: 1), () {
+                              if (sheetCtx.mounted) setSheetState(() {});
+                            });
+                          },
+                          child: Stack(
+                            children: [
+                              Container(
+                                width: 90,
+                                height: 90,
+                                padding: const EdgeInsets.all(3),
+                                decoration: const BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  gradient: LinearGradient(
+                                    colors: [
+                                      Color(0xFFEC4899),
+                                      Color(0xFF00F2FE)
+                                    ],
+                                  ),
+                                ),
+                                child: ClipOval(
+                                  child: (avatarUrl.isNotEmpty &&
+                                          avatarUrl.startsWith('http'))
+                                      ? Image.network(avatarUrl,
+                                          fit: BoxFit.cover)
+                                      : Container(
+                                          color: const Color(0xFF1E1F32),
+                                          alignment: Alignment.center,
+                                          child: Text(
+                                            nameC.text.isNotEmpty
+                                                ? nameC.text
+                                                    .substring(0, 1)
+                                                    .toUpperCase()
+                                                : "?",
+                                            style: const TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 28,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ),
+                                ),
+                              ),
+                              Positioned(
+                                bottom: 0,
+                                right: 0,
+                                child: Container(
+                                  padding: const EdgeInsets.all(6),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF0064E0),
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                        color: const Color(0xFF0F101A),
+                                        width: 2),
+                                  ),
+                                  child: const Icon(
+                                    Icons.edit_rounded,
+                                    color: Colors.white,
+                                    size: 12,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+
+                      // Full Name Field
+                      _buildSheetField(
+                        label: 'Full Name',
+                        controller: nameC,
+                        icon: Icons.person_outline_rounded,
+                      ),
+                      const SizedBox(height: 20),
+
+                      // Vibe Selection
+                      const Text(
+                        'Select Vibe',
+                        style: TextStyle(
+                          color: Colors.white70,
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: vibes.map((vibe) {
+                          final isSelected = tempSelectedVibe == vibe;
+                          return ChoiceChip(
+                            label: Text(
+                              vibe,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            selected: isSelected,
+                            selectedColor: const Color(0xFF00F2FE),
+                            backgroundColor: const Color(0xFF1E1F32),
+                            showCheckmark: false,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                              side: BorderSide(
+                                  color: isSelected
+                                      ? const Color(0xFF00F2FE)
+                                      : Colors.white10),
+                            ),
+                            onSelected: (selected) {
+                              if (selected) {
+                                setSheetState(() {
+                                  tempSelectedVibe = vibe;
+                                });
+                              }
+                            },
+                          );
+                        }).toList(),
+                      ),
+                      if (tempSelectedVibe == 'Others') ...[
+                        const SizedBox(height: 14),
+                        TextField(
+                          controller: tempCustomVibeController,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          decoration: InputDecoration(
+                            hintText: "Enter your custom vibe...",
+                            hintStyle: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.2)),
+                            enabledBorder: const UnderlineInputBorder(
+                              borderSide:
+                                  BorderSide(color: Colors.white24, width: 1.5),
+                            ),
+                            focusedBorder: const UnderlineInputBorder(
+                              borderSide: BorderSide(
+                                  color: Color(0xFF00F2FE), width: 1.5),
+                            ),
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 28),
+
+                      // Save Button
+                      _buildSheetSaveButton(() async {
+                        final newName = nameC.text.trim();
+                        final finalVibe = tempSelectedVibe == 'Others'
+                            ? tempCustomVibeController.text.trim()
+                            : tempSelectedVibe;
+                        final uid = provider.userId;
+
+                        if (uid != null) {
+                          if (newName.isNotEmpty) {
+                            await provider.updateProfileField(
+                                'name', newName, uid);
+                            setState(() {
+                              _nameController.text = newName;
+                            });
+                          }
+                          if (finalVibe.isNotEmpty) {
+                            await provider.updateProfileField(
+                                'vibeTag', finalVibe, uid);
+                            setState(() {
+                              _selectedVibe = finalVibe;
+                            });
+                          }
+                        }
+                        if (sheetCtx.mounted) Navigator.pop(sheetCtx);
+                      }),
+                      const SizedBox(height: 8),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _showEditDetailsSheet() {
+    final provider = Provider.of<ProfileProvider>(context, listen: false);
+    final isCasual = _previewCard == ProfileCardType.casual;
+
+    final professionC = TextEditingController(text: provider.profession);
+    final companyC = TextEditingController(text: provider.company);
+    final emailC = TextEditingController(
+        text: isCasual ? provider.email : provider.professionalEmail);
+    final phoneC = TextEditingController(
+        text:
+            isCasual ? provider.phoneNumber : provider.professionalPhoneNumber);
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      barrierColor: Colors.black.withValues(alpha: 0.5),
+      builder: (sheetCtx) {
+        return Padding(
+          padding: EdgeInsets.only(
+              bottom: MediaQuery.of(sheetCtx).viewInsets.bottom),
+          child: Container(
+            decoration: const BoxDecoration(
+              color: Color(0xFF151624),
+              borderRadius: BorderRadius.only(
+                  topLeft: Radius.circular(24), topRight: Radius.circular(24)),
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Center(
+                      child: Container(
+                          width: 36,
+                          height: 4,
+                          decoration: BoxDecoration(
+                              color: Colors.white24,
+                              borderRadius: BorderRadius.circular(2)))),
+                  const SizedBox(height: 20),
+                  const Text('Edit Profile Details',
+                      style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 20),
+                  if (!isCasual) ...[
+                    _buildSheetField(
+                        label: 'Profession',
+                        controller: professionC,
+                        icon: Icons.work_rounded),
+                    const SizedBox(height: 14),
+                    _buildSheetField(
+                        label: 'Company',
+                        controller: companyC,
+                        icon: Icons.business_rounded),
+                    const SizedBox(height: 14),
+                  ],
+                  _buildSheetField(
+                      label: isCasual ? 'Email' : 'Professional Email',
+                      controller: emailC,
+                      icon: Icons.email_rounded),
+                  const SizedBox(height: 14),
+                  _buildSheetField(
+                      label: isCasual ? 'Phone' : 'Professional Phone',
+                      controller: phoneC,
+                      icon: Icons.phone_rounded),
+                  const SizedBox(height: 24),
+                  _buildSheetSaveButton(() async {
+                    final uid = provider.userId;
+                    if (uid != null) {
+                      if (!isCasual) {
+                        await provider.updateProfileField(
+                            'profession', professionC.text.trim(), uid);
+                        await provider.updateProfileField(
+                            'company', companyC.text.trim(), uid);
+                      }
+                      final emailField =
+                          isCasual ? 'email' : 'professionalEmail';
+                      final phoneField =
+                          isCasual ? 'phoneNumber' : 'professionalPhoneNumber';
+                      await provider.updateProfileField(
+                          emailField, emailC.text.trim(), uid);
+                      await provider.updateProfileField(
+                          phoneField, phoneC.text.trim(), uid);
+                    }
+                    if (sheetCtx.mounted) Navigator.pop(sheetCtx);
+                  }),
+                  const SizedBox(height: 8),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildSocialEditRow({
+    required String platform,
+    required String label,
+    required TextEditingController controller,
+    required String assetPath,
+    required ProfileProvider provider,
+    required StateSetter setModalState,
+  }) {
+    final isCasual = _previewCard == ProfileCardType.casual;
+    final assignment = provider.fieldAssignments[platform] ??
+        FieldCardAssignment(casual: false, professional: true);
+    final isVisible = isCasual ? assignment.casual : assignment.professional;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.02),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.05),
+          width: 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Image.asset(
+                assetPath,
+                width: 18,
+                height: 18,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                label,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const Spacer(),
+              // Visibility Toggle Button
+              GestureDetector(
+                onTap: () async {
+                  HapticFeedback.lightImpact();
+                  await provider.toggleFieldOnCard(platform, _previewCard);
+                  setModalState(() {});
+                },
+                behavior: HitTestBehavior.opaque,
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: isVisible
+                        ? const Color(0xFF00F2FE).withValues(alpha: 0.1)
+                        : Colors.white.withValues(alpha: 0.05),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: isVisible
+                          ? const Color(0xFF00F2FE).withValues(alpha: 0.3)
+                          : Colors.white.withValues(alpha: 0.1),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        isVisible
+                            ? Icons.visibility_rounded
+                            : Icons.visibility_off_rounded,
+                        color: isVisible
+                            ? const Color(0xFF00F2FE)
+                            : Colors.white38,
+                        size: 13,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        isVisible ? 'Visible' : 'Hidden',
+                        style: TextStyle(
+                          color: isVisible
+                              ? const Color(0xFF00F2FE)
+                              : Colors.white38,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          TextField(
+            controller: controller,
+            style: const TextStyle(color: Colors.white, fontSize: 13),
+            decoration: InputDecoration(
+              hintText: 'Enter $label handle or link...',
+              hintStyle: TextStyle(
+                color: Colors.white.withValues(alpha: 0.25),
+                fontSize: 12.5,
+              ),
+              filled: true,
+              fillColor: Colors.white.withValues(alpha: 0.03),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: BorderSide.none,
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide:
+                    const BorderSide(color: Color(0xFF00F2FE), width: 1),
+              ),
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSheetField({
+    required String label,
+    required TextEditingController controller,
+    IconData? icon,
+    String? assetPath,
+  }) {
+    Widget? prefix;
+    if (assetPath != null) {
+      prefix = Padding(
+        padding: const EdgeInsets.all(12.0),
+        child: Image.asset(
+          assetPath,
+          width: 18,
+          height: 18,
+        ),
+      );
+    } else if (icon != null) {
+      prefix = Icon(icon, color: const Color(0xFF00F2FE), size: 18);
+    }
+
+    return TextField(
+      controller: controller,
+      style: const TextStyle(color: Colors.white, fontSize: 14),
+      decoration: InputDecoration(
+        labelText: label,
+        labelStyle:
+            TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 13),
+        prefixIcon: prefix,
+        filled: true,
+        fillColor: Colors.white.withValues(alpha: 0.05),
+        border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide.none),
+        focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: Color(0xFF00F2FE), width: 1)),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      ),
+    );
+  }
+
+  Widget _buildSheetSaveButton(FutureOr<void> Function() onSave) {
+    return _SheetSaveButton(onSave: onSave);
+  }
+}
+
+class _SheetSaveButton extends StatefulWidget {
+  final FutureOr<void> Function() onSave;
+  const _SheetSaveButton({required this.onSave});
+
+  @override
+  State<_SheetSaveButton> createState() => _SheetSaveButtonState();
+}
+
+class _SheetSaveButtonState extends State<_SheetSaveButton> {
+  bool _isLoading = false;
 
   @override
   Widget build(BuildContext context) {
-    // Filter countries based on query
-    final query = _searchQuery.toLowerCase().trim();
-    final filtered = _allCountries.where((country) {
-      return country.name.toLowerCase().contains(query) ||
-          country.code.contains(query) ||
-          country.region.toLowerCase().contains(query);
-    }).toList();
-
-    // Group filtered countries by region
-    final Map<String, List<CountryInfo>> grouped = {};
-    for (var c in filtered) {
-      if (!grouped.containsKey(c.region)) {
-        grouped[c.region] = [];
-      }
-      grouped[c.region]!.add(c);
-    }
-
-    // Keep regional ordering: Dubai, America, Europe, Asia
-    final orderedRegions = ['Dubai', 'America', 'Europe', 'Asia']
-        .where((r) => grouped.containsKey(r))
-        .toList();
-    // Add any dynamic regions if somehow created
-    for (var r in grouped.keys) {
-      if (!orderedRegions.contains(r)) {
-        orderedRegions.add(r);
-      }
-    }
-
-    final double bottomPadding = MediaQuery.of(context).viewInsets.bottom;
-
-    return Material(
-      color: context.surfacePrimary,
-      borderRadius: BorderRadius.vertical(
-          top: Radius.circular(context.radiusPremiumCard)),
-      clipBehavior: Clip.antiAlias,
-      child: SizedBox(
-        height: MediaQuery.of(context).size.height * 0.75,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Drag handle
-            const SizedBox(height: 12),
-            Center(
-              child: Container(
-                width: 48,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            // Header
-            Padding(
-              padding: const EdgeInsets.symmetric(
-                  horizontal: AppDimensions.marginStandard),
-              child: Text(
-                'Select Country',
-                style: context.screenHeading.copyWith(
-                  color: context.textPrimary,
-                  fontSize: 18,
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            // Search Input
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: TextField(
-                controller: _searchController,
-                onChanged: (val) {
-                  setState(() {
-                    _searchQuery = val;
-                  });
-                },
-                style: context.bodyText.copyWith(color: context.textPrimary),
-                cursorColor: context.accentSecondary,
-                decoration: InputDecoration(
-                  hintText: 'Search country or code...',
-                  hintStyle: context.bodyText.copyWith(
-                    color: context.textMuted,
-                  ),
-                  prefixIcon: Icon(
-                    Icons.search_rounded,
-                    color: context.textMuted,
-                    size: 20,
-                  ),
-                  suffixIcon: _searchQuery.isNotEmpty
-                      ? IconButton(
-                          icon: Icon(
-                            Icons.close_rounded,
-                            color: context.textMuted,
-                            size: 20,
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: _isLoading
+              ? [
+                  const Color(0xFF00F2FE).withValues(alpha: 0.5),
+                  const Color(0xFF4FACFE).withValues(alpha: 0.5)
+                ]
+              : [const Color(0xFF00F2FE), const Color(0xFF4FACFE)],
+        ),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: ElevatedButton(
+        onPressed: _isLoading
+            ? null
+            : () async {
+                final messenger = ScaffoldMessenger.of(context);
+                setState(() {
+                  _isLoading = true;
+                });
+                try {
+                  await widget.onSave();
+                  messenger.showSnackBar(
+                    SnackBar(
+                      content: Row(
+                        children: [
+                          const Icon(Icons.check_circle_rounded,
+                              color: Color(0xFF00F2FE), size: 18),
+                          const SizedBox(width: 8),
+                          const Text(
+                            'Changes saved successfully!',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              fontFamily: 'Inter',
+                            ),
                           ),
-                          onPressed: () {
-                            _searchController.clear();
-                            setState(() {
-                              _searchQuery = '';
-                            });
-                          },
-                        )
-                      : null,
-                  filled: true,
-                  fillColor: context.surfaceSecondary,
-                  contentPadding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  border: OutlineInputBorder(
-                    borderRadius:
-                        BorderRadius.circular(AppDimensions.radiusComponent),
-                    borderSide: BorderSide.none,
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius:
-                        BorderRadius.circular(AppDimensions.radiusComponent),
-                    borderSide: BorderSide(
-                      color: context.textMuted.withValues(alpha: 0.1),
-                    ),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius:
-                        BorderRadius.circular(AppDimensions.radiusComponent),
-                    borderSide: BorderSide(
-                      color: context.accentSecondary,
-                      width: 1,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            // Countries List
-            Expanded(
-              child: filtered.isEmpty
-                  ? Center(
-                      child: Text(
-                        'No countries found',
-                        style: context.bodyText.copyWith(
-                          color: context.textSecondary,
-                        ),
+                        ],
                       ),
-                    )
-                  : ListView.builder(
-                      padding:
-                          EdgeInsets.fromLTRB(16, 0, 16, 24 + bottomPadding),
-                      itemCount: orderedRegions.length,
-                      itemBuilder: (context, regionIndex) {
-                        final regionName = orderedRegions[regionIndex];
-                        final countries = grouped[regionName]!;
-
-                        return Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Padding(
-                              padding: const EdgeInsets.only(
-                                  left: 8, top: 16, bottom: 8),
-                              child: Text(
-                                regionName.toUpperCase(),
-                                style: context.captionText.copyWith(
-                                  color: context.accentSecondary,
-                                  fontSize: 12,
-                                  letterSpacing: 1.2,
-                                ),
+                      backgroundColor: const Color(0xFF1E1F32),
+                      behavior: SnackBarBehavior.floating,
+                      duration: const Duration(seconds: 2),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10)),
+                    ),
+                  );
+                } catch (e) {
+                  messenger.showSnackBar(
+                    SnackBar(
+                      content: Row(
+                        children: [
+                          const Icon(Icons.error_outline_rounded,
+                              color: Colors.redAccent, size: 18),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Failed to save changes: $e',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                fontFamily: 'Inter',
                               ),
                             ),
-                            ...countries.map((country) {
-                              return Theme(
-                                data: Theme.of(context).copyWith(
-                                  splashColor: context.accentSecondary
-                                      .withValues(alpha: 0.1),
-                                  highlightColor: context.accentSecondary
-                                      .withValues(alpha: 0.05),
-                                ),
-                                child: ListTile(
-                                  contentPadding: const EdgeInsets.symmetric(
-                                      horizontal: 12),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(
-                                        AppDimensions.radiusComponent),
-                                  ),
-                                  leading: Text(
-                                    country.flag,
-                                    style: const TextStyle(fontSize: 22),
-                                  ),
-                                  title: Text(
-                                    country.name,
-                                    style: context.bodyText.copyWith(
-                                      color: context.textPrimary,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                  trailing: Text(
-                                    country.code,
-                                    style: context.bodyText.copyWith(
-                                      color: context.textSecondary,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                  onTap: () {
-                                    Navigator.pop(context, country.code);
-                                  },
-                                ),
-                              );
-                            }),
-                          ],
-                        );
-                      },
+                          ),
+                        ],
+                      ),
+                      backgroundColor: const Color(0xFF1E1F32),
+                      behavior: SnackBarBehavior.floating,
+                      duration: const Duration(seconds: 3),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10)),
                     ),
-            ),
-          ],
+                  );
+                } finally {
+                  if (mounted) {
+                    setState(() {
+                      _isLoading = false;
+                    });
+                  }
+                }
+              },
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.transparent,
+          shadowColor: Colors.transparent,
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         ),
+        child: _isLoading
+            ? const SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2.5,
+                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                ),
+              )
+            : const Text(
+                'Save',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 15,
+                ),
+              ),
       ),
     );
   }
@@ -3833,32 +4557,3 @@ class CardPatternPainter extends CustomPainter {
   bool shouldRepaint(covariant CardPatternPainter oldDelegate) =>
       oldDelegate.color != color;
 }
-
-// class CardPatternPainter extends CustomPainter {
-//   final Color color;
-//   CardPatternPainter({required this.color});
-
-//   @override
-//   void paint(Canvas canvas, Size size) {
-//     final paint = Paint()
-//       ..color = color
-//       ..style = PaintingStyle.stroke
-//       ..strokeWidth = 1.0;
-
-//     // Draw concentric circles in the top right corner
-//     final centerTR = Offset(size.width, 0);
-//     for (double r = 40.0; r <= 220.0; r += 16.0) {
-//       canvas.drawCircle(centerTR, r, paint);
-//     }
-
-//     // Draw concentric circles in the bottom left corner
-//     final centerBL = Offset(0, size.height);
-//     for (double r = 40.0; r <= 220.0; r += 16.0) {
-//       canvas.drawCircle(centerBL, r, paint);
-//     }
-//   }
-
-//   @override
-//   bool shouldRepaint(covariant CardPatternPainter oldDelegate) =>
-//       oldDelegate.color != color;
-// }

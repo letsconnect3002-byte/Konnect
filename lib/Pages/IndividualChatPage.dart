@@ -249,10 +249,10 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
     setState(() {
       _replyMessage = null;
     });
-
     if (replyMsg != null) {
       final isReplyMe = replyMsg['sender_id'] == _myUserId;
-      final replySenderName = isReplyMe ? 'You' : _name;
+      final myName = Provider.of<ProfileProvider>(context, listen: false).name;
+      final replySenderName = isReplyMe ? (myName.isNotEmpty ? myName : 'You') : _name;
       await _provider.sendChatMessage(
         roomId: _roomId!,
         text: text,
@@ -770,7 +770,8 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
                             _scrollToAndHighlightMessage(
                                 replyToId, _provider.activeRoomMessages);
                           },
-                          child: _buildBubbleReplyQuote(replyToSenderName ?? '',
+                          child: _buildBubbleReplyQuote(
+                              _resolveReplySenderName(replyToSenderName),
                               replyToPayload ?? '', isMe),
                         ),
                         const SizedBox(height: 6),
@@ -973,6 +974,13 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
         ),
       ),
     );
+  }
+
+  String _resolveReplySenderName(String? storedName) {
+    if (storedName == null || storedName.isEmpty) return '';
+    final myName = Provider.of<ProfileProvider>(context, listen: false).name;
+    if (storedName == myName || storedName == 'You') return 'You';
+    return storedName;
   }
 
   Widget _buildBubbleReplyQuote(String senderName, String text, bool isMe) {

@@ -321,7 +321,7 @@ class _ConnectHubBottomSheetState extends State<ConnectHubBottomSheet>
                         onPressed: () => _showQrOptionsBottomSheet(context),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: context.accentPrimary,
-                          foregroundColor: Colors.black,
+                          foregroundColor: Colors.white,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),
@@ -439,19 +439,6 @@ class _ConnectHubBottomSheetState extends State<ConnectHubBottomSheet>
                           });
                         },
                       ),
-                      const SizedBox(height: 12),
-                      _buildOptionTile(
-                        title: "Both Cards",
-                        subtitle:
-                            "Share your complete casual and professional profiles.",
-                        value: "both",
-                        groupValue: _selectedShareType,
-                        onChanged: (val) {
-                          setModalState(() {
-                            _selectedShareType = val!;
-                          });
-                        },
-                      ),
                       const SizedBox(height: 24),
                       ElevatedButton(
                         onPressed: () {
@@ -466,7 +453,7 @@ class _ConnectHubBottomSheetState extends State<ConnectHubBottomSheet>
                         },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: context.accentPrimary,
-                          foregroundColor: Colors.black,
+                          foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(vertical: 14),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(16),
@@ -758,11 +745,11 @@ class _ConnectHubBottomSheetState extends State<ConnectHubBottomSheet>
                   child: ElevatedButton.icon(
                     onPressed: _openCameraScanner,
                     icon: const Icon(Icons.camera_alt_rounded,
-                        color: Colors.black, size: 18),
+                        color: Colors.white, size: 18),
                     label: const Text(
                       "Open Camera Scanner",
                       style: TextStyle(
-                        color: Colors.black,
+                        color: Colors.white,
                         fontWeight: FontWeight.bold,
                         fontFamily: 'Inter',
                         fontSize: 14,
@@ -909,7 +896,8 @@ class _ConnectHubBottomSheetState extends State<ConnectHubBottomSheet>
             // Active sharing type chip/card below QR code
             Center(
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 decoration: BoxDecoration(
                   color: context.surfacePrimary,
                   borderRadius:
@@ -1014,7 +1002,7 @@ class _ConnectHubBottomSheetState extends State<ConnectHubBottomSheet>
                           onPressed: _generateInviteCode,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: context.accentPrimary,
-                            foregroundColor: Colors.black,
+                            foregroundColor: Colors.white,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),
                             ),

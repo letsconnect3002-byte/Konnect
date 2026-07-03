@@ -556,7 +556,7 @@ class _ProfilePageState extends State<ProfilePage> {
                           },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: context.accentPrimary,
-                            foregroundColor: Colors.black,
+                            foregroundColor: Colors.white,
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 16, vertical: 8),
                             shape: RoundedRectangleBorder(
@@ -623,7 +623,7 @@ class _ProfilePageState extends State<ProfilePage> {
                               },
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: context.accentPrimary,
-                                foregroundColor: Colors.black,
+                                foregroundColor: Colors.white,
                                 padding: const EdgeInsets.symmetric(
                                     horizontal: 16, vertical: 8),
                                 shape: RoundedRectangleBorder(
@@ -727,19 +727,7 @@ class _ProfilePageState extends State<ProfilePage> {
                           });
                         },
                       ),
-                      const SizedBox(height: 12),
-                      _buildOptionTile(
-                        title: "Both Cards",
-                        subtitle:
-                            "Share your complete casual and professional profiles.",
-                        value: "both",
-                        groupValue: _selectedShareType,
-                        onChanged: (val) {
-                          setModalState(() {
-                            _selectedShareType = val!;
-                          });
-                        },
-                      ),
+
                       const SizedBox(height: 24),
                       ElevatedButton(
                         onPressed: () {
@@ -750,7 +738,7 @@ class _ProfilePageState extends State<ProfilePage> {
                         },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: context.accentPrimary,
-                          foregroundColor: Colors.black,
+                          foregroundColor: Colors.white,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(
                                 AppDimensions.radiusComponent),
@@ -859,19 +847,7 @@ class _ProfilePageState extends State<ProfilePage> {
                           });
                         },
                       ),
-                      const SizedBox(height: 12),
-                      _buildOptionTile(
-                        title: "Both Cards",
-                        subtitle:
-                            "Share your complete casual and professional profiles.",
-                        value: "both",
-                        groupValue: _selectedShareType,
-                        onChanged: (val) {
-                          setModalState(() {
-                            _selectedShareType = val!;
-                          });
-                        },
-                      ),
+
                       const SizedBox(height: 24),
                       ElevatedButton(
                         onPressed: () {
@@ -880,7 +856,7 @@ class _ProfilePageState extends State<ProfilePage> {
                         },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: context.accentPrimary,
-                          foregroundColor: Colors.black,
+                          foregroundColor: Colors.white,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(
                                 AppDimensions.radiusComponent),

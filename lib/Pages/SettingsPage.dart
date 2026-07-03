@@ -305,6 +305,8 @@ class _SettingsPageState extends State<SettingsPage> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   const SizedBox(height: 8),
+
+
                   
                   // ── SOUND EFFECTS SECTION ──
                   Container(
@@ -329,29 +331,32 @@ class _SettingsPageState extends State<SettingsPage> {
                           ),
                         ),
                         const SizedBox(height: 8),
-                        SwitchListTile.adaptive(
-                          contentPadding: EdgeInsets.zero,
-                          title: Text(
-                            "Global Sound Effects",
-                            style: context.bodyText.copyWith(
-                              fontWeight: FontWeight.w600,
-                              color: context.textPrimary,
+                        Material(
+                          color: Colors.transparent,
+                          child: SwitchListTile.adaptive(
+                            contentPadding: EdgeInsets.zero,
+                            title: Text(
+                              "Global Sound Effects",
+                              style: context.bodyText.copyWith(
+                                fontWeight: FontWeight.w600,
+                                color: context.textPrimary,
+                              ),
                             ),
-                          ),
-                          subtitle: Text(
-                            "Play sounds when sending or receiving chat messages.",
-                            style: context.captionText.copyWith(
-                              color: context.textSecondary,
+                            subtitle: Text(
+                              "Play sounds when sending or receiving chat messages.",
+                              style: context.captionText.copyWith(
+                                color: context.textSecondary,
+                              ),
                             ),
+                            activeThumbColor: context.accentPrimary,
+                            activeTrackColor:
+                                context.accentPrimary.withValues(alpha: 0.3),
+                            value: chatProvider.soundEffectsEnabled,
+                            onChanged: (val) {
+                              HapticFeedback.lightImpact();
+                              chatProvider.setSoundEffectsEnabled(val);
+                            },
                           ),
-                          activeThumbColor: context.accentPrimary,
-                          activeTrackColor:
-                              context.accentPrimary.withValues(alpha: 0.3),
-                          value: chatProvider.soundEffectsEnabled,
-                          onChanged: (val) {
-                            HapticFeedback.lightImpact();
-                            chatProvider.setSoundEffectsEnabled(val);
-                          },
                         ),
                       ],
                     ),
@@ -406,14 +411,7 @@ class _SettingsPageState extends State<SettingsPage> {
                               onTap: () => profileProvider
                                   .setDefaultCardVisibility("professional"),
                             ),
-                            const SizedBox(width: 8),
-                            _buildCardOption(
-                              label: "Both",
-                              value: "both",
-                              activeValue: profileProvider.defaultCardVisibility,
-                              onTap: () => profileProvider
-                                  .setDefaultCardVisibility("both"),
-                            ),
+
                           ],
                         ),
                         const SizedBox(height: 8),

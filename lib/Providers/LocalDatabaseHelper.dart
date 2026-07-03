@@ -120,7 +120,18 @@ class LocalDatabaseHelper {
     String? replyToMessageSenderName,
   }) async {
     final db = await database;
-    final timeStr = createdAt ?? DateTime.now().toUtc().toIso8601String();
+    
+    // Parse and normalize timestamp to standard ISO8601 format to ensure correct SQLite text sorting
+    String timeStr;
+    if (createdAt != null) {
+      try {
+        timeStr = DateTime.parse(createdAt).toUtc().toIso8601String();
+      } catch (_) {
+        timeStr = createdAt;
+      }
+    } else {
+      timeStr = DateTime.now().toUtc().toIso8601String();
+    }
 
     // Check if message already exists locally
     final existing = await db.query(
@@ -132,12 +143,34 @@ class LocalDatabaseHelper {
     );
 
     if (existing.isNotEmpty) {
-      // Message already exists — only upgrade status, never downgrade
+      // Message already exists — merge missing fields and check status rank
       final currentStatus = existing.first['status'] as String? ?? 'sent';
+      final Map<String, dynamic> updates = {};
+      
       if (_statusRank(status) > _statusRank(currentStatus)) {
+        updates['status'] = status;
+      }
+      
+      // Update metadata fields if they are present in the new insert call but might be null/missing locally
+      if (replyToMessageId != null) {
+        updates['reply_to_message_id'] = replyToMessageId;
+      }
+      if (replyToMessagePayload != null) {
+        updates['reply_to_message_payload'] = replyToMessagePayload;
+      }
+      if (replyToMessageSenderName != null) {
+        updates['reply_to_message_sender_name'] = replyToMessageSenderName;
+      }
+      
+      // Align the local timestamp with the server-assigned standardized timestamp
+      if (createdAt != null) {
+        updates['created_at'] = timeStr;
+      }
+
+      if (updates.isNotEmpty) {
         await db.update(
           'messages',
-          {'status': status},
+          updates,
           where: 'id = ?',
           whereArgs: [id],
         );
