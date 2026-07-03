@@ -169,7 +169,9 @@ void handleLocalNotificationClickPayload(String payload) {
 
 Future<bool> _isUserMutedUnderMonkMode(int senderId) async {
   try {
-    final settings = await LocalDatabaseHelper.instance.getMonkModeSettings();
+    final ownerId = await LocalDatabaseHelper.instance.getActiveUserId();
+    if (ownerId == null) return false;
+    final settings = await LocalDatabaseHelper.instance.getMonkModeSettings(ownerId);
     final bool enabled = settings['enabled'] as bool? ?? false;
     if (!enabled) return false;
 
@@ -579,6 +581,8 @@ class MyApp extends StatelessWidget {
         navigatorKey: navigatorKey,
         debugShowCheckedModeBanner: false,
         theme: AppTheme.darkTheme,
+        darkTheme: AppTheme.darkTheme,
+        themeMode: ThemeMode.dark,
         builder: (context, child) {
           final profileProvider = Provider.of<ProfileProvider>(context);
           final blurEnabled = profileProvider.blurBackground;
@@ -1019,18 +1023,20 @@ class _AppShellGateState extends State<AppShellGate> {
         ),
       );
     }
-    return const _AppShell();
+    return AppShell(key: appShellKey);
   }
 }
 
-class _AppShell extends StatefulWidget {
-  const _AppShell();
+final GlobalKey<AppShellState> appShellKey = GlobalKey<AppShellState>();
+
+class AppShell extends StatefulWidget {
+  const AppShell({super.key});
 
   @override
-  State<_AppShell> createState() => _AppShellState();
+  State<AppShell> createState() => AppShellState();
 }
 
-class _AppShellState extends State<_AppShell> with WidgetsBindingObserver {
+class AppShellState extends State<AppShell> with WidgetsBindingObserver {
   int _currentIndex = 0;
   late final List<Widget> _screens;
 
@@ -1093,6 +1099,12 @@ class _AppShellState extends State<_AppShell> with WidgetsBindingObserver {
         }
       }
     }
+  }
+
+  void setSelectedIndex(int index) {
+    setState(() {
+      _currentIndex = index;
+    });
   }
 
   @override

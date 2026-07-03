@@ -9,6 +9,7 @@ import 'package:connect/Providers/profile_provider.dart';
 import 'package:connect/Providers/connection_provider.dart';
 import 'package:connect/Pages/QrCodeScanner.dart';
 import 'package:connect/Config/app_theme.dart';
+import 'package:connect/main.dart';
 
 class ConnectHubBottomSheet extends StatefulWidget {
   const ConnectHubBottomSheet({super.key});
@@ -879,6 +880,15 @@ class _ConnectHubBottomSheetState extends State<ConnectHubBottomSheet>
       );
     }
 
+    final bool isComplete = _checkIsProfileComplete(profileProvider);
+    if (!isComplete) {
+      return SingleChildScrollView(
+        physics: const BouncingScrollPhysics(),
+        padding: const EdgeInsets.symmetric(horizontal: 24),
+        child: _buildIncompleteProfileCard(profileProvider),
+      );
+    }
+
     return SingleChildScrollView(
       physics: const BouncingScrollPhysics(),
       padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -1108,6 +1118,111 @@ class _ConnectHubBottomSheetState extends State<ConnectHubBottomSheet>
             ),
           ),
           const SizedBox(height: 10),
+        ],
+      ),
+    );
+  }
+
+  bool _checkIsProfileComplete(ProfileProvider provider) {
+    final String name = provider.name.trim();
+    final String vibe = provider.vibeTag.trim();
+    final int interestsCount = provider.interestTags.length;
+
+    // Name check: not empty and not default "Jane Doe"
+    final bool hasName = name.isNotEmpty && name.toLowerCase() != 'jane doe';
+    // Vibe check: not empty
+    final bool hasVibe = vibe.isNotEmpty;
+    // Interests check: at least 3 interests
+    final bool hasInterests = interestsCount >= 3;
+
+    // Email check: either casual email or professional email is filled
+    final bool hasEmail = provider.email.trim().isNotEmpty ||
+        provider.professionalEmail.trim().isNotEmpty;
+    // Phone check: either casual phone or professional phone is filled
+    final bool hasPhone = provider.phoneNumber.trim().isNotEmpty ||
+        provider.professionalPhoneNumber.trim().isNotEmpty;
+
+    return hasName && hasVibe && hasInterests && hasEmail && hasPhone;
+  }
+
+  Widget _buildIncompleteProfileCard(ProfileProvider provider) {
+    return Container(
+      margin: const EdgeInsets.only(top: 24, bottom: 24),
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: const Color(0xFF151624),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.08),
+          width: 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.amber.withValues(alpha: 0.15),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.lock_person_rounded,
+                  color: Colors.amber,
+                  size: 24,
+                ),
+              ),
+              const SizedBox(width: 16),
+              const Expanded(
+                child: Text(
+                  "Setup Required",
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    fontFamily: 'Inter',
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Text(
+            "To generate your personal QR code and private sharing keys, please complete your profile details first.",
+            style: TextStyle(
+              color: context.textSecondary,
+              fontSize: 13,
+              height: 1.4,
+              fontFamily: 'Inter',
+            ),
+          ),
+          const SizedBox(height: 28),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              // Switch to the Profile tab index (4) using global appShellKey
+              appShellKey.currentState?.setSelectedIndex(4);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: context.accentPrimary,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              elevation: 0,
+            ),
+            child: const Text(
+              "Go to Profile",
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 14,
+                fontFamily: 'Inter',
+              ),
+            ),
+          ),
         ],
       ),
     );

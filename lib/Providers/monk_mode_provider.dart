@@ -45,7 +45,9 @@ class MonkModeProvider with ChangeNotifier {
 
   Future<void> loadSettings() async {
     try {
-      final settings = await LocalDatabaseHelper.instance.getMonkModeSettings();
+      final userIdVal = _profileProvider?.userId ?? await LocalDatabaseHelper.instance.getActiveUserId();
+      if (userIdVal == null) return;
+      final settings = await LocalDatabaseHelper.instance.getMonkModeSettings(userIdVal);
       _enabled = settings['enabled'] as bool? ?? false;
       final String? deactivateAtStr = settings['deactivate_at'] as String?;
       _deactivateAt = deactivateAtStr != null ? DateTime.tryParse(deactivateAtStr)?.toLocal() : null;
@@ -198,7 +200,10 @@ class MonkModeProvider with ChangeNotifier {
   }
 
   Future<void> _saveToLocalDb() async {
+    final userIdVal = _profileProvider?.userId ?? await LocalDatabaseHelper.instance.getActiveUserId();
+    if (userIdVal == null) return;
     await LocalDatabaseHelper.instance.updateMonkMode(
+      userId: userIdVal,
       enabled: _enabled,
       deactivateAt: _deactivateAt?.toUtc().toIso8601String(),
       blockedIds: _blockedIds,

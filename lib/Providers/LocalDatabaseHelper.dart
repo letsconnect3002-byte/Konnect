@@ -1,12 +1,35 @@
 import 'dart:convert';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class LocalDatabaseHelper {
   static final LocalDatabaseHelper instance = LocalDatabaseHelper._init();
   static Database? _database;
+  static int? _activeUserId;
 
   LocalDatabaseHelper._init();
+
+  static int? get activeUserId => _activeUserId;
+  static set activeUserId(int? id) {
+    _activeUserId = id;
+    if (id != null) {
+      SharedPreferences.getInstance().then((prefs) {
+        prefs.setInt('active_user_id', id);
+      });
+    }
+  }
+
+  Future<int?> getActiveUserId() async {
+    if (_activeUserId != null) return _activeUserId;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      _activeUserId = prefs.getInt('active_user_id');
+    } catch (e) {
+      print("Error loading active user ID from shared preferences: $e");
+    }
+    return _activeUserId;
+  }
 
   Future<Database> get database async {
     if (_database != null) return _database!;
@@ -20,7 +43,7 @@ class LocalDatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 3,
+      version: 4,
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
     );
@@ -30,6 +53,7 @@ class LocalDatabaseHelper {
     await db.execute('''
       CREATE TABLE messages (
         id TEXT PRIMARY KEY,
+        owner_id INTEGER NOT NULL,
         room_id TEXT NOT NULL,
         sender_id INTEGER NOT NULL,
         payload TEXT NOT NULL,
@@ -41,8 +65,9 @@ class LocalDatabaseHelper {
       )
     ''');
 
-    // Create index on room_id for fast retrieval
+    // Create index on room_id and owner_id for fast retrieval
     await db.execute('CREATE INDEX idx_messages_room_id ON messages (room_id)');
+    await db.execute('CREATE INDEX idx_messages_owner_id ON messages (owner_id)');
 
     await db.execute('''
       CREATE TABLE monk_mode_settings (
@@ -52,13 +77,6 @@ class LocalDatabaseHelper {
         blocked_ids TEXT
       )
     ''');
-
-    await db.insert('monk_mode_settings', {
-      'id': 1,
-      'enabled': 0,
-      'deactivate_at': null,
-      'blocked_ids': '[]',
-    });
   }
 
   Future<void> _upgradeDB(Database db, int oldVersion, int newVersion) async {
@@ -79,16 +97,31 @@ class LocalDatabaseHelper {
           blocked_ids TEXT
         )
       ''');
-      await db.insert(
-        'monk_mode_settings',
-        {
-          'id': 1,
-          'enabled': 0,
-          'deactivate_at': null,
-          'blocked_ids': '[]',
-        },
-        conflictAlgorithm: ConflictAlgorithm.ignore,
-      );
+    }
+    if (oldVersion < 4) {
+      try {
+        await db.execute('ALTER TABLE messages ADD COLUMN owner_id INTEGER');
+      } catch (e) {
+        print("Upgrade: error adding owner_id to messages: $e");
+      }
+      try {
+        await db.execute('CREATE INDEX idx_messages_owner_id ON messages (owner_id)');
+      } catch (e) {
+        print("Upgrade: error creating owner_id index: $e");
+      }
+      
+      // Migrate existing local messages: set owner_id to the stored active_user_id fallback to 0
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final activeId = prefs.getInt('active_user_id');
+        if (activeId != null) {
+          await db.rawUpdate('UPDATE messages SET owner_id = ? WHERE owner_id IS NULL', [activeId]);
+        } else {
+          await db.rawUpdate('UPDATE messages SET owner_id = 0 WHERE owner_id IS NULL');
+        }
+      } catch (e) {
+        print("Upgrade: error migrating existing message owners: $e");
+      }
     }
   }
 
@@ -120,6 +153,7 @@ class LocalDatabaseHelper {
     String? replyToMessageSenderName,
   }) async {
     final db = await database;
+    final ownerId = await getActiveUserId() ?? 0;
     
     // Parse and normalize timestamp to standard ISO8601 format to ensure correct SQLite text sorting
     String timeStr;
@@ -137,8 +171,8 @@ class LocalDatabaseHelper {
     final existing = await db.query(
       'messages',
       columns: ['id', 'status'],
-      where: 'id = ?',
-      whereArgs: [id],
+      where: 'id = ? AND owner_id = ?',
+      whereArgs: [id, ownerId],
       limit: 1,
     );
 
@@ -171,8 +205,8 @@ class LocalDatabaseHelper {
         await db.update(
           'messages',
           updates,
-          where: 'id = ?',
-          whereArgs: [id],
+          where: 'id = ? AND owner_id = ?',
+          whereArgs: [id, ownerId],
         );
       }
       return;
@@ -183,6 +217,7 @@ class LocalDatabaseHelper {
       'messages',
       {
         'id': id,
+        'owner_id': ownerId,
         'room_id': roomId,
         'sender_id': senderId,
         'payload': payload,
@@ -198,29 +233,32 @@ class LocalDatabaseHelper {
 
   Future<void> updateMessageStatus(String messageId, String status) async {
     final db = await database;
+    final ownerId = await getActiveUserId() ?? 0;
     await db.update(
       'messages',
       {'status': status},
-      where: 'id = ?',
-      whereArgs: [messageId],
+      where: 'id = ? AND owner_id = ?',
+      whereArgs: [messageId, ownerId],
     );
   }
 
   Future<void> deleteMessage(String id) async {
     final db = await database;
+    final ownerId = await getActiveUserId() ?? 0;
     await db.delete(
       'messages',
-      where: 'id = ?',
-      whereArgs: [id],
+      where: 'id = ? AND owner_id = ?',
+      whereArgs: [id, ownerId],
     );
   }
 
   Future<Map<String, dynamic>?> getMessageById(String id) async {
     final db = await database;
+    final ownerId = await getActiveUserId() ?? 0;
     final List<Map<String, dynamic>> results = await db.query(
       'messages',
-      where: 'id = ?',
-      whereArgs: [id],
+      where: 'id = ? AND owner_id = ?',
+      whereArgs: [id, ownerId],
     );
     if (results.isNotEmpty) {
       return results.first;
@@ -230,21 +268,23 @@ class LocalDatabaseHelper {
 
   Future<List<Map<String, dynamic>>> getMessagesForRoom(String roomId) async {
     final db = await database;
+    final ownerId = await getActiveUserId() ?? 0;
     // Order by created_at ascending for chat history
     return await db.query(
       'messages',
-      where: 'room_id = ?',
-      whereArgs: [roomId],
+      where: 'room_id = ? AND owner_id = ?',
+      whereArgs: [roomId, ownerId],
       orderBy: 'created_at ASC',
     );
   }
 
   Future<Map<String, dynamic>?> getLastMessageForRoom(String roomId) async {
     final db = await database;
+    final ownerId = await getActiveUserId() ?? 0;
     final results = await db.query(
       'messages',
-      where: 'room_id = ?',
-      whereArgs: [roomId],
+      where: 'room_id = ? AND owner_id = ?',
+      whereArgs: [roomId, ownerId],
       orderBy: 'created_at DESC',
       limit: 1,
     );
@@ -258,11 +298,12 @@ class LocalDatabaseHelper {
   /// so we can reconcile them against Supabase on next app launch.
   Future<List<Map<String, dynamic>>> getUnreadSentMessages(int senderId) async {
     final db = await database;
+    final ownerId = await getActiveUserId() ?? 0;
     return await db.query(
       'messages',
       columns: ['id', 'room_id', 'status'],
-      where: "sender_id = ? AND status != 'read'",
-      whereArgs: [senderId],
+      where: "sender_id = ? AND status != 'read' AND owner_id = ?",
+      whereArgs: [senderId, ownerId],
     );
   }
 
@@ -271,16 +312,18 @@ class LocalDatabaseHelper {
   Future<List<Map<String, dynamic>>> getUnreadMessagesForRoomBySender(
       String roomId, int senderId) async {
     final db = await database;
+    final ownerId = await getActiveUserId() ?? 0;
     return await db.query(
       'messages',
       columns: ['payload'],
-      where: "room_id = ? AND sender_id = ? AND status != 'read'",
-      whereArgs: [roomId, senderId],
+      where: "room_id = ? AND sender_id = ? AND status != 'read' AND owner_id = ?",
+      whereArgs: [roomId, senderId, ownerId],
       orderBy: 'created_at ASC',
     );
   }
 
   Future<void> updateMonkMode({
+    required int userId,
     required bool enabled,
     String? deactivateAt,
     required List<int> blockedIds,
@@ -289,7 +332,7 @@ class LocalDatabaseHelper {
     await db.insert(
       'monk_mode_settings',
       {
-        'id': 1,
+        'id': userId,
         'enabled': enabled ? 1 : 0,
         'deactivate_at': deactivateAt,
         'blocked_ids': jsonEncode(blockedIds),
@@ -298,11 +341,12 @@ class LocalDatabaseHelper {
     );
   }
 
-  Future<Map<String, dynamic>> getMonkModeSettings() async {
+  Future<Map<String, dynamic>> getMonkModeSettings(int userId) async {
     final db = await database;
     final List<Map<String, dynamic>> results = await db.query(
       'monk_mode_settings',
-      where: 'id = 1',
+      where: 'id = ?',
+      whereArgs: [userId],
     );
     if (results.isNotEmpty) {
       final row = results.first;
@@ -330,9 +374,24 @@ class LocalDatabaseHelper {
   }
 
   Future<void> clearDatabase() async {
+    final ownerId = await getActiveUserId();
+    if (ownerId != null) {
+      await clearDatabaseForUser(ownerId);
+    }
+  }
+
+  Future<void> clearDatabaseForUser(int userId) async {
     final db = await database;
-    await db.delete('messages');
-    await db.delete('monk_mode_settings');
+    await db.delete(
+      'messages',
+      where: 'owner_id = ?',
+      whereArgs: [userId],
+    );
+    await db.delete(
+      'monk_mode_settings',
+      where: 'id = ?',
+      whereArgs: [userId],
+    );
   }
 
   Future<void> close() async {

@@ -66,11 +66,8 @@ class _SettingsPageState extends State<SettingsPage> {
 
     if (confirm == true) {
       try {
-        // Clear local credentials/fields
-        profileProvider.clearFields();
-
         // Sign out from Supabase auth
-        await profileProvider.deleteAccount().catchError((_) {}); // Fallback triggers
+        await profileProvider.signOut();
         
         messenger.showSnackBar(
           SnackBar(

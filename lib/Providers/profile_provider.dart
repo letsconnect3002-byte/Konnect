@@ -114,6 +114,7 @@ class ProfileProvider with ChangeNotifier {
     _lastKnownUserId = userIdVal;
     _lastKnownIsCreated = isCreatedVal;
     _state = ProfileLoaded(userIdVal, isCreatedVal);
+    LocalDatabaseHelper.activeUserId = userIdVal;
   }
 
   void clearError() {
@@ -793,6 +794,7 @@ class ProfileProvider with ChangeNotifier {
     interestTags = [];
     quickSetupComplete = false;
     _state = ProfileInitial();
+    LocalDatabaseHelper.activeUserId = null;
     notifyListeners();
   }
 
@@ -923,7 +925,7 @@ class ProfileProvider with ChangeNotifier {
     await client.from('profiles').delete().eq('id', myUserId);
 
     // 4. Wipe local databases
-    await LocalDatabaseHelper.instance.clearDatabase();
+    await LocalDatabaseHelper.instance.clearDatabaseForUser(myUserId);
 
     // 5. Clear SharedPreferences keys
     final prefs = await SharedPreferences.getInstance();
@@ -936,5 +938,37 @@ class ProfileProvider with ChangeNotifier {
 
     // 7. Sign out of auth
     await client.auth.signOut();
+  }
+
+  Future<void> signOut() async {
+    // 1. Sign out of Supabase auth first to trigger AuthGate redirect immediately
+    try {
+      await Supabase.instance.client.auth.signOut();
+    } catch (e) {
+      print("SignOut: Error signing out of Supabase: $e");
+    }
+
+    // 2. Wipe local databases
+    try {
+      final myUserId = userId;
+      if (myUserId != null) {
+        await LocalDatabaseHelper.instance.clearDatabaseForUser(myUserId);
+      }
+    } catch (e) {
+      print("SignOut: Error clearing local database: $e");
+    }
+
+    // 3. Clear SharedPreferences keys
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('owner_id');
+      await prefs.remove('default_card_visibility');
+      await prefs.remove('blur_background');
+    } catch (e) {
+      print("SignOut: Error clearing shared preferences: $e");
+    }
+
+    // 4. Clear fields in Provider
+    clearFields();
   }
 }

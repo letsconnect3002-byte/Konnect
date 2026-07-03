@@ -46,6 +46,16 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
   final TextEditingController _customInterestController =
       TextEditingController();
 
+  final TextEditingController _onboardingEmailController =
+      TextEditingController();
+  final TextEditingController _onboardingPhoneController =
+      TextEditingController();
+  final TextEditingController _onboardingProfEmailController =
+      TextEditingController();
+  final TextEditingController _onboardingProfPhoneController =
+      TextEditingController();
+  bool _useSameContactForProfessional = true;
+
   @override
   void initState() {
     super.initState();
@@ -74,13 +84,17 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
     _onboardingScrollController.dispose();
     _customVibeController.dispose();
     _customInterestController.dispose();
+    _onboardingEmailController.dispose();
+    _onboardingPhoneController.dispose();
+    _onboardingProfEmailController.dispose();
+    _onboardingProfPhoneController.dispose();
     super.dispose();
   }
 
   // Onboarding Wizard Methods
 
   void _nextStep() {
-    if (_onboardingStep < 2) {
+    if (_onboardingStep < 3) {
       setState(() {
         _onboardingStep++;
       });
@@ -114,6 +128,20 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
       provider.name = _nameController.text.trim();
       provider.vibeTag = _selectedVibe;
       provider.interestTags = _selectedInterests.toList();
+
+      // Save onboarding contact details
+      provider.email = _onboardingEmailController.text.trim();
+      provider.phoneNumber = _onboardingPhoneController.text.trim();
+      if (_useSameContactForProfessional) {
+        provider.professionalEmail = _onboardingEmailController.text.trim();
+        provider.professionalPhoneNumber =
+            _onboardingPhoneController.text.trim();
+      } else {
+        provider.professionalEmail = _onboardingProfEmailController.text.trim();
+        provider.professionalPhoneNumber =
+            _onboardingProfPhoneController.text.trim();
+      }
+
       provider.quickSetupComplete = true;
 
       await provider.saveOrUpdateProfile();
@@ -150,7 +178,7 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
 
   Widget _buildQuickIdentityWizard() {
     return Scaffold(
-      backgroundColor: const Color(0xFF0F101A),
+      backgroundColor: context.surfacePrimary,
       body: SafeArea(
         child: Stack(
           children: [
@@ -159,6 +187,7 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
               physics: const NeverScrollableScrollPhysics(),
               children: [
                 _buildStepNameVibe(),
+                _buildStepContactDetails(),
                 _buildStepInterests(),
                 _buildStepDone(),
               ],
@@ -170,9 +199,9 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const CircularProgressIndicator(
-                          valueColor:
-                              AlwaysStoppedAnimation<Color>(Color(0xFF00F2FE))),
+                      CircularProgressIndicator(
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                              context.accentSecondary)),
                       const SizedBox(height: 16),
                       Text(
                         "Setting up your vibe...",
@@ -259,8 +288,9 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
               enabledBorder: const UnderlineInputBorder(
                 borderSide: BorderSide(color: Colors.white24, width: 2),
               ),
-              focusedBorder: const UnderlineInputBorder(
-                borderSide: BorderSide(color: Color(0xFF00F2FE), width: 2),
+              focusedBorder: UnderlineInputBorder(
+                borderSide:
+                    BorderSide(color: context.accentSecondary, width: 2),
               ),
               border: const UnderlineInputBorder(
                 borderSide: BorderSide(color: Colors.white24),
@@ -295,13 +325,14 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                   ),
                 ),
                 selected: isSelected,
-                selectedColor: const Color(0xFF00F2FE),
-                backgroundColor: const Color(0xFF1E1F32),
+                selectedColor: context.accentSecondary,
+                backgroundColor: context.surfaceSecondary,
+                checkmarkColor: Colors.white,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(20),
                   side: BorderSide(
                       color: isSelected
-                          ? const Color(0xFF00F2FE)
+                          ? context.accentSecondary
                           : Colors.white10),
                 ),
                 onSelected: (selected) {
@@ -349,8 +380,9 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                 enabledBorder: const UnderlineInputBorder(
                   borderSide: BorderSide(color: Colors.white24, width: 1.5),
                 ),
-                focusedBorder: const UnderlineInputBorder(
-                  borderSide: BorderSide(color: Color(0xFF00F2FE), width: 1.5),
+                focusedBorder: UnderlineInputBorder(
+                  borderSide:
+                      BorderSide(color: context.accentSecondary, width: 1.5),
                 ),
               ),
               onChanged: (_) => setState(() {}),
@@ -374,7 +406,226 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                   }
                 : null,
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF0064E0),
+              backgroundColor: context.accentSecondary,
+              disabledBackgroundColor: Colors.white10,
+              foregroundColor: Colors.white,
+              disabledForegroundColor: Colors.white24,
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16)),
+            ),
+            child: const Text(
+              "Continue",
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStepContactDetails() {
+    return SingleChildScrollView(
+      controller: _onboardingScrollController,
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.only(
+          left: 24.0, right: 24.0, top: 24.0, bottom: 80.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              IconButton(
+                icon: const Icon(Icons.arrow_back_ios_new_rounded,
+                    color: Colors.white54, size: 20),
+                onPressed: _prevStep,
+              ),
+              const Expanded(
+                child: Text(
+                  "CONTACT INFO",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Colors.white38,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 1.5,
+                    fontSize: 11,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 40),
+            ],
+          ),
+          const SizedBox(height: 12),
+          const Text(
+            "How should people reach you?",
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 24,
+              fontWeight: FontWeight.w900,
+              fontFamily: 'Inter',
+            ),
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            "Fill in your email and phone number.",
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: Colors.white54,
+              fontSize: 13,
+              fontFamily: 'Inter',
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          // Email Input
+          TextField(
+            controller: _onboardingEmailController,
+            keyboardType: TextInputType.emailAddress,
+            style: const TextStyle(
+                color: Colors.white, fontSize: 15, fontFamily: 'Inter'),
+            decoration: InputDecoration(
+              labelText: "Casual Email",
+              labelStyle: const TextStyle(color: Colors.white38, fontSize: 13),
+              hintText: "email@example.com",
+              hintStyle: TextStyle(
+                  color: Colors.white.withOpacity(0.15), fontSize: 14),
+              contentPadding: const EdgeInsets.symmetric(vertical: 4),
+              enabledBorder: const UnderlineInputBorder(
+                borderSide: BorderSide(color: Colors.white24, width: 1.0),
+              ),
+              focusedBorder: UnderlineInputBorder(
+                borderSide:
+                    BorderSide(color: context.accentSecondary, width: 1.5),
+              ),
+            ),
+            onChanged: (_) => setState(() {}),
+          ),
+          const SizedBox(height: 14),
+
+          // Phone Input
+          TextField(
+            controller: _onboardingPhoneController,
+            keyboardType: TextInputType.phone,
+            style: const TextStyle(
+                color: Colors.white, fontSize: 15, fontFamily: 'Inter'),
+            decoration: InputDecoration(
+              labelText: "Casual Phone",
+              labelStyle: const TextStyle(color: Colors.white38, fontSize: 13),
+              hintText: "+1 (555) 123-4567",
+              hintStyle: TextStyle(
+                  color: Colors.white.withOpacity(0.15), fontSize: 14),
+              contentPadding: const EdgeInsets.symmetric(vertical: 4),
+              enabledBorder: const UnderlineInputBorder(
+                borderSide: BorderSide(color: Colors.white24, width: 1.0),
+              ),
+              focusedBorder: UnderlineInputBorder(
+                borderSide:
+                    BorderSide(color: context.accentSecondary, width: 1.5),
+              ),
+            ),
+            onChanged: (_) => setState(() {}),
+          ),
+          const SizedBox(height: 16),
+
+          // Same as Professional Toggle
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  "Use same details for Professional profile",
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.7),
+                    fontSize: 13,
+                    fontFamily: 'Inter',
+                  ),
+                ),
+              ),
+              Switch(
+                value: _useSameContactForProfessional,
+                onChanged: (val) {
+                  setState(() {
+                    _useSameContactForProfessional = val;
+                  });
+                },
+                activeColor: context.accentSecondary,
+                activeTrackColor: context.accentSecondary.withOpacity(0.3),
+              ),
+            ],
+          ),
+
+          if (!_useSameContactForProfessional) ...[
+            const SizedBox(height: 14),
+            // Pro Email Input
+            TextField(
+              controller: _onboardingProfEmailController,
+              keyboardType: TextInputType.emailAddress,
+              style: const TextStyle(
+                  color: Colors.white, fontSize: 15, fontFamily: 'Inter'),
+              decoration: InputDecoration(
+                labelText: "Professional Email",
+                labelStyle:
+                    const TextStyle(color: Colors.white38, fontSize: 13),
+                hintText: "work@company.com",
+                hintStyle: TextStyle(
+                    color: Colors.white.withOpacity(0.15), fontSize: 14),
+                contentPadding: const EdgeInsets.symmetric(vertical: 4),
+                enabledBorder: const UnderlineInputBorder(
+                  borderSide: BorderSide(color: Colors.white24, width: 1.0),
+                ),
+                focusedBorder: UnderlineInputBorder(
+                  borderSide:
+                      BorderSide(color: context.accentSecondary, width: 1.5),
+                ),
+              ),
+              onChanged: (_) => setState(() {}),
+            ),
+            const SizedBox(height: 14),
+
+            // Pro Phone Input
+            TextField(
+              controller: _onboardingProfPhoneController,
+              keyboardType: TextInputType.phone,
+              style: const TextStyle(
+                  color: Colors.white, fontSize: 15, fontFamily: 'Inter'),
+              decoration: InputDecoration(
+                labelText: "Professional Phone",
+                labelStyle:
+                    const TextStyle(color: Colors.white38, fontSize: 13),
+                hintText: "+1 (555) 987-6543",
+                hintStyle: TextStyle(
+                    color: Colors.white.withOpacity(0.15), fontSize: 14),
+                contentPadding: const EdgeInsets.symmetric(vertical: 4),
+                enabledBorder: const UnderlineInputBorder(
+                  borderSide: BorderSide(color: Colors.white24, width: 1.0),
+                ),
+                focusedBorder: UnderlineInputBorder(
+                  borderSide:
+                      BorderSide(color: context.accentSecondary, width: 1.5),
+                ),
+              ),
+              onChanged: (_) => setState(() {}),
+            ),
+          ],
+
+          const SizedBox(height: 24),
+          ElevatedButton(
+            onPressed: (_onboardingEmailController.text.trim().isNotEmpty &&
+                    _onboardingPhoneController.text.trim().isNotEmpty &&
+                    (_useSameContactForProfessional ||
+                        (_onboardingProfEmailController.text
+                                .trim()
+                                .isNotEmpty &&
+                            _onboardingProfPhoneController.text
+                                .trim()
+                                .isNotEmpty)))
+                ? () {
+                    HapticFeedback.lightImpact();
+                    _nextStep();
+                  }
+                : null,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: context.accentSecondary,
               disabledBackgroundColor: Colors.white10,
               foregroundColor: Colors.white,
               disabledForegroundColor: Colors.white24,
@@ -478,14 +729,14 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                   ),
                 ),
                 selected: isSelected,
-                selectedColor: const Color(0xFF00F2FE),
-                backgroundColor: const Color(0xFF1E1F32),
+                selectedColor: context.accentSecondary,
+                backgroundColor: context.surfaceSecondary,
                 checkmarkColor: Colors.white,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(20),
                   side: BorderSide(
                       color: isSelected
-                          ? const Color(0xFF00F2FE)
+                          ? context.accentSecondary
                           : Colors.white10),
                 ),
                 onSelected: (selected) {
@@ -529,16 +780,16 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                       enabledBorder: const UnderlineInputBorder(
                         borderSide: BorderSide(color: Colors.white24),
                       ),
-                      focusedBorder: const UnderlineInputBorder(
-                        borderSide: BorderSide(color: Color(0xFF00F2FE)),
+                      focusedBorder: UnderlineInputBorder(
+                        borderSide: BorderSide(color: context.accentSecondary),
                       ),
                     ),
                     onSubmitted: (_) => _addCustomInterest(),
                   ),
                 ),
                 IconButton(
-                  icon: const Icon(Icons.add_circle_outline_rounded,
-                      color: Color(0xFF00F2FE), size: 28),
+                  icon: Icon(Icons.add_circle_outline_rounded,
+                      color: context.accentSecondary, size: 28),
                   onPressed: _addCustomInterest,
                 ),
               ],
@@ -550,7 +801,7 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
             textAlign: TextAlign.center,
             style: TextStyle(
               color: _selectedInterests.where((i) => i != 'Others').length >= 3
-                  ? const Color(0xFF00F2FE)
+                  ? context.accentSecondary
                   : Colors.white38,
               fontSize: 14,
               fontWeight: FontWeight.bold,
@@ -574,7 +825,7 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                   }
                 : null,
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF0064E0),
+              backgroundColor: context.accentSecondary,
               disabledBackgroundColor: Colors.white10,
               foregroundColor: Colors.white,
               disabledForegroundColor: Colors.white24,
@@ -614,7 +865,7 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
             child: Container(
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
-                color: const Color(0xFF1E1F32).withOpacity(0.8),
+                color: context.surfaceSecondary.withOpacity(0.8),
                 borderRadius: BorderRadius.circular(24),
                 border: Border.all(color: Colors.white.withOpacity(0.08)),
               ),
@@ -626,12 +877,15 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                     height: 96,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFF00F2FE), Color(0xFF0064E0)],
+                      gradient: LinearGradient(
+                        colors: [
+                          context.accentSecondary,
+                          context.accentSecondary.withValues(alpha: 0.8)
+                        ],
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: const Color(0xFF00F2FE).withOpacity(0.15),
+                          color: context.accentSecondary.withOpacity(0.15),
                           blurRadius: 6,
                           spreadRadius: 1,
                         ),
@@ -677,13 +931,13 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                     padding:
                         const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF00F2FE).withOpacity(0.1),
+                      color: context.accentSecondary.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
                       _selectedVibe,
-                      style: const TextStyle(
-                          color: Color(0xFF00F2FE),
+                      style: TextStyle(
+                          color: context.accentSecondary,
                           fontSize: 12,
                           fontWeight: FontWeight.bold),
                     ),
@@ -718,7 +972,7 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
             onPressed: () =>
                 _finishQuickIdentity(openProfessionalEditor: false),
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF00F2FE),
+              backgroundColor: context.accentSecondary,
               foregroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(vertical: 16),
               shape: RoundedRectangleBorder(
@@ -791,6 +1045,15 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
     if (_selectedVibe.isNotEmpty && !defaultVibes.contains(_selectedVibe)) {
       _customVibeController.text = _selectedVibe;
     }
+
+    _onboardingEmailController.text = provider.email;
+    _onboardingPhoneController.text = provider.phoneNumber;
+    _onboardingProfEmailController.text = provider.professionalEmail;
+    _onboardingProfPhoneController.text = provider.professionalPhoneNumber;
+
+    // Default switch to true if professional details match casual or are empty
+    _useSameContactForProfessional = provider.professionalEmail.isEmpty ||
+        provider.professionalEmail == provider.email;
   }
 
   @override
@@ -2981,9 +3244,9 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
           padding: EdgeInsets.only(
               bottom: MediaQuery.of(sheetCtx).viewInsets.bottom),
           child: Container(
-            decoration: const BoxDecoration(
-              color: Color(0xFF151624),
-              borderRadius: BorderRadius.only(
+            decoration: BoxDecoration(
+              color: context.surfacePrimary,
+              borderRadius: const BorderRadius.only(
                 topLeft: Radius.circular(24),
                 topRight: Radius.circular(24),
               ),
@@ -3060,9 +3323,9 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
           padding: EdgeInsets.only(
               bottom: MediaQuery.of(sheetCtx).viewInsets.bottom),
           child: Container(
-            decoration: const BoxDecoration(
-              color: Color(0xFF151624),
-              borderRadius: BorderRadius.only(
+            decoration: BoxDecoration(
+              color: context.surfacePrimary,
+              borderRadius: const BorderRadius.only(
                 topLeft: Radius.circular(24),
                 topRight: Radius.circular(24),
               ),
@@ -3105,7 +3368,7 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                     focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
                         borderSide: const BorderSide(
-                            color: Color(0xFF00F2FE), width: 1)),
+                            color: Color(0xFFEC4899), width: 1)),
                   ),
                 ),
                 const SizedBox(height: 20),
@@ -3116,7 +3379,10 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                         'professionalBio', controller.text.trim(), uid);
                   }
                   if (sheetCtx.mounted) Navigator.pop(sheetCtx);
-                }),
+                }, customColors: [
+                  const Color(0xFFEC4899),
+                  const Color(0xFFD946EF)
+                ]),
                 const SizedBox(height: 8),
               ],
             ),
@@ -3167,9 +3433,9 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
               child: Container(
                 constraints: BoxConstraints(
                     maxHeight: MediaQuery.of(ctx).size.height * 0.7),
-                decoration: const BoxDecoration(
-                  color: Color(0xFF151624),
-                  borderRadius: BorderRadius.only(
+                decoration: BoxDecoration(
+                  color: context.surfacePrimary,
+                  borderRadius: const BorderRadius.only(
                       topLeft: Radius.circular(24),
                       topRight: Radius.circular(24)),
                 ),
@@ -3207,14 +3473,14 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                                     fontWeight: FontWeight.w600,
                                     fontSize: 13)),
                             selected: isSelected,
-                            selectedColor: const Color(0xFF00F2FE),
-                            backgroundColor: const Color(0xFF1E1F32),
+                            selectedColor: context.accentSecondary,
+                            backgroundColor: context.surfaceSecondary,
                             checkmarkColor: Colors.white,
                             shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(20),
                                 side: BorderSide(
                                     color: isSelected
-                                        ? const Color(0xFF00F2FE)
+                                        ? context.accentSecondary
                                         : Colors.white10)),
                             onSelected: (selected) {
                               HapticFeedback.lightImpact();
@@ -3255,9 +3521,9 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                                   enabledBorder: const UnderlineInputBorder(
                                       borderSide:
                                           BorderSide(color: Colors.white24)),
-                                  focusedBorder: const UnderlineInputBorder(
-                                      borderSide:
-                                          BorderSide(color: Color(0xFF00F2FE))),
+                                  focusedBorder: UnderlineInputBorder(
+                                      borderSide: BorderSide(
+                                          color: context.accentSecondary)),
                                 ),
                                 onSubmitted: (_) {
                                   final t = customController.text.trim();
@@ -3271,8 +3537,8 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                               ),
                             ),
                             IconButton(
-                              icon: const Icon(Icons.add_circle_outline_rounded,
-                                  color: Color(0xFF00F2FE), size: 26),
+                              icon: Icon(Icons.add_circle_outline_rounded,
+                                  color: context.accentSecondary, size: 26),
                               onPressed: () {
                                 final t = customController.text.trim();
                                 if (t.isNotEmpty) {
@@ -3336,9 +3602,9 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
               padding: EdgeInsets.only(
                   bottom: MediaQuery.of(sheetCtx).viewInsets.bottom),
               child: Container(
-                decoration: const BoxDecoration(
-                  color: Color(0xFF151624),
-                  borderRadius: BorderRadius.only(
+                decoration: BoxDecoration(
+                  color: context.surfacePrimary,
+                  borderRadius: const BorderRadius.only(
                       topLeft: Radius.circular(24),
                       topRight: Radius.circular(24)),
                 ),
@@ -3445,9 +3711,9 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
               padding: EdgeInsets.only(
                   bottom: MediaQuery.of(sheetCtx).viewInsets.bottom),
               child: Container(
-                decoration: const BoxDecoration(
-                  color: Color(0xFF151624),
-                  borderRadius: BorderRadius.only(
+                decoration: BoxDecoration(
+                  color: context.surfacePrimary,
+                  borderRadius: const BorderRadius.only(
                     topLeft: Radius.circular(24),
                     topRight: Radius.circular(24),
                   ),
@@ -3706,7 +3972,7 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: const Color(0xFF151624),
+      backgroundColor: context.surfacePrimary,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
@@ -3911,9 +4177,9 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
               padding: EdgeInsets.only(
                   bottom: MediaQuery.of(sheetCtx).viewInsets.bottom),
               child: Container(
-                decoration: const BoxDecoration(
-                  color: Color(0xFF151624),
-                  borderRadius: BorderRadius.only(
+                decoration: BoxDecoration(
+                  color: context.surfacePrimary,
+                  borderRadius: const BorderRadius.only(
                     topLeft: Radius.circular(24),
                     topRight: Radius.circular(24),
                   ),
@@ -4047,14 +4313,15 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                               ),
                             ),
                             selected: isSelected,
-                            selectedColor: const Color(0xFF00F2FE),
-                            backgroundColor: const Color(0xFF1E1F32),
+                            selectedColor: context.accentSecondary,
+                            backgroundColor: context.surfaceSecondary,
+                            checkmarkColor: Colors.white,
                             showCheckmark: false,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(16),
                               side: BorderSide(
                                   color: isSelected
-                                      ? const Color(0xFF00F2FE)
+                                      ? context.accentSecondary
                                       : Colors.white10),
                             ),
                             onSelected: (selected) {
@@ -4133,15 +4400,16 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
 
   void _showEditDetailsSheet() {
     final provider = Provider.of<ProfileProvider>(context, listen: false);
-    final isCasual = _previewCard == ProfileCardType.casual;
 
+    // Initial controllers with current provider values for both casual and professional
+    final casualEmailC = TextEditingController(text: provider.email);
+    final casualPhoneC = TextEditingController(text: provider.phoneNumber);
+
+    final profEmailC = TextEditingController(text: provider.professionalEmail);
+    final profPhoneC =
+        TextEditingController(text: provider.professionalPhoneNumber);
     final professionC = TextEditingController(text: provider.profession);
     final companyC = TextEditingController(text: provider.company);
-    final emailC = TextEditingController(
-        text: isCasual ? provider.email : provider.professionalEmail);
-    final phoneC = TextEditingController(
-        text:
-            isCasual ? provider.phoneNumber : provider.professionalPhoneNumber);
 
     showModalBottomSheet(
       context: context,
@@ -4149,82 +4417,214 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
       backgroundColor: Colors.transparent,
       barrierColor: Colors.black.withValues(alpha: 0.5),
       builder: (sheetCtx) {
-        return Padding(
-          padding: EdgeInsets.only(
-              bottom: MediaQuery.of(sheetCtx).viewInsets.bottom),
-          child: Container(
-            decoration: const BoxDecoration(
-              color: Color(0xFF151624),
-              borderRadius: BorderRadius.only(
-                  topLeft: Radius.circular(24), topRight: Radius.circular(24)),
-            ),
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Center(
-                      child: Container(
+        return StatefulBuilder(
+          builder: (BuildContext context, StateSetter setModalState) {
+            return Padding(
+              padding: EdgeInsets.only(
+                  bottom: MediaQuery.of(sheetCtx).viewInsets.bottom),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: context.surfacePrimary,
+                  borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(24),
+                      topRight: Radius.circular(24)),
+                ),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Center(
+                        child: Container(
                           width: 36,
                           height: 4,
                           decoration: BoxDecoration(
-                              color: Colors.white24,
-                              borderRadius: BorderRadius.circular(2)))),
-                  const SizedBox(height: 20),
-                  const Text('Edit Profile Details',
-                      style: TextStyle(
+                            color: Colors.white24,
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      const Text(
+                        'Edit Profile Details',
+                        style: TextStyle(
                           color: Colors.white,
                           fontSize: 18,
-                          fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 20),
-                  if (!isCasual) ...[
-                    _buildSheetField(
+                          fontWeight: FontWeight.bold,
+                          fontFamily: 'Inter',
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+
+                      // --- SECTION 1: CASUAL DETAILS ---
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            "CASUAL PROFILE",
+                            style: TextStyle(
+                              color: Color(0xFF00F2FE),
+                              fontWeight: FontWeight.bold,
+                              fontSize: 11,
+                              letterSpacing: 1.0,
+                            ),
+                          ),
+                          if (profEmailC.text.isNotEmpty ||
+                              profPhoneC.text.isNotEmpty)
+                            TextButton.icon(
+                              onPressed: () {
+                                setModalState(() {
+                                  if (casualEmailC.text.isEmpty) {
+                                    casualEmailC.text = profEmailC.text;
+                                  }
+                                  if (casualPhoneC.text.isEmpty) {
+                                    casualPhoneC.text = profPhoneC.text;
+                                  }
+                                });
+                              },
+                              icon: const Icon(Icons.copy_all_rounded,
+                                  size: 12, color: Color(0xFF00F2FE)),
+                              label: const Text(
+                                "Copy Pro Details",
+                                style: TextStyle(
+                                    color: Color(0xFF00F2FE),
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold),
+                              ),
+                              style: TextButton.styleFrom(
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 8),
+                                minimumSize: Size.zero,
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              ),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      _buildSheetField(
+                        label: 'Casual Email',
+                        controller: casualEmailC,
+                        icon: Icons.email_outlined,
+                        accentColor: const Color(0xFF00F2FE),
+                      ),
+                      const SizedBox(height: 14),
+                      _buildSheetField(
+                        label: 'Casual Phone',
+                        controller: casualPhoneC,
+                        icon: Icons.phone_android_outlined,
+                        accentColor: const Color(0xFF00F2FE),
+                      ),
+                      const SizedBox(height: 24),
+
+                      // --- SECTION 2: PROFESSIONAL DETAILS ---
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            "PROFESSIONAL PROFILE",
+                            style: TextStyle(
+                              color: Color(0xFFEC4899),
+                              fontWeight: FontWeight.bold,
+                              fontSize: 11,
+                              letterSpacing: 1.0,
+                            ),
+                          ),
+                          if (casualEmailC.text.isNotEmpty ||
+                              casualPhoneC.text.isNotEmpty)
+                            TextButton.icon(
+                              onPressed: () {
+                                setModalState(() {
+                                  if (profEmailC.text.isEmpty) {
+                                    profEmailC.text = casualEmailC.text;
+                                  }
+                                  if (profPhoneC.text.isEmpty) {
+                                    profPhoneC.text = casualPhoneC.text;
+                                  }
+                                });
+                              },
+                              icon: const Icon(Icons.copy_all_rounded,
+                                  size: 12, color: Color(0xFFEC4899)),
+                              label: const Text(
+                                "Copy Casual Details",
+                                style: TextStyle(
+                                    color: Color(0xFFEC4899),
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold),
+                              ),
+                              style: TextButton.styleFrom(
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 8),
+                                minimumSize: Size.zero,
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              ),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      _buildSheetField(
                         label: 'Profession',
                         controller: professionC,
-                        icon: Icons.work_rounded),
-                    const SizedBox(height: 14),
-                    _buildSheetField(
+                        icon: Icons.work_outline_rounded,
+                        accentColor: const Color(0xFFEC4899),
+                      ),
+                      const SizedBox(height: 14),
+                      _buildSheetField(
                         label: 'Company',
                         controller: companyC,
-                        icon: Icons.business_rounded),
-                    const SizedBox(height: 14),
-                  ],
-                  _buildSheetField(
-                      label: isCasual ? 'Email' : 'Professional Email',
-                      controller: emailC,
-                      icon: Icons.email_rounded),
-                  const SizedBox(height: 14),
-                  _buildSheetField(
-                      label: isCasual ? 'Phone' : 'Professional Phone',
-                      controller: phoneC,
-                      icon: Icons.phone_rounded),
-                  const SizedBox(height: 24),
-                  _buildSheetSaveButton(() async {
-                    final uid = provider.userId;
-                    if (uid != null) {
-                      if (!isCasual) {
-                        await provider.updateProfileField(
-                            'profession', professionC.text.trim(), uid);
-                        await provider.updateProfileField(
-                            'company', companyC.text.trim(), uid);
-                      }
-                      final emailField =
-                          isCasual ? 'email' : 'professionalEmail';
-                      final phoneField =
-                          isCasual ? 'phoneNumber' : 'professionalPhoneNumber';
-                      await provider.updateProfileField(
-                          emailField, emailC.text.trim(), uid);
-                      await provider.updateProfileField(
-                          phoneField, phoneC.text.trim(), uid);
-                    }
-                    if (sheetCtx.mounted) Navigator.pop(sheetCtx);
-                  }),
-                  const SizedBox(height: 8),
-                ],
+                        icon: Icons.business_outlined,
+                        accentColor: const Color(0xFFEC4899),
+                      ),
+                      const SizedBox(height: 14),
+                      _buildSheetField(
+                        label: 'Professional Email',
+                        controller: profEmailC,
+                        icon: Icons.email_outlined,
+                        accentColor: const Color(0xFFEC4899),
+                      ),
+                      const SizedBox(height: 14),
+                      _buildSheetField(
+                        label: 'Professional Phone',
+                        controller: profPhoneC,
+                        icon: Icons.phone_android_outlined,
+                        accentColor: const Color(0xFFEC4899),
+                      ),
+                      const SizedBox(height: 28),
+
+                      _buildSheetSaveButton(() async {
+                        final uid = provider.userId;
+                        if (uid != null) {
+                          // Save casual details
+                          await provider.updateProfileField(
+                              'email', casualEmailC.text.trim(), uid);
+                          await provider.updateProfileField(
+                              'phoneNumber', casualPhoneC.text.trim(), uid);
+
+                          // Save professional details
+                          await provider.updateProfileField(
+                              'professionalEmail', profEmailC.text.trim(), uid);
+                          await provider.updateProfileField(
+                              'professionalPhoneNumber',
+                              profPhoneC.text.trim(),
+                              uid);
+                          await provider.updateProfileField(
+                              'profession', professionC.text.trim(), uid);
+                          await provider.updateProfileField(
+                              'company', companyC.text.trim(), uid);
+                        }
+                        if (sheetCtx.mounted) Navigator.pop(sheetCtx);
+                      }, customColors: [
+                        const Color(0xFF00F2FE),
+                        const Color(0xFFEC4899)
+                      ]),
+                      const SizedBox(height: 8),
+                    ],
+                  ),
+                ),
               ),
-            ),
-          ),
+            );
+          },
         );
       },
     );
@@ -4361,6 +4761,7 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
     required TextEditingController controller,
     IconData? icon,
     String? assetPath,
+    Color accentColor = const Color(0xFF00F2FE),
   }) {
     Widget? prefix;
     if (assetPath != null) {
@@ -4373,7 +4774,7 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
         ),
       );
     } else if (icon != null) {
-      prefix = Icon(icon, color: const Color(0xFF00F2FE), size: 18);
+      prefix = Icon(icon, color: accentColor, size: 18);
     }
 
     return TextField(
@@ -4391,21 +4792,23 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
             borderSide: BorderSide.none),
         focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: Color(0xFF00F2FE), width: 1)),
+            borderSide: BorderSide(color: accentColor, width: 1)),
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       ),
     );
   }
 
-  Widget _buildSheetSaveButton(FutureOr<void> Function() onSave) {
-    return _SheetSaveButton(onSave: onSave);
+  Widget _buildSheetSaveButton(FutureOr<void> Function() onSave,
+      {List<Color>? customColors}) {
+    return _SheetSaveButton(onSave: onSave, customColors: customColors);
   }
 }
 
 class _SheetSaveButton extends StatefulWidget {
   final FutureOr<void> Function() onSave;
-  const _SheetSaveButton({required this.onSave});
+  final List<Color>? customColors;
+  const _SheetSaveButton({required this.onSave, this.customColors});
 
   @override
   State<_SheetSaveButton> createState() => _SheetSaveButtonState();
@@ -4416,17 +4819,14 @@ class _SheetSaveButtonState extends State<_SheetSaveButton> {
 
   @override
   Widget build(BuildContext context) {
+    final buttonColor = context.accentSecondary;
+    final effectiveColor =
+        _isLoading ? buttonColor.withValues(alpha: 0.5) : buttonColor;
+
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: _isLoading
-              ? [
-                  const Color(0xFF00F2FE).withValues(alpha: 0.5),
-                  const Color(0xFF4FACFE).withValues(alpha: 0.5)
-                ]
-              : [const Color(0xFF00F2FE), const Color(0xFF4FACFE)],
-        ),
+        color: effectiveColor,
         borderRadius: BorderRadius.circular(14),
       ),
       child: ElevatedButton(
@@ -4443,8 +4843,8 @@ class _SheetSaveButtonState extends State<_SheetSaveButton> {
                     SnackBar(
                       content: Row(
                         children: [
-                          const Icon(Icons.check_circle_rounded,
-                              color: Color(0xFF00F2FE), size: 18),
+                          Icon(Icons.check_circle_rounded,
+                              color: context.accentSecondary, size: 18),
                           const SizedBox(width: 8),
                           const Text(
                             'Changes saved successfully!',

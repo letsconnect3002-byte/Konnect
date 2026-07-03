@@ -129,14 +129,16 @@ class AppTheme {
   AppTheme._();
 
   static ThemeData get darkTheme {
-    return ThemeData(
-      brightness: Brightness.dark,
+    return ThemeData.dark().copyWith(
       scaffoldBackgroundColor: Colors.transparent,
       canvasColor: AppColors.canvasBackground,
       cardColor: AppColors.surfacePrimary,
       primaryColor: AppColors.textPrimary,
       dialogTheme: const DialogThemeData(
         backgroundColor: AppColors.surfacePrimary,
+      ),
+      chipTheme: const ChipThemeData(
+        checkmarkColor: Colors.white,
       ),
       colorScheme: const ColorScheme.dark(
         primary: AppColors.textPrimary,
@@ -145,7 +147,7 @@ class AppTheme {
         onSurface: AppColors.textPrimary,
         error: Colors.redAccent,
       ),
-      textTheme: TextTheme(
+      textTheme: const TextTheme().copyWith(
         displayLarge: AppTypography.displayHeader,
         headlineMedium: AppTypography.screenHeading,
         titleMedium: AppTypography.cardTitle,
