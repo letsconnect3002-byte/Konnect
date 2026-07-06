@@ -1252,17 +1252,10 @@ class _NotificationPageState extends State<NotificationPage> {
                                                   referredUserId: otherUser['id'],
                                                   note: noteToSend,
                                                 ).then((_) {
-                                                  notificationProvider.markReferralRequestActioned(
+                                                  notificationProvider.deleteNotification(
                                                     notification['id'],
-                                                    rawNote,
                                                   );
-                                                  setDialogState(() {
-                                                    final newNote = rawNote.replaceFirst(
-                                                        '[REFERRAL_REQUEST]',
-                                                        '[REFERRAL_REQUEST_ACTIONED]');
-                                                    notification['note'] = newNote;
-                                                    showNoteInput = false;
-                                                  });
+                                                  Navigator.of(context).pop();
                                                   ScaffoldMessenger.of(context).showSnackBar(
                                                     const SnackBar(
                                                       content: Text("Introduction request approved and sent!"),

@@ -322,6 +322,20 @@ class LocalDatabaseHelper {
     );
   }
 
+  /// Returns all unread (non-'read') messages in [roomId] (both sent and received),
+  /// ordered oldest-first. Used to build the notification tray history.
+  Future<List<Map<String, dynamic>>> getUnreadMessagesForRoom(
+      String roomId) async {
+    final db = await database;
+    final ownerId = await getActiveUserId() ?? 0;
+    return await db.query(
+      'messages',
+      where: "room_id = ? AND status != 'read' AND owner_id = ?",
+      whereArgs: [roomId, ownerId],
+      orderBy: 'created_at ASC',
+    );
+  }
+
   Future<void> updateMonkMode({
     required int userId,
     required bool enabled,

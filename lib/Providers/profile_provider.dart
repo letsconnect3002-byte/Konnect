@@ -92,6 +92,7 @@ class ProfileProvider with ChangeNotifier {
   String vibeTag = '';
   List<String> interestTags = [];
   bool quickSetupComplete = false;
+  bool showSignUpNext = false;
 
   String? _ownerId;
   int? _lastKnownUserId;
@@ -233,6 +234,33 @@ class ProfileProvider with ChangeNotifier {
         print("Updated field assignments in Supabase");
       } catch (e) {
         print("Error saving field assignments to Supabase: $e");
+        _setError(e);
+      }
+    }
+  }
+
+  bool isFieldPrivate(String field) {
+    _ensureDefaultFieldAssignments();
+    final assignment = fieldAssignments[field];
+    return assignment?.isPrivate ?? false;
+  }
+
+  Future<void> setFieldPrivate(String field, bool private) async {
+    _ensureDefaultFieldAssignments();
+    fieldAssignments.putIfAbsent(
+        field, () => FieldCardAssignment(casual: false, professional: true));
+    final current = fieldAssignments[field]!;
+    fieldAssignments[field] = current.copyWith(isPrivate: private);
+    notifyListeners();
+    final currentUserId = userId;
+    if (currentUserId != null) {
+      try {
+        final assignmentsMap =
+            fieldAssignments.map((k, v) => MapEntry(k, v.toJson()));
+        await _repository.updateProfileField(currentUserId, 'field_assignments', assignmentsMap);
+        print("Updated field assignments privacy in Supabase");
+      } catch (e) {
+        print("Error saving field assignments privacy to Supabase: $e");
         _setError(e);
       }
     }
@@ -936,11 +964,17 @@ class ProfileProvider with ChangeNotifier {
     // 6. Clear fields in Provider
     clearFields();
 
+    // Set redirect flag
+    showSignUpNext = true;
+
     // 7. Sign out of auth
     await client.auth.signOut();
   }
 
   Future<void> signOut() async {
+    // Set redirect flag
+    showSignUpNext = true;
+
     // 1. Sign out of Supabase auth first to trigger AuthGate redirect immediately
     try {
       await Supabase.instance.client.auth.signOut();
@@ -948,17 +982,8 @@ class ProfileProvider with ChangeNotifier {
       print("SignOut: Error signing out of Supabase: $e");
     }
 
-    // 2. Wipe local databases
-    try {
-      final myUserId = userId;
-      if (myUserId != null) {
-        await LocalDatabaseHelper.instance.clearDatabaseForUser(myUserId);
-      }
-    } catch (e) {
-      print("SignOut: Error clearing local database: $e");
-    }
-
-    // 3. Clear SharedPreferences keys
+    // 2. Clear SharedPreferences keys (but NOT local chat database —
+    //    messages are scoped by owner_id and preserved for when the user signs back in)
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove('owner_id');
@@ -968,7 +993,7 @@ class ProfileProvider with ChangeNotifier {
       print("SignOut: Error clearing shared preferences: $e");
     }
 
-    // 4. Clear fields in Provider
+    // 3. Clear fields in Provider
     clearFields();
   }
 }

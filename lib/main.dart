@@ -31,6 +31,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:uuid/uuid.dart';
 
 import 'package:connect/Config/app_theme.dart';
 import 'package:connect/Pages/AuthScreen.dart';
@@ -76,8 +77,51 @@ Future<void> showLocalNotification(
   Map<String, dynamic> dataPayload,
 ) async {
   final notificationId = getNotificationId(roomId);
-  final int count = messageLines.length;
-  final String latestBody = messageLines.last;
+
+  List<String> formattedLines = [];
+  try {
+    final unreadMsgs =
+        await LocalDatabaseHelper.instance.getUnreadMessagesForRoom(roomId);
+    final ownerId = await LocalDatabaseHelper.instance.getActiveUserId();
+
+    if (unreadMsgs.isNotEmpty) {
+      for (final msg in unreadMsgs) {
+        final int msgSenderId = msg['sender_id'] as int? ?? 0;
+        final String payload = msg['payload'] as String? ?? '';
+        if (ownerId != null && msgSenderId == ownerId) {
+          formattedLines.add("You: $payload");
+        } else {
+          formattedLines.add(payload);
+        }
+      }
+    }
+  } catch (e) {
+    print("Error loading unread messages for local notification: $e");
+  }
+
+  if (formattedLines.isEmpty) {
+    formattedLines = messageLines;
+  }
+
+  final int count = formattedLines.length;
+  final String latestBody = formattedLines.last;
+
+  final List<AndroidNotificationAction> androidActions = [
+    const AndroidNotificationAction(
+      'action_reply',
+      'Reply',
+      inputs: [
+        AndroidNotificationActionInput(
+          label: 'Type message...',
+        ),
+      ],
+      allowGeneratedReplies: true,
+    ),
+    const AndroidNotificationAction(
+      'action_mark_read',
+      'Mark as Read',
+    ),
+  ];
 
   final AndroidNotificationDetails androidNotificationDetails;
   if (count > 1) {
@@ -90,19 +134,21 @@ Future<void> showLocalNotification(
       showWhen: true,
       number: count,
       styleInformation: InboxStyleInformation(
-        messageLines,
+        formattedLines,
         contentTitle: title,
-        summaryText: '$count new messages',
+        summaryText: '$count messages',
       ),
+      actions: androidActions,
     );
   } else {
-    androidNotificationDetails = const AndroidNotificationDetails(
+    androidNotificationDetails = AndroidNotificationDetails(
       'messages_channel',
       'Messages',
       channelDescription: 'Notifications for new messages',
       importance: Importance.max,
       priority: Priority.high,
       showWhen: true,
+      actions: androidActions,
     );
   }
 
@@ -112,6 +158,7 @@ Future<void> showLocalNotification(
     presentBadge: true,
     presentSound: true,
     threadIdentifier: roomId,
+    categoryIdentifier: 'messages_category',
   );
 
   final NotificationDetails notificationDetails = NotificationDetails(
@@ -132,6 +179,181 @@ Future<void> showLocalNotification(
 Future<void> cancelLocalNotification(String roomId) async {
   final notificationId = getNotificationId(roomId);
   await flutterLocalNotificationsPlugin.cancel(id: notificationId);
+}
+
+/// Shows a connection or referral local notification with interactive action buttons.
+Future<void> showConnectionLocalNotification({
+  required String notificationId,
+  required String type,
+  required String title,
+  required String body,
+  required Map<String, dynamic> dataPayload,
+}) async {
+  final int notifId = getNotificationId(notificationId);
+
+  // Determine actions based on type and note
+  final String? note = dataPayload['note']?.toString();
+  final bool isReferralRequest = type == 'referral' &&
+      note != null &&
+      (note.startsWith('[REFERRAL_REQUEST]') ||
+          note.startsWith('[REFERRAL_REQUEST_ACTIONED]'));
+  final bool isRequestActioned =
+      note != null && note.startsWith('[REFERRAL_REQUEST_ACTIONED]');
+  final bool isNormalReferral = type == 'referral' && !isReferralRequest;
+
+  bool isAlreadyConnected = false;
+  if (isNormalReferral) {
+    try {
+      final referredUserIdStr = dataPayload['referred_user_id']?.toString() ??
+          dataPayload['target_id']?.toString();
+      final referredUserId =
+          referredUserIdStr != null ? int.tryParse(referredUserIdStr) : null;
+      final activeUserId = await LocalDatabaseHelper.instance.getActiveUserId();
+      if (referredUserId != null && activeUserId != null) {
+        final client =
+            SupabaseClient(SupabaseConfig.url, SupabaseConfig.serviceRoleKey);
+        final id1 =
+            activeUserId < referredUserId ? activeUserId : referredUserId;
+        final id2 =
+            activeUserId > referredUserId ? activeUserId : referredUserId;
+        final res = await client
+            .from('user_connections')
+            .select()
+            .eq('user_id_1', id1)
+            .eq('user_id_2', id2)
+            .maybeSingle();
+        isAlreadyConnected = res != null;
+      }
+    } catch (e) {
+      print(
+          "Error checking connection status in showConnectionLocalNotification: $e");
+    }
+  }
+
+  List<AndroidNotificationAction> androidActions = [];
+  String iosCategory = 'messages_category';
+
+  final bool isConnectionConfirmation =
+      type == 'referral_connect' || type == 'vip_pass_key';
+
+  if (isConnectionConfirmation) {
+    androidActions = [];
+    iosCategory = 'default_category';
+  } else if (isReferralRequest) {
+    if (!isRequestActioned) {
+      androidActions = [
+        const AndroidNotificationAction(
+          'action_introduce',
+          'Introduce',
+          inputs: [
+            AndroidNotificationActionInput(
+              label: 'Type introduction note...',
+            ),
+          ],
+          allowGeneratedReplies: true,
+        ),
+        const AndroidNotificationAction(
+          'action_ignore',
+          'Ignore',
+        ),
+      ];
+      iosCategory = 'referral_request_category';
+    }
+  } else if (isNormalReferral) {
+    if (isAlreadyConnected) {
+      androidActions = [
+        const AndroidNotificationAction(
+          'action_message',
+          'Message',
+        ),
+        const AndroidNotificationAction(
+          'action_ignore',
+          'Ignore',
+        ),
+      ];
+      iosCategory = 'referral_message_category';
+    } else {
+      androidActions = [
+        const AndroidNotificationAction(
+          'action_connect',
+          'Connect',
+        ),
+        const AndroidNotificationAction(
+          'action_ignore',
+          'Ignore',
+        ),
+      ];
+      iosCategory = 'referral_connect_category';
+    }
+  } else {
+    androidActions = [
+      const AndroidNotificationAction(
+        'action_chat',
+        'Chat',
+      ),
+      const AndroidNotificationAction(
+        'action_ignore',
+        'Ignore',
+      ),
+    ];
+    iosCategory = 'connection_accept_category';
+  }
+
+  // Create a separate notification channel for connection updates so we don't mix them with DM messages
+  const AndroidNotificationChannel connectionChannel =
+      AndroidNotificationChannel(
+    'connections_channel',
+    'Connections',
+    description: 'Notifications for connection requests and referrals',
+    importance: Importance.max,
+  );
+
+  // Ensure channel is registered
+  try {
+    await flutterLocalNotificationsPlugin
+        .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>()
+        ?.createNotificationChannel(connectionChannel);
+  } catch (e) {
+    print("Error creating connection channel: $e");
+  }
+
+  final androidDetails = AndroidNotificationDetails(
+    connectionChannel.id,
+    connectionChannel.name,
+    channelDescription: connectionChannel.description,
+    importance: Importance.max,
+    priority: Priority.high,
+    showWhen: true,
+    category: AndroidNotificationCategory.promo,
+    actions: androidActions,
+  );
+
+  final iosDetails = DarwinNotificationDetails(
+    categoryIdentifier: iosCategory,
+  );
+
+  final details = NotificationDetails(
+    android: androidDetails,
+    iOS: iosDetails,
+  );
+
+  final Map<String, dynamic> fullPayload =
+      Map<String, dynamic>.from(dataPayload);
+  fullPayload['notification_id'] = notificationId;
+  fullPayload['type'] = type;
+  if (!fullPayload.containsKey('is_connection_notification')) {
+    fullPayload['is_connection_notification'] = true;
+  }
+
+  await flutterLocalNotificationsPlugin.show(
+    id: notifId,
+    title: title,
+    body: body,
+    notificationDetails: details,
+    payload: jsonEncode(fullPayload),
+  );
+  print("PushNotifications: Connection notification displayed. ID: $notifId");
 }
 
 String? pendingNotificationPayload;
@@ -171,7 +393,8 @@ Future<bool> _isUserMutedUnderMonkMode(int senderId) async {
   try {
     final ownerId = await LocalDatabaseHelper.instance.getActiveUserId();
     if (ownerId == null) return false;
-    final settings = await LocalDatabaseHelper.instance.getMonkModeSettings(ownerId);
+    final settings =
+        await LocalDatabaseHelper.instance.getMonkModeSettings(ownerId);
     final bool enabled = settings['enabled'] as bool? ?? false;
     if (!enabled) return false;
 
@@ -193,6 +416,373 @@ Future<bool> _isUserMutedUnderMonkMode(int senderId) async {
 }
 
 @pragma('vm:entry-point')
+Future<void> onNotificationActionReceived(NotificationResponse response) async {
+  WidgetsFlutterBinding.ensureInitialized();
+  final String? actionId = response.actionId;
+  final String? payload = response.payload;
+  print(
+      "PushNotificationsAction: Action received. ID: $actionId, payload: $payload");
+  if (payload == null) return;
+
+  try {
+    final Map<String, dynamic> data = jsonDecode(payload);
+    final isConnectionNotif = data['is_connection_notification'] == true;
+    final client =
+        SupabaseClient(SupabaseConfig.url, SupabaseConfig.serviceRoleKey);
+
+    if (isConnectionNotif) {
+      final String? notificationId =
+          data['notification_id']?.toString() ?? data['id']?.toString();
+      if (notificationId == null) {
+        print(
+            "PushNotificationsAction: Missing notificationId in connection notification payload");
+        return;
+      }
+      final int notifId = getNotificationId(notificationId);
+
+      if (actionId == 'action_ignore') {
+        print(
+            "PushNotificationsAction: Ignore action triggered for notification: $notificationId");
+        await client
+            .from('connection_notifications')
+            .update({'is_seen': true}).eq('id', notificationId);
+        await flutterLocalNotificationsPlugin.cancel(id: notifId);
+      } else if (actionId == 'action_connect') {
+        print("PushNotificationsAction: Connect action triggered");
+        final myUserId = await LocalDatabaseHelper.instance.getActiveUserId();
+        final referredUserIdStr = data['referred_user_id']?.toString() ??
+            data['target_id']?.toString();
+        final referredUserId =
+            referredUserIdStr != null ? int.tryParse(referredUserIdStr) : null;
+        if (myUserId != null && referredUserId != null) {
+          final int id1 = myUserId < referredUserId ? myUserId : referredUserId;
+          final int id2 = myUserId > referredUserId ? myUserId : referredUserId;
+
+          await client.from('user_connections').upsert({
+            'user_id_1': id1,
+            'user_id_2': id2,
+            'user_1_shared_card': 'both',
+            'user_2_shared_card': 'both',
+          });
+
+          await client.from('connection_notifications').insert([
+            {
+              'user_id': myUserId,
+              'other_user_id': referredUserId,
+              'type': 'referral_connect',
+              'is_seen': false,
+            },
+            {
+              'user_id': referredUserId,
+              'other_user_id': myUserId,
+              'type': 'referral_connect',
+              'is_seen': false,
+            }
+          ]);
+
+          await client
+              .from('connection_notifications')
+              .update({'is_seen': true}).eq('id', notificationId);
+          await flutterLocalNotificationsPlugin.cancel(id: notifId);
+        }
+      } else if (actionId == 'action_introduce') {
+        final String? noteInput = response.input?.trim();
+        print(
+            "PushNotificationsAction: Introduce action triggered. Note: $noteInput");
+
+        final myUserId = await LocalDatabaseHelper.instance.getActiveUserId();
+        final actorIdStr =
+            data['actor_id']?.toString() ?? data['other_user_id']?.toString();
+        final actorId = actorIdStr != null ? int.tryParse(actorIdStr) : null;
+        final referredUserIdStr = data['referred_user_id']?.toString() ??
+            data['target_id']?.toString();
+        final referredUserId =
+            referredUserIdStr != null ? int.tryParse(referredUserIdStr) : null;
+
+        if (myUserId != null && actorId != null && referredUserId != null) {
+          final String targetName = data['referred_user_name']?.toString() ??
+              data['target_name']?.toString() ??
+              'there';
+          final String requesterName = data['actor_name']?.toString() ??
+              data['other_user_name']?.toString() ??
+              'someone';
+          final String noteToSend = (noteInput != null && noteInput.isNotEmpty)
+              ? noteInput
+              : "Hey $targetName, I'd like to introduce you to $requesterName.";
+
+          await client.from('connection_notifications').insert({
+            'user_id': referredUserId,
+            'other_user_id': myUserId,
+            'referred_user_id': actorId,
+            'type': 'referral',
+            'note': noteToSend,
+            'is_seen': false,
+          });
+
+          final currentNote = data['note']?.toString() ?? '';
+          final actionedNote = currentNote.replaceFirst(
+              '[REFERRAL_REQUEST]', '[REFERRAL_REQUEST_ACTIONED]');
+          await client.from('connection_notifications').update({
+            'note': actionedNote.isNotEmpty
+                ? actionedNote
+                : '[REFERRAL_REQUEST_ACTIONED]',
+            'is_seen': true,
+          }).eq('id', notificationId);
+
+          await flutterLocalNotificationsPlugin.cancel(id: notifId);
+        }
+      } else if (actionId == 'action_chat' || actionId == 'action_message') {
+        print("PushNotificationsAction: Chat/Message action triggered");
+        final referredUserIdStr = data['referred_user_id']?.toString() ??
+            data['target_id']?.toString() ??
+            data['other_user_id']?.toString();
+        final referredUserId =
+            referredUserIdStr != null ? int.tryParse(referredUserIdStr) : null;
+        if (referredUserId != null) {
+          targetChatSenderId = referredUserId;
+        }
+
+        await client
+            .from('connection_notifications')
+            .update({'is_seen': true}).eq('id', notificationId);
+        await flutterLocalNotificationsPlugin.cancel(id: notifId);
+      }
+      return;
+    }
+
+    final String? roomId = data['room_id']?.toString();
+    final String? senderIdStr = data['sender_id']?.toString();
+    if (roomId == null || senderIdStr == null) {
+      print(
+          "PushNotificationsAction: Missing roomId or senderIdStr in payload");
+      return;
+    }
+
+    final senderId = int.tryParse(senderIdStr);
+    if (senderId == null) {
+      print("PushNotificationsAction: Invalid senderId format");
+      return;
+    }
+
+    final notificationId = getNotificationId(roomId);
+
+    if (actionId == 'action_mark_read') {
+      print(
+          "PushNotificationsAction: Mark as read triggered for room: $roomId, sender: $senderId");
+
+      // 1. Update local DB
+      final db = await LocalDatabaseHelper.instance.database;
+      final ownerId = await LocalDatabaseHelper.instance.getActiveUserId() ?? 0;
+      final localUpdated = await db.update(
+        'messages',
+        {'status': 'read'},
+        where: 'room_id = ? AND owner_id = ? AND sender_id = ?',
+        whereArgs: [roomId, ownerId, senderId],
+      );
+      print(
+          "PushNotificationsAction: Local DB updated. Rows affected: $localUpdated");
+
+      // 2. Update remote Supabase messages status to 'read'
+      try {
+        await client
+            .from('messages')
+            .update({'status': 'read'})
+            .eq('room_id', roomId)
+            .eq('sender_id', senderId)
+            .inFilter('status', ['sent', 'delivered']);
+        print(
+            "PushNotificationsAction: Supabase messages marked read successfully");
+      } catch (supabaseError) {
+        print(
+            "PushNotificationsAction: Supabase mark read error: $supabaseError");
+      }
+
+      // 3. Cancel the notification tray entry
+      await flutterLocalNotificationsPlugin.cancel(id: notificationId);
+      print("PushNotificationsAction: Notification tray entry cancelled");
+
+      // 4. Delay tear-down of the isolate to allow connection sockets to fully flush
+      await Future.delayed(const Duration(milliseconds: 500));
+    } else if (actionId == 'action_reply') {
+      final String? replyText = response.input;
+      print(
+          "PushNotificationsAction: Direct Reply triggered. Text: $replyText");
+      if (replyText == null || replyText.trim().isEmpty) return;
+
+      final ownerId = await LocalDatabaseHelper.instance.getActiveUserId();
+      if (ownerId == null) {
+        print("PushNotificationsAction: Owner ID not found. Cannot reply.");
+        return;
+      }
+
+      // Generate a unique message ID
+      final String newMessageId = const Uuid().v4();
+      final String createdAt = DateTime.now().toUtc().toIso8601String();
+
+      // 1. Insert message into local SQLite database as status: 'sent'
+      try {
+        await LocalDatabaseHelper.instance.insertMessage(
+          newMessageId,
+          roomId,
+          ownerId,
+          replyText.trim(),
+          status: 'sent',
+          createdAt: createdAt,
+        );
+        print("PushNotificationsAction: Message saved locally");
+      } catch (dbError) {
+        print("PushNotificationsAction: Database save error: $dbError");
+      }
+
+      // 2. Push the new message row directly to the Supabase 'messages' table
+      try {
+        await client.from('messages').insert({
+          'id': newMessageId,
+          'room_id': roomId,
+          'sender_id': ownerId,
+          'payload': replyText.trim(),
+          'status': 'sent',
+          'created_at': createdAt,
+          'updated_at': createdAt,
+        });
+        print("PushNotificationsAction: Message sent to Supabase successfully");
+      } catch (supabaseError) {
+        print("PushNotificationsAction: Supabase insert error: $supabaseError");
+      }
+
+      // 3. Re-show/update the notification in the tray to include the user's reply, keeping it in the same tray.
+      final String senderName = data['sender_name']?.toString() ?? 'Connect';
+      await showLocalNotification(
+        roomId,
+        senderName,
+        [replyText.trim()],
+        data,
+      );
+      print(
+          "PushNotificationsAction: Direct Reply finished. Notification updated with reply.");
+
+      // 4. Delay tear-down of the isolate to allow connection sockets to fully flush
+      await Future.delayed(const Duration(milliseconds: 500));
+    }
+  } catch (e) {
+    print("Error handling remote notification action in background: $e");
+  }
+}
+
+List<DarwinNotificationCategory> buildDarwinNotificationCategories() {
+  return [
+    DarwinNotificationCategory(
+      'messages_category',
+      actions: <DarwinNotificationAction>[
+        DarwinNotificationAction.text(
+          'action_reply',
+          'Reply',
+          buttonTitle: 'Send',
+          placeholder: 'Type message...',
+        ),
+        DarwinNotificationAction.plain(
+          'action_mark_read',
+          'Mark as Read',
+          options: <DarwinNotificationActionOption>{
+            DarwinNotificationActionOption.destructive,
+          },
+        ),
+      ],
+      options: <DarwinNotificationCategoryOption>{
+        DarwinNotificationCategoryOption.hiddenPreviewShowTitle,
+      },
+    ),
+    DarwinNotificationCategory(
+      'referral_request_category',
+      actions: <DarwinNotificationAction>[
+        DarwinNotificationAction.text(
+          'action_introduce',
+          'Introduce',
+          buttonTitle: 'Send',
+          placeholder: 'Type introduction note...',
+        ),
+        DarwinNotificationAction.plain(
+          'action_ignore',
+          'Ignore',
+          options: <DarwinNotificationActionOption>{
+            DarwinNotificationActionOption.destructive,
+          },
+        ),
+      ],
+      options: <DarwinNotificationCategoryOption>{
+        DarwinNotificationCategoryOption.hiddenPreviewShowTitle,
+      },
+    ),
+    DarwinNotificationCategory(
+      'referral_connect_category',
+      actions: <DarwinNotificationAction>[
+        DarwinNotificationAction.plain(
+          'action_connect',
+          'Connect',
+          options: <DarwinNotificationActionOption>{
+            DarwinNotificationActionOption.foreground,
+          },
+        ),
+        DarwinNotificationAction.plain(
+          'action_ignore',
+          'Ignore',
+          options: <DarwinNotificationActionOption>{
+            DarwinNotificationActionOption.destructive,
+          },
+        ),
+      ],
+      options: <DarwinNotificationCategoryOption>{
+        DarwinNotificationCategoryOption.hiddenPreviewShowTitle,
+      },
+    ),
+    DarwinNotificationCategory(
+      'referral_message_category',
+      actions: <DarwinNotificationAction>[
+        DarwinNotificationAction.plain(
+          'action_message',
+          'Message',
+          options: <DarwinNotificationActionOption>{
+            DarwinNotificationActionOption.foreground,
+          },
+        ),
+        DarwinNotificationAction.plain(
+          'action_ignore',
+          'Ignore',
+          options: <DarwinNotificationActionOption>{
+            DarwinNotificationActionOption.destructive,
+          },
+        ),
+      ],
+      options: <DarwinNotificationCategoryOption>{
+        DarwinNotificationCategoryOption.hiddenPreviewShowTitle,
+      },
+    ),
+    DarwinNotificationCategory(
+      'connection_accept_category',
+      actions: <DarwinNotificationAction>[
+        DarwinNotificationAction.plain(
+          'action_chat',
+          'Chat',
+          options: <DarwinNotificationActionOption>{
+            DarwinNotificationActionOption.foreground,
+          },
+        ),
+        DarwinNotificationAction.plain(
+          'action_ignore',
+          'Ignore',
+          options: <DarwinNotificationActionOption>{
+            DarwinNotificationActionOption.destructive,
+          },
+        ),
+      ],
+      options: <DarwinNotificationCategoryOption>{
+        DarwinNotificationCategoryOption.hiddenPreviewShowTitle,
+      },
+    ),
+  ];
+}
+
+@pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -211,15 +801,21 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   try {
     const AndroidInitializationSettings initializationSettingsAndroid =
         AndroidInitializationSettings('@mipmap/ic_launcher');
-    const DarwinInitializationSettings initializationSettingsDarwin =
-        DarwinInitializationSettings();
-    const InitializationSettings initializationSettings =
+    final List<DarwinNotificationCategory> darwinNotificationCategories =
+        buildDarwinNotificationCategories();
+
+    final DarwinInitializationSettings initializationSettingsDarwin =
+        DarwinInitializationSettings(
+      notificationCategories: darwinNotificationCategories,
+    );
+    final InitializationSettings initializationSettings =
         InitializationSettings(
       android: initializationSettingsAndroid,
       iOS: initializationSettingsDarwin,
     );
     await flutterLocalNotificationsPlugin.initialize(
       settings: initializationSettings,
+      onDidReceiveBackgroundNotificationResponse: onNotificationActionReceived,
     );
 
     await flutterLocalNotificationsPlugin
@@ -281,6 +877,14 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
         try {
           final isMuted = await _isUserMutedUnderMonkMode(senderId);
           if (!isMuted) {
+            final activeUserId =
+                await LocalDatabaseHelper.instance.getActiveUserId();
+            if (activeUserId != null && senderId == activeUserId) {
+              print(
+                  "PushNotifications: Received own message in background FCM. Ignoring notification.");
+              return;
+            }
+
             List<String> messageLines = [];
             bool isFallback = false;
             try {
@@ -300,17 +904,18 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
             final senderName = data['sender_name'] as String? ?? 'New Message';
             if (isFallback) {
               await showLocalNotification(
-                messageId, // Using messageId instead of roomId so it's individual and doesn't collapse
+                roomId, // Collapse by roomId so notifications stay in the same tray
                 senderName,
                 [payload],
                 {
                   'sender_id': senderIdStr,
                   'room_id': roomId,
                   'message_id': messageId,
+                  'sender_name': senderName,
                 },
               );
               print(
-                  "PushNotifications: Background fallback notification displayed for messageId: $messageId.");
+                  "PushNotifications: Background fallback notification displayed for roomId: $roomId.");
             } else {
               await showLocalNotification(
                 roomId,
@@ -319,6 +924,7 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
                 {
                   'sender_id': senderIdStr,
                   'room_id': roomId,
+                  'sender_name': senderName,
                 },
               );
               print(
@@ -384,6 +990,68 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
             "PushNotifications: Error handling background message delete: $e");
       }
     }
+  } else if (action == 'connection_notification') {
+    final notificationId =
+        data['notification_id']?.toString() ?? data['id']?.toString();
+    if (notificationId != null) {
+      try {
+        final client =
+            SupabaseClient(SupabaseConfig.url, SupabaseConfig.serviceRoleKey);
+        final notifRow = await client
+            .from('connection_notifications')
+            .select(
+                '*, other_user:profiles!other_user_id(id, name, avatar_url, profession), referred_user:profiles!referred_user_id(id, name, avatar_url, profession)')
+            .eq('id', notificationId)
+            .maybeSingle();
+
+        if (notifRow != null) {
+          final type = notifRow['type']?.toString() ?? 'referral';
+          final note = notifRow['note']?.toString();
+
+          final actor = notifRow['other_user'] as Map<String, dynamic>? ?? {};
+          final actorName = actor['name']?.toString() ?? 'Someone';
+          final referred =
+              notifRow['referred_user'] as Map<String, dynamic>? ?? {};
+          final referredName = referred['name']?.toString() ?? 'Someone';
+
+          String title = "New Connection";
+          String body = "You have a new update.";
+
+          if (type == "vip_pass_key") {
+            title = "New Connection";
+            body = "$actorName connected via Private Key";
+          } else if (type == "referral_connect") {
+            title = "New Connection";
+            body = "$actorName connected via Referral";
+          } else if (type == "referral") {
+            final isRequest = note != null &&
+                (note.startsWith("[REFERRAL_REQUEST]") ||
+                    note.startsWith("[REFERRAL_REQUEST_ACTIONED]"));
+            if (isRequest) {
+              title = "Introduction Request";
+              body = "$actorName asked to be introduced to $referredName";
+            } else {
+              title = "New Referral";
+              body = "$actorName referred $referredName to you";
+            }
+          } else {
+            title = "New Connection";
+            body = "$actorName connected with you";
+          }
+
+          await showConnectionLocalNotification(
+            notificationId: notificationId,
+            type: type,
+            title: title,
+            body: body,
+            dataPayload: notifRow,
+          );
+        }
+      } catch (e) {
+        print(
+            "PushNotifications: Error handling background connection_notification: $e");
+      }
+    }
   }
 }
 
@@ -426,15 +1094,24 @@ void main() async {
   // Initialize flutter_local_notifications
   const AndroidInitializationSettings initializationSettingsAndroid =
       AndroidInitializationSettings('@mipmap/ic_launcher');
-  const DarwinInitializationSettings initializationSettingsDarwin =
-      DarwinInitializationSettings();
-  const InitializationSettings initializationSettings = InitializationSettings(
+  final List<DarwinNotificationCategory> darwinNotificationCategories =
+      buildDarwinNotificationCategories();
+
+  final DarwinInitializationSettings initializationSettingsDarwin =
+      DarwinInitializationSettings(
+    notificationCategories: darwinNotificationCategories,
+  );
+  final InitializationSettings initializationSettings = InitializationSettings(
     android: initializationSettingsAndroid,
     iOS: initializationSettingsDarwin,
   );
   await flutterLocalNotificationsPlugin.initialize(
     settings: initializationSettings,
     onDidReceiveNotificationResponse: (NotificationResponse response) async {
+      if (response.actionId != null) {
+        onNotificationActionReceived(response);
+        return;
+      }
       final payload = response.payload;
       if (payload != null) {
         final context = navigatorKey.currentContext;
@@ -454,6 +1131,7 @@ void main() async {
         }
       }
     },
+    onDidReceiveBackgroundNotificationResponse: onNotificationActionReceived,
   );
 
   // Explicitly create the Android notification channel
@@ -667,7 +1345,12 @@ class AuthGate extends StatelessWidget {
           return const AppShellGate();
         }
 
-        return const AuthScreen();
+        final profileProvider =
+            Provider.of<ProfileProvider>(context, listen: false);
+        final initialIsSignIn = !profileProvider.showSignUpNext;
+        profileProvider.showSignUpNext = false;
+
+        return AuthScreen(initialIsSignIn: initialIsSignIn);
       },
     );
   }
@@ -891,6 +1574,14 @@ class _AppShellGateState extends State<AppShellGate> {
                 // 4. Show notification ONLY if the user is NOT actively in the chat room
                 if (!isCurrentRoom) {
                   try {
+                    final activeUserId =
+                        await LocalDatabaseHelper.instance.getActiveUserId();
+                    if (activeUserId != null && senderId == activeUserId) {
+                      print(
+                          "PushNotifications: Foreground received own message. Skipping banner.");
+                      return;
+                    }
+
                     final isMuted = await _isUserMutedUnderMonkMode(senderId);
                     if (isMuted) {
                       print(
@@ -975,31 +1666,83 @@ class _AppShellGateState extends State<AppShellGate> {
               }
             }
           } else if (action == 'connection_notification') {
-            final title = message.notification?.title ?? 'New Notification';
-            final body = message.notification?.body ?? 'You have a new update.';
-            final actorIdStr = data['actor_id'] as String?;
-            final actorAvatar = data['actor_avatar'] as String? ?? '';
-            final actorId =
-                actorIdStr != null ? (int.tryParse(actorIdStr) ?? 0) : 0;
+            final notificationId =
+                data['notification_id']?.toString() ?? data['id']?.toString();
+            if (notificationId != null) {
+              try {
+                final client = SupabaseClient(
+                    SupabaseConfig.url, SupabaseConfig.serviceRoleKey);
+                final notifRow = await client
+                    .from('connection_notifications')
+                    .select(
+                        '*, other_user:profiles!other_user_id(id, name, avatar_url, profession), referred_user:profiles!referred_user_id(id, name, avatar_url, profession)')
+                    .eq('id', notificationId)
+                    .maybeSingle();
 
-            final overlayState = navigatorKey.currentState?.overlay;
-            if (overlayState != null) {
-              InAppNotificationBanner.show(
-                overlayState: overlayState,
-                senderId: actorId,
-                senderName: title,
-                avatarUrl: actorAvatar,
-                message: body,
-                onTap: () {
-                  navigatorKey.currentState?.push(
-                    MaterialPageRoute(
-                      builder: (routeContext) => const NotificationPage(),
-                    ),
-                  );
-                },
-              );
-              print(
-                  "PushNotifications: Foreground connection notification banner displayed.");
+                if (notifRow != null) {
+                  final type = notifRow['type']?.toString() ?? 'referral';
+                  final note = notifRow['note']?.toString();
+
+                  final actor =
+                      notifRow['other_user'] as Map<String, dynamic>? ?? {};
+                  final actorName = actor['name']?.toString() ?? 'Someone';
+                  final actorAvatar = actor['avatar_url']?.toString() ?? '';
+                  final actorId = actor['id'] as int? ?? 0;
+                  final referred =
+                      notifRow['referred_user'] as Map<String, dynamic>? ?? {};
+                  final referredName =
+                      referred['name']?.toString() ?? 'Someone';
+
+                  String title = "New Connection";
+                  String body = "You have a new update.";
+
+                  if (type == "vip_pass_key") {
+                    title = "New Connection";
+                    body = "$actorName connected via Private Key";
+                  } else if (type == "referral_connect") {
+                    title = "New Connection";
+                    body = "$actorName connected via Referral";
+                  } else if (type == "referral") {
+                    final isRequest = note != null &&
+                        (note.startsWith("[REFERRAL_REQUEST]") ||
+                            note.startsWith("[REFERRAL_REQUEST_ACTIONED]"));
+                    if (isRequest) {
+                      title = "Introduction Request";
+                      body =
+                          "$actorName asked to be introduced to $referredName";
+                    } else {
+                      title = "New Referral";
+                      body = "$actorName referred $referredName to you";
+                    }
+                  } else {
+                    title = "New Connection";
+                    body = "$actorName connected with you";
+                  }
+
+                  final overlayState = navigatorKey.currentState?.overlay;
+                  if (overlayState != null) {
+                    InAppNotificationBanner.show(
+                      overlayState: overlayState,
+                      senderId: actorId,
+                      senderName: title,
+                      avatarUrl: actorAvatar,
+                      message: body,
+                      onTap: () {
+                        navigatorKey.currentState?.push(
+                          MaterialPageRoute(
+                            builder: (routeContext) => const NotificationPage(),
+                          ),
+                        );
+                      },
+                    );
+                    print(
+                        "PushNotifications: Foreground connection notification banner displayed.");
+                  }
+                }
+              } catch (e) {
+                print(
+                    "PushNotifications: Error showing foreground connection_notification: $e");
+              }
             }
           }
         } catch (e) {

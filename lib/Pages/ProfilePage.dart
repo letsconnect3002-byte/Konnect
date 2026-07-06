@@ -156,7 +156,7 @@ class _ProfilePageState extends State<ProfilePage> {
       }
 
       final shareMessage =
-          "Hey, I'm inviting you to my private circle on Mandala. Download the app here: joinmandala.in and use my single-use Private code to connect: *$code*.";
+          "Hey, I'm inviting you to my private circle on Jana. Download the app here: joinmandala.in and use my single-use Private code to connect: *$code*.";
 
       await SharePlus.instance.share(ShareParams(text: shareMessage));
     } catch (e) {

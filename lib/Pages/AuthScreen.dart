@@ -9,7 +9,8 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:connect/Config/app_theme.dart';
 
 class AuthScreen extends StatefulWidget {
-  const AuthScreen({super.key});
+  final bool initialIsSignIn;
+  const AuthScreen({super.key, this.initialIsSignIn = true});
 
   @override
   State<AuthScreen> createState() => _AuthScreenState();
@@ -22,7 +23,7 @@ class _AuthScreenState extends State<AuthScreen> {
   final _confirmPasswordController = TextEditingController();
   final _otpController = TextEditingController();
 
-  bool _isSignIn = true;
+  late bool _isSignIn;
   bool _isLoading = false;
   bool _obscurePassword = true;
   bool _isOtpMode = false;
@@ -30,6 +31,12 @@ class _AuthScreenState extends State<AuthScreen> {
   bool _isRecoveryMode = false;
   bool _isRecoveryOtpMode = false;
   bool _acceptPrivacyPolicy = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _isSignIn = widget.initialIsSignIn;
+  }
 
   @override
   void dispose() {
@@ -536,7 +543,7 @@ class _AuthScreenState extends State<AuthScreen> {
                               ],
                             ),
                             child: Image.asset(
-                              'assets/icons/Mandala Icon 1.png',
+                              'assets/icons/New Jana Logo.png',
                               fit: BoxFit.contain,
                             ),
                           ),

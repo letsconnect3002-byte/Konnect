@@ -725,7 +725,7 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
                 ),
                 child: Center(
                   child: Image.asset(
-                    'assets/icons/Mandala Icon 1.png',
+                    'assets/icons/New Jana Logo.png',
                     width: 22,
                     height: 22,
                     color: const Color(0xFF00F2FE),

@@ -149,7 +149,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                               ],
                             ),
                             child: Image.asset(
-                              'assets/icons/Mandala Icon 1.png',
+                              'assets/icons/New Jana Logo.png',
                               fit: BoxFit.contain,
                             ),
                           ),
@@ -170,7 +170,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                       ),
                       const SizedBox(height: 6),
                       const Text(
-                        "Set a new secure password for your Mandala account.",
+                        "Set a new secure password for your Jana account.",
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           color: Color(0xFF8B8C9E),

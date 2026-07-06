@@ -12,7 +12,8 @@ import 'package:connect/Config/app_theme.dart';
 import 'package:connect/main.dart';
 
 class ConnectHubBottomSheet extends StatefulWidget {
-  const ConnectHubBottomSheet({super.key});
+  final String initialShareType;
+  const ConnectHubBottomSheet({super.key, this.initialShareType = 'casual'});
 
   @override
   State<ConnectHubBottomSheet> createState() => _ConnectHubBottomSheetState();
@@ -34,6 +35,7 @@ class _ConnectHubBottomSheetState extends State<ConnectHubBottomSheet>
   @override
   void initState() {
     super.initState();
+    _selectedShareType = widget.initialShareType;
     _tabController = TabController(length: 2, vsync: this);
     _tabController.addListener(_onTabChanged);
   }
@@ -199,7 +201,7 @@ class _ConnectHubBottomSheetState extends State<ConnectHubBottomSheet>
   void _shareInviteLink() async {
     if (_generatedInviteCode == null) return;
     final shareMessage =
-        "Hey! Connect with me on Mandala using my connection code: $_generatedInviteCode. Let's start messaging privately.";
+        "Hey! Connect with me on Jana using my connection code: $_generatedInviteCode. Let's start messaging privately.";
     await SharePlus.instance.share(ShareParams(text: shareMessage));
   }
 
@@ -1125,24 +1127,15 @@ class _ConnectHubBottomSheetState extends State<ConnectHubBottomSheet>
 
   bool _checkIsProfileComplete(ProfileProvider provider) {
     final String name = provider.name.trim();
-    final String vibe = provider.vibeTag.trim();
-    final int interestsCount = provider.interestTags.length;
 
     // Name check: not empty and not default "Jane Doe"
     final bool hasName = name.isNotEmpty && name.toLowerCase() != 'jane doe';
-    // Vibe check: not empty
-    final bool hasVibe = vibe.isNotEmpty;
-    // Interests check: at least 3 interests
-    final bool hasInterests = interestsCount >= 3;
 
     // Email check: either casual email or professional email is filled
     final bool hasEmail = provider.email.trim().isNotEmpty ||
         provider.professionalEmail.trim().isNotEmpty;
-    // Phone check: either casual phone or professional phone is filled
-    final bool hasPhone = provider.phoneNumber.trim().isNotEmpty ||
-        provider.professionalPhoneNumber.trim().isNotEmpty;
 
-    return hasName && hasVibe && hasInterests && hasEmail && hasPhone;
+    return hasName && hasEmail;
   }
 
   Widget _buildIncompleteProfileCard(ProfileProvider provider) {
@@ -1190,7 +1183,7 @@ class _ConnectHubBottomSheetState extends State<ConnectHubBottomSheet>
           ),
           const SizedBox(height: 16),
           Text(
-            "To generate your personal QR code and private sharing keys, please complete your profile details first.",
+            "To generate your personal QR code and private sharing keys, please complete your name and email settings first.",
             style: TextStyle(
               color: context.textSecondary,
               fontSize: 13,

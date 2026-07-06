@@ -94,17 +94,20 @@ class ChatProvider with ChangeNotifier {
   Future<void> loadDrafts() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final keys = prefs.getKeys();
       _drafts.clear();
-      for (final key in keys) {
-        if (key.startsWith('chat_draft_')) {
-          final parts = key.split('_');
-          if (parts.length == 3) {
-            final userId = int.tryParse(parts[2]);
-            if (userId != null) {
-              final draft = prefs.getString(key);
-              if (draft != null && draft.isNotEmpty) {
-                _drafts[userId] = draft;
+      final myUserId = _userId;
+      if (myUserId != null) {
+        final keys = prefs.getKeys();
+        for (final key in keys) {
+          if (key.startsWith('chat_draft_${myUserId}_')) {
+            final parts = key.split('_');
+            if (parts.length == 4) {
+              final otherId = int.tryParse(parts[3]);
+              if (otherId != null) {
+                final draft = prefs.getString(key);
+                if (draft != null && draft.isNotEmpty) {
+                  _drafts[otherId] = draft;
+                }
               }
             }
           }
@@ -117,6 +120,8 @@ class ChatProvider with ChangeNotifier {
   }
 
   Future<void> saveDraft(int otherUserId, String draft) async {
+    final myUserId = _userId;
+    if (myUserId == null) return;
     if (draft.trim().isEmpty) {
       await clearDraft(otherUserId);
       return;
@@ -127,22 +132,24 @@ class ChatProvider with ChangeNotifier {
     });
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('chat_draft_$otherUserId', draft.trim());
+      await prefs.setString('chat_draft_${myUserId}_$otherUserId', draft.trim());
     } catch (e) {
       print("Error saving draft: $e");
     }
   }
 
   Future<void> clearDraft(int otherUserId) async {
+    final myUserId = _userId;
     if (_drafts.containsKey(otherUserId)) {
       _drafts.remove(otherUserId);
       WidgetsBinding.instance.addPostFrameCallback((_) {
         notifyListeners();
       });
     }
+    if (myUserId == null) return;
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.remove('chat_draft_$otherUserId');
+      await prefs.remove('chat_draft_${myUserId}_$otherUserId');
     } catch (e) {
       print("Error clearing draft: $e");
     }
@@ -233,8 +240,11 @@ class ChatProvider with ChangeNotifier {
       _externalConnections = List.from(connections);
     }
 
-    if (userIdChanged && userId != null) {
-      loadChatRooms();
+    if (userIdChanged) {
+      loadDrafts();
+      if (userId != null) {
+        loadChatRooms();
+      }
     } else if (connectionsChanged && userId != null) {
       // Only recalculate unread counts when connection list actually changes
       updateUnreadCount();

@@ -44,6 +44,9 @@ class ProfileFieldFilter {
     if (assignmentRaw == null) return true;
 
     final Map<String, dynamic> assignment = Map<String, dynamic>.from(assignmentRaw as Map);
+    final bool isPrivate = assignment['pr'] == true;
+    if (isPrivate) return false;
+
     final bool isCasual = assignment['c'] == true;
     final bool isProfessional = assignment['p'] == true;
 

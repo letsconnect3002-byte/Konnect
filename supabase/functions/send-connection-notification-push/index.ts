@@ -25,6 +25,12 @@ serve(async (req) => {
       note,
     } = record
 
+    // Skip push notifications for already seen/actioned notifications
+    if (record.is_seen === true) {
+      console.log("Skipping push notification because record is already seen.")
+      return new Response("Seen notification skipped", { status: 200 })
+    }
+
     // Skip QR Code connection notifications as requested by user
     if (type === "qr_code") {
       console.log("Skipping push notification for QR code connection.")
@@ -82,7 +88,38 @@ serve(async (req) => {
       bodyText = `${actorName} connected with you`
     }
 
-    // 5. Fetch registered FCM tokens for the recipient
+    // 5. Query user connection status if it is a normal referral
+    let isAlreadyConnected = false
+    if (type === "referral" && targetId) {
+      const isRequest = note && (note.startsWith("[REFERRAL_REQUEST]") || note.startsWith("[REFERRAL_REQUEST_ACTIONED]"))
+      if (!isRequest) {
+        const id1 = recipientId < targetId ? recipientId : targetId
+        const id2 = recipientId > targetId ? recipientId : targetId
+        const { data: conn } = await supabase
+          .from("user_connections")
+          .select("user_id_1")
+          .eq("user_id_1", id1)
+          .eq("user_id_2", id2)
+          .maybeSingle()
+        isAlreadyConnected = conn !== null
+      }
+    }
+
+    let apnsCategory = "default_category"
+    if (type === "referral") {
+      const isRequest = note && (note.startsWith("[REFERRAL_REQUEST]") || note.startsWith("[REFERRAL_REQUEST_ACTIONED]"))
+      if (isRequest) {
+        apnsCategory = note.startsWith("[REFERRAL_REQUEST_ACTIONED]") ? "default_category" : "referral_request_category"
+      } else {
+        apnsCategory = isAlreadyConnected ? "referral_message_category" : "referral_connect_category"
+      }
+    } else if (type === "vip_pass_key" || type === "referral_connect") {
+      apnsCategory = "default_category"
+    } else {
+      apnsCategory = "connection_accept_category"
+    }
+
+    // 6. Fetch registered FCM tokens for the recipient
     const { data: tokens, error: tError } = await supabase
       .from("user_push_tokens")
       .select("fcm_token")
@@ -93,7 +130,7 @@ serve(async (req) => {
       return new Response("No push tokens registered", { status: 200 })
     }
 
-    // 6. Generate Google OAuth2 access token for FCM
+    // 7. Generate Google OAuth2 access token for FCM
     const jwt = new JWT({
       email: serviceAccountJson.client_email,
       key: serviceAccountJson.private_key,
@@ -102,7 +139,7 @@ serve(async (req) => {
     const credentials = await jwt.authorize()
     const accessToken = credentials.access_token
 
-    // 7. Send notification to each device token
+    // 8. Send notification to each device token
     const results = []
     for (const row of tokens) {
       const fcmToken = row.fcm_token
@@ -110,10 +147,6 @@ serve(async (req) => {
       const fcmBody = {
         message: {
           token: fcmToken,
-          notification: {
-            title: title,
-            body: bodyText,
-          },
           data: {
             action: "connection_notification",
             notification_id: String(notificationId),
@@ -121,12 +154,11 @@ serve(async (req) => {
             actor_id: String(actorId),
             actor_name: actorName,
             actor_avatar: actorAvatar,
+            title: title,
+            body: bodyText,
           },
           android: {
             priority: "high",
-            notification: {
-              channel_id: "messages_channel",
-            },
           },
           apns: {
             headers: {
@@ -135,7 +167,13 @@ serve(async (req) => {
             },
             payload: {
               aps: {
+                "content-available": 1,
+                alert: {
+                  title: title,
+                  body: bodyText,
+                },
                 sound: "default",
+                category: apnsCategory,
               },
             },
           },

@@ -1740,7 +1740,7 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _buildSectionHeader('PROFILE DETAILS', _showEditDetailsSheet),
+        _buildSectionHeader('PROFILE DETAILS', () => _showEditDetailsSheet(isCasual)),
         const SizedBox(height: 12),
         Container(
           padding: const EdgeInsets.all(0),
@@ -1783,13 +1783,54 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                     : (provider.professionalEmail.trim().isEmpty
                         ? 'Not set'
                         : provider.professionalEmail.trim()),
+                onCopy: () {
+                  final textToCopy = isCasual
+                      ? provider.email.trim()
+                      : provider.professionalEmail.trim();
+                  if (textToCopy.isNotEmpty) {
+                    Clipboard.setData(ClipboardData(text: textToCopy));
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Row(
+                          children: [
+                            Icon(Icons.check_circle_rounded,
+                                color: context.accentSecondary, size: 18),
+                            const SizedBox(width: 8),
+                            const Text(
+                              'Email copied to clipboard',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                fontFamily: 'Inter',
+                              ),
+                            ),
+                          ],
+                        ),
+                        backgroundColor: const Color(0xFF1C1D22),
+                        behavior: SnackBarBehavior.floating,
+                        duration: const Duration(seconds: 1),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10)),
+                      ),
+                    );
+                  }
+                },
               ),
               const Divider(color: Colors.transparent, height: 20),
 
               // Phone
               _buildDetailRow(
-                icon: Icons.phone_rounded,
-                label: isCasual ? 'Casual Phone' : 'Professional Phone',
+                icon: provider.isFieldPrivate(isCasual ? 'phoneNumber' : 'professionalPhoneNumber')
+                    ? Icons.lock_outline_rounded
+                    : Icons.phone_rounded,
+                label: isCasual
+                    ? (provider.isFieldPrivate('phoneNumber')
+                        ? 'Casual Phone (Private)'
+                        : 'Casual Phone')
+                    : (provider.isFieldPrivate('professionalPhoneNumber')
+                        ? 'Professional Phone (Private)'
+                        : 'Professional Phone'),
                 value: isCasual
                     ? (provider.phoneNumber.trim().isEmpty
                         ? 'Not set'
@@ -1797,6 +1838,79 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                     : (provider.professionalPhoneNumber.trim().isEmpty
                         ? 'Not set'
                         : provider.professionalPhoneNumber.trim()),
+                isPrivate: provider.isFieldPrivate(isCasual ? 'phoneNumber' : 'professionalPhoneNumber'),
+                onTogglePrivacy: () async {
+                  final fieldKey = isCasual ? 'phoneNumber' : 'professionalPhoneNumber';
+                  final currentPrivate = provider.isFieldPrivate(fieldKey);
+                  await provider.setFieldPrivate(fieldKey, !currentPrivate);
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Row(
+                          children: [
+                            Icon(
+                              !currentPrivate
+                                  ? Icons.lock_outline_rounded
+                                  : Icons.lock_open_rounded,
+                              color: context.accentSecondary,
+                              size: 18,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              !currentPrivate
+                                  ? 'Phone number is now private'
+                                  : 'Phone number is now public',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                fontFamily: 'Inter',
+                              ),
+                            ),
+                          ],
+                        ),
+                        backgroundColor: const Color(0xFF1C1D22),
+                        behavior: SnackBarBehavior.floating,
+                        duration: const Duration(seconds: 2),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10)),
+                      ),
+                    );
+                  }
+                },
+                onCopy: () {
+                  final textToCopy = isCasual
+                      ? provider.phoneNumber.trim()
+                      : provider.professionalPhoneNumber.trim();
+                  if (textToCopy.isNotEmpty) {
+                    Clipboard.setData(ClipboardData(text: textToCopy));
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Row(
+                          children: [
+                            Icon(Icons.check_circle_rounded,
+                                color: context.accentSecondary, size: 18),
+                            const SizedBox(width: 8),
+                            const Text(
+                              'Phone number copied to clipboard',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                fontFamily: 'Inter',
+                              ),
+                            ),
+                          ],
+                        ),
+                        backgroundColor: const Color(0xFF1C1D22),
+                        behavior: SnackBarBehavior.floating,
+                        duration: const Duration(seconds: 1),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10)),
+                      ),
+                    );
+                  }
+                },
               ),
             ],
           ),
@@ -1873,34 +1987,63 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
     required IconData icon,
     required String label,
     required String value,
+    VoidCallback? onCopy,
+    VoidCallback? onTogglePrivacy,
+    bool isPrivate = false,
   }) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         Icon(icon, color: context.accentSecondary, size: 18),
         const SizedBox(width: 12),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              label,
-              style: TextStyle(
-                color: context.textSecondary,
-                fontSize: 11,
-                fontWeight: FontWeight.bold,
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: TextStyle(
+                  color: context.textSecondary,
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              value,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
+              const SizedBox(height: 2),
+              Text(
+                value,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
+        if (onTogglePrivacy != null && value != 'Not set' && value.isNotEmpty) ...[
+          IconButton(
+            icon: Icon(
+              isPrivate ? Icons.lock_rounded : Icons.lock_open_rounded,
+              color: isPrivate ? context.accentSecondary : context.textSecondary,
+              size: 16,
+            ),
+            onPressed: onTogglePrivacy,
+            splashRadius: 18,
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(),
+            tooltip: isPrivate ? 'Make public' : 'Make private',
+          ),
+          const SizedBox(width: 12),
+        ],
+        if (onCopy != null && value != 'Not set' && value.isNotEmpty)
+          IconButton(
+            icon: Icon(Icons.copy_rounded, color: context.textSecondary, size: 16),
+            onPressed: onCopy,
+            splashRadius: 18,
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(),
+            tooltip: 'Copy to clipboard',
+          ),
       ],
     );
   }
@@ -2246,7 +2389,9 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                   context: context,
                   isScrollControlled: true,
                   backgroundColor: Colors.transparent,
-                  builder: (context) => const ConnectHubBottomSheet(),
+                  builder: (context) => const ConnectHubBottomSheet(
+                    initialShareType: 'casual',
+                  ),
                 );
               },
               child: Container(
@@ -2344,7 +2489,7 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                     ],
                   ),
                   Image.asset(
-                    'assets/icons/Mandala Icon 1.png',
+                    'assets/icons/New Jana Logo.png',
                     width: 20,
                     height: 20,
                     color: const Color(0xFF00F2FE),
@@ -2493,7 +2638,7 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                 ),
                 child: Center(
                   child: Image.asset(
-                    'assets/icons/Mandala Icon 1.png',
+                    'assets/icons/New Jana Logo.png',
                     width: 22,
                     height: 22,
                     color: const Color(0xFF00F2FE),
@@ -2611,7 +2756,9 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                 context: context,
                 isScrollControlled: true,
                 backgroundColor: Colors.transparent,
-                builder: (context) => const ConnectHubBottomSheet(),
+                builder: (context) => const ConnectHubBottomSheet(
+                  initialShareType: 'professional',
+                ),
               );
             },
             child: Container(
@@ -4464,7 +4611,7 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
     );
   }
 
-  void _showEditDetailsSheet() {
+  void _showEditDetailsSheet(bool isCasual) {
     final provider = Provider.of<ProfileProvider>(context, listen: false);
 
     // Initial controllers with current provider values for both casual and professional
@@ -4477,12 +4624,17 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
     final professionC = TextEditingController(text: provider.profession);
     final companyC = TextEditingController(text: provider.company);
 
+    final String titleText = isCasual ? 'Edit Casual Details' : 'Edit Professional Details';
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       barrierColor: Colors.black.withValues(alpha: 0.5),
       builder: (sheetCtx) {
+        bool casualPhonePrivate = provider.isFieldPrivate('phoneNumber');
+        bool profPhonePrivate = provider.isFieldPrivate('professionalPhoneNumber');
+
         return StatefulBuilder(
           builder: (BuildContext context, StateSetter setModalState) {
             return Padding(
@@ -4513,9 +4665,9 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                         ),
                       ),
                       const SizedBox(height: 20),
-                      const Text(
-                        'Edit Profile Details',
-                        style: TextStyle(
+                      Text(
+                        titleText,
+                        style: const TextStyle(
                           color: Colors.white,
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
@@ -4524,166 +4676,181 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                       ),
                       const SizedBox(height: 20),
 
-                      // --- SECTION 1: CASUAL DETAILS ---
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text(
-                            "CASUAL PROFILE",
-                            style: TextStyle(
-                              color: Color(0xFF00F2FE),
-                              fontWeight: FontWeight.bold,
-                              fontSize: 11,
-                              letterSpacing: 1.0,
-                            ),
-                          ),
-                          if (profEmailC.text.isNotEmpty ||
-                              profPhoneC.text.isNotEmpty)
-                            TextButton.icon(
-                              onPressed: () {
-                                setModalState(() {
-                                  if (casualEmailC.text.isEmpty) {
-                                    casualEmailC.text = profEmailC.text;
-                                  }
-                                  if (casualPhoneC.text.isEmpty) {
-                                    casualPhoneC.text = profPhoneC.text;
-                                  }
-                                });
-                              },
-                              icon: const Icon(Icons.copy_all_rounded,
-                                  size: 12, color: Color(0xFF00F2FE)),
-                              label: const Text(
-                                "Copy Pro Details",
-                                style: TextStyle(
-                                    color: Color(0xFF00F2FE),
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.bold),
-                              ),
-                              style: TextButton.styleFrom(
-                                padding:
-                                    const EdgeInsets.symmetric(horizontal: 8),
-                                minimumSize: Size.zero,
-                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      if (isCasual) ...[
+                        // --- SECTION 1: CASUAL DETAILS ---
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              "CASUAL PROFILE",
+                              style: TextStyle(
+                                color: context.textSecondary,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 11,
+                                letterSpacing: 1.0,
                               ),
                             ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      _buildSheetField(
-                        label: 'Casual Email',
-                        controller: casualEmailC,
-                        icon: Icons.email_outlined,
-                        accentColor: const Color(0xFF00F2FE),
-                      ),
-                      const SizedBox(height: 14),
-                      _buildSheetField(
-                        label: 'Casual Phone',
-                        controller: casualPhoneC,
-                        icon: Icons.phone_android_outlined,
-                        accentColor: const Color(0xFF00F2FE),
-                      ),
-                      const SizedBox(height: 24),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        _buildSheetField(
+                          label: 'Casual Email',
+                          controller: casualEmailC,
+                          icon: Icons.email_outlined,
+                          accentColor: context.accentSecondary,
+                        ),
+                        const SizedBox(height: 14),
+                        _buildSheetField(
+                          label: 'Casual Phone',
+                          controller: casualPhoneC,
+                          icon: Icons.phone_android_outlined,
+                          accentColor: context.accentSecondary,
+                        ),
+                        const SizedBox(height: 10),
+                        Row(
+                          children: [
+                            SizedBox(
+                              height: 24,
+                              width: 24,
+                              child: Checkbox(
+                                value: casualPhonePrivate,
+                                activeColor: context.accentSecondary,
+                                checkColor: Colors.white,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                side: BorderSide(
+                                  color: context.textSecondary.withValues(alpha: 0.5),
+                                  width: 1.5,
+                                ),
+                                onChanged: (val) {
+                                  setModalState(() {
+                                    casualPhonePrivate = val ?? false;
+                                  });
+                                },
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              "Keep phone number private",
+                              style: TextStyle(
+                                color: context.textSecondary,
+                                fontSize: 13,
+                                fontFamily: 'Inter',
+                              ),
+                            ),
+                          ],
+                        ),
+                      ] else ...[
+                        // --- SECTION 2: PROFESSIONAL DETAILS ---
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              "PROFESSIONAL PROFILE",
+                              style: TextStyle(
+                                color: context.textSecondary,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 11,
+                                letterSpacing: 1.0,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        _buildSheetField(
+                          label: 'Profession',
+                          controller: professionC,
+                          icon: Icons.work_outline_rounded,
+                          accentColor: context.accentSecondary,
+                        ),
+                        const SizedBox(height: 14),
+                        _buildSheetField(
+                          label: 'Company',
+                          controller: companyC,
+                          icon: Icons.business_outlined,
+                          accentColor: context.accentSecondary,
+                        ),
+                        const SizedBox(height: 14),
+                        _buildSheetField(
+                          label: 'Professional Email',
+                          controller: profEmailC,
+                          icon: Icons.email_outlined,
+                          accentColor: context.accentSecondary,
+                        ),
+                        const SizedBox(height: 14),
+                        _buildSheetField(
+                          label: 'Professional Phone',
+                          controller: profPhoneC,
+                          icon: Icons.phone_android_outlined,
+                          accentColor: context.accentSecondary,
+                        ),
+                        const SizedBox(height: 10),
+                        Row(
+                          children: [
+                            SizedBox(
+                              height: 24,
+                              width: 24,
+                              child: Checkbox(
+                                value: profPhonePrivate,
+                                activeColor: context.accentSecondary,
+                                checkColor: Colors.white,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                side: BorderSide(
+                                  color: context.textSecondary.withValues(alpha: 0.5),
+                                  width: 1.5,
+                                ),
+                                onChanged: (val) {
+                                  setModalState(() {
+                                    profPhonePrivate = val ?? false;
+                                  });
+                                },
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              "Keep phone number private",
+                              style: TextStyle(
+                                color: context.textSecondary,
+                                fontSize: 13,
+                                fontFamily: 'Inter',
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
 
-                      // --- SECTION 2: PROFESSIONAL DETAILS ---
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text(
-                            "PROFESSIONAL PROFILE",
-                            style: TextStyle(
-                              color: Color(0xFFEC4899),
-                              fontWeight: FontWeight.bold,
-                              fontSize: 11,
-                              letterSpacing: 1.0,
-                            ),
-                          ),
-                          if (casualEmailC.text.isNotEmpty ||
-                              casualPhoneC.text.isNotEmpty)
-                            TextButton.icon(
-                              onPressed: () {
-                                setModalState(() {
-                                  if (profEmailC.text.isEmpty) {
-                                    profEmailC.text = casualEmailC.text;
-                                  }
-                                  if (profPhoneC.text.isEmpty) {
-                                    profPhoneC.text = casualPhoneC.text;
-                                  }
-                                });
-                              },
-                              icon: const Icon(Icons.copy_all_rounded,
-                                  size: 12, color: Color(0xFFEC4899)),
-                              label: const Text(
-                                "Copy Casual Details",
-                                style: TextStyle(
-                                    color: Color(0xFFEC4899),
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.bold),
-                              ),
-                              style: TextButton.styleFrom(
-                                padding:
-                                    const EdgeInsets.symmetric(horizontal: 8),
-                                minimumSize: Size.zero,
-                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                              ),
-                            ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      _buildSheetField(
-                        label: 'Profession',
-                        controller: professionC,
-                        icon: Icons.work_outline_rounded,
-                        accentColor: const Color(0xFFEC4899),
-                      ),
-                      const SizedBox(height: 14),
-                      _buildSheetField(
-                        label: 'Company',
-                        controller: companyC,
-                        icon: Icons.business_outlined,
-                        accentColor: const Color(0xFFEC4899),
-                      ),
-                      const SizedBox(height: 14),
-                      _buildSheetField(
-                        label: 'Professional Email',
-                        controller: profEmailC,
-                        icon: Icons.email_outlined,
-                        accentColor: const Color(0xFFEC4899),
-                      ),
-                      const SizedBox(height: 14),
-                      _buildSheetField(
-                        label: 'Professional Phone',
-                        controller: profPhoneC,
-                        icon: Icons.phone_android_outlined,
-                        accentColor: const Color(0xFFEC4899),
-                      ),
                       const SizedBox(height: 28),
 
                       _buildSheetSaveButton(() async {
                         final uid = provider.userId;
                         if (uid != null) {
-                          // Save casual details
-                          await provider.updateProfileField(
-                              'email', casualEmailC.text.trim(), uid);
-                          await provider.updateProfileField(
-                              'phoneNumber', casualPhoneC.text.trim(), uid);
-
-                          // Save professional details
-                          await provider.updateProfileField(
-                              'professionalEmail', profEmailC.text.trim(), uid);
-                          await provider.updateProfileField(
-                              'professionalPhoneNumber',
-                              profPhoneC.text.trim(),
-                              uid);
-                          await provider.updateProfileField(
-                              'profession', professionC.text.trim(), uid);
-                          await provider.updateProfileField(
-                              'company', companyC.text.trim(), uid);
+                          if (isCasual) {
+                            await provider.updateProfileField(
+                                'email', casualEmailC.text.trim(), uid);
+                            await provider.updateProfileField(
+                                'phoneNumber', casualPhoneC.text.trim(), uid);
+                            await provider.setFieldPrivate(
+                                'phoneNumber', casualPhonePrivate);
+                          } else {
+                            await provider.updateProfileField(
+                                'professionalEmail', profEmailC.text.trim(), uid);
+                            await provider.updateProfileField(
+                                'professionalPhoneNumber',
+                                profPhoneC.text.trim(),
+                                uid);
+                            await provider.updateProfileField(
+                                'profession', professionC.text.trim(), uid);
+                            await provider.updateProfileField(
+                                'company', companyC.text.trim(), uid);
+                            await provider.setFieldPrivate(
+                                'professionalPhoneNumber', profPhonePrivate);
+                          }
                         }
                         if (sheetCtx.mounted) Navigator.pop(sheetCtx);
-                      }, customColors: [
-                        const Color(0xFF00F2FE),
-                        const Color(0xFFEC4899)
-                      ]),
+                      }),
                       const SizedBox(height: 8),
                     ],
                   ),
@@ -4828,6 +4995,7 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
     IconData? icon,
     String? assetPath,
     Color accentColor = const Color(0xFF00F2FE),
+    Widget? suffixIcon,
   }) {
     Widget? prefix;
     if (assetPath != null) {
@@ -4851,6 +5019,7 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
         labelStyle:
             TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 13),
         prefixIcon: prefix,
+        suffixIcon: suffixIcon,
         filled: true,
         fillColor: Colors.white.withValues(alpha: 0.05),
         border: OutlineInputBorder(
@@ -4885,16 +5054,31 @@ class _SheetSaveButtonState extends State<_SheetSaveButton> {
 
   @override
   Widget build(BuildContext context) {
-    final buttonColor = context.accentSecondary;
+    final hasCustomColors = widget.customColors != null && widget.customColors!.isNotEmpty;
+    final buttonColor = hasCustomColors ? widget.customColors!.first : context.accentSecondary;
     final effectiveColor =
         _isLoading ? buttonColor.withValues(alpha: 0.5) : buttonColor;
 
-    return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
+    final Decoration decoration;
+    if (hasCustomColors && widget.customColors!.length > 1 && !_isLoading) {
+      decoration = BoxDecoration(
+        gradient: LinearGradient(
+          colors: widget.customColors!,
+          begin: Alignment.centerLeft,
+          end: Alignment.centerRight,
+        ),
+        borderRadius: BorderRadius.circular(14),
+      );
+    } else {
+      decoration = BoxDecoration(
         color: effectiveColor,
         borderRadius: BorderRadius.circular(14),
-      ),
+      );
+    }
+
+    return Container(
+      width: double.infinity,
+      decoration: decoration,
       child: ElevatedButton(
         onPressed: _isLoading
             ? null

@@ -3,22 +3,37 @@ enum ProfileCardType { casual, professional }
 class FieldCardAssignment {
   bool casual;
   bool professional;
+  bool isPrivate;
 
-  FieldCardAssignment({this.casual = false, this.professional = true});
+  FieldCardAssignment({
+    this.casual = false,
+    this.professional = true,
+    this.isPrivate = false,
+  });
 
-  Map<String, dynamic> toJson() => {'c': casual, 'p': professional};
+  Map<String, dynamic> toJson() => {
+        'c': casual,
+        'p': professional,
+        'pr': isPrivate,
+      };
 
   factory FieldCardAssignment.fromJson(Map<String, dynamic> json) {
     return FieldCardAssignment(
       casual: json['c'] == true,
       professional: json['p'] != false,
+      isPrivate: json['pr'] == true,
     );
   }
 
-  FieldCardAssignment copyWith({bool? casual, bool? professional}) {
+  FieldCardAssignment copyWith({
+    bool? casual,
+    bool? professional,
+    bool? isPrivate,
+  }) {
     return FieldCardAssignment(
       casual: casual ?? this.casual,
       professional: professional ?? this.professional,
+      isPrivate: isPrivate ?? this.isPrivate,
     );
   }
 }
