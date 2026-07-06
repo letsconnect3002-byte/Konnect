@@ -335,28 +335,50 @@ class _EditProfilePageState extends State<EditProfilePage> {
                           ),
                         ),
                         padding: const EdgeInsets.all(3),
-                        child: CircleAvatar(
-                          radius: 57,
-                          backgroundImage: (_avatarUrl.isNotEmpty &&
-                                  _avatarUrl.startsWith('http'))
-                              ? NetworkImage(_avatarUrl)
-                              : null,
-                          backgroundColor: context.surfaceSecondary,
-                          child: (_avatarUrl.isNotEmpty &&
-                                  _avatarUrl.startsWith('http'))
-                              ? null
-                              : Text(
-                                  _nameController.text.isNotEmpty
-                                      ? _nameController.text
-                                          .substring(0, 1)
-                                          .toUpperCase()
-                                      : "?",
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 38,
-                                    fontWeight: FontWeight.bold,
+                        child: Container(
+                          width: 114,
+                          height: 114,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: context.surfaceSecondary,
+                          ),
+                          child: ClipOval(
+                            child: (_avatarUrl.isNotEmpty &&
+                                    _avatarUrl.startsWith('http'))
+                                ? Image.network(
+                                    _avatarUrl,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (context, error, stackTrace) =>
+                                        Center(
+                                      child: Text(
+                                        _nameController.text.isNotEmpty
+                                            ? _nameController.text
+                                                .substring(0, 1)
+                                                .toUpperCase()
+                                            : "?",
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 38,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                  )
+                                : Center(
+                                    child: Text(
+                                      _nameController.text.isNotEmpty
+                                          ? _nameController.text
+                                              .substring(0, 1)
+                                              .toUpperCase()
+                                          : "?",
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 38,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
                                   ),
-                                ),
+                          ),
                         ),
                       ),
                     ),
@@ -1270,7 +1292,25 @@ class _EditProfilePageState extends State<EditProfilePage> {
                           ),
                           child: ClipOval(
                             child: (_avatarUrl.isNotEmpty && _avatarUrl.startsWith('http'))
-                                ? Image.network(_avatarUrl, fit: BoxFit.cover)
+                                ? Image.network(
+                                    _avatarUrl,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (context, error, stackTrace) =>
+                                        Container(
+                                      color: const Color(0xFF1E1F32),
+                                      alignment: Alignment.center,
+                                      child: Text(
+                                        _nameController.text.isNotEmpty
+                                            ? _nameController.text.substring(0, 1).toUpperCase()
+                                            : "?",
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 32,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                  )
                                 : Container(
                                     color: const Color(0xFF1E1F32),
                                     alignment: Alignment.center,

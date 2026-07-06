@@ -350,23 +350,43 @@ class _NotificationPageState extends State<NotificationPage> {
                           )
                         : null,
                   ),
-                  child: CircleAvatar(
-                    radius: 20,
-                    backgroundColor: const Color(0xFF1A1B2E),
-                    backgroundImage: avatarUrl.startsWith('http')
-                        ? NetworkImage(avatarUrl)
-                        : null,
-                    child: avatarUrl.startsWith('http')
-                        ? null
-                        : Text(
-                            _getInitials(name),
-                            style: TextStyle(
-                              color: isUnseen ? accentColor : Colors.white60,
-                              fontSize: 13,
-                              fontWeight: FontWeight.bold,
-                              fontFamily: 'Inter',
+                  child: Container(
+                    width: 40,
+                    height: 40,
+                    decoration: const BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Color(0xFF1A1B2E),
+                    ),
+                    child: ClipOval(
+                      child: avatarUrl.startsWith('http')
+                          ? Image.network(
+                              avatarUrl,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) =>
+                                  Center(
+                                child: Text(
+                                  _getInitials(name),
+                                  style: TextStyle(
+                                    color: isUnseen ? accentColor : Colors.white60,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.bold,
+                                    fontFamily: 'Inter',
+                                  ),
+                                ),
+                              ),
+                            )
+                          : Center(
+                              child: Text(
+                                _getInitials(name),
+                                style: TextStyle(
+                                  color: isUnseen ? accentColor : Colors.white60,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.bold,
+                                  fontFamily: 'Inter',
+                                ),
+                              ),
                             ),
-                          ),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -1365,21 +1385,40 @@ class _NotificationPageState extends State<NotificationPage> {
       String avatar, String role) {
     return Row(
       children: [
-        CircleAvatar(
-          radius: 18,
-          backgroundColor: context.surfacePrimary,
-          backgroundImage:
-              avatar.startsWith('http') ? NetworkImage(avatar) : null,
-          child: avatar.startsWith('http')
-              ? null
-              : Text(
-                  _getInitials(name),
-                  style: TextStyle(
-                    color: context.textPrimary,
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
+        Container(
+          width: 36,
+          height: 36,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: context.surfacePrimary,
+          ),
+          child: ClipOval(
+            child: avatar.startsWith('http')
+                ? Image.network(
+                    avatar,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) => Center(
+                      child: Text(
+                        _getInitials(name),
+                        style: TextStyle(
+                          color: context.textPrimary,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  )
+                : Center(
+                    child: Text(
+                      _getInitials(name),
+                      style: TextStyle(
+                        color: context.textPrimary,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ),
-                ),
+          ),
         ),
         const SizedBox(width: 12),
         Expanded(

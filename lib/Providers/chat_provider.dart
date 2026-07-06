@@ -86,10 +86,73 @@ class ChatProvider with ChangeNotifier {
     }
   }
 
+  final Map<int, String> _drafts = {};
+  Map<int, String> get drafts => _drafts;
+
+  String? getDraft(int otherUserId) => _drafts[otherUserId];
+
+  Future<void> loadDrafts() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final keys = prefs.getKeys();
+      _drafts.clear();
+      for (final key in keys) {
+        if (key.startsWith('chat_draft_')) {
+          final parts = key.split('_');
+          if (parts.length == 3) {
+            final userId = int.tryParse(parts[2]);
+            if (userId != null) {
+              final draft = prefs.getString(key);
+              if (draft != null && draft.isNotEmpty) {
+                _drafts[userId] = draft;
+              }
+            }
+          }
+        }
+      }
+      notifyListeners();
+    } catch (e) {
+      print("Error loading drafts: $e");
+    }
+  }
+
+  Future<void> saveDraft(int otherUserId, String draft) async {
+    if (draft.trim().isEmpty) {
+      await clearDraft(otherUserId);
+      return;
+    }
+    _drafts[otherUserId] = draft.trim();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      notifyListeners();
+    });
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('chat_draft_$otherUserId', draft.trim());
+    } catch (e) {
+      print("Error saving draft: $e");
+    }
+  }
+
+  Future<void> clearDraft(int otherUserId) async {
+    if (_drafts.containsKey(otherUserId)) {
+      _drafts.remove(otherUserId);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        notifyListeners();
+      });
+    }
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('chat_draft_$otherUserId');
+    } catch (e) {
+      print("Error clearing draft: $e");
+    }
+  }
+
   ChatProvider({ChatRepository? chatRepository})
       : _repository = chatRepository ?? SupabaseChatRepository() {
     _loadSoundEffectsPreference();
     _preloadSounds();
+    loadDrafts();
   }
 
   int? _userId;

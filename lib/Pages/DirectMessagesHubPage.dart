@@ -578,6 +578,9 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
                               final bool isTyping = roomId != null &&
                                   chatProvider.isRoomTyping(roomId);
 
+                              final draft = chatProvider
+                                  .getDraft(connection['id'] as int? ?? 0);
+
                               return Container(
                                 // decoration: BoxDecoration(
                                 //   color: context.surfacePrimary,
@@ -621,8 +624,30 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
                                       ),
                                       child: ClipOval(
                                         child: avatar.isNotEmpty
-                                            ? Image.network(avatar,
-                                                fit: BoxFit.cover)
+                                            ? Image.network(
+                                                avatar,
+                                                fit: BoxFit.cover,
+                                                errorBuilder: (context, error,
+                                                        stackTrace) =>
+                                                    Container(
+                                                  color:
+                                                      context.surfaceSecondary,
+                                                  alignment: Alignment.center,
+                                                  child: Text(
+                                                    name.isNotEmpty
+                                                        ? name
+                                                            .substring(0, 1)
+                                                            .toUpperCase()
+                                                        : "?",
+                                                    style: TextStyle(
+                                                        color:
+                                                            context.textPrimary,
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                        fontSize: 15),
+                                                  ),
+                                                ),
+                                              )
                                             : Container(
                                                 color: context.surfaceSecondary,
                                                 alignment: Alignment.center,
@@ -674,7 +699,8 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
                                       ],
                                     ),
                                     subtitle: lastMessageText.isEmpty &&
-                                            !isTyping
+                                            !isTyping &&
+                                            (draft == null || draft.isEmpty)
                                         ? null
                                         : Padding(
                                             padding:
@@ -682,33 +708,86 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
                                             child: Row(
                                               children: [
                                                 Expanded(
-                                                  child: Text(
-                                                    isTyping
-                                                        ? "typing..."
-                                                        : lastMessageText,
-                                                    maxLines: 1,
-                                                    overflow:
-                                                        TextOverflow.ellipsis,
-                                                    style: context.bodyText
-                                                        .copyWith(
-                                                      color: isTyping
-                                                          ? context
-                                                              .accentSecondary
-                                                          : (isUnread
-                                                              ? context
-                                                                  .textPrimary
-                                                              : context
-                                                                  .textSecondary),
-                                                      fontSize: 12.5,
-                                                      fontWeight: isTyping ||
-                                                              isUnread
-                                                          ? FontWeight.w600
-                                                          : FontWeight.normal,
-                                                      fontStyle: isTyping
-                                                          ? FontStyle.italic
-                                                          : FontStyle.normal,
-                                                    ),
-                                                  ),
+                                                  child: isTyping
+                                                      ? Text(
+                                                          "typing...",
+                                                          maxLines: 1,
+                                                          overflow: TextOverflow
+                                                              .ellipsis,
+                                                          style: context
+                                                              .bodyText
+                                                              .copyWith(
+                                                            color: context
+                                                                .accentSecondary,
+                                                            fontSize: 12.5,
+                                                            fontWeight:
+                                                                FontWeight.w600,
+                                                            fontStyle: FontStyle
+                                                                .italic,
+                                                          ),
+                                                        )
+                                                      : (draft != null &&
+                                                              draft.isNotEmpty)
+                                                          ? RichText(
+                                                              maxLines: 1,
+                                                              overflow:
+                                                                  TextOverflow
+                                                                      .ellipsis,
+                                                              text: TextSpan(
+                                                                children: [
+                                                                  const TextSpan(
+                                                                    text:
+                                                                        "Draft: ",
+                                                                    style:
+                                                                        TextStyle(
+                                                                      color: Colors
+                                                                          .blueAccent,
+                                                                      fontWeight:
+                                                                          FontWeight
+                                                                              .bold,
+                                                                      fontSize:
+                                                                          12.5,
+                                                                      fontFamily:
+                                                                          'Inter',
+                                                                    ),
+                                                                  ),
+                                                                  TextSpan(
+                                                                    text: draft,
+                                                                    style:
+                                                                        TextStyle(
+                                                                      color: context
+                                                                          .textSecondary,
+                                                                      fontSize:
+                                                                          12.5,
+                                                                      fontFamily:
+                                                                          'Inter',
+                                                                    ),
+                                                                  ),
+                                                                ],
+                                                              ),
+                                                            )
+                                                          : Text(
+                                                              lastMessageText,
+                                                              maxLines: 1,
+                                                              overflow:
+                                                                  TextOverflow
+                                                                      .ellipsis,
+                                                              style: context
+                                                                  .bodyText
+                                                                  .copyWith(
+                                                                color: isUnread
+                                                                    ? context
+                                                                        .textPrimary
+                                                                    : context
+                                                                        .textSecondary,
+                                                                fontSize: 12.5,
+                                                                fontWeight: isUnread
+                                                                    ? FontWeight
+                                                                        .w600
+                                                                    : FontWeight
+                                                                        .normal,
+                                                              ),
+                                                            ),
                                                 ),
                                                 if (isUnread)
                                                   Container(

@@ -1031,22 +1031,41 @@ class _ReferBottomSheetState extends State<_ReferBottomSheet> {
                         ),
                         child: Row(
                           children: [
-                            CircleAvatar(
-                              radius: 18,
-                              backgroundColor: context.surfacePrimary,
-                              backgroundImage: avatar.startsWith('http')
-                                  ? NetworkImage(avatar)
-                                  : null,
-                              child: avatar.startsWith('http')
-                                  ? null
-                                  : Text(
-                                      _getInitials(name),
-                                      style: TextStyle(
-                                        color: context.textPrimary,
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.bold,
+                            Container(
+                              width: 36,
+                              height: 36,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: context.surfacePrimary,
+                              ),
+                              child: ClipOval(
+                                child: avatar.startsWith('http')
+                                    ? Image.network(
+                                        avatar,
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (context, error, stackTrace) =>
+                                            Center(
+                                          child: Text(
+                                            _getInitials(name),
+                                            style: TextStyle(
+                                              color: context.textPrimary,
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ),
+                                      )
+                                    : Center(
+                                        child: Text(
+                                          _getInitials(name),
+                                          style: TextStyle(
+                                            color: context.textPrimary,
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
                                       ),
-                                    ),
+                              ),
                             ),
                             const SizedBox(width: 12),
                             Expanded(

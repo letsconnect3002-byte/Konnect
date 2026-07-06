@@ -8,10 +8,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:connect/Widgets/connect_hub_bottom_sheet.dart';
+import 'package:connect/Utils/social_launcher.dart';
 import 'package:connect/services/analytics_service.dart';
 import 'package:skeletonizer/skeletonizer.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:connect/services/image_upload_service.dart';
 import 'package:connect/Pages/crop_image_page.dart';
@@ -897,8 +897,24 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                       return (provider.avatarUrl.isNotEmpty &&
                               provider.avatarUrl.startsWith('http'))
                           ? ClipOval(
-                              child: Image.network(provider.avatarUrl,
-                                  fit: BoxFit.cover),
+                              child: Image.network(
+                                provider.avatarUrl,
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) =>
+                                    Center(
+                                  child: Text(
+                                    _nameController.text.isNotEmpty
+                                        ? _nameController.text
+                                            .substring(0, 1)
+                                            .toUpperCase()
+                                        : "?",
+                                    style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 36,
+                                        fontWeight: FontWeight.bold),
+                                  ),
+                                ),
+                              ),
                             )
                           : Center(
                               child: Text(
@@ -1397,8 +1413,27 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                       child: ClipOval(
                         child: (provider.avatarUrl.isNotEmpty &&
                                 provider.avatarUrl.startsWith('http'))
-                            ? Image.network(provider.avatarUrl,
-                                fit: BoxFit.cover)
+                            ? Image.network(
+                                provider.avatarUrl,
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) =>
+                                    Container(
+                                  color: const Color(0xFF1E1F32),
+                                  alignment: Alignment.center,
+                                  child: Text(
+                                    _nameController.text.isNotEmpty
+                                        ? _nameController.text
+                                            .substring(0, 1)
+                                            .toUpperCase()
+                                        : "?",
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 24,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              )
                             : Container(
                                 color: const Color(0xFF1E1F32),
                                 alignment: Alignment.center,
@@ -2065,7 +2100,25 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                 child: ClipOval(
                   child: (provider.avatarUrl.isNotEmpty &&
                           provider.avatarUrl.startsWith('http'))
-                      ? Image.network(provider.avatarUrl, fit: BoxFit.cover)
+                      ? Image.network(
+                          provider.avatarUrl,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) =>
+                              Container(
+                            color: const Color(0xFF121324),
+                            alignment: Alignment.center,
+                            child: Text(
+                              provider.name.isNotEmpty
+                                  ? provider.name.substring(0, 1).toUpperCase()
+                                  : "?",
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 24,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        )
                       : Container(
                           color: const Color(0xFF121324),
                           alignment: Alignment.center,
@@ -2970,24 +3023,7 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
   }
 
   String _getSocialUrl(String platform, String handle) {
-    final cleaned = handle.trim();
-    if (cleaned.startsWith('http://') || cleaned.startsWith('https://')) {
-      return cleaned;
-    }
-    switch (platform.toLowerCase()) {
-      case 'linkedin':
-        return 'https://linkedin.com/in/$cleaned';
-      case 'twitter':
-      case 'x':
-        return 'https://x.com/$cleaned';
-      case 'instagram':
-        return 'https://instagram.com/$cleaned';
-      case 'spotify':
-        if (cleaned.contains('spotify.com')) return cleaned;
-        return 'https://open.spotify.com/user/$cleaned';
-      default:
-        return cleaned;
-    }
+    return SocialLauncher.getSocialUrl(platform, handle);
   }
 
   void _showSocialActionSheet(
@@ -3006,13 +3042,13 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
       builder: (sheetContext) {
         return Container(
           decoration: BoxDecoration(
-            color: const Color(0xFF151624),
+            color: context.surfacePrimary,
             borderRadius: const BorderRadius.only(
               topLeft: Radius.circular(24),
               topRight: Radius.circular(24),
             ),
             border: Border.all(
-              color: Colors.white.withValues(alpha: 0.08),
+              color: context.borderMuted,
               width: 1,
             ),
           ),
@@ -3038,7 +3074,7 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                     width: 44,
                     height: 44,
                     decoration: BoxDecoration(
-                      color: const Color(0xFF00F2FE).withValues(alpha: 0.1),
+                      color: context.accentPrimary.withValues(alpha: 0.1),
                       shape: BoxShape.circle,
                     ),
                     child: Center(
@@ -3065,8 +3101,8 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                         const SizedBox(height: 2),
                         Text(
                           '@$handle',
-                          style: const TextStyle(
-                            color: Color(0xFF8FA39E),
+                          style: TextStyle(
+                            color: context.textSecondary,
                             fontSize: 13,
                           ),
                           maxLines: 1,
@@ -3082,10 +3118,10 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                 padding:
                     const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                 decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: 0.15),
+                  color: context.surfaceSecondary,
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.05),
+                    color: context.borderMuted,
                   ),
                 ),
                 child: Row(
@@ -3093,8 +3129,8 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                     Expanded(
                       child: Text(
                         url,
-                        style: const TextStyle(
-                          color: Color(0xFF00F2FE),
+                        style: TextStyle(
+                          color: context.accentSecondary,
                           fontSize: 13,
                         ),
                         maxLines: 1,
@@ -3115,25 +3151,25 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                           Navigator.pop(sheetContext);
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
-                              content: Text(
-                                  'Copied $displayName link to clipboard!'),
-                              backgroundColor: const Color(0xFF1E1F32),
+                              content: Text('Copied $displayName link to clipboard!',
+                                  style: TextStyle(color: context.textPrimary)),
+                              backgroundColor: context.surfaceSecondary,
                               duration: const Duration(seconds: 2),
                             ),
                           );
                         }
                       },
-                      icon: const Icon(Icons.copy_rounded,
-                          color: Colors.white70, size: 18),
-                      label: const Text(
+                      icon: Icon(Icons.copy_rounded,
+                          color: context.textSecondary, size: 18),
+                      label: Text(
                         "Copy Link",
                         style: TextStyle(
-                            color: Colors.white70, fontWeight: FontWeight.bold),
+                            color: context.textSecondary, fontWeight: FontWeight.bold),
                       ),
                       style: OutlinedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 14),
                         side: BorderSide(
-                            color: Colors.white.withValues(alpha: 0.15)),
+                            color: context.borderMuted),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
@@ -3144,27 +3180,18 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                   Expanded(
                     child: Container(
                       decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFF00F2FE), Color(0xFF4FACFE)],
+                        gradient: LinearGradient(
+                          colors: [
+                            context.accentPrimary,
+                            context.accentPrimary.withValues(alpha: 0.7),
+                          ],
                         ),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: ElevatedButton.icon(
                         onPressed: () async {
-                          final uri = Uri.parse(url);
-                          if (await canLaunchUrl(uri)) {
-                            await launchUrl(uri,
-                                mode: LaunchMode.externalApplication);
-                          } else {
-                            if (sheetContext.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text('Could not launch $url'),
-                                  backgroundColor: Colors.redAccent,
-                                ),
-                              );
-                            }
-                          }
+                          await SocialLauncher.launchSocialLink(
+                              context, platform, handle);
                           if (sheetContext.mounted) Navigator.pop(sheetContext);
                         },
                         icon: const Icon(Icons.open_in_new_rounded,
@@ -4030,7 +4057,27 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                         child: ClipOval(
                           child: (avatarUrl.isNotEmpty &&
                                   avatarUrl.startsWith('http'))
-                              ? Image.network(avatarUrl, fit: BoxFit.cover)
+                              ? Image.network(
+                                  avatarUrl,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (context, error, stackTrace) =>
+                                      Container(
+                                    color: const Color(0xFF1E1F32),
+                                    alignment: Alignment.center,
+                                    child: Text(
+                                      _nameController.text.isNotEmpty
+                                          ? _nameController.text
+                                              .substring(0, 1)
+                                              .toUpperCase()
+                                          : "?",
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 38,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                )
                               : Container(
                                   color: const Color(0xFF1E1F32),
                                   alignment: Alignment.center,
@@ -4235,8 +4282,27 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                                 child: ClipOval(
                                   child: (avatarUrl.isNotEmpty &&
                                           avatarUrl.startsWith('http'))
-                                      ? Image.network(avatarUrl,
-                                          fit: BoxFit.cover)
+                                      ? Image.network(
+                                          avatarUrl,
+                                          fit: BoxFit.cover,
+                                          errorBuilder: (context, error, stackTrace) =>
+                                              Container(
+                                            color: const Color(0xFF1E1F32),
+                                            alignment: Alignment.center,
+                                            child: Text(
+                                              nameC.text.isNotEmpty
+                                                  ? nameC.text
+                                                      .substring(0, 1)
+                                                      .toUpperCase()
+                                                  : "?",
+                                              style: const TextStyle(
+                                                color: Colors.white,
+                                                fontSize: 28,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                          ),
+                                        )
                                       : Container(
                                           color: const Color(0xFF1E1F32),
                                           alignment: Alignment.center,

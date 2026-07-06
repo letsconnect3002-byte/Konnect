@@ -7,9 +7,9 @@ import 'package:connect/Providers/connection_provider.dart';
 import 'package:connect/Providers/chat_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:connect/Utils/profile_field_filter.dart';
+import 'package:connect/Utils/social_launcher.dart';
 import 'package:skeletonizer/skeletonizer.dart';
 import 'package:connect/Config/app_theme.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 class ConnectionProfilePage extends StatefulWidget {
   final Map<String, dynamic> profileData;
@@ -1268,24 +1268,7 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
   }
 
   String _getSocialUrl(String platform, String handle) {
-    final cleaned = handle.trim();
-    if (cleaned.startsWith('http://') || cleaned.startsWith('https://')) {
-      return cleaned;
-    }
-    switch (platform.toLowerCase()) {
-      case 'linkedin':
-        return 'https://linkedin.com/in/$cleaned';
-      case 'twitter':
-      case 'x':
-        return 'https://x.com/$cleaned';
-      case 'instagram':
-        return 'https://instagram.com/$cleaned';
-      case 'spotify':
-        if (cleaned.contains('spotify.com')) return cleaned;
-        return 'https://open.spotify.com/user/$cleaned';
-      default:
-        return cleaned;
-    }
+    return SocialLauncher.getSocialUrl(platform, handle);
   }
 
   void _showSocialActionSheet(
@@ -1304,13 +1287,13 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
       builder: (sheetContext) {
         return Container(
           decoration: BoxDecoration(
-            color: const Color(0xFF151624),
+            color: context.surfacePrimary,
             borderRadius: const BorderRadius.only(
               topLeft: Radius.circular(24),
               topRight: Radius.circular(24),
             ),
             border: Border.all(
-              color: Colors.white.withValues(alpha: 0.08),
+              color: context.borderMuted,
               width: 1,
             ),
           ),
@@ -1336,7 +1319,7 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
                     width: 44,
                     height: 44,
                     decoration: BoxDecoration(
-                      color: const Color(0xFF00F2FE).withValues(alpha: 0.1),
+                      color: context.accentPrimary.withValues(alpha: 0.1),
                       shape: BoxShape.circle,
                     ),
                     child: Center(
@@ -1363,8 +1346,8 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
                         const SizedBox(height: 2),
                         Text(
                           '@$handle',
-                          style: const TextStyle(
-                            color: Color(0xFF8FA39E),
+                          style: TextStyle(
+                            color: context.textSecondary,
                             fontSize: 13,
                           ),
                           maxLines: 1,
@@ -1380,10 +1363,10 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
                 padding:
                     const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                 decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: 0.15),
+                  color: context.surfaceSecondary,
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.05),
+                    color: context.borderMuted,
                   ),
                 ),
                 child: Row(
@@ -1391,8 +1374,8 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
                     Expanded(
                       child: Text(
                         url,
-                        style: const TextStyle(
-                          color: Color(0xFF00F2FE),
+                        style: TextStyle(
+                          color: context.accentSecondary,
                           fontSize: 13,
                         ),
                         maxLines: 1,
@@ -1412,25 +1395,26 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
                         if (sheetContext.mounted) {
                           Navigator.pop(sheetContext);
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Copied link to clipboard!'),
-                              backgroundColor: Color(0xFF1E1F32),
-                              duration: Duration(seconds: 2),
+                            SnackBar(
+                              content: Text('Copied link to clipboard!',
+                                  style: TextStyle(color: context.textPrimary)),
+                              backgroundColor: context.surfaceSecondary,
+                              duration: const Duration(seconds: 2),
                             ),
                           );
                         }
                       },
-                      icon: const Icon(Icons.copy_rounded,
-                          color: Colors.white70, size: 18),
-                      label: const Text(
+                      icon: Icon(Icons.copy_rounded,
+                          color: context.textSecondary, size: 18),
+                      label: Text(
                         "Copy Link",
                         style: TextStyle(
-                            color: Colors.white70, fontWeight: FontWeight.bold),
+                            color: context.textSecondary,
+                            fontWeight: FontWeight.bold),
                       ),
                       style: OutlinedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 14),
-                        side: BorderSide(
-                            color: Colors.white.withValues(alpha: 0.15)),
+                        side: BorderSide(color: context.borderMuted),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
@@ -1441,27 +1425,18 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
                   Expanded(
                     child: Container(
                       decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFF00F2FE), Color(0xFF4FACFE)],
+                        gradient: LinearGradient(
+                          colors: [
+                            context.accentPrimary,
+                            context.accentPrimary.withValues(alpha: 0.7),
+                          ],
                         ),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: ElevatedButton.icon(
                         onPressed: () async {
-                          final uri = Uri.parse(url);
-                          if (await canLaunchUrl(uri)) {
-                            await launchUrl(uri,
-                                mode: LaunchMode.externalApplication);
-                          } else {
-                            if (sheetContext.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text('Could not launch $url'),
-                                  backgroundColor: Colors.redAccent,
-                                ),
-                              );
-                            }
-                          }
+                          await SocialLauncher.launchSocialLink(
+                              context, platform, handle);
                           if (sheetContext.mounted) Navigator.pop(sheetContext);
                         },
                         icon: const Icon(Icons.open_in_new_rounded,
@@ -1603,7 +1578,7 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 const Text(
-                  'Connection Profile',
+                  'Profile Space',
                   textAlign: TextAlign.center,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -1617,10 +1592,10 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
                 const SizedBox(height: 2),
                 Text(
                   _sharedCardPermission == 'casual'
-                      ? 'Casual Access'
+                      ? 'Personal Profile'
                       : (_sharedCardPermission == 'professional'
-                          ? 'Professional Access'
-                          : 'Digital Card'),
+                          ? 'Professional Profile'
+                          : 'Digital Profile'),
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     color: context.textSecondary,
@@ -1728,8 +1703,6 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
                         ],
                         // Business card graphic
                         _buildDigitalCard(),
-                        const SizedBox(height: 24),
-                        _buildAccessControlSection(),
                         const SizedBox(height: 32),
                       ],
                       // Section: Identity (Photo, Name, Vibe)
@@ -1756,8 +1729,28 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
                               child: ClipOval(
                                 child: (_avatarUrl.isNotEmpty &&
                                         _avatarUrl.startsWith('http'))
-                                    ? Image.network(_avatarUrl,
-                                        fit: BoxFit.cover)
+                                    ? Image.network(
+                                        _avatarUrl,
+                                        fit: BoxFit.cover,
+                                        errorBuilder:
+                                            (context, error, stackTrace) =>
+                                                Container(
+                                          color: const Color(0xFF1E1F32),
+                                          alignment: Alignment.center,
+                                          child: Text(
+                                            _name.isNotEmpty
+                                                ? _name
+                                                    .substring(0, 1)
+                                                    .toUpperCase()
+                                                : "?",
+                                            style: const TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 24,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ),
+                                      )
                                     : Container(
                                         color: const Color(0xFF1E1F32),
                                         alignment: Alignment.center,
@@ -1834,6 +1827,8 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
                           ],
                         ),
                       ),
+                      const SizedBox(height: 24),
+                      _buildAccessControlSection(),
                       const SizedBox(height: 24),
 
                       // Section: My Story (Bio)

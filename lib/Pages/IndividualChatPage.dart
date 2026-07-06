@@ -22,7 +22,8 @@ class IndividualChatPage extends StatefulWidget {
   State<IndividualChatPage> createState() => _IndividualChatPageState();
 }
 
-class _IndividualChatPageState extends State<IndividualChatPage> {
+class _IndividualChatPageState extends State<IndividualChatPage>
+    with WidgetsBindingObserver {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final FocusNode _messageFocusNode = FocusNode();
@@ -49,6 +50,7 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _connectionData = widget.connectionData;
     if (_connectionData != null) {
       _name = _connectionData!['name'] ?? 'Unknown';
@@ -136,6 +138,11 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
 
       if (!mounted) return;
 
+      final draft = _provider.getDraft(otherUserId);
+      if (draft != null && draft.isNotEmpty) {
+        _messageController.text = draft;
+      }
+
       setState(() {
         _roomId = roomId;
         _isRoomLoading = false;
@@ -201,8 +208,31 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
     }
   }
 
+  void _saveDraft() {
+    final otherUserId = _connectionData != null
+        ? (_connectionData!['id'] as int?)
+        : widget.otherUserId;
+    if (otherUserId != null) {
+      final text = _messageController.text.trim();
+      if (text.isNotEmpty) {
+        _provider.saveDraft(otherUserId, text);
+      } else {
+        _provider.clearDraft(otherUserId);
+      }
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
+      _saveDraft();
+    }
+  }
+
   @override
   void dispose() {
+    _saveDraft();
+    WidgetsBinding.instance.removeObserver(this);
     _messageController.removeListener(_onTextChanged);
     _localTypingTimer?.cancel();
     if (_amITyping) {
@@ -243,6 +273,12 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
     }
 
     _messageController.clear();
+    final otherUserId = _connectionData != null
+        ? (_connectionData!['id'] as int?)
+        : widget.otherUserId;
+    if (otherUserId != null) {
+      _provider.clearDraft(otherUserId);
+    }
     HapticFeedback.lightImpact();
 
     final replyMsg = _replyMessage;
@@ -439,7 +475,24 @@ class _IndividualChatPageState extends State<IndividualChatPage> {
                         )
                       : ClipOval(
                           child: avatar.isNotEmpty
-                              ? Image.network(avatar, fit: BoxFit.cover)
+                              ? Image.network(
+                                  avatar,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (context, error, stackTrace) =>
+                                      Container(
+                                    color: context.surfaceSecondary,
+                                    alignment: Alignment.center,
+                                    child: Text(
+                                      _name.isNotEmpty
+                                          ? _name.substring(0, 1).toUpperCase()
+                                          : "?",
+                                      style: TextStyle(
+                                          color: context.textPrimary,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 14),
+                                    ),
+                                  ),
+                                )
                               : Container(
                                   color: context.surfaceSecondary,
                                   alignment: Alignment.center,

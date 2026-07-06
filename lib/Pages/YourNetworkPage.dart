@@ -6,7 +6,7 @@ import 'package:connect/Providers/connection_provider.dart';
 import 'package:connect/Providers/notification_provider.dart';
 import 'package:connect/Providers/network_provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:connect/Utils/social_launcher.dart';
 import 'dart:ui';
 
 class YourNetworkPage extends StatefulWidget {
@@ -366,21 +366,25 @@ class _YourNetworkPageState extends State<YourNetworkPage> {
                         children: [
                           if (linkedin.isNotEmpty)
                             _buildSocialIcon(
+                              'linkedin',
                               'assets/icons/linkedin.png',
                               linkedin,
                             ),
                           if (twitter.isNotEmpty)
                             _buildSocialIcon(
+                              'twitter',
                               'assets/icons/twitter.png',
                               twitter,
                             ),
                           if (instagram.isNotEmpty)
                             _buildSocialIcon(
+                              'instagram',
                               'assets/icons/instagram.png',
                               instagram,
                             ),
                           if (spotify.isNotEmpty)
                             _buildSocialIcon(
+                              'spotify',
                               'assets/icons/spotify.png',
                               spotify,
                             ),
@@ -423,20 +427,11 @@ class _YourNetworkPageState extends State<YourNetworkPage> {
     );
   }
 
-  Widget _buildSocialIcon(String assetPath, String url) {
+  Widget _buildSocialIcon(String platform, String assetPath, String input) {
     return GestureDetector(
       onTap: () async {
-        try {
-          final uri = Uri.parse(url);
-          if (await canLaunchUrl(uri)) {
-            HapticFeedback.lightImpact();
-            await launchUrl(uri, mode: LaunchMode.externalApplication);
-          } else {
-            print("Could not launch url: $url");
-          }
-        } catch (e) {
-          print("Error launching url: $e");
-        }
+        HapticFeedback.lightImpact();
+        await SocialLauncher.launchSocialLink(context, platform, input);
       },
       child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 12),
@@ -1311,22 +1306,41 @@ class _ReferBottomSheetState extends State<_ReferBottomSheet> {
                         ),
                         child: Row(
                           children: [
-                            CircleAvatar(
-                              radius: 18,
-                              backgroundColor: context.surfacePrimary,
-                              backgroundImage: avatar.startsWith('http')
-                                  ? NetworkImage(avatar)
-                                  : null,
-                              child: avatar.startsWith('http')
-                                  ? null
-                                  : Text(
-                                      _getInitials(name),
-                                      style: TextStyle(
-                                        color: context.textPrimary,
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.bold,
+                            Container(
+                              width: 36,
+                              height: 36,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: context.surfacePrimary,
+                              ),
+                              child: ClipOval(
+                                child: avatar.startsWith('http')
+                                    ? Image.network(
+                                        avatar,
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (context, error, stackTrace) =>
+                                            Center(
+                                          child: Text(
+                                            _getInitials(name),
+                                            style: TextStyle(
+                                              color: context.textPrimary,
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ),
+                                      )
+                                    : Center(
+                                        child: Text(
+                                          _getInitials(name),
+                                          style: TextStyle(
+                                            color: context.textPrimary,
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
                                       ),
-                                    ),
+                              ),
                             ),
                             const SizedBox(width: 12),
                             Expanded(
