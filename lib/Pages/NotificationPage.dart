@@ -708,6 +708,7 @@ class _NotificationPageState extends State<NotificationPage> {
                                       .connectUsers(
                                     provider.userId!,
                                     referredUser['id'],
+                                    sharedCardByPresenter: referredUser['default_card_visibility']?.toString(),
                                     connectionType: 'referral_connect',
                                   )
                                       .then((_) {
@@ -1252,8 +1253,9 @@ class _NotificationPageState extends State<NotificationPage> {
                                                   referredUserId: otherUser['id'],
                                                   note: noteToSend,
                                                 ).then((_) {
-                                                  notificationProvider.deleteNotification(
+                                                  notificationProvider.markReferralRequestActioned(
                                                     notification['id'],
+                                                    notification['note'] ?? '',
                                                   );
                                                   Navigator.of(context).pop();
                                                   ScaffoldMessenger.of(context).showSnackBar(
@@ -1335,13 +1337,12 @@ class _NotificationPageState extends State<NotificationPage> {
                                         ),
                                         onPressed: () {
                                           HapticFeedback.lightImpact();
-                                          connectionProvider
-                                              .connectUsers(
+                                          connectionProvider.connectUsers(
                                             notificationProvider.userId!,
                                             referredUser['id'],
+                                            sharedCardByPresenter: referredUser['default_card_visibility']?.toString(),
                                             connectionType: 'referral_connect',
-                                          )
-                                              .then((_) {
+                                          ).then((_) {
                                             notificationProvider
                                                 .markAsSeen(notification['id']);
                                             Navigator.pop(context);

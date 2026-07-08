@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'dart:ui';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:connect/firebase_options.dart';
@@ -245,12 +246,6 @@ Future<void> showConnectionLocalNotification({
         const AndroidNotificationAction(
           'action_introduce',
           'Introduce',
-          inputs: [
-            AndroidNotificationActionInput(
-              label: 'Type introduction note...',
-            ),
-          ],
-          allowGeneratedReplies: true,
         ),
         const AndroidNotificationAction(
           'action_ignore',
@@ -330,6 +325,9 @@ Future<void> showConnectionLocalNotification({
   );
 
   final iosDetails = DarwinNotificationDetails(
+    presentAlert: true,
+    presentBadge: true,
+    presentSound: true,
     categoryIdentifier: iosCategory,
   );
 
@@ -440,111 +438,152 @@ Future<void> onNotificationActionReceived(NotificationResponse response) async {
       }
       final int notifId = getNotificationId(notificationId);
 
-      if (actionId == 'action_ignore') {
-        print(
-            "PushNotificationsAction: Ignore action triggered for notification: $notificationId");
-        await client
-            .from('connection_notifications')
-            .update({'is_seen': true}).eq('id', notificationId);
-        await flutterLocalNotificationsPlugin.cancel(id: notifId);
-      } else if (actionId == 'action_connect') {
-        print("PushNotificationsAction: Connect action triggered");
-        final myUserId = await LocalDatabaseHelper.instance.getActiveUserId();
-        final referredUserIdStr = data['referred_user_id']?.toString() ??
-            data['target_id']?.toString();
-        final referredUserId =
-            referredUserIdStr != null ? int.tryParse(referredUserIdStr) : null;
-        if (myUserId != null && referredUserId != null) {
-          final int id1 = myUserId < referredUserId ? myUserId : referredUserId;
-          final int id2 = myUserId > referredUserId ? myUserId : referredUserId;
+      try {
+        if (actionId == 'action_ignore') {
+          print(
+              "PushNotificationsAction: Ignore action triggered for notification: $notificationId");
+          await client
+              .from('connection_notifications')
+              .update({'is_seen': true}).eq('id', notificationId);
+        } else if (actionId == 'action_connect') {
+          print("PushNotificationsAction: Connect action triggered");
+          final myUserId = await LocalDatabaseHelper.instance.getActiveUserId();
+          final referredUserIdStr = data['referred_user_id']?.toString() ??
+              data['target_id']?.toString();
+          final referredUserId = referredUserIdStr != null
+              ? int.tryParse(referredUserIdStr)
+              : null;
+          if (myUserId != null && referredUserId != null) {
+            final int id1 =
+                myUserId < referredUserId ? myUserId : referredUserId;
+            final int id2 =
+                myUserId > referredUserId ? myUserId : referredUserId;
 
-          await client.from('user_connections').upsert({
-            'user_id_1': id1,
-            'user_id_2': id2,
-            'user_1_shared_card': 'both',
-            'user_2_shared_card': 'both',
-          });
+            // Fetch other user's default_card_visibility from Supabase
+            String referredUserDefaultCard = 'casual';
+            try {
+              final otherProfileRes = await client
+                  .from('profiles')
+                  .select('default_card_visibility')
+                  .eq('id', referredUserId)
+                  .maybeSingle();
+              if (otherProfileRes != null && otherProfileRes['default_card_visibility'] != null) {
+                referredUserDefaultCard = otherProfileRes['default_card_visibility'].toString();
+                if (referredUserDefaultCard == 'both') {
+                  referredUserDefaultCard = 'casual';
+                }
+              }
+            } catch (fetchErr) {
+              print("PushNotificationsAction: Error fetching other user profile: $fetchErr");
+            }
 
-          await client.from('connection_notifications').insert([
-            {
-              'user_id': myUserId,
-              'other_user_id': referredUserId,
-              'type': 'referral_connect',
-              'is_seen': false,
-            },
-            {
+            final prefs = await SharedPreferences.getInstance();
+            final String defaultCard = prefs.getString('default_card_visibility') ?? 'casual';
+
+            String u1Share = 'casual';
+            String u2Share = 'casual';
+
+            if (myUserId < referredUserId) {
+              u1Share = defaultCard;
+              u2Share = referredUserDefaultCard;
+            } else {
+              u1Share = referredUserDefaultCard;
+              u2Share = defaultCard;
+            }
+
+            await client.from('user_connections').upsert({
+              'user_id_1': id1,
+              'user_id_2': id2,
+              'user_1_shared_card': u1Share,
+              'user_2_shared_card': u2Share,
+            });
+
+            await client.from('connection_notifications').insert([
+              {
+                'user_id': myUserId,
+                'other_user_id': referredUserId,
+                'type': 'referral_connect',
+                'is_seen': false,
+              },
+              {
+                'user_id': referredUserId,
+                'other_user_id': myUserId,
+                'type': 'referral_connect',
+                'is_seen': false,
+              }
+            ]);
+
+            await client
+                .from('connection_notifications')
+                .update({'is_seen': true}).eq('id', notificationId);
+          }
+        } else if (actionId == 'action_introduce') {
+          final String? noteInput = response.input?.trim();
+          print(
+              "PushNotificationsAction: Introduce action triggered. Note: $noteInput");
+
+          final myUserId = await LocalDatabaseHelper.instance.getActiveUserId();
+          final actorIdStr =
+              data['actor_id']?.toString() ?? data['other_user_id']?.toString();
+          final actorId = actorIdStr != null ? int.tryParse(actorIdStr) : null;
+          final referredUserIdStr = data['referred_user_id']?.toString() ??
+              data['target_id']?.toString();
+          final referredUserId = referredUserIdStr != null
+              ? int.tryParse(referredUserIdStr)
+              : null;
+
+          if (myUserId != null && actorId != null && referredUserId != null) {
+            final String targetName = data['referred_user_name']?.toString() ??
+                data['target_name']?.toString() ??
+                'there';
+            final String requesterName = data['actor_name']?.toString() ??
+                data['other_user_name']?.toString() ??
+                'someone';
+            final String noteToSend = (noteInput != null &&
+                    noteInput.isNotEmpty)
+                ? noteInput
+                : "Hey $targetName, I'd like to introduce you to $requesterName.";
+
+            await client.from('connection_notifications').insert({
               'user_id': referredUserId,
               'other_user_id': myUserId,
-              'type': 'referral_connect',
+              'referred_user_id': actorId,
+              'type': 'referral',
+              'note': noteToSend,
               'is_seen': false,
-            }
-          ]);
+            });
+
+            final currentNote = data['note']?.toString() ?? '';
+            final actionedNote = currentNote.replaceFirst(
+                '[REFERRAL_REQUEST]', '[REFERRAL_REQUEST_ACTIONED]');
+            await client.from('connection_notifications').update({
+              'note': actionedNote.isNotEmpty
+                  ? actionedNote
+                  : '[REFERRAL_REQUEST_ACTIONED]',
+              'is_seen': true,
+            }).eq('id', notificationId);
+          }
+        } else if (actionId == 'action_chat' || actionId == 'action_message') {
+          print("PushNotificationsAction: Chat/Message action triggered");
+          final referredUserIdStr = data['referred_user_id']?.toString() ??
+              data['target_id']?.toString() ??
+              data['other_user_id']?.toString();
+          final referredUserId = referredUserIdStr != null
+              ? int.tryParse(referredUserIdStr)
+              : null;
+          if (referredUserId != null) {
+            targetChatSenderId = referredUserId;
+          }
 
           await client
               .from('connection_notifications')
               .update({'is_seen': true}).eq('id', notificationId);
-          await flutterLocalNotificationsPlugin.cancel(id: notifId);
         }
-      } else if (actionId == 'action_introduce') {
-        final String? noteInput = response.input?.trim();
+      } catch (e) {
+        print("PushNotificationsAction: Error handling action $actionId: $e");
+      } finally {
         print(
-            "PushNotificationsAction: Introduce action triggered. Note: $noteInput");
-
-        final myUserId = await LocalDatabaseHelper.instance.getActiveUserId();
-        final actorIdStr =
-            data['actor_id']?.toString() ?? data['other_user_id']?.toString();
-        final actorId = actorIdStr != null ? int.tryParse(actorIdStr) : null;
-        final referredUserIdStr = data['referred_user_id']?.toString() ??
-            data['target_id']?.toString();
-        final referredUserId =
-            referredUserIdStr != null ? int.tryParse(referredUserIdStr) : null;
-
-        if (myUserId != null && actorId != null && referredUserId != null) {
-          final String targetName = data['referred_user_name']?.toString() ??
-              data['target_name']?.toString() ??
-              'there';
-          final String requesterName = data['actor_name']?.toString() ??
-              data['other_user_name']?.toString() ??
-              'someone';
-          final String noteToSend = (noteInput != null && noteInput.isNotEmpty)
-              ? noteInput
-              : "Hey $targetName, I'd like to introduce you to $requesterName.";
-
-          await client.from('connection_notifications').insert({
-            'user_id': referredUserId,
-            'other_user_id': myUserId,
-            'referred_user_id': actorId,
-            'type': 'referral',
-            'note': noteToSend,
-            'is_seen': false,
-          });
-
-          final currentNote = data['note']?.toString() ?? '';
-          final actionedNote = currentNote.replaceFirst(
-              '[REFERRAL_REQUEST]', '[REFERRAL_REQUEST_ACTIONED]');
-          await client.from('connection_notifications').update({
-            'note': actionedNote.isNotEmpty
-                ? actionedNote
-                : '[REFERRAL_REQUEST_ACTIONED]',
-            'is_seen': true,
-          }).eq('id', notificationId);
-
-          await flutterLocalNotificationsPlugin.cancel(id: notifId);
-        }
-      } else if (actionId == 'action_chat' || actionId == 'action_message') {
-        print("PushNotificationsAction: Chat/Message action triggered");
-        final referredUserIdStr = data['referred_user_id']?.toString() ??
-            data['target_id']?.toString() ??
-            data['other_user_id']?.toString();
-        final referredUserId =
-            referredUserIdStr != null ? int.tryParse(referredUserIdStr) : null;
-        if (referredUserId != null) {
-          targetChatSenderId = referredUserId;
-        }
-
-        await client
-            .from('connection_notifications')
-            .update({'is_seen': true}).eq('id', notificationId);
+            "PushNotificationsAction: Canceling/removing notification ID $notifId from tray");
         await flutterLocalNotificationsPlugin.cancel(id: notifId);
       }
       return;
@@ -650,18 +689,43 @@ Future<void> onNotificationActionReceived(NotificationResponse response) async {
         print("PushNotificationsAction: Supabase insert error: $supabaseError");
       }
 
-      // 3. Re-show/update the notification in the tray to include the user's reply, keeping it in the same tray.
-      final String senderName = data['sender_name']?.toString() ?? 'Connect';
-      await showLocalNotification(
-        roomId,
-        senderName,
-        [replyText.trim()],
-        data,
-      );
-      print(
-          "PushNotificationsAction: Direct Reply finished. Notification updated with reply.");
+      // 3. Mark incoming messages in this room from senderId as read locally
+      try {
+        final db = await LocalDatabaseHelper.instance.database;
+        final localUpdated = await db.update(
+          'messages',
+          {'status': 'read'},
+          where: 'room_id = ? AND owner_id = ? AND sender_id = ?',
+          whereArgs: [roomId, ownerId, senderId],
+        );
+        print(
+            "PushNotificationsAction: Local DB updated on reply. Rows affected: $localUpdated");
+      } catch (dbUpdateError) {
+        print(
+            "PushNotificationsAction: Error updating local DB on reply: $dbUpdateError");
+      }
 
-      // 4. Delay tear-down of the isolate to allow connection sockets to fully flush
+      // 4. Mark incoming messages in this room from senderId as read in Supabase
+      try {
+        await client
+            .from('messages')
+            .update({'status': 'read'})
+            .eq('room_id', roomId)
+            .eq('sender_id', senderId)
+            .inFilter('status', ['sent', 'delivered']);
+        print(
+            "PushNotificationsAction: Supabase messages marked read successfully on reply");
+      } catch (supabaseError) {
+        print(
+            "PushNotificationsAction: Supabase mark read error on reply: $supabaseError");
+      }
+
+      // 5. Cancel the notification tray entry
+      await flutterLocalNotificationsPlugin.cancel(id: notificationId);
+      print(
+          "PushNotificationsAction: Direct Reply finished. Notification dismissed.");
+
+      // 6. Delay tear-down of the isolate to allow connection sockets to fully flush
       await Future.delayed(const Duration(milliseconds: 500));
     }
   } catch (e) {
@@ -695,11 +759,9 @@ List<DarwinNotificationCategory> buildDarwinNotificationCategories() {
     DarwinNotificationCategory(
       'referral_request_category',
       actions: <DarwinNotificationAction>[
-        DarwinNotificationAction.text(
+        DarwinNotificationAction.plain(
           'action_introduce',
           'Introduce',
-          buttonTitle: 'Send',
-          placeholder: 'Type introduction note...',
         ),
         DarwinNotificationAction.plain(
           'action_ignore',

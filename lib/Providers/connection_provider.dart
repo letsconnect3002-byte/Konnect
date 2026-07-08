@@ -6,12 +6,16 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 sealed class UserConnectionState {}
+
 class UserConnectionInitial extends UserConnectionState {}
+
 class UserConnectionLoading extends UserConnectionState {}
+
 class UserConnectionLoaded extends UserConnectionState {
   final List<Map<String, dynamic>> connections;
   UserConnectionLoaded(this.connections);
 }
+
 class UserConnectionError extends UserConnectionState {
   final AppError error;
   UserConnectionError(this.error);
@@ -25,7 +29,8 @@ class ConnectionProvider with ChangeNotifier {
     ConnectionRepository? connectionRepository,
     NotificationRepository? notificationRepository,
   })  : _repository = connectionRepository ?? SupabaseConnectionRepository(),
-        _notificationRepository = notificationRepository ?? SupabaseNotificationRepository();
+        _notificationRepository =
+            notificationRepository ?? SupabaseNotificationRepository();
 
   int? _userId;
   int? get userId => _userId;
@@ -37,12 +42,12 @@ class ConnectionProvider with ChangeNotifier {
   UserConnectionState _state = UserConnectionInitial();
   UserConnectionState get state => _state;
 
-  List<Map<String, dynamic>> get connections =>
-      _state is UserConnectionLoaded
-          ? (_state as UserConnectionLoaded).connections
-          : _lastKnownConnections;
-  AppError? get lastError =>
-      _state is UserConnectionError ? (_state as UserConnectionError).error : null;
+  List<Map<String, dynamic>> get connections => _state is UserConnectionLoaded
+      ? (_state as UserConnectionLoaded).connections
+      : _lastKnownConnections;
+  AppError? get lastError => _state is UserConnectionError
+      ? (_state as UserConnectionError).error
+      : null;
 
   void _setError(Object e) {
     _state = UserConnectionError(AppError.from(e));
@@ -100,7 +105,8 @@ class ConnectionProvider with ChangeNotifier {
     }
   }
 
-  Future<List<Map<String, dynamic>>> fetchConnections({bool silent = false}) async {
+  Future<List<Map<String, dynamic>>> fetchConnections(
+      {bool silent = false}) async {
     if (!silent) {
       _state = UserConnectionLoading();
       notifyListeners();
@@ -115,7 +121,8 @@ class ConnectionProvider with ChangeNotifier {
     if (_userId == null) return;
     unsubscribeFromConnections();
 
-    _connectionsSubscription = _repository.subscribeToConnections((payload) async {
+    _connectionsSubscription =
+        _repository.subscribeToConnections((payload) async {
       print("Realtime connection change detected: ${payload.toString()}");
       await fetchConnections(silent: true);
     });
@@ -174,7 +181,9 @@ class ConnectionProvider with ChangeNotifier {
   }
 
   Future<void> connectUsers(int idA, int idB,
-      {String? sharedCardByPresenter, String? sharedCardByScanner, String connectionType = 'qr_code'}) async {
+      {String? sharedCardByPresenter,
+      String? sharedCardByScanner,
+      String connectionType = 'qr_code'}) async {
     if (idA == idB) {
       print("Cannot connect a user to themselves");
       return;
@@ -182,24 +191,29 @@ class ConnectionProvider with ChangeNotifier {
     final int id1 = idA < idB ? idA : idB;
     final int id2 = idA > idB ? idA : idB;
 
-    String u1Share = 'both';
-    String u2Share = 'both';
+    final prefs = await SharedPreferences.getInstance();
+    final String defaultCard =
+        prefs.getString('default_card_visibility') ?? 'casual';
+
+    String u1Share = 'casual';
+    String u2Share = 'casual';
 
     if (idA < idB) {
-      u1Share = sharedCardByScanner ?? 'both';
-      u2Share = sharedCardByPresenter ?? 'both';
+      u1Share = sharedCardByScanner ?? defaultCard;
+      u2Share = sharedCardByPresenter ?? 'casual';
     } else {
-      u1Share = sharedCardByPresenter ?? 'both';
-      u2Share = sharedCardByScanner ?? 'both';
+      u1Share = sharedCardByPresenter ?? 'casual';
+      u2Share = sharedCardByScanner ?? defaultCard;
     }
 
     try {
-      final bool alreadyConnected = await _repository.connectionExists(id1, id2);
+      final bool alreadyConnected =
+          await _repository.connectionExists(id1, id2);
 
       await _repository.connectUsers(id1, id2, u1Share, u2Share);
       print(
           "Successfully connected user $id1 and user $id2 (shares: $u1Share, $u2Share)");
-      
+
       if (!alreadyConnected) {
         // Insert notifications for both users since this is a new connection
         try {
@@ -218,9 +232,11 @@ class ConnectionProvider with ChangeNotifier {
           print("Non-fatal error inserting notifications: $notifErr");
         }
       } else {
-        print("Connection already exists. Skipping insertion of duplicate notifications.");
+        print(
+            "Connection already exists. Skipping insertion of duplicate notifications.");
       }
 
+      await fetchConnections(silent: true);
       notifyListeners();
     } catch (e) {
       _setError(e);
@@ -240,7 +256,8 @@ class ConnectionProvider with ChangeNotifier {
         myUserId < otherUserId ? 'user_1_shared_card' : 'user_2_shared_card';
 
     try {
-      await _repository.updateConnectionAccess(id1, id2, columnToUpdate, newAccessType);
+      await _repository.updateConnectionAccess(
+          id1, id2, columnToUpdate, newAccessType);
       print(
           "Updated connection access: $myUserId shares $newAccessType with $otherUserId");
       await fetchConnections();
@@ -257,7 +274,7 @@ class ConnectionProvider with ChangeNotifier {
     try {
       await _repository.disconnectUsers(id1, id2);
       print("Successfully disconnected user $id1 and user $id2");
-      
+
       // Delete connection notifications between the users
       try {
         await _notificationRepository.deleteNotificationsBetweenUsers(idA, idB);
@@ -266,6 +283,7 @@ class ConnectionProvider with ChangeNotifier {
         print("Non-fatal error deleting connection notifications: $notifErr");
       }
 
+      await fetchConnections(silent: true);
       notifyListeners();
     } catch (e) {
       print("Error disconnecting users: $e");
@@ -308,7 +326,9 @@ class ConnectionProvider with ChangeNotifier {
     }
   }
 
-  Future<void> deleteProfile(int id, {Future<void> Function(int profileId, String? roomId)? onRoomCleanup}) async {
+  Future<void> deleteProfile(int id,
+      {Future<void> Function(int profileId, String? roomId)?
+          onRoomCleanup}) async {
     final myUserId = _userId;
     if (myUserId == null) return;
     if (id == myUserId) {

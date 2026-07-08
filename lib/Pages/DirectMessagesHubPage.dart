@@ -80,6 +80,19 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
     }
   }
 
+  Future<void> _handleRefresh(BuildContext context) async {
+    final profileProvider = Provider.of<ProfileProvider>(context, listen: false);
+    final connectionProvider = Provider.of<ConnectionProvider>(context, listen: false);
+    final chatProvider = Provider.of<ChatProvider>(context, listen: false);
+
+    final myUserId = profileProvider.userId;
+    await Future.wait([
+      connectionProvider.fetchConnections(silent: true),
+      chatProvider.loadChatRooms(),
+      if (myUserId != null) profileProvider.loadProfile(myUserId),
+    ]);
+  }
+
   String _getAvatarUrl(String name, String? existingUrl) {
     if (existingUrl != null &&
         existingUrl.isNotEmpty &&
@@ -507,131 +520,162 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
           const SizedBox(height: 8),
 
           Expanded(
-            child: isMessagesLoading
-                ? Skeletonizer(
-                    enabled: true,
-                    child: _buildSkeletonChatRooms(),
-                  )
-                : (connections.isEmpty && _searchQuery.isEmpty)
-                    ? _buildOnboardingHeroCard(context)
-                    : filteredConnections.isEmpty
-                        ? Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
+            child: RefreshIndicator(
+              onRefresh: () => _handleRefresh(context),
+              color: context.accentSecondary,
+              backgroundColor: context.surfaceSecondary,
+              child: isMessagesLoading
+                  ? Skeletonizer(
+                      enabled: true,
+                      child: _buildSkeletonChatRooms(),
+                    )
+                  : (connections.isEmpty && _searchQuery.isEmpty)
+                      ? _buildOnboardingHeroCard(context)
+                      : filteredConnections.isEmpty
+                          ? ListView(
+                              physics: const AlwaysScrollableScrollPhysics(),
                               children: [
-                                Icon(
-                                  _searchQuery.isEmpty
-                                      ? Icons.chat_bubble_outline_rounded
-                                      : Icons.search_off_rounded,
-                                  color: context.textMuted,
-                                  size: 40,
-                                ),
-                                const SizedBox(height: 16),
-                                Text(
-                                  _searchQuery.isEmpty
-                                      ? "No ${_selectedTab == 'casual' ? 'casual' : 'professional'} conversations yet"
-                                      : "No results match your search",
-                                  style: context.bodyText.copyWith(
-                                    color: context.textSecondary,
+                                SizedBox(
+                                  height: MediaQuery.of(context).size.height * 0.5,
+                                  child: Center(
+                                    child: Column(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        Icon(
+                                          _searchQuery.isEmpty
+                                              ? Icons.chat_bubble_outline_rounded
+                                              : Icons.search_off_rounded,
+                                          color: context.textMuted,
+                                          size: 40,
+                                        ),
+                                        const SizedBox(height: 16),
+                                        Text(
+                                          _searchQuery.isEmpty
+                                              ? "No ${_selectedTab == 'casual' ? 'casual' : 'professional'} conversations yet"
+                                              : "No results match your search",
+                                          style: context.bodyText.copyWith(
+                                            color: context.textSecondary,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                   ),
                                 ),
                               ],
-                            ),
-                          )
-                        : ListView.separated(
-                            padding: const EdgeInsets.only(
-                                left: AppDimensions.marginStandard,
-                                right: AppDimensions.marginStandard,
-                                top: 8,
-                                bottom: 100),
-                            itemCount: filteredConnections.length,
-                            separatorBuilder: (context, index) =>
-                                const SizedBox(height: 5.0),
-                            itemBuilder: (context, index) {
-                              final connection = filteredConnections[index];
-                              final name = connection['name'] ?? 'Unknown';
-                              final avatar = _getAvatarUrl(
-                                  name,
-                                  connection['avatarUrl'] ??
-                                      connection['avatar_url']);
+                            )
+                          : ListView.separated(
+                              physics: const AlwaysScrollableScrollPhysics(),
+                              padding: const EdgeInsets.only(
+                                  left: AppDimensions.marginStandard,
+                                  right: AppDimensions.marginStandard,
+                                  top: 8,
+                                  bottom: 100),
+                              itemCount: filteredConnections.length,
+                              separatorBuilder: (context, index) =>
+                                  const SizedBox(height: 5.0),
+                              itemBuilder: (context, index) {
+                                final connection = filteredConnections[index];
+                                final name = connection['name'] ?? 'Unknown';
+                                final avatar = _getAvatarUrl(
+                                    name,
+                                    connection['avatarUrl'] ??
+                                        connection['avatar_url']);
 
-                              final roomId = chatProvider
-                                  .connectionRooms[connection['id']];
+                                final roomId = chatProvider
+                                    .connectionRooms[connection['id']];
 
-                              final lastMsg = roomId != null
-                                  ? chatProvider.lastMessagesByRoom[roomId]
-                                  : null;
+                                final lastMsg = roomId != null
+                                    ? chatProvider.lastMessagesByRoom[roomId]
+                                    : null;
 
-                              final String lastMessageText = lastMsg != null
-                                  ? lastMsg['payload'] ?? ''
-                                  : '';
+                                final String lastMessageText = lastMsg != null
+                                    ? lastMsg['payload'] ?? ''
+                                    : '';
 
-                              final String msgTime = lastMsg != null
-                                  ? _formatMessageTime(
-                                      lastMsg['created_at'] as String?)
-                                  : '';
+                                final String msgTime = lastMsg != null
+                                    ? _formatMessageTime(
+                                        lastMsg['created_at'] as String?)
+                                    : '';
 
-                              final bool isUnread = lastMsg != null &&
-                                  lastMsg['sender_id'] != myUserId &&
-                                  lastMsg['status'] != 'read';
+                                final bool isUnread = lastMsg != null &&
+                                    lastMsg['sender_id'] != myUserId &&
+                                    lastMsg['status'] != 'read';
 
-                              final bool isTyping = roomId != null &&
-                                  chatProvider.isRoomTyping(roomId);
+                                final bool isTyping = roomId != null &&
+                                    chatProvider.isRoomTyping(roomId);
 
-                              final draft = chatProvider
-                                  .getDraft(connection['id'] as int? ?? 0);
+                                final draft = chatProvider
+                                    .getDraft(connection['id'] as int? ?? 0);
 
-                              return Container(
-                                // decoration: BoxDecoration(
-                                //   color: context.surfacePrimary,
-                                //   borderRadius: BorderRadius.circular(
-                                //       AppDimensions.radiusPremiumCard / 1.5),
-                                //   border: Border.all(
-                                //     color: context.surfaceSecondary
-                                //         .withValues(alpha: 0.5),
-                                //     width: 1.0,
-                                //   ),
-                                // ),
-                                child: Material(
-                                  color: Colors.transparent,
-                                  clipBehavior: Clip.antiAlias,
-                                  borderRadius: BorderRadius.circular(
-                                      AppDimensions.radiusPremiumCard),
-                                  child: ListTile(
-                                    onTap: () {
-                                      HapticFeedback.lightImpact();
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (context) =>
-                                              IndividualChatPage(
-                                                  connectionData: connection),
+                                return Container(
+                                  // decoration: BoxDecoration(
+                                  //   color: context.surfacePrimary,
+                                  //   borderRadius: BorderRadius.circular(
+                                  //       AppDimensions.radiusPremiumCard / 1.5),
+                                  //   border: Border.all(
+                                  //     color: context.surfaceSecondary
+                                  //         .withValues(alpha: 0.5),
+                                  //     width: 1.0,
+                                  //   ),
+                                  // ),
+                                  child: Material(
+                                    color: Colors.transparent,
+                                    clipBehavior: Clip.antiAlias,
+                                    borderRadius: BorderRadius.circular(
+                                        AppDimensions.radiusPremiumCard),
+                                    child: ListTile(
+                                      onTap: () {
+                                        HapticFeedback.lightImpact();
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (context) =>
+                                                IndividualChatPage(
+                                                    connectionData: connection),
+                                          ),
+                                        );
+                                      },
+                                      onLongPress: () {
+                                        HapticFeedback.mediumImpact();
+                                        _showDeleteConfirmation(context,
+                                            connection, connectionProvider);
+                                      },
+                                      contentPadding: const EdgeInsets.symmetric(
+                                          horizontal: 14, vertical: 0),
+                                      leading: Container(
+                                        width: 44,
+                                        height: 44,
+                                        decoration: const BoxDecoration(
+                                          shape: BoxShape.circle,
                                         ),
-                                      );
-                                    },
-                                    onLongPress: () {
-                                      HapticFeedback.mediumImpact();
-                                      _showDeleteConfirmation(context,
-                                          connection, connectionProvider);
-                                    },
-                                    contentPadding: const EdgeInsets.symmetric(
-                                        horizontal: 14, vertical: 0),
-                                    leading: Container(
-                                      width: 44,
-                                      height: 44,
-                                      decoration: const BoxDecoration(
-                                        shape: BoxShape.circle,
-                                      ),
-                                      child: ClipOval(
-                                        child: avatar.isNotEmpty
-                                            ? Image.network(
-                                                avatar,
-                                                fit: BoxFit.cover,
-                                                errorBuilder: (context, error,
-                                                        stackTrace) =>
-                                                    Container(
-                                                  color:
-                                                      context.surfaceSecondary,
+                                        child: ClipOval(
+                                          child: avatar.isNotEmpty
+                                              ? Image.network(
+                                                  avatar,
+                                                  fit: BoxFit.cover,
+                                                  errorBuilder: (context, error,
+                                                          stackTrace) =>
+                                                      Container(
+                                                    color:
+                                                        context.surfaceSecondary,
+                                                    alignment: Alignment.center,
+                                                    child: Text(
+                                                      name.isNotEmpty
+                                                          ? name
+                                                              .substring(0, 1)
+                                                              .toUpperCase()
+                                                          : "?",
+                                                      style: TextStyle(
+                                                          color:
+                                                              context.textPrimary,
+                                                          fontWeight:
+                                                              FontWeight.bold,
+                                                          fontSize: 15),
+                                                    ),
+                                                  ),
+                                                )
+                                              : Container(
+                                                  color: context.surfaceSecondary,
                                                   alignment: Alignment.center,
                                                   child: Text(
                                                     name.isNotEmpty
@@ -647,169 +691,152 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
                                                         fontSize: 15),
                                                   ),
                                                 ),
-                                              )
-                                            : Container(
-                                                color: context.surfaceSecondary,
-                                                alignment: Alignment.center,
-                                                child: Text(
-                                                  name.isNotEmpty
-                                                      ? name
-                                                          .substring(0, 1)
-                                                          .toUpperCase()
-                                                      : "?",
-                                                  style: TextStyle(
-                                                      color:
-                                                          context.textPrimary,
-                                                      fontWeight:
-                                                          FontWeight.bold,
-                                                      fontSize: 15),
-                                                ),
-                                              ),
-                                      ),
-                                    ),
-                                    title: Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        Expanded(
-                                          child: Text(
-                                            name,
-                                            style: context.cardTitle.copyWith(
-                                              fontWeight: FontWeight.bold,
-                                              color: context.textPrimary,
-                                            ),
-                                            overflow: TextOverflow.ellipsis,
-                                            maxLines: 1,
-                                          ),
                                         ),
-                                        if (msgTime.isNotEmpty) ...[
-                                          const SizedBox(width: 8),
-                                          Text(
-                                            msgTime,
-                                            style: context.captionText.copyWith(
-                                              color: isUnread
-                                                  ? context.accentSecondary
-                                                  : context.textMuted,
-                                              fontWeight: isUnread
-                                                  ? FontWeight.bold
-                                                  : FontWeight.normal,
+                                      ),
+                                      title: Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          Expanded(
+                                            child: Text(
+                                              name,
+                                              style: context.cardTitle.copyWith(
+                                                fontWeight: FontWeight.bold,
+                                                color: context.textPrimary,
+                                              ),
+                                              overflow: TextOverflow.ellipsis,
+                                              maxLines: 1,
                                             ),
                                           ),
+                                          if (msgTime.isNotEmpty) ...[
+                                            const SizedBox(width: 8),
+                                            Text(
+                                              msgTime,
+                                              style: context.captionText.copyWith(
+                                                color: isUnread
+                                                    ? context.accentSecondary
+                                                    : context.textMuted,
+                                                fontWeight: isUnread
+                                                    ? FontWeight.bold
+                                                    : FontWeight.normal,
+                                              ),
+                                            ),
+                                          ],
                                         ],
-                                      ],
-                                    ),
-                                    subtitle: lastMessageText.isEmpty &&
-                                            !isTyping &&
-                                            (draft == null || draft.isEmpty)
-                                        ? null
-                                        : Padding(
-                                            padding:
-                                                const EdgeInsets.only(top: 4.0),
-                                            child: Row(
-                                              children: [
-                                                Expanded(
-                                                  child: isTyping
-                                                      ? Text(
-                                                          "typing...",
-                                                          maxLines: 1,
-                                                          overflow: TextOverflow
-                                                              .ellipsis,
-                                                          style: context
-                                                              .bodyText
-                                                              .copyWith(
-                                                            color: context
-                                                                .accentSecondary,
-                                                            fontSize: 12.5,
-                                                            fontWeight:
-                                                                FontWeight.w600,
-                                                            fontStyle: FontStyle
-                                                                .italic,
-                                                          ),
-                                                        )
-                                                      : (draft != null &&
-                                                              draft.isNotEmpty)
-                                                          ? RichText(
-                                                              maxLines: 1,
-                                                              overflow:
-                                                                  TextOverflow
-                                                                      .ellipsis,
-                                                              text: TextSpan(
-                                                                children: [
-                                                                  const TextSpan(
-                                                                    text:
-                                                                        "Draft: ",
-                                                                    style:
-                                                                        TextStyle(
-                                                                      color: Colors
-                                                                          .blueAccent,
-                                                                      fontWeight:
-                                                                          FontWeight
-                                                                              .bold,
-                                                                      fontSize:
-                                                                          12.5,
-                                                                      fontFamily:
-                                                                          'Inter',
-                                                                    ),
-                                                                  ),
-                                                                  TextSpan(
-                                                                    text: draft,
-                                                                    style:
-                                                                        TextStyle(
-                                                                      color: context
-                                                                          .textSecondary,
-                                                                      fontSize:
-                                                                          12.5,
-                                                                      fontFamily:
-                                                                          'Inter',
-                                                                    ),
-                                                                  ),
-                                                                ],
-                                                              ),
-                                                            )
-                                                          : Text(
-                                                              lastMessageText,
-                                                              maxLines: 1,
-                                                              overflow:
-                                                                  TextOverflow
-                                                                      .ellipsis,
-                                                              style: context
-                                                                  .bodyText
-                                                                  .copyWith(
-                                                                color: isUnread
-                                                                    ? context
-                                                                        .textPrimary
-                                                                    : context
-                                                                        .textSecondary,
-                                                                fontSize: 12.5,
-                                                                fontWeight: isUnread
-                                                                    ? FontWeight
-                                                                        .w600
-                                                                    : FontWeight
-                                                                        .normal,
-                                                              ),
+                                      ),
+                                      subtitle: lastMessageText.isEmpty &&
+                                              !isTyping &&
+                                              (draft == null || draft.isEmpty)
+                                          ? null
+                                          : Padding(
+                                              padding:
+                                                  const EdgeInsets.only(top: 4.0),
+                                              child: Row(
+                                                children: [
+                                                  Expanded(
+                                                    child: isTyping
+                                                        ? Text(
+                                                            "typing...",
+                                                            maxLines: 1,
+                                                            overflow: TextOverflow
+                                                                .ellipsis,
+                                                            style: context
+                                                                .bodyText
+                                                                .copyWith(
+                                                              color: context
+                                                                  .accentSecondary,
+                                                              fontSize: 12.5,
+                                                              fontWeight:
+                                                                  FontWeight.w600,
+                                                              fontStyle: FontStyle
+                                                                  .italic,
                                                             ),
-                                                ),
-                                                if (isUnread)
-                                                  Container(
-                                                    margin:
-                                                        const EdgeInsets.only(
-                                                            left: 8),
-                                                    width: 8,
-                                                    height: 8,
-                                                    decoration: BoxDecoration(
-                                                      color: context
-                                                          .accentSecondary,
-                                                      shape: BoxShape.circle,
-                                                    ),
+                                                          )
+                                                        : (draft != null &&
+                                                                draft.isNotEmpty)
+                                                            ? RichText(
+                                                                maxLines: 1,
+                                                                overflow:
+                                                                    TextOverflow
+                                                                        .ellipsis,
+                                                                text: TextSpan(
+                                                                  children: [
+                                                                    const TextSpan(
+                                                                      text:
+                                                                          "Draft: ",
+                                                                      style:
+                                                                          TextStyle(
+                                                                        color: Colors
+                                                                            .blueAccent,
+                                                                        fontWeight:
+                                                                            FontWeight
+                                                                                .bold,
+                                                                        fontSize:
+                                                                            12.5,
+                                                                        fontFamily:
+                                                                            'Inter',
+                                                                      ),
+                                                                    ),
+                                                                    TextSpan(
+                                                                      text: draft,
+                                                                      style:
+                                                                          TextStyle(
+                                                                        color: context
+                                                                            .textSecondary,
+                                                                        fontSize:
+                                                                            12.5,
+                                                                        fontFamily:
+                                                                            'Inter',
+                                                                      ),
+                                                                    ),
+                                                                  ],
+                                                                ),
+                                                              )
+                                                            : Text(
+                                                                lastMessageText,
+                                                                maxLines: 1,
+                                                                overflow:
+                                                                    TextOverflow
+                                                                        .ellipsis,
+                                                                style: context
+                                                                    .bodyText
+                                                                    .copyWith(
+                                                                  color: isUnread
+                                                                      ? context
+                                                                          .textPrimary
+                                                                      : context
+                                                                          .textSecondary,
+                                                                  fontSize: 12.5,
+                                                                  fontWeight: isUnread
+                                                                      ? FontWeight
+                                                                          .w600
+                                                                      : FontWeight
+                                                                          .normal,
+                                                                ),
+                                                              ),
                                                   ),
-                                              ],
+                                                  if (isUnread)
+                                                    Container(
+                                                      margin:
+                                                          const EdgeInsets.only(
+                                                              left: 8),
+                                                      width: 8,
+                                                      height: 8,
+                                                      decoration: BoxDecoration(
+                                                        color: context
+                                                            .accentSecondary,
+                                                        shape: BoxShape.circle,
+                                                      ),
+                                                    ),
+                                                ],
+                                              ),
                                             ),
-                                          ),
+                                    ),
                                   ),
-                                ),
-                              );
-                            },
-                          ),
+                                );
+                              },
+                            ),
+            ),
           ),
         ],
       ),
@@ -840,6 +867,7 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
 
   Widget _buildOnboardingHeroCard(BuildContext context) {
     return SingleChildScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.symmetric(
         horizontal: AppDimensions.marginStandard,
         vertical: 24,
@@ -965,7 +993,7 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
 
   Widget _buildSkeletonChatRooms() {
     return ListView.separated(
-      physics: const NeverScrollableScrollPhysics(),
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.symmetric(
           horizontal: AppDimensions.marginStandard, vertical: 8),
       itemCount: 5,

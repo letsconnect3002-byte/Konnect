@@ -179,8 +179,8 @@ class SupabaseChatRepository implements ChatRepository {
     return await db.query(
       'messages',
       columns: ['id'],
-      where: "sender_id != ? AND status != 'read'",
-      whereArgs: [senderId],
+      where: "sender_id != ? AND status != 'read' AND owner_id = ?",
+      whereArgs: [senderId, senderId],
     );
   }
 
@@ -188,8 +188,8 @@ class SupabaseChatRepository implements ChatRepository {
   Future<int> getTotalUnreadCountLocally(int myUserId) async {
     final db = await _localDb.database;
     final result = await db.rawQuery(
-      "SELECT COUNT(*) as count FROM messages WHERE sender_id != ? AND status != 'read'",
-      [myUserId],
+      "SELECT COUNT(*) as count FROM messages WHERE sender_id != ? AND status != 'read' AND owner_id = ?",
+      [myUserId, myUserId],
     );
     if (result.isNotEmpty) {
       return Sqflite.firstIntValue(result) ?? 0;
@@ -202,8 +202,8 @@ class SupabaseChatRepository implements ChatRepository {
       int myUserId) async {
     final db = await _localDb.database;
     return await db.rawQuery(
-      "SELECT room_id, COUNT(*) as count FROM messages WHERE sender_id != ? AND status != 'read' GROUP BY room_id",
-      [myUserId],
+      "SELECT room_id, COUNT(*) as count FROM messages WHERE sender_id != ? AND status != 'read' AND owner_id = ? GROUP BY room_id",
+      [myUserId, myUserId],
     );
   }
 
@@ -313,8 +313,8 @@ class SupabaseChatRepository implements ChatRepository {
     final db = await _localDb.database;
     await db.delete(
       'messages',
-      where: 'room_id = ?',
-      whereArgs: [roomId],
+      where: 'room_id = ? AND owner_id = ?',
+      whereArgs: [roomId, myUserId],
     );
   }
 

@@ -49,10 +49,21 @@ class ProfileProvider with ChangeNotifier {
   String get defaultCardVisibility => _defaultCardVisibility;
 
   Future<void> setDefaultCardVisibility(String val) async {
-    _defaultCardVisibility = val;
+    final String cleanVal = val == 'both' ? 'casual' : val;
+    _defaultCardVisibility = cleanVal;
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('default_card_visibility', val);
+    await prefs.setString('default_card_visibility', cleanVal);
+
+    final myUserId = userId;
+    if (myUserId != null) {
+      try {
+        await _repository.updateProfileField(myUserId, 'default_card_visibility', cleanVal);
+        print("Successfully synced default_card_visibility to Supabase: $cleanVal");
+      } catch (e) {
+        print("Error syncing default_card_visibility to Supabase: $e");
+      }
+    }
   }
 
   Future<void> loadDefaultCardVisibilityPref() async {
@@ -625,6 +636,14 @@ class ProfileProvider with ChangeNotifier {
         }
         quickSetupComplete = response['quick_setup_complete'] == true;
 
+        final dbVisibility = response['default_card_visibility']?.toString();
+        if (dbVisibility != null && dbVisibility.isNotEmpty) {
+          final String cleanVisibility = dbVisibility == 'both' ? 'casual' : dbVisibility;
+          _defaultCardVisibility = cleanVisibility;
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString('default_card_visibility', cleanVisibility);
+        }
+
         customLinks = [];
         if (response['custom_links'] != null) {
           try {
@@ -773,6 +792,7 @@ class ProfileProvider with ChangeNotifier {
       'vibe_tag': vibeTag,
       'interest_tags': interestTags,
       'quick_setup_complete': quickSetupComplete,
+      'default_card_visibility': defaultCardVisibility == 'both' ? 'casual' : defaultCardVisibility,
     };
 
     try {
