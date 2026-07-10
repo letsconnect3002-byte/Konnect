@@ -854,165 +854,188 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
   }
 
   Widget _buildStepDone() {
-    return Padding(
-      padding: const EdgeInsets.all(24.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Spacer(),
-          Center(
-            child: Container(
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                color: context.surfaceSecondary.withOpacity(0.8),
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(color: Colors.white.withOpacity(0.08)),
-              ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return SingleChildScrollView(
+          physics: const BouncingScrollPhysics(),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              minHeight: constraints.maxHeight,
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(24.0),
               child: Column(
-                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Container(
-                    width: 96,
-                    height: 96,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: LinearGradient(
-                        colors: [
-                          context.accentSecondary,
-                          context.accentSecondary.withValues(alpha: 0.8)
+                  const SizedBox(height: 16),
+                  Center(
+                    child: Container(
+                      padding: const EdgeInsets.all(24),
+                      decoration: BoxDecoration(
+                        color: context.surfaceSecondary.withOpacity(0.8),
+                        borderRadius: BorderRadius.circular(24),
+                        border: Border.all(color: Colors.white.withOpacity(0.08)),
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            width: 96,
+                            height: 96,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              gradient: LinearGradient(
+                                colors: [
+                                  context.accentSecondary,
+                                  context.accentSecondary.withValues(alpha: 0.8)
+                                ],
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: context.accentSecondary.withOpacity(0.15),
+                                  blurRadius: 6,
+                                  spreadRadius: 1,
+                                ),
+                              ],
+                            ),
+                            child: Builder(builder: (context) {
+                              final provider =
+                                  Provider.of<ProfileProvider>(context, listen: false);
+                              return (provider.avatarUrl.isNotEmpty &&
+                                      provider.avatarUrl.startsWith('http'))
+                                  ? ClipOval(
+                                      child: Image.network(
+                                        provider.avatarUrl,
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (context, error, stackTrace) =>
+                                            Center(
+                                          child: Text(
+                                            _nameController.text.isNotEmpty
+                                                ? _nameController.text
+                                                    .substring(0, 1)
+                                                    .toUpperCase()
+                                                : "?",
+                                            style: const TextStyle(
+                                                color: Colors.white,
+                                                fontSize: 36,
+                                                fontWeight: FontWeight.bold),
+                                          ),
+                                        ),
+                                      ),
+                                    )
+                                  : Center(
+                                      child: Text(
+                                        _nameController.text.isNotEmpty
+                                            ? _nameController.text
+                                                .substring(0, 1)
+                                                .toUpperCase()
+                                            : "?",
+                                        style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 36,
+                                            fontWeight: FontWeight.bold),
+                                      ),
+                                    );
+                            }),
+                          )
+                              .animate()
+                              .scale(duration: 400.ms, curve: Curves.easeOutBack),
+                          const SizedBox(height: 20),
+                          Text(
+                            _nameController.text,
+                            style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 24,
+                                fontWeight: FontWeight.bold,
+                                fontFamily: 'Inter'),
+                          ).animate().fadeIn(delay: 200.ms, duration: 300.ms),
+                          const SizedBox(height: 6),
+                          Container(
+                            padding:
+                                const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: context.accentSecondary.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              _selectedVibe,
+                              style: TextStyle(
+                                  color: context.accentSecondary,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold),
+                            ),
+                          ).animate().fadeIn(delay: 300.ms, duration: 300.ms),
                         ],
                       ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: context.accentSecondary.withOpacity(0.15),
-                          blurRadius: 6,
-                          spreadRadius: 1,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text(
+                        "You are ready to connect!",
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 24,
+                          fontWeight: FontWeight.w900,
+                          fontFamily: 'Inter',
                         ),
-                      ],
-                    ),
-                    child: Builder(builder: (context) {
-                      final provider =
-                          Provider.of<ProfileProvider>(context, listen: false);
-                      return (provider.avatarUrl.isNotEmpty &&
-                              provider.avatarUrl.startsWith('http'))
-                          ? ClipOval(
-                              child: Image.network(
-                                provider.avatarUrl,
-                                fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) =>
-                                    Center(
-                                  child: Text(
-                                    _nameController.text.isNotEmpty
-                                        ? _nameController.text
-                                            .substring(0, 1)
-                                            .toUpperCase()
-                                        : "?",
-                                    style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 36,
-                                        fontWeight: FontWeight.bold),
-                                  ),
-                                ),
-                              ),
-                            )
-                          : Center(
-                              child: Text(
-                                _nameController.text.isNotEmpty
-                                    ? _nameController.text
-                                        .substring(0, 1)
-                                        .toUpperCase()
-                                    : "?",
-                                style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 36,
-                                    fontWeight: FontWeight.bold),
-                              ),
-                            );
-                    }),
-                  )
-                      .animate()
-                      .scale(duration: 400.ms, curve: Curves.easeOutBack),
-                  const SizedBox(height: 20),
-                  Text(
-                    _nameController.text,
-                    style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                        fontFamily: 'Inter'),
-                  ).animate().fadeIn(delay: 200.ms, duration: 300.ms),
-                  const SizedBox(height: 6),
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: context.accentSecondary.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      _selectedVibe,
-                      style: TextStyle(
-                          color: context.accentSecondary,
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold),
-                    ),
-                  ).animate().fadeIn(delay: 300.ms, duration: 300.ms),
+                      ).animate().fadeIn(delay: 450.ms),
+                      const SizedBox(height: 8),
+                      const Text(
+                        "Scan others to connect or show your card to share details instantly.",
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: Colors.white54,
+                          fontSize: 14,
+                          fontFamily: 'Inter',
+                        ),
+                      ).animate().fadeIn(delay: 500.ms),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+                  Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      ElevatedButton(
+                        onPressed: () =>
+                            _finishQuickIdentity(openProfessionalEditor: false),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: context.accentSecondary,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16)),
+                        ),
+                        child: const Text(
+                          "Continue",
+                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      TextButton(
+                        onPressed: () => _finishQuickIdentity(openProfessionalEditor: true),
+                        child: const Text(
+                          "Add Professional Details",
+                          style: TextStyle(
+                            color: Colors.white54,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ],
               ),
             ),
           ),
-          const SizedBox(height: 32),
-          const Text(
-            "You are ready to connect!",
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 24,
-              fontWeight: FontWeight.w900,
-              fontFamily: 'Inter',
-            ),
-          ).animate().fadeIn(delay: 450.ms),
-          const SizedBox(height: 8),
-          const Text(
-            "Scan others to connect or show your card to share details instantly.",
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: Colors.white54,
-              fontSize: 14,
-              fontFamily: 'Inter',
-            ),
-          ).animate().fadeIn(delay: 500.ms),
-          const Spacer(),
-          ElevatedButton(
-            onPressed: () =>
-                _finishQuickIdentity(openProfessionalEditor: false),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: context.accentSecondary,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16)),
-            ),
-            child: const Text(
-              "Continue",
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-            ),
-          ),
-          const SizedBox(height: 12),
-          TextButton(
-            onPressed: () => _finishQuickIdentity(openProfessionalEditor: true),
-            child: const Text(
-              "Add Professional Details",
-              style: TextStyle(
-                color: Colors.white54,
-                fontWeight: FontWeight.w600,
-                fontSize: 14,
-              ),
-            ),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -2489,7 +2512,7 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                     ],
                   ),
                   Image.asset(
-                    'assets/icons/New Jana Logo.png',
+                    'assets/icons/Group 5.png',
                     width: 20,
                     height: 20,
                     color: const Color(0xFF00F2FE),
@@ -2638,7 +2661,7 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                 ),
                 child: Center(
                   child: Image.asset(
-                    'assets/icons/New Jana Logo.png',
+                    'assets/icons/Group 5.png',
                     width: 22,
                     height: 22,
                     color: const Color(0xFF00F2FE),

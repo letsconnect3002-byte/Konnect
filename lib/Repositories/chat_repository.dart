@@ -57,6 +57,14 @@ abstract class ChatRepository {
   Future<void> sendTypingBroadcast(
       RealtimeChannel channel, int userId, bool isTyping);
   void removeChannel(RealtimeChannel channel);
+  Future<void> reportMessage({
+    required int reporterId,
+    required int reportedUserId,
+    String? messageId,
+    String? messageContent,
+    required String reason,
+    String? additionalDetails,
+  });
 }
 
 class SupabaseChatRepository implements ChatRepository {
@@ -391,5 +399,24 @@ class SupabaseChatRepository implements ChatRepository {
   @override
   void removeChannel(RealtimeChannel channel) {
     _client.removeChannel(channel);
+  }
+
+  @override
+  Future<void> reportMessage({
+    required int reporterId,
+    required int reportedUserId,
+    String? messageId,
+    String? messageContent,
+    required String reason,
+    String? additionalDetails,
+  }) async {
+    await _client.from('content_reports').insert({
+      'reporter_id': reporterId,
+      'reported_user_id': reportedUserId,
+      'message_id': messageId,
+      'message_content': messageContent,
+      'reason': reason,
+      'additional_details': additionalDetails,
+    });
   }
 }

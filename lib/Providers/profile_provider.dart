@@ -95,9 +95,6 @@ class ProfileProvider with ChangeNotifier {
   String spotify = '';
   List<CustomLink> customLinks = [];
   bool showProfileToConnections = true;
-  bool monkModeEnabled = false;
-  String? monkModeDeactivateAt;
-  List<int> monkModeBlockedIds = [];
 
   // Quick Identity fields
   String vibeTag = '';
@@ -155,9 +152,6 @@ class ProfileProvider with ChangeNotifier {
     avatarUrl = '';
     gender = '';
     customLinks = [];
-    monkModeEnabled = false;
-    monkModeDeactivateAt = null;
-    monkModeBlockedIds = [];
     vibeTag = '';
     interestTags = [];
     quickSetupComplete = false;
@@ -505,14 +499,7 @@ class ProfileProvider with ChangeNotifier {
     }
   }
 
-  Map<String, dynamic>? getMonkModeData() {
-    if (userId == null) return null;
-    return {
-      'enabled': monkModeEnabled,
-      'deactivate_at': monkModeDeactivateAt != null ? DateTime.tryParse(monkModeDeactivateAt!)?.toLocal() : null,
-      'blocked_ids': monkModeBlockedIds,
-    };
-  }
+
 
   // Method to fetch and set userId by profile type (isMyProfile)
   Future<void> fetchAndSetUserId(bool isMyProfile) async {
@@ -585,9 +572,6 @@ class ProfileProvider with ChangeNotifier {
       "gender": "",
       "custom_links": [],
       "showProfileToConnections": true,
-      "monkModeEnabled": false,
-      "monkModeDeactivateAt": null,
-      "monkModeBlockedIds": <int>[]
     };
     try {
       // Only transition to ProfileLoading if we don't already have data.
@@ -618,14 +602,7 @@ class ProfileProvider with ChangeNotifier {
         gender = response['gender'] ?? '';
         showProfileToConnections =
             response['show_profile_to_connections'] == true;
-        monkModeEnabled = response['monk_mode_enabled'] == true;
-        monkModeDeactivateAt = response['monk_mode_deactivate_at'];
-        final List<dynamic>? blockedRaw = response['monk_mode_blocked_ids'];
-        if (blockedRaw != null) {
-          monkModeBlockedIds = blockedRaw.map((e) => int.tryParse(e.toString())).whereType<int>().toList();
-        } else {
-          monkModeBlockedIds = [];
-        }
+
 
         vibeTag = response['vibe_tag'] ?? '';
         final List<dynamic>? interestsRaw = response['interest_tags'];
@@ -673,9 +650,7 @@ class ProfileProvider with ChangeNotifier {
         profileData["gender"] = gender;
         profileData["custom_links"] = customLinks.map((l) => l.toJson()).toList();
         profileData["showProfileToConnections"] = showProfileToConnections;
-        profileData["monkModeEnabled"] = monkModeEnabled;
-        profileData["monkModeDeactivateAt"] = monkModeDeactivateAt;
-        profileData["monkModeBlockedIds"] = monkModeBlockedIds;
+        profileData["vibeTag"] = vibeTag;
         profileData["vibeTag"] = vibeTag;
         profileData["interestTags"] = interestTags;
         profileData["quickSetupComplete"] = quickSetupComplete;
@@ -744,9 +719,6 @@ class ProfileProvider with ChangeNotifier {
           'show_profile_to_connections': showProfileToConnections,
           'field_assignments': assignmentsMap,
           'custom_links': customLinks.map((l) => l.toJson()).toList(),
-          'monk_mode_enabled': monkModeEnabled,
-          'monk_mode_deactivate_at': monkModeDeactivateAt,
-          'monk_mode_blocked_ids': monkModeBlockedIds,
           'vibe_tag': vibeTag,
           'interest_tags': interestTags,
           'quick_setup_complete': quickSetupComplete,
@@ -786,9 +758,6 @@ class ProfileProvider with ChangeNotifier {
       'show_profile_to_connections': showProfileToConnections,
       'field_assignments': assignmentsMap,
       'custom_links': customLinks.map((l) => l.toJson()).toList(),
-      'monk_mode_enabled': monkModeEnabled,
-      'monk_mode_deactivate_at': monkModeDeactivateAt,
-      'monk_mode_blocked_ids': monkModeBlockedIds,
       'vibe_tag': vibeTag,
       'interest_tags': interestTags,
       'quick_setup_complete': quickSetupComplete,
@@ -835,9 +804,7 @@ class ProfileProvider with ChangeNotifier {
     avatarUrl = '';
     gender = '';
     showProfileToConnections = true;
-    monkModeEnabled = false;
-    monkModeDeactivateAt = null;
-    monkModeBlockedIds = [];
+    vibeTag = '';
     vibeTag = '';
     interestTags = [];
     quickSetupComplete = false;

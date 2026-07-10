@@ -11,7 +11,7 @@ import 'package:connect/Pages/DirectMessagesHubPage.dart';
 import 'package:connect/Pages/OtherProfilesPage.dart';
 import 'package:connect/Pages/yet_to_be_built_profile_page.dart';
 import 'package:connect/Pages/IndividualChatPage.dart';
-import 'package:connect/Pages/MonkModePage.dart';
+import 'package:connect/Pages/PlansPage.dart';
 import 'package:connect/Providers/profile_provider.dart';
 import 'package:connect/Providers/connection_provider.dart';
 import 'package:connect/Providers/chat_provider.dart';
@@ -23,11 +23,14 @@ import 'package:connect/Repositories/connection_repository.dart';
 import 'package:connect/Repositories/chat_repository.dart';
 import 'package:connect/Providers/notification_provider.dart';
 import 'package:connect/Repositories/notification_repository.dart';
-import 'package:connect/Providers/monk_mode_provider.dart';
+import 'package:connect/Providers/plans_provider.dart';
+import 'package:connect/Repositories/plans_repository.dart';
 import 'package:connect/Providers/network_provider.dart';
 import 'package:connect/Repositories/network_repository.dart';
-import 'package:timezone/data/latest.dart' as tz;
+import 'package:timezone/data/latest.dart' as tz_latest;
+import 'package:timezone/timezone.dart' as tz;
 import 'package:audio_session/audio_session.dart' as session;
+import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -236,8 +239,29 @@ Future<void> showConnectionLocalNotification({
 
   final bool isConnectionConfirmation =
       type == 'referral_connect' || type == 'vip_pass_key';
+  final bool isPlanNotif = type == 'plan_invite' ||
+      type == 'plan_update' ||
+      type == 'plan_reminder_30' ||
+      type == 'plan_reminder_start';
 
-  if (isConnectionConfirmation) {
+  if (type == 'plan_invite') {
+    androidActions = [
+      const AndroidNotificationAction(
+        'action_plan_accept',
+        'Accept',
+      ),
+      const AndroidNotificationAction(
+        'action_plan_decline',
+        'Decline',
+        inputs: [
+          AndroidNotificationActionInput(
+            label: 'Reason for declining...',
+          ),
+        ],
+      ),
+    ];
+    iosCategory = 'plan_invite_category';
+  } else if (isConnectionConfirmation || isPlanNotif) {
     androidActions = [];
     iosCategory = 'default_category';
   } else if (isReferralRequest) {
@@ -387,32 +411,6 @@ void handleLocalNotificationClickPayload(String payload) {
   }
 }
 
-Future<bool> _isUserMutedUnderMonkMode(int senderId) async {
-  try {
-    final ownerId = await LocalDatabaseHelper.instance.getActiveUserId();
-    if (ownerId == null) return false;
-    final settings =
-        await LocalDatabaseHelper.instance.getMonkModeSettings(ownerId);
-    final bool enabled = settings['enabled'] as bool? ?? false;
-    if (!enabled) return false;
-
-    final String? deactivateAtStr = settings['deactivate_at'] as String?;
-    if (deactivateAtStr != null) {
-      final deactivateAt = DateTime.tryParse(deactivateAtStr)?.toLocal();
-      if (deactivateAt != null && DateTime.now().isAfter(deactivateAt)) {
-        return false;
-      }
-    }
-
-    final List<int> blockedIds =
-        List<int>.from(settings['blocked_ids'] as List? ?? []);
-    return blockedIds.contains(senderId);
-  } catch (e) {
-    print("Error checking monk mode status: $e");
-    return false;
-  }
-}
-
 @pragma('vm:entry-point')
 Future<void> onNotificationActionReceived(NotificationResponse response) async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -467,18 +465,22 @@ Future<void> onNotificationActionReceived(NotificationResponse response) async {
                   .select('default_card_visibility')
                   .eq('id', referredUserId)
                   .maybeSingle();
-              if (otherProfileRes != null && otherProfileRes['default_card_visibility'] != null) {
-                referredUserDefaultCard = otherProfileRes['default_card_visibility'].toString();
+              if (otherProfileRes != null &&
+                  otherProfileRes['default_card_visibility'] != null) {
+                referredUserDefaultCard =
+                    otherProfileRes['default_card_visibility'].toString();
                 if (referredUserDefaultCard == 'both') {
                   referredUserDefaultCard = 'casual';
                 }
               }
             } catch (fetchErr) {
-              print("PushNotificationsAction: Error fetching other user profile: $fetchErr");
+              print(
+                  "PushNotificationsAction: Error fetching other user profile: $fetchErr");
             }
 
             final prefs = await SharedPreferences.getInstance();
-            final String defaultCard = prefs.getString('default_card_visibility') ?? 'casual';
+            final String defaultCard =
+                prefs.getString('default_card_visibility') ?? 'casual';
 
             String u1Share = 'casual';
             String u2Share = 'casual';
@@ -562,6 +564,63 @@ Future<void> onNotificationActionReceived(NotificationResponse response) async {
                   : '[REFERRAL_REQUEST_ACTIONED]',
               'is_seen': true,
             }).eq('id', notificationId);
+          }
+        } else if (actionId == 'action_plan_accept') {
+          print("PushNotificationsAction: Plan Accept action triggered");
+          final myUserId = await LocalDatabaseHelper.instance.getActiveUserId();
+          final planId =
+              data['plan_id']?.toString() ?? data['note']?.toString();
+          print(
+              "PushNotificationsAction: myUserId: $myUserId, planId: $planId");
+          if (myUserId != null && planId != null) {
+            final inviteRes = await client
+                .from('plan_invites')
+                .select('id')
+                .eq('plan_id', planId)
+                .eq('invitee_id', myUserId)
+                .maybeSingle();
+
+            if (inviteRes != null && inviteRes['id'] != null) {
+              final inviteId = inviteRes['id'] as String;
+              await client.from('plan_invites').update({
+                'status': 'accepted',
+                'responded_at': DateTime.now().toUtc().toIso8601String(),
+              }).eq('id', inviteId);
+            }
+
+            await client
+                .from('connection_notifications')
+                .update({'is_seen': true}).eq('id', notificationId);
+          }
+        } else if (actionId == 'action_plan_decline') {
+          final String? declineReason = response.input?.trim();
+          print(
+              "PushNotificationsAction: Plan Decline action triggered. Reason: $declineReason");
+          final myUserId = await LocalDatabaseHelper.instance.getActiveUserId();
+          final planId =
+              data['plan_id']?.toString() ?? data['note']?.toString();
+          print(
+              "PushNotificationsAction: myUserId: $myUserId, planId: $planId");
+          if (myUserId != null && planId != null) {
+            final inviteRes = await client
+                .from('plan_invites')
+                .select('id')
+                .eq('plan_id', planId)
+                .eq('invitee_id', myUserId)
+                .maybeSingle();
+
+            if (inviteRes != null && inviteRes['id'] != null) {
+              final inviteId = inviteRes['id'] as String;
+              await client.from('plan_invites').update({
+                'status': 'declined',
+                'decline_reason': declineReason,
+                'responded_at': DateTime.now().toUtc().toIso8601String(),
+              }).eq('id', inviteId);
+            }
+
+            await client
+                .from('connection_notifications')
+                .update({'is_seen': true}).eq('id', notificationId);
           }
         } else if (actionId == 'action_chat' || actionId == 'action_message') {
           print("PushNotificationsAction: Chat/Message action triggered");
@@ -841,6 +900,24 @@ List<DarwinNotificationCategory> buildDarwinNotificationCategories() {
         DarwinNotificationCategoryOption.hiddenPreviewShowTitle,
       },
     ),
+    DarwinNotificationCategory(
+      'plan_invite_category',
+      actions: <DarwinNotificationAction>[
+        DarwinNotificationAction.plain(
+          'action_plan_accept',
+          'Accept',
+        ),
+        DarwinNotificationAction.text(
+          'action_plan_decline',
+          'Decline',
+          buttonTitle: 'Decline',
+          placeholder: 'Reason for declining...',
+        ),
+      ],
+      options: <DarwinNotificationCategoryOption>{
+        DarwinNotificationCategoryOption.hiddenPreviewShowTitle,
+      },
+    ),
   ];
 }
 
@@ -935,66 +1012,60 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
               "PushNotifications: Error updating remote Supabase status in background: $e");
         }
 
-        // 3. Show notification if sender is not muted
+        // 3. Show notification
         try {
-          final isMuted = await _isUserMutedUnderMonkMode(senderId);
-          if (!isMuted) {
-            final activeUserId =
-                await LocalDatabaseHelper.instance.getActiveUserId();
-            if (activeUserId != null && senderId == activeUserId) {
-              print(
-                  "PushNotifications: Received own message in background FCM. Ignoring notification.");
-              return;
-            }
+          final activeUserId =
+              await LocalDatabaseHelper.instance.getActiveUserId();
+          if (activeUserId != null && senderId == activeUserId) {
+            print(
+                "PushNotifications: Received own message in background FCM. Ignoring notification.");
+            return;
+          }
 
-            List<String> messageLines = [];
-            bool isFallback = false;
-            try {
-              final unreadRows = await LocalDatabaseHelper.instance
-                  .getUnreadMessagesForRoomBySender(roomId, senderId);
-              messageLines =
-                  unreadRows.map((r) => r['payload'] as String).toList();
-              if (messageLines.isEmpty) {
-                isFallback = true;
-              }
-            } catch (dbError) {
-              print(
-                  "PushNotifications: Database read failed in background: $dbError");
+          List<String> messageLines = [];
+          bool isFallback = false;
+          try {
+            final unreadRows = await LocalDatabaseHelper.instance
+                .getUnreadMessagesForRoomBySender(roomId, senderId);
+            messageLines =
+                unreadRows.map((r) => r['payload'] as String).toList();
+            if (messageLines.isEmpty) {
               isFallback = true;
             }
-
-            final senderName = data['sender_name'] as String? ?? 'New Message';
-            if (isFallback) {
-              await showLocalNotification(
-                roomId, // Collapse by roomId so notifications stay in the same tray
-                senderName,
-                [payload],
-                {
-                  'sender_id': senderIdStr,
-                  'room_id': roomId,
-                  'message_id': messageId,
-                  'sender_name': senderName,
-                },
-              );
-              print(
-                  "PushNotifications: Background fallback notification displayed for roomId: $roomId.");
-            } else {
-              await showLocalNotification(
-                roomId,
-                senderName,
-                messageLines,
-                {
-                  'sender_id': senderIdStr,
-                  'room_id': roomId,
-                  'sender_name': senderName,
-                },
-              );
-              print(
-                  "PushNotifications: Background local notification displayed with ${messageLines.length} lines.");
-            }
-          } else {
+          } catch (dbError) {
             print(
-                "PushNotifications: Background notification suppressed because sender $senderId is muted.");
+                "PushNotifications: Database read failed in background: $dbError");
+            isFallback = true;
+          }
+
+          final senderName = data['sender_name'] as String? ?? 'New Message';
+          if (isFallback) {
+            await showLocalNotification(
+              roomId, // Collapse by roomId so notifications stay in the same tray
+              senderName,
+              [payload],
+              {
+                'sender_id': senderIdStr,
+                'room_id': roomId,
+                'message_id': messageId,
+                'sender_name': senderName,
+              },
+            );
+            print(
+                "PushNotifications: Background fallback notification displayed for roomId: $roomId.");
+          } else {
+            await showLocalNotification(
+              roomId,
+              senderName,
+              messageLines,
+              {
+                'sender_id': senderIdStr,
+                'room_id': roomId,
+                'sender_name': senderName,
+              },
+            );
+            print(
+                "PushNotifications: Background local notification displayed with ${messageLines.length} lines.");
           }
         } catch (e) {
           print(
@@ -1096,6 +1167,102 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
               title = "New Referral";
               body = "$actorName referred $referredName to you";
             }
+          } else if (type == "plan_invite" ||
+              type == "plan_update" ||
+              type == "plan_reminder_30" ||
+              type == "plan_reminder_start") {
+            String planId = note ?? '';
+            List<String> changedFields = [];
+            if (note != null && note.startsWith('{')) {
+              try {
+                final parsed = jsonDecode(note);
+                planId = parsed['plan_id']?.toString() ?? '';
+                if (parsed['changed_fields'] is List) {
+                  changedFields = List<String>.from(parsed['changed_fields']);
+                }
+              } catch (e) {
+                print("Error parsing note JSON in background push: $e");
+              }
+            }
+
+            String planTitle = "Plan";
+            String startsAtText = "";
+            if (planId.isNotEmpty) {
+              try {
+                final planRow = await client
+                    .from('plans')
+                    .select('title, starts_at')
+                    .eq('id', planId)
+                    .maybeSingle();
+                if (planRow != null) {
+                  if (planRow['title'] != null) {
+                    planTitle = planRow['title'].toString();
+                  }
+                  final startsAtStr = planRow['starts_at'] as String?;
+                  if (startsAtStr != null) {
+                    try {
+                      final dt = DateTime.parse(startsAtStr);
+                      final diff = dt.difference(DateTime.now());
+                      if (diff.isNegative) {
+                        startsAtText = "now";
+                      } else {
+                        final days = diff.inDays;
+                        final hours = diff.inHours % 24;
+                        final minutes = diff.inMinutes % 60;
+                        final seconds = diff.inSeconds % 60;
+
+                        final pad = (int n) => n.toString().padLeft(2, '0');
+
+                        if (days > 0) {
+                          startsAtText =
+                              "in ${days}d:${pad(hours)}h:${pad(minutes)}m:${pad(seconds)}s";
+                        } else if (hours > 0) {
+                          startsAtText =
+                              "in ${pad(hours)}h:${pad(minutes)}m:${pad(seconds)}s";
+                        } else {
+                          startsAtText = "in ${pad(minutes)}m:${pad(seconds)}s";
+                        }
+                      }
+                    } catch (e) {
+                      print("Error formatting starts_at: $e");
+                    }
+                  }
+                }
+              } catch (e) {
+                print("Error fetching plan details for push: $e");
+              }
+            }
+            if (type == "plan_invite") {
+              title = "New Plan Invitation";
+              body = "$actorName invited you to join \"$planTitle\"";
+            } else if (type == "plan_update") {
+              title = "Plan Updated";
+              String changeDesc = "";
+              if (changedFields.isNotEmpty) {
+                final labelsMap = {
+                  'starts_at': 'time',
+                  'location': 'location',
+                  'title': 'title',
+                  'description': 'description',
+                  'category': 'category',
+                  'plan_type': 'type',
+                  'is_online': 'online status',
+                  'meeting_link': 'meeting link',
+                };
+                final labels =
+                    changedFields.map((f) => labelsMap[f] ?? f).toList();
+                changeDesc = " (changed: ${labels.join(', ')})";
+              }
+              body = "$actorName updated the plan \"$planTitle\"$changeDesc";
+            } else if (type == "plan_reminder_30") {
+              title = "Upcoming Plan Reminder";
+              final timeSuffix =
+                  startsAtText.isNotEmpty ? " $startsAtText" : " in 30 minutes";
+              body = "\"$planTitle\" starts$timeSuffix";
+            } else if (type == "plan_reminder_start") {
+              title = "Plan Starting Now";
+              body = "\"$planTitle\" is starting now!";
+            }
           } else {
             title = "New Connection";
             body = "$actorName connected with you";
@@ -1142,7 +1309,19 @@ void main() async {
     print("AudioSession: Error configuring native audio session: $e");
   }
 
-  tz.initializeTimeZones();
+  tz_latest.initializeTimeZones();
+  try {
+    final timezoneInfo = await FlutterTimezone.getLocalTimezone();
+    final timeZoneName = timezoneInfo.identifier;
+    tz.setLocalLocation(tz.getLocation(timeZoneName));
+    print("Timezone: Local location set to $timeZoneName");
+  } catch (e) {
+    print("Timezone: Error setting local timezone location: $e");
+    // Fallback to UTC if device timezone lookup fails
+    try {
+      tz.setLocalLocation(tz.getLocation('UTC'));
+    } catch (_) {}
+  }
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
@@ -1262,11 +1441,13 @@ class MyApp extends StatelessWidget {
             ..loadBackgroundBlurPref()
             ..loadDefaultCardVisibilityPref(),
         ),
-        ChangeNotifierProxyProvider<ProfileProvider, MonkModeProvider>(
-          create: (_) => MonkModeProvider(),
-          update: (_, profileProvider, monkModeProvider) {
-            monkModeProvider!.updateProfileProvider(profileProvider);
-            return monkModeProvider;
+        ChangeNotifierProxyProvider<ProfileProvider, PlansProvider>(
+          create: (_) => PlansProvider(
+            plansRepository: SupabasePlansRepository(),
+          ),
+          update: (_, profileProvider, plansProvider) {
+            plansProvider!.updateUserId(profileProvider.userId);
+            return plansProvider;
           },
         ),
         ChangeNotifierProxyProvider<ProfileProvider, ConnectionProvider>(
@@ -1644,23 +1825,17 @@ class _AppShellGateState extends State<AppShellGate> {
                       return;
                     }
 
-                    final isMuted = await _isUserMutedUnderMonkMode(senderId);
-                    if (isMuted) {
+                    final overlayState = navigatorKey.currentState?.overlay;
+                    if (overlayState != null) {
+                      InAppNotificationBanner.show(
+                        overlayState: overlayState,
+                        senderId: senderId,
+                        senderName: senderName,
+                        avatarUrl: data['sender_avatar'] ?? '',
+                        message: payload,
+                      );
                       print(
-                          "PushNotifications: Foreground notification suppressed because sender $senderId is muted.");
-                    } else {
-                      final overlayState = navigatorKey.currentState?.overlay;
-                      if (overlayState != null) {
-                        InAppNotificationBanner.show(
-                          overlayState: overlayState,
-                          senderId: senderId,
-                          senderName: senderName,
-                          avatarUrl: data['sender_avatar'] ?? '',
-                          message: payload,
-                        );
-                        print(
-                            "PushNotifications: Foreground in-app notification banner displayed for messageId: $messageId.");
-                      }
+                          "PushNotifications: Foreground in-app notification banner displayed for messageId: $messageId.");
                     }
                   } catch (e) {
                     print(
@@ -1776,6 +1951,108 @@ class _AppShellGateState extends State<AppShellGate> {
                       title = "New Referral";
                       body = "$actorName referred $referredName to you";
                     }
+                  } else if (type == "plan_invite" ||
+                      type == "plan_update" ||
+                      type == "plan_reminder_30" ||
+                      type == "plan_reminder_start") {
+                    String planId = note ?? '';
+                    List<String> changedFields = [];
+                    if (note != null && note.startsWith('{')) {
+                      try {
+                        final parsed = jsonDecode(note);
+                        planId = parsed['plan_id']?.toString() ?? '';
+                        if (parsed['changed_fields'] is List) {
+                          changedFields =
+                              List<String>.from(parsed['changed_fields']);
+                        }
+                      } catch (e) {
+                        print("Error parsing note JSON in foreground push: $e");
+                      }
+                    }
+
+                    String planTitle = "Plan";
+                    String startsAtText = "";
+                    if (planId.isNotEmpty) {
+                      try {
+                        final planRow = await client
+                            .from('plans')
+                            .select('title, starts_at')
+                            .eq('id', planId)
+                            .maybeSingle();
+                        if (planRow != null) {
+                          if (planRow['title'] != null) {
+                            planTitle = planRow['title'].toString();
+                          }
+                          final startsAtStr = planRow['starts_at'] as String?;
+                          if (startsAtStr != null) {
+                            try {
+                              final dt = DateTime.parse(startsAtStr);
+                              final diff = dt.difference(DateTime.now());
+                              if (diff.isNegative) {
+                                startsAtText = "now";
+                              } else {
+                                final days = diff.inDays;
+                                final hours = diff.inHours % 24;
+                                final minutes = diff.inMinutes % 60;
+                                final seconds = diff.inSeconds % 60;
+
+                                final pad =
+                                    (int n) => n.toString().padLeft(2, '0');
+
+                                if (days > 0) {
+                                  startsAtText =
+                                      "in ${days}d:${pad(hours)}h:${pad(minutes)}m:${pad(seconds)}s";
+                                } else if (hours > 0) {
+                                  startsAtText =
+                                      "in ${pad(hours)}h:${pad(minutes)}m:${pad(seconds)}s";
+                                } else {
+                                  startsAtText =
+                                      "in ${pad(minutes)}m:${pad(seconds)}s";
+                                }
+                              }
+                            } catch (e) {
+                              print("Error formatting starts_at: $e");
+                            }
+                          }
+                        }
+                      } catch (e) {
+                        print("Error fetching plan details for push: $e");
+                      }
+                    }
+                    if (type == "plan_invite") {
+                      title = "New Plan Invitation";
+                      body = "$actorName invited you to join \"$planTitle\"";
+                    } else if (type == "plan_update") {
+                      title = "Plan Updated";
+                      String changeDesc = "";
+                      if (changedFields.isNotEmpty) {
+                        final labelsMap = {
+                          'starts_at': 'time',
+                          'location': 'location',
+                          'title': 'title',
+                          'description': 'description',
+                          'category': 'category',
+                          'plan_type': 'type',
+                          'is_online': 'online status',
+                          'meeting_link': 'meeting link',
+                        };
+                        final labels = changedFields
+                            .map((f) => labelsMap[f] ?? f)
+                            .toList();
+                        changeDesc = " (changed: ${labels.join(', ')})";
+                      }
+                      body =
+                          "$actorName updated the plan \"$planTitle\"$changeDesc";
+                    } else if (type == "plan_reminder_30") {
+                      title = "Upcoming Plan Reminder";
+                      final timeSuffix = startsAtText.isNotEmpty
+                          ? " $startsAtText"
+                          : " in 30 minutes";
+                      body = "\"$planTitle\" starts$timeSuffix";
+                    } else if (type == "plan_reminder_start") {
+                      title = "Plan Starting Now";
+                      body = "\"$planTitle\" is starting now!";
+                    }
                   } else {
                     title = "New Connection";
                     body = "$actorName connected with you";
@@ -1853,7 +2130,7 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
       const DirectMessagesHubPage(), // index 0 — Home / Chats
       const OtherProfilesPage(), // index 1 — Mandal / Connections
       const YourNetworkPage(), // index 2 — Your Network
-      const MonkModePage(), // index 3 — Monk Mode
+      const PlansPage(), // index 3 — Plans
       const YetToBeBuiltProfilePage(), // index 4 — My Card
     ];
     _setupNotificationTapListeners();
@@ -1972,7 +2249,7 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
                       index: 0, icon: Icons.chat_bubble_outline_rounded),
                   _buildNavItem(index: 1, icon: Icons.people_outline_rounded),
                   _buildNavItem(index: 2, icon: Icons.search_rounded),
-                  _buildNavItem(index: 3, icon: Icons.self_improvement_rounded),
+                  _buildNavItem(index: 3, icon: Icons.event_outlined),
                   _buildNavItem(index: 4, icon: Icons.person_outline_rounded),
                 ],
               ),

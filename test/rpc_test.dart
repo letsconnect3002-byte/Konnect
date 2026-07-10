@@ -10,6 +10,7 @@ void main() {
     );
     try {
       final response = await client.rpc('get_network_stats', params: {'p_user_id': 2}); // dummy RPC call just to check
+      print('RPC response: $response');
       // Let's run a direct SQL query by calling a postgres system view or writing a dummy query if possible.
       // Wait, is there a general query we can run? Since we don't have direct sql editor, we might not have a general query RPC.
       // But we can check if we can get info from pg_catalog by selecting from it if it's exposed or if there's any other way.

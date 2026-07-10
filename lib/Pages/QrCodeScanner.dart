@@ -22,6 +22,8 @@ class _QRScannerPageState extends State<QRScannerPage> {
   Barcode? result;
   QRViewController? controller;
   final GlobalKey qrKey = GlobalKey(debugLabel: 'QR');
+  bool _isLoading = false;
+  bool _processingScan = false;
 
   @override
   void reassemble() {
@@ -34,56 +36,92 @@ class _QRScannerPageState extends State<QRScannerPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: context.canvasBackground,
-      appBar: AppBar(
-        title: Text(
-          "Scan Identity QR",
-          style: context.screenHeading,
-        ),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        flexibleSpace: const GlassmorphicFlexibleSpace(),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded,
-              color: Colors.white, size: 18),
-          onPressed: () => Navigator.pop(context),
-        ),
-      ),
-      body: Column(
-        children: <Widget>[
-          Expanded(flex: 4, child: _buildQrView(context)),
-          Expanded(
-            flex: 1,
-            child: Container(
-              color: context.canvasBackground,
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      "Hold your device over the QR code",
-                      style: context.bodyText.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                      textAlign: TextAlign.center,
+    return Stack(
+      children: [
+        Scaffold(
+          backgroundColor: context.canvasBackground,
+          appBar: AppBar(
+            title: Text(
+              "Scan Identity QR",
+              style: context.screenHeading,
+            ),
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            flexibleSpace: const GlassmorphicFlexibleSpace(),
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back_ios_new_rounded,
+                  color: Colors.white, size: 18),
+              onPressed: () => Navigator.pop(context),
+            ),
+          ),
+          body: Column(
+            children: <Widget>[
+              Expanded(flex: 4, child: _buildQrView(context)),
+              Expanded(
+                flex: 1,
+                child: Container(
+                  color: context.canvasBackground,
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  child: Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          "Hold your device over the QR code",
+                          style: context.bodyText.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          "Scanning is secure & connects you directly.",
+                          style: context.captionText.copyWith(
+                            color: context.textSecondary,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 6),
-                    Text(
-                      "Scanning is secure & connects you directly.",
-                      style: context.captionText.copyWith(
-                        color: context.textSecondary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        if (_isLoading)
+          Container(
+            color: Colors.black.withOpacity(0.6),
+            child: Center(
+              child: GlassmorphicContainer(
+                borderRadius:
+                    BorderRadius.circular(AppDimensions.radiusPremiumCard),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                      vertical: 24, horizontal: 16),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      CircularProgressIndicator(
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                            context.accentPrimary),
                       ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ],
+                      const SizedBox(height: 16),
+                      Text(
+                        "Loading their card...",
+                        style: context.bodyText.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
           ),
-        ],
-      ),
+      ],
     );
   }
 
@@ -151,9 +189,12 @@ class _QRScannerPageState extends State<QRScannerPage> {
     });
 
     controller.scannedDataStream.listen((scanData) async {
+      if (_processingScan) return;
+
       print("Scanned QR Code: ${scanData.code}");
 
       setState(() {
+        _processingScan = true;
         result = scanData;
       });
 
@@ -184,44 +225,11 @@ class _QRScannerPageState extends State<QRScannerPage> {
             final int idToFetch =
                 userIdVal is int ? userIdVal : int.parse(userIdVal.toString());
 
-            // Show a progress dialog while fetching profile
-            if (mounted) {
-              showDialog(
-                context: context,
-                barrierDismissible: false,
-                builder: (context) => Dialog(
-                  backgroundColor: Colors.transparent,
-                  elevation: 0,
-                  child: GlassmorphicContainer(
-                    borderRadius:
-                        BorderRadius.circular(AppDimensions.radiusPremiumCard),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                          vertical: 24, horizontal: 16),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          CircularProgressIndicator(
-                            valueColor: AlwaysStoppedAnimation<Color>(
-                                context.accentPrimary),
-                          ),
-                          const SizedBox(height: 16),
-                          Text(
-                            "Loading their card...",
-                            style: context.bodyText.copyWith(
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              );
-            }
+            // Show a progress indicator locally inside the page layout
+            setState(() {
+              _isLoading = true;
+            });
 
-            if (!mounted) return;
             final profileProvider =
                 Provider.of<ProfileProvider>(context, listen: false);
             final fetchedData =
@@ -230,9 +238,9 @@ class _QRScannerPageState extends State<QRScannerPage> {
               fetchedData['sharedCard'] = decodedData['sharedCard'] ?? 'both';
             }
 
-            if (mounted) {
-              Navigator.pop(context); // Dismiss progress dialog
-            }
+            setState(() {
+              _isLoading = false;
+            });
 
             if (fetchedData.isNotEmpty &&
                 fetchedData['name'].toString().isNotEmpty) {
@@ -243,6 +251,9 @@ class _QRScannerPageState extends State<QRScannerPage> {
                     builder: (context) => ProfileCard(profileData: fetchedData),
                   ),
                 ).then((_) {
+                  setState(() {
+                    _processingScan = false;
+                  });
                   controller.resumeCamera();
                 });
               }
@@ -251,6 +262,9 @@ class _QRScannerPageState extends State<QRScannerPage> {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(content: Text("Profile data not found")),
                 );
+                setState(() {
+                  _processingScan = false;
+                });
                 controller.resumeCamera();
               }
             }
@@ -263,6 +277,9 @@ class _QRScannerPageState extends State<QRScannerPage> {
                   builder: (context) => ProfileCard(profileData: decodedData),
                 ),
               ).then((_) {
+                setState(() {
+                  _processingScan = false;
+                });
                 controller.resumeCamera();
               });
             }
@@ -270,6 +287,10 @@ class _QRScannerPageState extends State<QRScannerPage> {
         } catch (e) {
           // Handle any parsing errors gracefully
           print("Error decoding QR data: $e");
+          setState(() {
+            _isLoading = false;
+            _processingScan = false;
+          });
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(content: Text("Invalid QR Code")),

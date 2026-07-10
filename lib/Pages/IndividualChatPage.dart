@@ -46,6 +46,7 @@ class _IndividualChatPageState extends State<IndividualChatPage>
   bool _showScrollToBottom = false;
   int _previousMessageCount = 0;
   final Set<String> _animatedMessageIds = {};
+  Map<String, dynamic>? _selectedMessage;
 
   @override
   void initState() {
@@ -427,133 +428,210 @@ class _IndividualChatPageState extends State<IndividualChatPage>
         backgroundColor: Colors.transparent,
         elevation: 0,
         flexibleSpace: const GlassmorphicFlexibleSpace(),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded,
-              color: Colors.white, size: 18),
-          onPressed: () => Navigator.pop(context),
-        ),
-        titleSpacing: 0,
-        title: GestureDetector(
-          onTap: () {
-            if (_connectionData != null) {
-              HapticFeedback.lightImpact();
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => ConnectionProfilePage(
-                    profileData: _connectionData!,
-                  ),
-                ),
-              );
-            }
-          },
-          behavior: HitTestBehavior.opaque,
-          child: Row(
-            children: [
-              Container(
-                width: 38,
-                height: 38,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: context.accentPrimary,
-                    width: 2.0,
-                  ),
-                ),
-                padding: const EdgeInsets.all(1.5),
-                child: Container(
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: context.surfaceSecondary,
-                  ),
-                  padding: const EdgeInsets.all(1.5),
-                  child: _isProfileLoading
-                      ? const _ShimmerBox(
-                          width: 34,
-                          height: 34,
-                          shape: BoxShape.circle,
-                        )
-                      : ClipOval(
-                          child: avatar.isNotEmpty
-                              ? Image.network(
-                                  avatar,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (context, error, stackTrace) =>
-                                      Container(
-                                    color: context.surfaceSecondary,
-                                    alignment: Alignment.center,
-                                    child: Text(
-                                      _name.isNotEmpty
-                                          ? _name.substring(0, 1).toUpperCase()
-                                          : "?",
-                                      style: TextStyle(
-                                          color: context.textPrimary,
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 14),
-                                    ),
-                                  ),
-                                )
-                              : Container(
-                                  color: context.surfaceSecondary,
-                                  alignment: Alignment.center,
-                                  child: Text(
-                                    _name.isNotEmpty
-                                        ? _name.substring(0, 1).toUpperCase()
-                                        : "?",
-                                    style: TextStyle(
-                                        color: context.textPrimary,
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 14),
-                                  ),
-                                ),
-                        ),
-                ),
+        leading: _selectedMessage != null
+            ? IconButton(
+                icon: const Icon(Icons.close_rounded, color: Colors.white, size: 22),
+                onPressed: () {
+                  setState(() {
+                    _selectedMessage = null;
+                  });
+                },
+              )
+            : IconButton(
+                icon: const Icon(Icons.arrow_back_ios_new_rounded,
+                    color: Colors.white, size: 18),
+                onPressed: () => Navigator.pop(context),
               ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+        titleSpacing: 0,
+        title: _selectedMessage != null
+            ? Text(
+                "1 selected",
+                style: context.screenHeading.copyWith(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              )
+            : GestureDetector(
+                onTap: () {
+                  if (_connectionData != null) {
+                    HapticFeedback.lightImpact();
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => ConnectionProfilePage(
+                          profileData: _connectionData!,
+                        ),
+                      ),
+                    );
+                  }
+                },
+                behavior: HitTestBehavior.opaque,
+                child: Row(
                   children: [
-                    if (_isProfileLoading) ...[
-                      const _ShimmerBox(
-                        width: 100,
-                        height: 14,
-                        borderRadius: 4,
-                      ),
-                      const SizedBox(height: 5),
-                      const _ShimmerBox(
-                        width: 70,
-                        height: 10,
-                        borderRadius: 3,
-                      ),
-                    ] else ...[
-                      Text(
-                        _name,
-                        style: context.bodyText.copyWith(
-                          color: context.textPrimary,
-                          fontWeight: FontWeight.bold,
+                    Container(
+                      width: 38,
+                      height: 38,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: context.accentPrimary,
+                          width: 2.0,
                         ),
                       ),
-                      const SizedBox(height: 2),
-                      Text(
-                        _profession,
-                        style: context.captionText.copyWith(
-                          color: context.textSecondary,
+                      padding: const EdgeInsets.all(1.5),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: context.surfaceSecondary,
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                        padding: const EdgeInsets.all(1.5),
+                        child: _isProfileLoading
+                            ? const _ShimmerBox(
+                                width: 34,
+                                height: 34,
+                                shape: BoxShape.circle,
+                              )
+                            : ClipOval(
+                                child: avatar.isNotEmpty
+                                    ? Image.network(
+                                        avatar,
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (context, error, stackTrace) =>
+                                            Container(
+                                          color: context.surfaceSecondary,
+                                          alignment: Alignment.center,
+                                          child: Text(
+                                            _name.isNotEmpty
+                                                ? _name.substring(0, 1).toUpperCase()
+                                                : "?",
+                                            style: TextStyle(
+                                                color: context.textPrimary,
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 14),
+                                          ),
+                                        ),
+                                      )
+                                    : Container(
+                                        color: context.surfaceSecondary,
+                                        alignment: Alignment.center,
+                                        child: Text(
+                                          _name.isNotEmpty
+                                              ? _name.substring(0, 1).toUpperCase()
+                                              : "?",
+                                          style: TextStyle(
+                                              color: context.textPrimary,
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 14),
+                                        ),
+                                      ),
+                              ),
                       ),
-                    ],
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (_isProfileLoading) ...[
+                            const _ShimmerBox(
+                              width: 100,
+                              height: 14,
+                              borderRadius: 4,
+                            ),
+                            const SizedBox(height: 5),
+                            const _ShimmerBox(
+                              width: 70,
+                              height: 10,
+                              borderRadius: 3,
+                            ),
+                          ] else ...[
+                            Text(
+                              _name,
+                              style: context.bodyText.copyWith(
+                                color: context.textPrimary,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              _profession,
+                              style: context.captionText.copyWith(
+                                color: context.textSecondary,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
                   ],
                 ),
               ),
-            ],
-          ),
-        ),
-
+        actions: _selectedMessage == null
+            ? []
+            : [
+                if (_selectedMessage!['sender_id'] == _myUserId &&
+                    _selectedMessage!['status'] == 'error')
+                  IconButton(
+                    icon: const Icon(Icons.refresh_rounded, color: Color(0xFF00F2FE)),
+                    tooltip: 'Resend',
+                    onPressed: () {
+                      final msg = _selectedMessage!;
+                      setState(() {
+                        _selectedMessage = null;
+                      });
+                      _provider.resendChatMessage(msg['id'] as String);
+                    },
+                  ),
+                IconButton(
+                  icon: const Icon(Icons.report_gmailerrorred_outlined, color: Colors.orangeAccent),
+                  tooltip: 'Report Message',
+                  onPressed: () {
+                    final msg = _selectedMessage!;
+                    setState(() {
+                      _selectedMessage = null;
+                    });
+                    _showReportDialog(msg);
+                  },
+                ),
+                IconButton(
+                  icon: const Icon(Icons.reply_rounded, color: Colors.white),
+                  tooltip: 'Reply',
+                  onPressed: () {
+                    final msg = _selectedMessage!;
+                    setState(() {
+                      _selectedMessage = null;
+                    });
+                    _setReplyMessage(msg, msg['sender_id'] == _myUserId);
+                    _messageFocusNode.requestFocus();
+                  },
+                ),
+                IconButton(
+                  icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent),
+                  tooltip: 'Delete',
+                  onPressed: () {
+                    final msg = _selectedMessage!;
+                    setState(() {
+                      _selectedMessage = null;
+                    });
+                    _handleDeleteMessage(msg, msg['sender_id'] == _myUserId);
+                  },
+                ),
+                const SizedBox(width: 8),
+              ],
       ),
-      body: Stack(
-        children: [
+      body: GestureDetector(
+        onTap: () {
+          if (_selectedMessage != null) {
+            setState(() {
+              _selectedMessage = null;
+            });
+          }
+        },
+        behavior: HitTestBehavior.opaque,
+        child: Stack(
+          children: [
           Positioned.fill(
             child: Image.asset(
               'assets/background/message background.png',
@@ -641,10 +719,19 @@ class _IndividualChatPageState extends State<IndividualChatPage>
                                   onTapDown: (details) {
                                     tapPosition = details.globalPosition;
                                   },
+                                  onTap: () {
+                                    if (_selectedMessage != null) {
+                                      setState(() {
+                                        _selectedMessage = null;
+                                      });
+                                    }
+                                  },
                                   onLongPress: () {
                                     _messageFocusNode.unfocus();
-                                    _showContextMenu(
-                                        context, tapPosition, msg, isMe);
+                                    HapticFeedback.mediumImpact();
+                                    setState(() {
+                                      _selectedMessage = msg;
+                                    });
                                   },
                                   child: _buildMessageBubble(
                                     text: msg['payload'] ?? '',
@@ -654,7 +741,7 @@ class _IndividualChatPageState extends State<IndividualChatPage>
                                     replyToId: replyToId,
                                     replyToPayload: replyToPayload,
                                     replyToSenderName: replyToSenderName,
-                                    isHighlighted: isHighlighted,
+                                    isHighlighted: isHighlighted || (_selectedMessage?['id'] == msgId),
                                   ),
                                 ),
                               );
@@ -748,6 +835,7 @@ class _IndividualChatPageState extends State<IndividualChatPage>
           ),
         ],
       ),
+     ),
     );
   }
 
@@ -1230,6 +1318,170 @@ class _IndividualChatPageState extends State<IndividualChatPage>
     setState(() {
       _replyMessage = message;
     });
+  }
+
+  void _showReportDialog(Map<String, dynamic> message) {
+    String selectedReason = 'Spam';
+    final detailsController = TextEditingController();
+    bool isSubmitting = false;
+
+    showDialog(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setStateBuilder) {
+            return GlassmorphicAlertDialog(
+              title: Text(
+                "Report Message",
+                style: context.screenHeading.copyWith(fontWeight: FontWeight.bold),
+              ),
+              content: SizedBox(
+                width: double.maxFinite,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        "Please select the reason for flagging this content:",
+                        style: context.bodyText.copyWith(color: context.textSecondary),
+                      ),
+                      const SizedBox(height: 12),
+                      ...['Spam', 'Harassment or Abuse', 'Inappropriate Content', 'Other'].map((reason) {
+                        final isSelected = selectedReason == reason;
+                        return InkWell(
+                          onTap: isSubmitting ? null : () {
+                            setStateBuilder(() {
+                              selectedReason = reason;
+                            });
+                          },
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 8.0),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  isSelected
+                                      ? Icons.radio_button_checked_rounded
+                                      : Icons.radio_button_off_rounded,
+                                  color: isSelected
+                                      ? context.accentPrimary
+                                      : context.textMuted,
+                                  size: 20,
+                                ),
+                                const SizedBox(width: 12),
+                                Text(
+                                  reason,
+                                  style: context.bodyText.copyWith(
+                                    color: isSelected
+                                        ? context.textPrimary
+                                        : context.textSecondary,
+                                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      }),
+                      const SizedBox(height: 16),
+                      Text(
+                        "Additional Details (Optional):",
+                        style: context.bodyText.copyWith(color: context.textSecondary),
+                      ),
+                      const SizedBox(height: 8),
+                      TextField(
+                        controller: detailsController,
+                        maxLines: 3,
+                        enabled: !isSubmitting,
+                        decoration: InputDecoration(
+                          hintText: "Enter details here...",
+                          hintStyle: TextStyle(color: context.textMuted, fontSize: 13),
+                          fillColor: context.surfaceSecondary,
+                          filled: true,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: BorderSide(color: context.borderMuted),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: BorderSide(color: context.accentPrimary),
+                          ),
+                          contentPadding: const EdgeInsets.all(12),
+                        ),
+                        style: context.bodyText,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              actions: isSubmitting
+                  ? [
+                      const Center(
+                        child: Padding(
+                          padding: EdgeInsets.all(8.0),
+                          child: SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                        ),
+                      )
+                    ]
+                  : [
+                      TextButton(
+                        onPressed: () => Navigator.of(dialogContext).pop(),
+                        child: Text("Cancel", style: TextStyle(color: context.textSecondary)),
+                      ),
+                      TextButton(
+                        onPressed: () async {
+                          setStateBuilder(() {
+                            isSubmitting = true;
+                          });
+                          
+                          try {
+                            await _provider.reportMessage(
+                              reportedUserId: message['sender_id'] as int,
+                              messageId: message['id'] as String,
+                              messageContent: message['payload'] as String? ?? '',
+                              reason: selectedReason,
+                              additionalDetails: detailsController.text.trim().isEmpty 
+                                  ? null 
+                                  : detailsController.text.trim(),
+                            );
+                            
+                            if (mounted) {
+                              Navigator.of(dialogContext).pop();
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text("Thank you, this content has been flagged for review."),
+                                  backgroundColor: Colors.green,
+                                  behavior: SnackBarBehavior.floating,
+                                ),
+                              );
+                            }
+                          } catch (e) {
+                            if (mounted) {
+                              setStateBuilder(() {
+                                isSubmitting = false;
+                              });
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text("Failed to report message: $e"),
+                                  backgroundColor: Colors.redAccent,
+                                  behavior: SnackBarBehavior.floating,
+                                ),
+                              );
+                            }
+                          }
+                        },
+                        child: const Text("Submit Report", style: TextStyle(color: Colors.orangeAccent)),
+                      ),
+                    ],
+            );
+          },
+        );
+      },
+    );
   }
 
   void _showContextMenu(BuildContext context, Offset tapPosition,

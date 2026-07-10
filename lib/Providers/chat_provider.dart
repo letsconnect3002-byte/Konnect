@@ -196,6 +196,7 @@ class ChatProvider with ChangeNotifier {
   Future<void> _updateLastMessageForRoomSilent(String roomId) async {
     final lastMsg = await _repository.getLastMessageForRoom(roomId);
     _lastMessagesByRoom[roomId] = lastMsg;
+    debugPrint("[ChatProvider] _updateLastMessageForRoomSilent: Room $roomId updated last message: ${lastMsg != null ? lastMsg['payload'] : 'null'}");
   }
 
   Future<void> updateLastMessageForRoom(String roomId) async {
@@ -246,8 +247,8 @@ class ChatProvider with ChangeNotifier {
         loadChatRooms();
       }
     } else if (connectionsChanged && userId != null) {
-      // Only recalculate unread counts when connection list actually changes
-      updateUnreadCount();
+      debugPrint("[ChatProvider] Connections list changed. Reloading chat rooms and updating subscriptions...");
+      loadChatRooms();
     }
   }
 
@@ -531,6 +532,8 @@ class ChatProvider with ChangeNotifier {
   void subscribeToRoom(String roomId) {
     if (_roomSubscriptions.containsKey(roomId)) return;
 
+    debugPrint("[ChatProvider] Establishing Realtime subscription for room: $roomId");
+
     final channel = _repository.subscribeToRoom(
       roomId,
       onInsert: (payload) async {
@@ -540,6 +543,8 @@ class ChatProvider with ChangeNotifier {
         final rId = msg['room_id'] as String;
         final senderId = msg['sender_id'] as int;
         final payloadText = msg['payload'] as String;
+
+        debugPrint("[ChatProvider] Realtime Postgres INSERT event received. Room: $rId, MessageId: $msgId, SenderId: $senderId, Payload: $payloadText");
 
         if (senderId == _userId) return;
 
@@ -565,9 +570,11 @@ class ChatProvider with ChangeNotifier {
         await _updateLastMessageForRoomSilent(rId);
 
         if (isInChat) {
+          debugPrint("[ChatProvider] Receiver is currently inside the active chat. Refreshing active messages...");
           _playReceiveSound();
           await refreshActiveRoomMessages();
         } else {
+          debugPrint("[ChatProvider] Receiver is in the messaging hub. Notifying listeners to trigger list sorting...");
           notifyListeners();
         }
         await updateUnreadCount();
@@ -578,6 +585,8 @@ class ChatProvider with ChangeNotifier {
         final newStatus = newRecord['status'] as String;
         final messageId = newRecord['id'] as String;
         final rId = newRecord['room_id'] as String;
+
+        debugPrint("[ChatProvider] Realtime Postgres UPDATE event received. Room: $rId, MessageId: $messageId, Status: $newStatus");
 
         await _repository.updateMessageStatusLocally(messageId, newStatus);
         await _updateLastMessageForRoomSilent(rId);
@@ -594,6 +603,8 @@ class ChatProvider with ChangeNotifier {
         if (oldRecord == null) return;
         final messageId = oldRecord['id'] as String?;
         final rId = oldRecord['room_id'] as String?;
+
+        debugPrint("[ChatProvider] Realtime Postgres DELETE event received. Room: $rId, MessageId: $messageId");
 
         if (messageId != null) {
           final localMsg = await _repository.getMessageByIdLocally(messageId);
@@ -619,6 +630,7 @@ class ChatProvider with ChangeNotifier {
         }
       },
       onSubscribeStatus: (status) async {
+        debugPrint("[ChatProvider] Realtime subscription status changed for room $roomId: $status");
         if (status == RealtimeSubscribeStatus.subscribed) {
           await syncOutgoingMessageStatuses();
           await updateUnreadCount();
@@ -1164,6 +1176,25 @@ class ChatProvider with ChangeNotifier {
 
   Future<Map<String, dynamic>?> getLastMessageForRoom(String roomId) {
     return _repository.getLastMessageForRoom(roomId);
+  }
+
+  Future<void> reportMessage({
+    required int reportedUserId,
+    String? messageId,
+    String? messageContent,
+    required String reason,
+    String? additionalDetails,
+  }) async {
+    final myUserId = _userId;
+    if (myUserId == null) throw Exception("User not authenticated.");
+    await _repository.reportMessage(
+      reporterId: myUserId,
+      reportedUserId: reportedUserId,
+      messageId: messageId,
+      messageContent: messageContent,
+      reason: reason,
+      additionalDetails: additionalDetails,
+    );
   }
 
   @override

@@ -2,6 +2,7 @@ import 'package:connect/Models/app_error.dart';
 import 'package:connect/Repositories/notification_repository.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:connect/main.dart';
 
 sealed class NotificationState {}
 
@@ -97,6 +98,20 @@ class NotificationProvider with ChangeNotifier {
       _userId!,
       (payload) async {
         print("Realtime connection notification change: ${payload.toString()}");
+        
+        // Dismiss from OS notification tray if the notification row was deleted
+        if (payload.eventType == PostgresChangeEvent.delete) {
+          final oldRecord = payload.oldRecord;
+          if (oldRecord != null) {
+            final notificationId = oldRecord['id'] as String?;
+            if (notificationId != null) {
+              final notifId = getNotificationId(notificationId);
+              await flutterLocalNotificationsPlugin.cancel(id: notifId);
+              print("PushNotifications: Dismissed notification $notifId from OS tray due to deletion.");
+            }
+          }
+        }
+        
         await fetchNotifications();
       },
     );

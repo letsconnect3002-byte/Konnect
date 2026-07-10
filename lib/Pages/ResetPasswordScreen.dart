@@ -41,12 +41,13 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text("Password updated successfully! Please sign in with your new password."),
+            content: Text(
+                "Password updated successfully! Please sign in with your new password."),
             backgroundColor: Colors.green,
             behavior: SnackBarBehavior.floating,
           ),
         );
-        
+
         // Log out user to clear recovery session and return to normal AuthScreen
         await Supabase.instance.client.auth.signOut();
       }
@@ -149,7 +150,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                               ],
                             ),
                             child: Image.asset(
-                              'assets/icons/New Jana Logo.png',
+                              'assets/icons/Group 5.png',
                               fit: BoxFit.contain,
                             ),
                           ),
@@ -220,8 +221,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                           if (value == null || value.trim().isEmpty) {
                             return "Please confirm your password";
                           }
-                          if (value.trim() !=
-                              _passwordController.text.trim()) {
+                          if (value.trim() != _passwordController.text.trim()) {
                             return "Passwords do not match";
                           }
                           return null;

@@ -126,6 +126,15 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
               onPressed: () => Navigator.pop(dialogContext),
             ),
             TextButton(
+              child: const Text("Delete & Report",
+                  style: TextStyle(
+                      color: Colors.orangeAccent, fontWeight: FontWeight.bold)),
+              onPressed: () {
+                Navigator.pop(dialogContext);
+                _showReportUserDialog(context, connection, provider);
+              },
+            ),
+            TextButton(
               child: const Text("Delete",
                   style: TextStyle(
                       color: Colors.redAccent, fontWeight: FontWeight.bold)),
@@ -149,6 +158,180 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
               },
             ),
           ],
+        );
+      },
+    );
+  }
+
+  void _showReportUserDialog(BuildContext context, Map<String, dynamic> connection, ConnectionProvider provider) {
+    final name = connection['name'] ?? 'this contact';
+    final intId = connection['id'] as int? ?? 0;
+    final chatProvider = Provider.of<ChatProvider>(context, listen: false);
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+
+    String selectedReason = 'Spam';
+    final detailsController = TextEditingController();
+    bool isSubmitting = false;
+
+    showDialog(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setStateBuilder) {
+            return GlassmorphicAlertDialog(
+              title: Text(
+                "Report & Disconnect $name",
+                style: context.screenHeading.copyWith(fontWeight: FontWeight.bold),
+              ),
+              content: SizedBox(
+                width: double.maxFinite,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        "Please select the reason for reporting this user:",
+                        style: context.bodyText.copyWith(color: context.textSecondary),
+                      ),
+                      const SizedBox(height: 12),
+                      ...['Spam', 'Harassment or Abuse', 'Inappropriate Behavior', 'Other'].map((reason) {
+                        final isSelected = selectedReason == reason;
+                        return InkWell(
+                          onTap: isSubmitting ? null : () {
+                            setStateBuilder(() {
+                              selectedReason = reason;
+                            });
+                          },
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 8.0),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  isSelected
+                                      ? Icons.radio_button_checked_rounded
+                                      : Icons.radio_button_off_rounded,
+                                  color: isSelected
+                                      ? context.accentPrimary
+                                      : context.textMuted,
+                                  size: 20,
+                                ),
+                                const SizedBox(width: 12),
+                                Text(
+                                  reason,
+                                  style: context.bodyText.copyWith(
+                                    color: isSelected
+                                        ? context.textPrimary
+                                        : context.textSecondary,
+                                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      }),
+                      const SizedBox(height: 16),
+                      Text(
+                        "Additional Details (Optional):",
+                        style: context.bodyText.copyWith(color: context.textSecondary),
+                      ),
+                      const SizedBox(height: 8),
+                      TextField(
+                        controller: detailsController,
+                        maxLines: 3,
+                        enabled: !isSubmitting,
+                        decoration: InputDecoration(
+                          hintText: "Enter details here...",
+                          hintStyle: TextStyle(color: context.textMuted, fontSize: 13),
+                          fillColor: context.surfaceSecondary,
+                          filled: true,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: BorderSide(color: context.borderMuted),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: BorderSide(color: context.accentPrimary),
+                          ),
+                          contentPadding: const EdgeInsets.all(12),
+                        ),
+                        style: context.bodyText,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              actions: isSubmitting
+                  ? [
+                      const Center(
+                        child: Padding(
+                          padding: EdgeInsets.all(8.0),
+                          child: SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                        ),
+                      )
+                    ]
+                  : [
+                      TextButton(
+                        onPressed: () => Navigator.of(dialogContext).pop(),
+                        child: Text("Cancel", style: TextStyle(color: context.textSecondary)),
+                      ),
+                      TextButton(
+                        onPressed: () async {
+                          setStateBuilder(() {
+                            isSubmitting = true;
+                          });
+                          
+                          try {
+                            // 1. Report User
+                            await chatProvider.reportMessage(
+                              reportedUserId: intId,
+                              reason: selectedReason,
+                              additionalDetails: detailsController.text.trim().isEmpty 
+                                  ? null 
+                                  : detailsController.text.trim(),
+                            );
+                            
+                            // 2. Delete Connection
+                            await provider.deleteProfile(intId,
+                                onRoomCleanup: (profileId, roomId) async {
+                              await chatProvider.handleRoomCleanup(profileId, roomId);
+                            });
+                            
+                            if (mounted) {
+                              Navigator.of(dialogContext).pop();
+                              scaffoldMessenger.showSnackBar(
+                                const SnackBar(
+                                  content: Text("Connection deleted and contact reported."),
+                                  backgroundColor: Colors.green,
+                                  behavior: SnackBarBehavior.floating,
+                                ),
+                              );
+                            }
+                          } catch (e) {
+                            if (mounted) {
+                              setStateBuilder(() {
+                                isSubmitting = false;
+                              });
+                              scaffoldMessenger.showSnackBar(
+                                SnackBar(
+                                  content: Text("Failed to report user: $e"),
+                                  backgroundColor: Colors.redAccent,
+                                  behavior: SnackBarBehavior.floating,
+                                ),
+                              );
+                            }
+                          }
+                        },
+                        child: const Text("Submit & Delete", style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
+                      ),
+                    ],
+            );
+          },
         );
       },
     );
@@ -231,6 +414,8 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
           aRoomId != null ? chatProvider.lastMessagesByRoom[aRoomId] : null;
       final bMsg =
           bRoomId != null ? chatProvider.lastMessagesByRoom[bRoomId] : null;
+
+      debugPrint("[DMHub] Sorting connection ${a['name']} (Room: $aRoomId, lastMsg: ${aMsg != null ? aMsg['payload'] : 'null'}) vs ${b['name']} (Room: $bRoomId, lastMsg: ${bMsg != null ? bMsg['payload'] : 'null'})");
 
       if (aMsg == null && bMsg == null) return 0;
       if (aMsg == null) return 1;

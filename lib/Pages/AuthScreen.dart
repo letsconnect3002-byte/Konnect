@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter/gestures.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:connect/Config/app_theme.dart';
 
@@ -48,10 +49,10 @@ class _AuthScreenState extends State<AuthScreen> {
   }
 
   Future<void> _submit() async {
-    if (!_isSignIn && !_acceptPrivacyPolicy) {
+    if (!_acceptPrivacyPolicy) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text("You must agree to the Privacy Policy to sign up"),
+          content: Text("You must agree to the Terms of Service & EULA to proceed"),
           backgroundColor: Colors.orangeAccent,
           behavior: SnackBarBehavior.floating,
         ),
@@ -342,6 +343,69 @@ class _AuthScreenState extends State<AuthScreen> {
     }
   }
 
+  Future<void> _signInWithApple() async {
+    debugPrint('[Apple Sign-In] Starting _signInWithApple process...');
+    setState(() => _isLoading = true);
+    HapticFeedback.mediumImpact();
+
+    try {
+      if (Platform.isIOS) {
+        // Native Apple Sign-In on iOS
+        final credential = await SignInWithApple.getAppleIDCredential(
+          scopes: [
+            AppleIDAuthorizationScopes.email,
+            AppleIDAuthorizationScopes.fullName,
+          ],
+        );
+
+        final idToken = credential.identityToken;
+        if (idToken == null) {
+          throw Exception('Apple Sign-In failed: No Identity Token found.');
+        }
+
+        // Pass identity token to Supabase using signInWithIdToken
+        await Supabase.instance.client.auth.signInWithIdToken(
+          provider: OAuthProvider.apple,
+          idToken: idToken,
+        );
+      } else {
+        // Web-based Apple Sign-In on Android/Web
+        await Supabase.instance.client.auth.signInWithOAuth(
+          OAuthProvider.apple,
+          redirectTo: 'connectapp://login-callback',
+        );
+      }
+
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    } catch (e) {
+      debugPrint('[Apple Sign-In] Error: $e');
+      if (mounted) {
+        setState(() => _isLoading = false);
+        final errorStr = e.toString();
+        if (e is SignInWithAppleAuthorizationException &&
+            e.code == AuthorizationErrorCode.canceled) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Apple Sign-In was cancelled'),
+              backgroundColor: Colors.orangeAccent,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Apple Sign-In failed: ${errorStr.replaceAll("Exception: ", "")}'),
+              backgroundColor: Colors.redAccent,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      }
+    }
+  }
+
   void _forgotPassword() {
     setState(() {
       _isSignIn = false;
@@ -543,7 +607,7 @@ class _AuthScreenState extends State<AuthScreen> {
                               ],
                             ),
                             child: Image.asset(
-                              'assets/icons/New Jana Logo.png',
+                              'assets/icons/Group 5.png',
                               fit: BoxFit.contain,
                             ),
                           ),
@@ -831,11 +895,11 @@ class _AuthScreenState extends State<AuthScreen> {
                           const SizedBox(height: 16),
                           // Gender Selection Field
                           _buildGenderDropdown(context),
-                          const SizedBox(height: 16),
-                          _buildPrivacyPolicyCheckbox(context),
                         ],
 
-                        const SizedBox(height: 32),
+                        const SizedBox(height: 24),
+                        _buildPrivacyPolicyCheckbox(context),
+                        const SizedBox(height: 24),
 
                         // Submit Button
                         _buildSubmitButton(context),
@@ -872,12 +936,11 @@ class _AuthScreenState extends State<AuthScreen> {
                         ),
                         const SizedBox(height: 24),
 
+                        // Apple Sign In Button (swapped for greater prominence)
+                        _buildAppleButton(context),
+                        const SizedBox(height: 12),
                         // Google Sign In Button
                         _buildGoogleButton(context),
-                        if (_isSignIn) ...[
-                          const SizedBox(height: 24),
-                          _buildSignInPrivacyNotice(context),
-                        ],
                       ],
                     ],
                   ),
@@ -1099,32 +1162,40 @@ class _AuthScreenState extends State<AuthScreen> {
   }
 
   Widget _buildSubmitButton(BuildContext context) {
-    return Container(
-      height: 52,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(AppDimensions.radiusPill),
-        boxShadow: [
-          BoxShadow(
-            color: context.accentPrimary.withValues(alpha: 0.15),
-            blurRadius: 16,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: ElevatedButton(
-        style: ElevatedButton.styleFrom(
-          backgroundColor: context.accentPrimary,
-          foregroundColor: Colors.white,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppDimensions.radiusPill),
-          ),
+    final isEnabled = _acceptPrivacyPolicy;
+    return Opacity(
+      opacity: isEnabled ? 1.0 : 0.4,
+      child: Container(
+        height: 52,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(AppDimensions.radiusPill),
+          boxShadow: isEnabled
+              ? [
+                  BoxShadow(
+                    color: context.accentPrimary.withValues(alpha: 0.15),
+                    blurRadius: 16,
+                    offset: const Offset(0, 4),
+                  ),
+                ]
+              : null,
         ),
-        onPressed: _submit,
-        child: Text(
-          _isSignIn ? "I'm in" : "I'm in",
-          style: context.cardTitle.copyWith(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
+        child: ElevatedButton(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: context.accentPrimary,
+            foregroundColor: Colors.white,
+            disabledBackgroundColor: context.accentPrimary.withValues(alpha: 0.5),
+            disabledForegroundColor: Colors.white.withValues(alpha: 0.5),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(AppDimensions.radiusPill),
+            ),
+          ),
+          onPressed: isEnabled ? _submit : null,
+          child: Text(
+            _isSignIn ? "I'm in" : "I'm in",
+            style: context.cardTitle.copyWith(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+            ),
           ),
         ),
       ),
@@ -1132,34 +1203,75 @@ class _AuthScreenState extends State<AuthScreen> {
   }
 
   Widget _buildGoogleButton(BuildContext context) {
-    return Container(
-      height: 52,
-      decoration: BoxDecoration(
-        color: context.surfacePrimary,
-        borderRadius: BorderRadius.circular(AppDimensions.radiusPill),
-        border: Border.all(
-          color: Colors.white.withValues(alpha: 0.04),
-          width: 1.0,
+    final isEnabled = _acceptPrivacyPolicy;
+    return Opacity(
+      opacity: isEnabled ? 1.0 : 0.4,
+      child: Container(
+        height: 52,
+        decoration: BoxDecoration(
+          color: context.surfacePrimary,
+          borderRadius: BorderRadius.circular(AppDimensions.radiusPill),
+          border: Border.all(
+            color: Colors.white.withValues(alpha: 0.04),
+            width: 1.0,
+          ),
+        ),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(AppDimensions.radiusPill),
+          onTap: isEnabled ? _signInWithGoogle : null,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Image.asset(
+                'assets/icons/Google-Sign-in.png',
+                width: 22,
+                height: 22,
+                fit: BoxFit.contain,
+              ),
+              const SizedBox(width: 12),
+              Text(
+                "Continue with Google",
+                style: context.cardTitle,
+              ),
+            ],
+          ),
         ),
       ),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(AppDimensions.radiusPill),
-        onTap: _signInWithGoogle,
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Image.asset(
-              'assets/icons/Google-Sign-in.png',
-              width: 22,
-              height: 22,
-              fit: BoxFit.contain,
-            ),
-            const SizedBox(width: 12),
-            Text(
-              "Continue with Google",
-              style: context.cardTitle,
-            ),
-          ],
+    );
+  }
+
+  Widget _buildAppleButton(BuildContext context) {
+    final isEnabled = _acceptPrivacyPolicy;
+    return Opacity(
+      opacity: isEnabled ? 1.0 : 0.4,
+      child: Container(
+        height: 52,
+        decoration: BoxDecoration(
+          color: context.surfacePrimary,
+          borderRadius: BorderRadius.circular(AppDimensions.radiusPill),
+          border: Border.all(
+            color: Colors.white.withValues(alpha: 0.04),
+            width: 1.0,
+          ),
+        ),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(AppDimensions.radiusPill),
+          onTap: isEnabled ? _signInWithApple : null,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(
+                Icons.apple,
+                color: Colors.white,
+                size: 24,
+              ),
+              const SizedBox(width: 12),
+              Text(
+                "Continue with Apple",
+                style: context.cardTitle,
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -1276,14 +1388,14 @@ class _AuthScreenState extends State<AuthScreen> {
     );
   }
 
-  Future<void> _launchPrivacyPolicy() async {
-    final Uri url = Uri.parse('https://www.joinmandala.in/legal');
+  Future<void> _launchUrl(String urlString) async {
+    final Uri url = Uri.parse(urlString);
     try {
       if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text("Could not open the privacy policy link."),
+            SnackBar(
+              content: Text("Could not open link: $urlString"),
               backgroundColor: Colors.redAccent,
               behavior: SnackBarBehavior.floating,
             ),
@@ -1344,7 +1456,7 @@ class _AuthScreenState extends State<AuthScreen> {
                     fontSize: 13,
                   ),
                   children: [
-                    const TextSpan(text: "I confirm that I am at least 18 years old, and I agree to the "),
+                    const TextSpan(text: "I agree to the "),
                     TextSpan(
                       text: "Privacy Policy",
                       style: TextStyle(
@@ -1353,9 +1465,10 @@ class _AuthScreenState extends State<AuthScreen> {
                         decoration: TextDecoration.underline,
                         decorationColor: context.accentPrimary,
                       ),
-                      recognizer: TapGestureRecognizer()..onTap = _launchPrivacyPolicy,
+                      recognizer: TapGestureRecognizer()
+                        ..onTap = () => _launchUrl('https://www.joinmandala.in/legal'),
                     ),
-                    const TextSpan(text: " and "),
+                    const TextSpan(text: ", "),
                     TextSpan(
                       text: "Terms of Service",
                       style: TextStyle(
@@ -1364,7 +1477,20 @@ class _AuthScreenState extends State<AuthScreen> {
                         decoration: TextDecoration.underline,
                         decorationColor: context.accentPrimary,
                       ),
-                      recognizer: TapGestureRecognizer()..onTap = _launchPrivacyPolicy,
+                      recognizer: TapGestureRecognizer()
+                        ..onTap = () => _launchUrl('https://www.joinmandala.in/legal'),
+                    ),
+                    const TextSpan(text: " and "),
+                    TextSpan(
+                      text: "End User License Agreement (EULA)",
+                      style: TextStyle(
+                        color: context.accentPrimary,
+                        fontWeight: FontWeight.bold,
+                        decoration: TextDecoration.underline,
+                        decorationColor: context.accentPrimary,
+                      ),
+                      recognizer: TapGestureRecognizer()
+                        ..onTap = () => _launchUrl('https://www.joinmandala.in/eula'),
                     ),
                     const TextSpan(text: "."),
                   ],
@@ -1373,34 +1499,6 @@ class _AuthScreenState extends State<AuthScreen> {
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildSignInPrivacyNotice(BuildContext context) {
-    return Center(
-      child: RichText(
-        textAlign: TextAlign.center,
-        text: TextSpan(
-          style: context.bodyText.copyWith(
-            color: context.textMuted,
-            fontSize: 12,
-          ),
-          children: [
-            const TextSpan(text: "By signing in, you agree to our "),
-            TextSpan(
-              text: "Privacy Policy & Terms",
-              style: TextStyle(
-                color: context.accentPrimary,
-                fontWeight: FontWeight.bold,
-                decoration: TextDecoration.underline,
-                decorationColor: context.accentPrimary,
-              ),
-              recognizer: TapGestureRecognizer()..onTap = _launchPrivacyPolicy,
-            ),
-            const TextSpan(text: "."),
-          ],
-        ),
       ),
     );
   }

@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 abstract class NotificationRepository {
@@ -6,6 +7,7 @@ abstract class NotificationRepository {
     required int userId,
     required int otherUserId,
     required String type,
+    String? note,
   });
   Future<void> insertReferralNotification({
     required int userId,
@@ -40,7 +42,85 @@ class SupabaseNotificationRepository implements NotificationRepository {
         .order('created_at', ascending: false);
 
     final List<dynamic> rows = response as List;
-    return rows.map((row) => Map<String, dynamic>.from(row)).toList();
+    final List<Map<String, dynamic>> list =
+        rows.map((row) => Map<String, dynamic>.from(row)).toList();
+
+    // Parse JSON notes if they exist
+    for (var n in list) {
+      final noteStr = n['note'] as String?;
+      if (noteStr != null && noteStr.startsWith('{')) {
+        try {
+          final parsed = jsonDecode(noteStr);
+          n['parsed_plan_id'] = parsed['plan_id']?.toString();
+          if (parsed['changed_fields'] is List) {
+            n['changed_fields'] = List<String>.from(parsed['changed_fields']);
+          }
+        } catch (e) {
+          print("Error parsing notification note JSON: $e");
+        }
+      }
+    }
+
+    // Batch load associated plans for plan_invite, plan_update, and reminders
+    final planIds = list
+        .where((n) =>
+            (n['type'] == 'plan_invite' ||
+                n['type'] == 'plan_update' ||
+                n['type'] == 'plan_reminder_30' ||
+                n['type'] == 'plan_reminder_start') &&
+            (n['parsed_plan_id'] != null || n['note'] != null))
+        .map((n) => (n['parsed_plan_id'] ?? n['note']) as String)
+        .toSet()
+        .toList();
+
+    if (planIds.isNotEmpty) {
+      try {
+        // 1. Batch load plans
+        final plansResponse = await _client
+            .from('plans')
+            .select('*, creator:profiles!creator_id(id, name, avatar_url)')
+            .inFilter('id', planIds);
+
+        final plansList = plansResponse as List;
+        final plansMap = {
+          for (var p in plansList) p['id'] as String: Map<String, dynamic>.from(p)
+        };
+
+        // 2. Batch load invite statuses
+        final invitesResponse = await _client
+            .from('plan_invites')
+            .select('plan_id, status')
+            .eq('invitee_id', userId)
+            .inFilter('plan_id', planIds);
+
+        final invitesList = invitesResponse as List;
+        final invitesMap = {
+          for (var i in invitesList) i['plan_id'] as String: i['status'] as String
+        };
+
+        for (var n in list) {
+          if (n['type'] == 'plan_invite' ||
+              n['type'] == 'plan_update' ||
+              n['type'] == 'plan_reminder_30' ||
+              n['type'] == 'plan_reminder_start') {
+            n['plan_loaded'] = true;
+            final pid = (n['parsed_plan_id'] ?? n['note']) as String?;
+            if (pid != null) {
+              if (plansMap.containsKey(pid)) {
+                n['plan'] = plansMap[pid];
+              }
+              if (invitesMap.containsKey(pid)) {
+                n['invite_status'] = invitesMap[pid];
+              }
+            }
+          }
+        }
+      } catch (e) {
+        print("Error batch fetching plans/invites for notifications: $e");
+      }
+    }
+
+    return list;
   }
 
   @override
@@ -48,11 +128,13 @@ class SupabaseNotificationRepository implements NotificationRepository {
     required int userId,
     required int otherUserId,
     required String type,
+    String? note,
   }) async {
     await _client.from('connection_notifications').insert({
       'user_id': userId,
       'other_user_id': otherUserId,
       'type': type,
+      'note': note,
       'is_seen': false,
     });
   }
