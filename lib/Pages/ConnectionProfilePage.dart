@@ -2223,12 +2223,23 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
     }
   }
 
+  Future<void> _blockProfileLocally(
+      String id, ConnectionProvider provider) async {
+    try {
+      final intId = int.tryParse(id) ?? 0;
+      await provider.blockUser(intId);
+    } catch (e) {
+      print("Error blocking profile locally: $e");
+    }
+  }
+
   Future<void> _showDeleteConfirmation(BuildContext context,
       Map<String, dynamic> connection, ConnectionProvider provider) async {
     final name = connection['name'] ?? 'this contact';
     final profileIdStr =
         (connection['id'] ?? connection['connection_profile_id'] ?? '')
             .toString();
+    final isBlockedByMe = connection['isBlockedByMe'] == true;
 
     return showDialog(
       context: context,
@@ -2241,11 +2252,13 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
             side: BorderSide(color: context.surfaceSecondary, width: 1.5),
           ),
           title: Text(
-            "Delete Connection",
+            "Manage Connection",
             style: context.screenHeading.copyWith(fontWeight: FontWeight.bold),
           ),
           content: Text(
-            "Are you sure you want to remove $name from your connections? This will permanently delete this connection and clear all chat history and text messages.",
+            isBlockedByMe
+                ? "What action would you like to perform for $name? You can unblock them or disconnect entirely."
+                : "What action would you like to perform for $name? Blocking will prevent them from contacting you, while deleting simply disconnects you.",
             style: context.bodyText.copyWith(color: context.textSecondary),
           ),
           actions: [
@@ -2255,7 +2268,7 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
               onPressed: () => Navigator.pop(dialogContext),
             ),
             TextButton(
-              child: const Text("Delete & Report",
+              child: const Text("Report User",
                   style: TextStyle(
                       color: Colors.orangeAccent, fontWeight: FontWeight.bold)),
               onPressed: () {
@@ -2263,10 +2276,66 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
                 _showReportUserDialog(context, connection, provider);
               },
             ),
+            isBlockedByMe
+                ? TextButton(
+                    child: const Text("Unblock User",
+                        style: TextStyle(
+                            color: Colors.greenAccent,
+                            fontWeight: FontWeight.bold)),
+                    onPressed: () async {
+                      final navigator = Navigator.of(context);
+                      final scaffoldMessenger = ScaffoldMessenger.of(context);
+                      Navigator.pop(dialogContext);
+                      try {
+                        final intId = int.tryParse(profileIdStr) ?? 0;
+                        await provider.unblockUser(intId);
+                        if (!mounted) return;
+                        navigator.pop(); // Pop detail page
+                        scaffoldMessenger.showSnackBar(
+                          const SnackBar(
+                            content: Text("User unblocked successfully"),
+                            backgroundColor: Colors.green,
+                          ),
+                        );
+                      } catch (e) {
+                        if (!mounted) return;
+                        scaffoldMessenger.showSnackBar(
+                          SnackBar(content: Text("Error unblocking user: $e")),
+                        );
+                      }
+                    },
+                  )
+                : TextButton(
+                    child: const Text("Block User",
+                        style: TextStyle(
+                            color: Colors.redAccent,
+                            fontWeight: FontWeight.bold)),
+                    onPressed: () async {
+                      final navigator = Navigator.of(context);
+                      final scaffoldMessenger = ScaffoldMessenger.of(context);
+                      Navigator.pop(dialogContext);
+                      try {
+                        await _blockProfileLocally(profileIdStr, provider);
+                        if (!mounted) return;
+                        navigator.pop(); // Pop profile detail screen
+                        scaffoldMessenger.showSnackBar(
+                          const SnackBar(
+                            content: Text("User blocked"),
+                            backgroundColor: Colors.redAccent,
+                          ),
+                        );
+                      } catch (e) {
+                        if (!mounted) return;
+                        scaffoldMessenger.showSnackBar(
+                          SnackBar(content: Text("Error blocking user: $e")),
+                        );
+                      }
+                    },
+                  ),
             TextButton(
-              child: const Text("Delete",
+              child: const Text("Delete Connection",
                   style: TextStyle(
-                      color: Colors.redAccent, fontWeight: FontWeight.bold)),
+                      color: Colors.redAccent, fontWeight: FontWeight.normal)),
               onPressed: () async {
                 final navigator = Navigator.of(context);
                 final scaffoldMessenger = ScaffoldMessenger.of(context);

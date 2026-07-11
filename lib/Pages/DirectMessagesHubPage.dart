@@ -107,16 +107,20 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
     final scaffoldMessenger = ScaffoldMessenger.of(context);
     final chatProvider = Provider.of<ChatProvider>(context, listen: false);
 
+    final isBlockedByMe = connection['isBlockedByMe'] == true;
+
     return showDialog(
       context: context,
       builder: (BuildContext dialogContext) {
         return GlassmorphicAlertDialog(
           title: Text(
-            "Delete Connection",
+            "Manage Connection",
             style: context.screenHeading.copyWith(fontWeight: FontWeight.bold),
           ),
           content: Text(
-            "Are you sure you want to remove ${connection['name'] ?? 'this contact'} from your connections?",
+            isBlockedByMe
+                ? "What action would you like to perform for ${connection['name'] ?? 'this contact'}? You can unblock them or disconnect entirely."
+                : "What action would you like to perform for ${connection['name'] ?? 'this contact'}? Blocking will prevent them from contacting you, while deleting simply disconnects you.",
             style: context.bodyText.copyWith(color: context.textSecondary),
           ),
           actions: [
@@ -126,7 +130,7 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
               onPressed: () => Navigator.pop(dialogContext),
             ),
             TextButton(
-              child: const Text("Delete & Report",
+              child: const Text("Report User",
                   style: TextStyle(
                       color: Colors.orangeAccent, fontWeight: FontWeight.bold)),
               onPressed: () {
@@ -134,10 +138,53 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
                 _showReportUserDialog(context, connection, provider);
               },
             ),
+            isBlockedByMe
+                ? TextButton(
+                    child: const Text("Unblock User",
+                        style: TextStyle(
+                            color: Colors.greenAccent,
+                            fontWeight: FontWeight.bold)),
+                    onPressed: () async {
+                      Navigator.pop(dialogContext);
+                      try {
+                        await provider.unblockUser(connection['id']);
+                        scaffoldMessenger.showSnackBar(
+                          const SnackBar(
+                            content: Text("User unblocked",
+                                style: TextStyle(color: Colors.white)),
+                            backgroundColor: Colors.green,
+                          ),
+                        );
+                      } catch (e) {
+                        print("Error unblocking user: $e");
+                      }
+                    },
+                  )
+                : TextButton(
+                    child: const Text("Block User",
+                        style: TextStyle(
+                            color: Colors.redAccent,
+                            fontWeight: FontWeight.bold)),
+                    onPressed: () async {
+                      Navigator.pop(dialogContext);
+                      try {
+                        await provider.blockUser(connection['id']);
+                        scaffoldMessenger.showSnackBar(
+                          const SnackBar(
+                            content: Text("User blocked",
+                                style: TextStyle(color: Colors.white)),
+                            backgroundColor: Colors.redAccent,
+                          ),
+                        );
+                      } catch (e) {
+                        print("Error blocking user: $e");
+                      }
+                    },
+                  ),
             TextButton(
-              child: const Text("Delete",
+              child: const Text("Delete Connection",
                   style: TextStyle(
-                      color: Colors.redAccent, fontWeight: FontWeight.bold)),
+                      color: Colors.redAccent, fontWeight: FontWeight.normal)),
               onPressed: () async {
                 Navigator.pop(dialogContext);
                 try {
@@ -883,17 +930,42 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
                                             MainAxisAlignment.spaceBetween,
                                         children: [
                                           Expanded(
-                                            child: Text(
-                                              name,
-                                              style: context.cardTitle.copyWith(
-                                                fontWeight: FontWeight.bold,
-                                                color: context.textPrimary,
-                                              ),
-                                              overflow: TextOverflow.ellipsis,
-                                              maxLines: 1,
+                                            child: Row(
+                                              children: [
+                                                Flexible(
+                                                  child: Text(
+                                                    name,
+                                                    style: context.cardTitle.copyWith(
+                                                      fontWeight: FontWeight.bold,
+                                                      color: context.textPrimary,
+                                                    ),
+                                                    overflow: TextOverflow.ellipsis,
+                                                    maxLines: 1,
+                                                  ),
+                                                ),
+                                                if (connection['isBlockedByMe'] == true) ...[
+                                                  const SizedBox(width: 8),
+                                                  Container(
+                                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                    decoration: BoxDecoration(
+                                                      color: Colors.redAccent.withValues(alpha: 0.2),
+                                                      borderRadius: BorderRadius.circular(4),
+                                                      border: Border.all(color: Colors.redAccent.withValues(alpha: 0.4), width: 0.5),
+                                                    ),
+                                                    child: const Text(
+                                                      "Blocked",
+                                                      style: TextStyle(
+                                                        color: Colors.redAccent,
+                                                        fontSize: 10,
+                                                        fontWeight: FontWeight.bold,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ],
                                             ),
                                           ),
-                                          if (msgTime.isNotEmpty) ...[
+                                          if (msgTime.isNotEmpty && connection['isBlocked'] != true) ...[
                                             const SizedBox(width: 8),
                                             Text(
                                               msgTime,
@@ -909,34 +981,50 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
                                           ],
                                         ],
                                       ),
-                                      subtitle: lastMessageText.isEmpty &&
-                                              !isTyping &&
-                                              (draft == null || draft.isEmpty)
-                                          ? null
-                                          : Padding(
-                                              padding:
-                                                  const EdgeInsets.only(top: 4.0),
-                                              child: Row(
-                                                children: [
-                                                  Expanded(
-                                                    child: isTyping
-                                                        ? Text(
-                                                            "typing...",
-                                                            maxLines: 1,
-                                                            overflow: TextOverflow
-                                                                .ellipsis,
-                                                            style: context
-                                                                .bodyText
-                                                                .copyWith(
-                                                              color: context
-                                                                  .accentSecondary,
-                                                              fontSize: 12.5,
-                                                              fontWeight:
-                                                                  FontWeight.w600,
-                                                              fontStyle: FontStyle
-                                                                  .italic,
-                                                            ),
-                                                          )
+                                      subtitle: connection['isBlockedByMe'] == true
+                                          ? Text(
+                                              "Blocked contact",
+                                              style: context.bodyText.copyWith(
+                                                color: Colors.redAccent.withValues(alpha: 0.7),
+                                                fontSize: 12.5,
+                                              ),
+                                            )
+                                          : connection['hasBlockedMe'] == true
+                                              ? Text(
+                                                  "Unavailable",
+                                                  style: context.bodyText.copyWith(
+                                                    color: Colors.redAccent.withValues(alpha: 0.7),
+                                                    fontSize: 12.5,
+                                                  ),
+                                                )
+                                              : lastMessageText.isEmpty &&
+                                                      !isTyping &&
+                                                      (draft == null || draft.isEmpty)
+                                                  ? null
+                                                  : Padding(
+                                                      padding:
+                                                          const EdgeInsets.only(top: 4.0),
+                                                      child: Row(
+                                                        children: [
+                                                          Expanded(
+                                                            child: isTyping
+                                                                ? Text(
+                                                                    "typing...",
+                                                                    maxLines: 1,
+                                                                    overflow: TextOverflow
+                                                                        .ellipsis,
+                                                                    style: context
+                                                                        .bodyText
+                                                                        .copyWith(
+                                                                      color: context
+                                                                          .accentSecondary,
+                                                                      fontSize: 12.5,
+                                                                      fontWeight:
+                                                                          FontWeight.w600,
+                                                                      fontStyle: FontStyle
+                                                                          .italic,
+                                                                    ),
+                                                                  )
                                                         : (draft != null &&
                                                                 draft.isNotEmpty)
                                                             ? RichText(

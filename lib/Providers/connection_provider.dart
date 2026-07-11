@@ -107,14 +107,54 @@ class ConnectionProvider with ChangeNotifier {
 
   Future<List<Map<String, dynamic>>> fetchConnections(
       {bool silent = false}) async {
+    final myUserId = _userId;
+    if (myUserId == null) {
+      if (!silent) {
+        _state = UserConnectionLoading();
+        notifyListeners();
+      }
+      _setLoadedState([]);
+      notifyListeners();
+      return [];
+    }
+
     if (!silent) {
       _state = UserConnectionLoading();
       notifyListeners();
     }
-    final list = await getOtherProfiles();
-    _setLoadedState(list);
+
+    try {
+      final list = await getOtherProfiles();
+
+      // Fetch user's blocked list (abusive users we blocked)
+      final List<dynamic> blocks = await Supabase.instance.client
+          .from('blocked_users')
+          .select('blocked_id')
+          .eq('blocker_id', myUserId);
+      final Set<int> blockedIds = blocks.map((b) => b['blocked_id'] as int).toSet();
+
+      // Fetch list of users who blocked us
+      final List<dynamic> blockedBy = await Supabase.instance.client
+          .from('blocked_users')
+          .select('blocker_id')
+          .eq('blocked_id', myUserId);
+      final Set<int> blockedByIds = blockedBy.map((b) => b['blocker_id'] as int).toSet();
+
+      // Mark connection attributes
+      for (final conn in list) {
+        final id = conn['id'] as int? ?? 0;
+        conn['isBlockedByMe'] = blockedIds.contains(id);
+        conn['hasBlockedMe'] = blockedByIds.contains(id);
+        conn['isBlocked'] = blockedIds.contains(id) || blockedByIds.contains(id);
+      }
+
+      _setLoadedState(list);
+    } catch (e) {
+      print("Error fetching connections/blocks: $e");
+      _setError(e);
+    }
     notifyListeners();
-    return list;
+    return connections;
   }
 
   void subscribeToConnections() {
@@ -207,6 +247,17 @@ class ConnectionProvider with ChangeNotifier {
     }
 
     try {
+      // Check if blocked by either user
+      final blockCheck = await Supabase.instance.client
+          .from('blocked_users')
+          .select('id')
+          .or('and(blocker_id.eq.$idA,blocked_id.eq.$idB),and(blocker_id.eq.$idB,blocked_id.eq.$idA)')
+          .maybeSingle();
+
+      if (blockCheck != null) {
+        throw Exception("You cannot connect to this user due to a block.");
+      }
+
       final bool alreadyConnected =
           await _repository.connectionExists(id1, id2);
 
@@ -352,6 +403,50 @@ class ConnectionProvider with ChangeNotifier {
         _setError(e);
         rethrow;
       }
+    }
+    notifyListeners();
+  }
+
+  Future<void> blockUser(int id) async {
+    final myUserId = _userId;
+    if (myUserId == null) throw Exception("User not authenticated");
+
+    try {
+      // 1. Log the block in Supabase blocked_users table
+      await Supabase.instance.client.from('blocked_users').insert({
+        'blocker_id': myUserId,
+        'blocked_id': id,
+      });
+      print("Logged block: blocker $myUserId, blocked $id");
+
+      // 2. Refresh connections lists to show blocked status instantly
+      await fetchConnections();
+    } catch (e) {
+      print("Error blocking user: $e");
+      _setError(e);
+      rethrow;
+    }
+    notifyListeners();
+  }
+
+  Future<void> unblockUser(int id) async {
+    final myUserId = _userId;
+    if (myUserId == null) throw Exception("User not authenticated");
+
+    try {
+      // Delete block entry from Supabase
+      await Supabase.instance.client
+          .from('blocked_users')
+          .delete()
+          .match({'blocker_id': myUserId, 'blocked_id': id});
+      print("Logged unblock: blocker $myUserId, unblocked $id");
+
+      // Refresh connections lists
+      await fetchConnections();
+    } catch (e) {
+      print("Error unblocking user: $e");
+      _setError(e);
+      rethrow;
     }
     notifyListeners();
   }

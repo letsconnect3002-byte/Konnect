@@ -87,10 +87,21 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
     }
   }
 
+  Future<void> _blockProfileLocally(
+      String id, ConnectionProvider provider) async {
+    try {
+      final intId = int.tryParse(id) ?? 0;
+      await provider.blockUser(intId);
+    } catch (e) {
+      print("Error blocking profile locally: $e");
+    }
+  }
+
   Future<void> _showDeleteConfirmation(BuildContext context,
       Map<String, dynamic> connection, ConnectionProvider provider) async {
     final name = connection['name'] ?? 'this contact';
     final profileIdStr = (connection['id'] ?? '').toString();
+    final isBlockedByMe = connection['isBlockedByMe'] == true;
 
     return showDialog(
       context: context,
@@ -102,11 +113,13 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
                   BorderRadius.circular(AppDimensions.radiusPremiumCard),
               side: BorderSide(color: context.surfaceSecondary, width: 1.5)),
           title: Text(
-            "Delete Connection",
+            "Manage Connection",
             style: context.screenHeading.copyWith(fontWeight: FontWeight.bold),
           ),
           content: Text(
-            "Are you sure you want to remove $name from your connections? This will permanently delete this connection and clear all chat history and text messages.",
+            isBlockedByMe
+                ? "What action would you like to perform for $name? You can unblock them or disconnect entirely."
+                : "What action would you like to perform for $name? Blocking will prevent them from contacting you, while deleting simply disconnects you.",
             style: context.bodyText.copyWith(color: context.textSecondary),
           ),
           actions: [
@@ -116,7 +129,7 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
               onPressed: () => Navigator.pop(dialogContext),
             ),
             TextButton(
-              child: const Text("Delete & Report",
+              child: const Text("Report User",
                   style: TextStyle(
                       color: Colors.orangeAccent, fontWeight: FontWeight.bold)),
               onPressed: () {
@@ -124,10 +137,64 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
                 _showReportUserDialog(context, connection, provider);
               },
             ),
+            isBlockedByMe
+                ? TextButton(
+                    child: const Text("Unblock User",
+                        style: TextStyle(
+                            color: Colors.greenAccent,
+                            fontWeight: FontWeight.bold)),
+                    onPressed: () async {
+                      final navigator = Navigator.of(dialogContext);
+                      final scaffoldMessenger = ScaffoldMessenger.of(context);
+                      navigator.pop();
+                      try {
+                        final intId = int.tryParse(profileIdStr) ?? 0;
+                        await provider.unblockUser(intId);
+                        if (!mounted) return;
+                        scaffoldMessenger.showSnackBar(
+                          const SnackBar(
+                            content: Text("User unblocked successfully"),
+                            backgroundColor: Colors.green,
+                          ),
+                        );
+                      } catch (e) {
+                        if (!mounted) return;
+                        scaffoldMessenger.showSnackBar(
+                          SnackBar(content: Text("Error unblocking user: $e")),
+                        );
+                      }
+                    },
+                  )
+                : TextButton(
+                    child: const Text("Block User",
+                        style: TextStyle(
+                            color: Colors.redAccent,
+                            fontWeight: FontWeight.bold)),
+                    onPressed: () async {
+                      final navigator = Navigator.of(dialogContext);
+                      final scaffoldMessenger = ScaffoldMessenger.of(context);
+                      navigator.pop();
+                      try {
+                        await _blockProfileLocally(profileIdStr, provider);
+                        if (!mounted) return;
+                        scaffoldMessenger.showSnackBar(
+                          const SnackBar(
+                            content: Text("User blocked"),
+                            backgroundColor: Colors.redAccent,
+                          ),
+                        );
+                      } catch (e) {
+                        if (!mounted) return;
+                        scaffoldMessenger.showSnackBar(
+                          SnackBar(content: Text("Error blocking user: $e")),
+                        );
+                      }
+                    },
+                  ),
             TextButton(
-              child: const Text("Delete",
+              child: const Text("Delete Connection",
                   style: TextStyle(
-                      color: Colors.redAccent, fontWeight: FontWeight.bold)),
+                      color: Colors.redAccent, fontWeight: FontWeight.normal)),
               onPressed: () async {
                 final navigator = Navigator.of(dialogContext);
                 final scaffoldMessenger = ScaffoldMessenger.of(context);
@@ -603,12 +670,37 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
                         ? MainAxisAlignment.start
                         : MainAxisAlignment.center,
                     children: [
-                      Text(
-                        name,
-                        style: context.cardTitle
-                            .copyWith(fontWeight: FontWeight.bold),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              name,
+                              style: context.cardTitle
+                                  .copyWith(fontWeight: FontWeight.bold),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          if (profileData['isBlockedByMe'] == true) ...[
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: Colors.redAccent.withValues(alpha: 0.2),
+                                borderRadius: BorderRadius.circular(4),
+                                border: Border.all(color: Colors.redAccent.withValues(alpha: 0.4), width: 0.5),
+                              ),
+                              child: const Text(
+                                "Blocked",
+                                style: TextStyle(
+                                  color: Colors.redAccent,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
                       if (profession.isNotEmpty) ...[
                         const SizedBox(height: 2),

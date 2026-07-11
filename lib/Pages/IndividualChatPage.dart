@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:connect/Providers/profile_provider.dart';
 import 'package:connect/Providers/chat_provider.dart';
+import 'package:connect/Providers/connection_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:connect/Config/app_theme.dart';
 
@@ -402,7 +403,29 @@ class _IndividualChatPageState extends State<IndividualChatPage>
   Widget build(BuildContext context) {
     final avatar = _getAvatarUrl(_name, _avatarUrl);
     final provider = Provider.of<ChatProvider>(context);
-    final messages = provider.activeRoomMessages;
+    final connectionProvider = Provider.of<ConnectionProvider>(context);
+    
+    final otherUserId = _connectionData != null
+        ? (_connectionData!['id'] as int?)
+        : widget.otherUserId;
+
+    bool isBlockedByMe = false;
+
+    if (otherUserId != null) {
+      final conn = connectionProvider.connections.firstWhere(
+        (c) => c['id'] == otherUserId,
+        orElse: () => <String, dynamic>{},
+      );
+      if (conn.isNotEmpty) {
+        isBlockedByMe = conn['isBlockedByMe'] == true;
+      }
+    }
+
+    var messages = provider.activeRoomMessages;
+    if (isBlockedByMe && otherUserId != null) {
+      messages = messages.where((msg) => msg['sender_id'] != otherUserId).toList();
+    }
+
     final isOtherTyping = provider.isOtherUserTyping;
 
     // Auto-scroll ONLY when a genuinely new message arrives AND user is near the bottom
@@ -1046,6 +1069,108 @@ class _IndividualChatPageState extends State<IndividualChatPage>
   }
 
   Widget _buildInputBar() {
+    final connectionProvider = Provider.of<ConnectionProvider>(context);
+    final otherUserId = _connectionData != null
+        ? (_connectionData!['id'] as int?)
+        : widget.otherUserId;
+
+    bool isBlockedByMe = false;
+    bool hasBlockedMe = false;
+
+    if (otherUserId != null) {
+      final conn = connectionProvider.connections.firstWhere(
+        (c) => c['id'] == otherUserId,
+        orElse: () => <String, dynamic>{},
+      );
+      if (conn.isNotEmpty) {
+        isBlockedByMe = conn['isBlockedByMe'] == true;
+        hasBlockedMe = conn['hasBlockedMe'] == true;
+      }
+    }
+
+    if (isBlockedByMe) {
+      return SafeArea(
+        child: Container(
+          margin: const EdgeInsets.fromLTRB(16.0, 8.0, 16.0, 16.0),
+          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+          decoration: BoxDecoration(
+            color: Colors.redAccent.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(AppDimensions.radiusPremiumCard),
+            border: Border.all(
+                color: Colors.redAccent.withValues(alpha: 0.3), width: 1),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Text(
+                  "You have blocked this contact.",
+                  style: context.bodyText.copyWith(
+                      color: Colors.redAccent, fontWeight: FontWeight.bold),
+                ),
+              ),
+              GestureDetector(
+                onTap: () async {
+                  HapticFeedback.mediumImpact();
+                  try {
+                    await connectionProvider.unblockUser(otherUserId!);
+                    if (!mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text("Contact unblocked successfully"),
+                        backgroundColor: Colors.green,
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                  } catch (e) {
+                    print("Error unblocking user: $e");
+                  }
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.green.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.green.withValues(alpha: 0.3)),
+                  ),
+                  child: const Text(
+                    "Unblock",
+                    style: TextStyle(
+                      color: Colors.greenAccent,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (hasBlockedMe) {
+      return SafeArea(
+        child: Container(
+          margin: const EdgeInsets.fromLTRB(16.0, 8.0, 16.0, 16.0),
+          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 16.0),
+          decoration: BoxDecoration(
+            color: Colors.redAccent.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(AppDimensions.radiusPremiumCard),
+            border: Border.all(
+                color: Colors.redAccent.withValues(alpha: 0.3), width: 1),
+          ),
+          child: Center(
+            child: Text(
+              "You cannot send messages to this contact.",
+              style: context.bodyText.copyWith(
+                  color: Colors.redAccent, fontWeight: FontWeight.bold),
+            ),
+          ),
+        ),
+      );
+    }
+
     return SafeArea(
       child: Container(
         margin: const EdgeInsets.fromLTRB(
