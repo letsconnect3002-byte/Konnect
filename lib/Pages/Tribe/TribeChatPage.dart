@@ -32,6 +32,10 @@ class _TribeChatPageState extends State<TribeChatPage> {
   Map<String, dynamic>? _replyMessage;
   Map<String, dynamic>? _selectedMessage;
 
+  final Map<String, GlobalKey> _messageKeys = {};
+  String? _highlightedMessageId;
+  bool _isLoadingMessages = true;
+
   @override
   void initState() {
     super.initState();
@@ -39,9 +43,25 @@ class _TribeChatPageState extends State<TribeChatPage> {
     provider.setActiveTribe(widget.tribeId);
     provider.subscribeToTribeRealtime(widget.tribeId);
     provider.fetchTribeDetails(widget.tribeId);
-    provider.fetchTribeMessagesAndLog(widget.tribeId);
     provider.fetchMyTribes(silent: true);
+    provider.fetchBlockedUserIds();
     _clearTribeNotifications();
+    _loadMessages();
+  }
+
+  Future<void> _loadMessages() async {
+    final provider = Provider.of<TribeProvider>(context, listen: false);
+    try {
+      await provider.fetchTribeMessagesAndLog(widget.tribeId);
+    } catch (e) {
+      print("Error loading tribe messages: $e");
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoadingMessages = false;
+        });
+      }
+    }
   }
 
   Future<void> _clearTribeNotifications() async {
@@ -193,6 +213,19 @@ class _TribeChatPageState extends State<TribeChatPage> {
       return bTime.compareTo(aTime);
     });
 
+    // Filter out soft-deleted messages
+    mergedList.removeWhere((item) =>
+        item['_is_message'] == true && item['is_deleted'] == true);
+
+    // Filter out messages from blocked users
+    final blockedIds = provider.blockedUserIds;
+    if (blockedIds.isNotEmpty) {
+      mergedList.removeWhere((item) =>
+          item['_is_message'] == true &&
+          item['sender_id'] != myUserId &&
+          blockedIds.contains(item['sender_id']));
+    }
+
     final membership = provider.myTribes.firstWhereOrNull(
       (t) {
         final tr = t['tribe'] as Map<String, dynamic>?;
@@ -221,77 +254,139 @@ class _TribeChatPageState extends State<TribeChatPage> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         flexibleSpace: const GlassmorphicFlexibleSpace(),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded,
-              color: Colors.white, size: 18),
-          onPressed: () => Navigator.pop(context),
-        ),
+        leading: _selectedMessage != null
+            ? IconButton(
+                icon: const Icon(Icons.close_rounded, color: Colors.white, size: 22),
+                onPressed: () {
+                  setState(() {
+                    _selectedMessage = null;
+                  });
+                },
+              )
+            : IconButton(
+                icon: const Icon(Icons.arrow_back_ios_new_rounded,
+                    color: Colors.white, size: 18),
+                onPressed: () => Navigator.pop(context),
+              ),
         titleSpacing: 0,
-        title: GestureDetector(
-          onTap: () {
-            HapticFeedback.lightImpact();
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => TribeDetailsPage(tribeId: widget.tribeId),
-              ),
-            );
-          },
-          behavior: HitTestBehavior.opaque,
-          child: Row(
-            children: [
-              Container(
-                width: 38,
-                height: 38,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border:
-                      Border.all(color: context.accentSecondary, width: 1.5),
-                  color: context.surfaceSecondary,
-                  image: avatarUrl.isNotEmpty
-                      ? DecorationImage(
-                          image: NetworkImage(avatarUrl),
-                          fit: BoxFit.cover,
-                        )
-                      : null,
+        title: _selectedMessage != null
+            ? Text(
+                "1 selected",
+                style: context.screenHeading.copyWith(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
                 ),
-                alignment: Alignment.center,
-                child: avatarUrl.isEmpty
-                    ? const Icon(Icons.group_rounded, size: 16, color: Colors.white70)
-                    : null,
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      widget.tribeName,
-                      style: context.bodyText.copyWith(
-                        color: context.textPrimary,
-                        fontWeight: FontWeight.bold,
-                      ),
+              )
+            : GestureDetector(
+                onTap: () {
+                  HapticFeedback.lightImpact();
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => TribeDetailsPage(tribeId: widget.tribeId),
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      "Tap for Mafia Info",
-                      style: context.captionText
-                          .copyWith(color: context.textSecondary),
+                  );
+                },
+                behavior: HitTestBehavior.opaque,
+                child: Row(
+                  children: [
+                    Container(
+                      width: 38,
+                      height: 38,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border:
+                            Border.all(color: context.accentSecondary, width: 1.5),
+                        color: context.surfaceSecondary,
+                        image: avatarUrl.isNotEmpty
+                            ? DecorationImage(
+                                image: NetworkImage(avatarUrl),
+                                fit: BoxFit.cover,
+                              )
+                            : null,
+                      ),
+                      alignment: Alignment.center,
+                      child: avatarUrl.isEmpty
+                          ? const Icon(Icons.group_rounded, size: 16, color: Colors.white70)
+                          : null,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            widget.tribeName,
+                            style: context.bodyText.copyWith(
+                              color: context.textPrimary,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            "Tap for Mafia Info",
+                            style: context.captionText
+                                .copyWith(color: context.textSecondary),
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
               ),
-            ],
-          ),
-        ),
         actions: _selectedMessage == null
             ? []
             : [
+                // Report — only for other people's messages
+                if (_selectedMessage!['sender_id'] != myUserId &&
+                    _selectedMessage!['is_deleted'] != true)
+                  IconButton(
+                    icon: const Icon(Icons.report_gmailerrorred_outlined,
+                        color: Colors.orangeAccent),
+                    tooltip: 'Report Message',
+                    onPressed: () {
+                      final msg = _selectedMessage!;
+                      setState(() {
+                        _selectedMessage = null;
+                      });
+                      _showReportDialog(msg, provider);
+                    },
+                  ),
+                // Block — only for other people's messages
+                if (_selectedMessage!['sender_id'] != myUserId)
+                  IconButton(
+                    icon: const Icon(Icons.block_rounded,
+                        color: Colors.red),
+                    tooltip: 'Block User',
+                    onPressed: () {
+                      final msg = _selectedMessage!;
+                      setState(() {
+                        _selectedMessage = null;
+                      });
+                      _showBlockConfirmation(msg, provider);
+                    },
+                  ),
+                // Reply — always (if not deleted)
+                if (_selectedMessage!['is_deleted'] != true)
+                  IconButton(
+                    icon: const Icon(Icons.reply_rounded, color: Colors.white),
+                    tooltip: 'Reply',
+                    onPressed: () {
+                      final msg = _selectedMessage!;
+                      setState(() {
+                        _selectedMessage = null;
+                        _replyMessage = msg;
+                      });
+                      _messageFocusNode.requestFocus();
+                    },
+                  ),
+                // Delete — only for own messages
                 if (_selectedMessage!['sender_id'] == myUserId &&
                     _selectedMessage!['is_deleted'] != true)
                   IconButton(
                     icon: const Icon(Icons.delete_outline_rounded,
                         color: Colors.redAccent),
+                    tooltip: 'Delete',
                     onPressed: () async {
                       final msg = _selectedMessage!;
                       setState(() {
@@ -301,40 +396,29 @@ class _TribeChatPageState extends State<TribeChatPage> {
                           widget.tribeId, msg['id'] as String);
                     },
                   ),
-                IconButton(
-                  icon: const Icon(Icons.reply_rounded, color: Colors.white),
-                  onPressed: () {
-                    final msg = _selectedMessage!;
-                    setState(() {
-                      _selectedMessage = null;
-                      _replyMessage = msg;
-                    });
-                    _messageFocusNode.requestFocus();
-                  },
-                ),
-                IconButton(
-                  icon: const Icon(Icons.close_rounded, color: Colors.white),
-                  onPressed: () {
-                    setState(() {
-                      _selectedMessage = null;
-                    });
-                  },
-                ),
+                const SizedBox(width: 8),
               ],
       ),
       body: SafeArea(
         child: Column(
           children: [
             Expanded(
-              child: mergedList.isEmpty
+              child: _isLoadingMessages
                   ? Center(
-                      child: Text(
-                        "Welcome to your Mafia Chat room!",
-                        style:
-                            context.bodyText.copyWith(color: context.textMuted),
+                      child: CircularProgressIndicator(
+                        color: context.accentSecondary,
+                        strokeWidth: 2.5,
                       ),
                     )
-                  : ListView.builder(
+                  : mergedList.isEmpty
+                      ? Center(
+                          child: Text(
+                            "Welcome to your Mafia Chat room!",
+                            style:
+                                context.bodyText.copyWith(color: context.textMuted),
+                          ),
+                        )
+                      : ListView.builder(
                       controller: _scrollController,
                       reverse: true,
                       padding: const EdgeInsets.symmetric(
@@ -385,150 +469,220 @@ class _TribeChatPageState extends State<TribeChatPage> {
                             ? (replyToRaw.isNotEmpty ? replyToRaw.first as Map<String, dynamic>? : null)
                             : (replyToRaw as Map<String, dynamic>?);
 
-                        return GestureDetector(
-                          onLongPress: () {
+                        final msgId = item['id'] as String;
+                        final key = _messageKeys.putIfAbsent(msgId, () => GlobalKey());
+
+                         return SwipeToReply(
+                          key: key,
+                          onReply: () {
                             if (isDeleted) return;
-                            HapticFeedback.mediumImpact();
                             setState(() {
-                              _selectedMessage = item;
+                              _replyMessage = item;
                             });
+                            _messageFocusNode.requestFocus();
                           },
-                          child: Container(
-                            margin: const EdgeInsets.symmetric(vertical: 4.0),
-                            padding: const EdgeInsets.symmetric(horizontal: 4.0),
-                            color: _selectedMessage?['id'] == item['id']
-                                ? context.accentSecondary
-                                    .withValues(alpha: 0.15)
-                                : Colors.transparent,
-                            child: Column(
-                              crossAxisAlignment: isMe
-                                  ? CrossAxisAlignment.end
-                                  : CrossAxisAlignment.start,
-                              children: [
-                                // Sender header row (avatar + name) for other members
-                                if (!isMe) ...[
-                                  Padding(
-                                    padding: const EdgeInsets.only(left: 4.0, bottom: 4.0),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        CircleAvatar(
-                                          radius: 12,
-                                          backgroundColor: context.surfaceSecondary,
-                                          backgroundImage: senderAvatar.isNotEmpty
-                                              ? NetworkImage(senderAvatar)
-                                              : null,
-                                          child: senderAvatar.isEmpty
-                                              ? Text(
-                                                  senderName.isNotEmpty
-                                                      ? senderName.substring(0, 1).toUpperCase()
-                                                      : '?',
-                                                  style: const TextStyle(
-                                                      fontSize: 10,
-                                                      color: Colors.white))
-                                              : null,
-                                        ),
-                                        const SizedBox(width: 6),
-                                        Text(
-                                          senderName,
-                                          style: TextStyle(
-                                            color: context.accentSecondary,
-                                            fontWeight: FontWeight.w600,
-                                            fontSize: 12,
+                          child: GestureDetector(
+                            onLongPress: () {
+                              if (isDeleted) return;
+                              HapticFeedback.mediumImpact();
+                              setState(() {
+                                _selectedMessage = item;
+                              });
+                            },
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 300),
+                              curve: Curves.easeInOut,
+                              margin: const EdgeInsets.symmetric(vertical: 4.0),
+                              padding: const EdgeInsets.symmetric(horizontal: 4.0),
+                              color: msgId == _highlightedMessageId
+                                  ? Colors.white.withValues(alpha: 0.08)
+                                  : (_selectedMessage?['id'] == item['id']
+                                      ? context.accentSecondary
+                                          .withValues(alpha: 0.15)
+                                      : Colors.transparent),
+                              child: Column(
+                                crossAxisAlignment: isMe
+                                    ? CrossAxisAlignment.end
+                                    : CrossAxisAlignment.start,
+                                children: [
+                                  // Sender header row (avatar + name) for other members
+                                  if (!isMe) ...[
+                                    Padding(
+                                      padding: const EdgeInsets.only(left: 4.0, bottom: 4.0),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          CircleAvatar(
+                                            radius: 12,
+                                            backgroundColor: context.surfaceSecondary,
+                                            backgroundImage: senderAvatar.isNotEmpty
+                                                ? NetworkImage(senderAvatar)
+                                                : null,
+                                            child: senderAvatar.isEmpty
+                                                ? Text(
+                                                    senderName.isNotEmpty
+                                                        ? senderName.substring(0, 1).toUpperCase()
+                                                        : '?',
+                                                    style: const TextStyle(
+                                                        fontSize: 10,
+                                                        color: Colors.white))
+                                                : null,
                                           ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                                // Message bubble
-                                ConstrainedBox(
-                                  constraints: BoxConstraints(
-                                    maxWidth: MediaQuery.of(context).size.width * 0.75,
-                                  ),
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 12, vertical: 10),
-                                    decoration: BoxDecoration(
-                                      color: isMe
-                                          ? context.accentSecondary
-                                              .withValues(alpha: 0.8)
-                                          : context.surfacePrimary,
-                                      borderRadius: BorderRadius.only(
-                                        topLeft: const Radius.circular(16),
-                                        topRight: const Radius.circular(16),
-                                        bottomLeft: isMe
-                                            ? const Radius.circular(16)
-                                            : Radius.zero,
-                                        bottomRight: isMe
-                                            ? Radius.zero
-                                            : const Radius.circular(16),
-                                      ),
-                                    ),
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        if (replyTo != null) ...[
-                                          Container(
-                                            padding: const EdgeInsets.all(6),
-                                            margin: const EdgeInsets.only(
-                                                bottom: 6),
-                                            decoration: BoxDecoration(
-                                              color: Colors.black26,
-                                              borderRadius:
-                                                  BorderRadius.circular(4),
-                                            ),
-                                            child: Text(
-                                              replyTo['content']
-                                                      ?.toString() ??
-                                                  'Attachment',
-                                              style: const TextStyle(
-                                                  fontSize: 11,
-                                                  color: Colors.white54,
-                                                  fontStyle:
-                                                      FontStyle.italic),
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
+                                          const SizedBox(width: 6),
+                                          Text(
+                                            senderName,
+                                            style: TextStyle(
+                                              color: context.accentSecondary,
+                                              fontWeight: FontWeight.w600,
+                                              fontSize: 12,
                                             ),
                                           ),
                                         ],
-                                        isDeleted
-                                            ? Text(
-                                                "This message was deleted",
-                                                style:
-                                                    context.bodyText.copyWith(
-                                                  color: Colors.white38,
-                                                  fontStyle: FontStyle.italic,
-                                                ),
-                                              )
-                                            : item['message_type'] == 'image'
-                                                ? ClipRRect(
-                                                    borderRadius:
-                                                        BorderRadius.circular(
-                                                            8),
-                                                    child: Image.network(
-                                                      item['attachment_url']
+                                      ),
+                                    ),
+                                  ],
+                                  // Message bubble
+                                  ConstrainedBox(
+                                    constraints: BoxConstraints(
+                                      maxWidth: MediaQuery.of(context).size.width * 0.75,
+                                    ),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 12, vertical: 10),
+                                      decoration: BoxDecoration(
+                                        color: isMe
+                                            ? context.accentSecondary
+                                                .withValues(alpha: 0.8)
+                                            : context.surfacePrimary,
+                                        borderRadius: BorderRadius.only(
+                                          topLeft: const Radius.circular(16),
+                                          topRight: const Radius.circular(16),
+                                          bottomLeft: isMe
+                                              ? const Radius.circular(16)
+                                              : Radius.zero,
+                                          bottomRight: isMe
+                                              ? Radius.zero
+                                              : const Radius.circular(16),
+                                        ),
+                                      ),
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          if (replyTo != null) ...[
+                                            Builder(
+                                              builder: (context) {
+                                                final replyToSenderRaw = replyTo['sender'];
+                                                final Map<String, dynamic>? replyToSender = replyToSenderRaw is List
+                                                    ? (replyToSenderRaw.isNotEmpty ? replyToSenderRaw.first as Map<String, dynamic>? : null)
+                                                    : (replyToSenderRaw as Map<String, dynamic>?);
+                                                final replyToSenderName = replyToSender != null
+                                                    ? replyToSender['name']?.toString() ?? 'Someone'
+                                                    : 'Someone';
+                                                final bool isReplyToMe = replyTo['sender_id'] == myUserId;
+                                                final String replyToDisplayName = isReplyToMe ? "You" : replyToSenderName;
+
+                                                return GestureDetector(
+                                                  onTap: () {
+                                                    _scrollToAndHighlightMessage(
+                                                        replyTo['id'] as String,
+                                                        mergedList);
+                                                  },
+                                                  child: Container(
+                                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                                                    margin: const EdgeInsets.only(bottom: 6),
+                                                    decoration: BoxDecoration(
+                                                      color: Colors.black.withValues(alpha: isMe ? 0.15 : 0.22),
+                                                      borderRadius: BorderRadius.circular(6),
+                                                    ),
+                                                    child: IntrinsicHeight(
+                                                      child: Row(
+                                                        mainAxisSize: MainAxisSize.min,
+                                                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                                                        children: [
+                                                          Container(
+                                                            width: 3,
+                                                            decoration: BoxDecoration(
+                                                              color: isMe ? const Color(0xFF00F2FE) : context.accentSecondary,
+                                                              borderRadius: BorderRadius.circular(1.5),
+                                                            ),
+                                                          ),
+                                                          const SizedBox(width: 8),
+                                                          Flexible(
+                                                            child: Column(
+                                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                                              mainAxisSize: MainAxisSize.min,
+                                                              children: [
+                                                                Text(
+                                                                  replyToDisplayName,
+                                                                  style: TextStyle(
+                                                                    color: isMe ? const Color(0xFF00F2FE) : context.accentSecondary,
+                                                                    fontSize: 11,
+                                                                    fontWeight: FontWeight.bold,
+                                                                  ),
+                                                                  maxLines: 1,
+                                                                  overflow: TextOverflow.ellipsis,
+                                                                ),
+                                                                const SizedBox(height: 2),
+                                                                Text(
+                                                                  replyTo['content']?.toString() ?? 'Attachment',
+                                                                  style: const TextStyle(
+                                                                    color: Colors.white70,
+                                                                    fontSize: 11,
+                                                                  ),
+                                                                  maxLines: 1,
+                                                                  overflow: TextOverflow.ellipsis,
+                                                                ),
+                                                              ],
+                                                            ),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                    ),
+                                                  ),
+                                                );
+                                              },
+                                            ),
+                                          ],
+                                          isDeleted
+                                              ? Text(
+                                                  "This message was deleted",
+                                                  style:
+                                                      context.bodyText.copyWith(
+                                                    color: Colors.white38,
+                                                    fontStyle: FontStyle.italic,
+                                                  ),
+                                                )
+                                              : item['message_type'] == 'image'
+                                                  ? ClipRRect(
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                              8),
+                                                      child: Image.network(
+                                                        item['attachment_url']
+                                                                ?.toString() ??
+                                                            '',
+                                                        width: 200,
+                                                        fit: BoxFit.cover,
+                                                        errorBuilder: (context, error, stackTrace) =>
+                                                            const Icon(Icons.broken_image_rounded, size: 40),
+                                                      ),
+                                                    )
+                                                  : Text(
+                                                      item['content']
                                                               ?.toString() ??
                                                           '',
-                                                      width: 200,
-                                                      fit: BoxFit.cover,
+                                                      style: context.bodyText
+                                                          .copyWith(
+                                                              color:
+                                                                  Colors.white),
                                                     ),
-                                                  )
-                                                : Text(
-                                                    item['content']
-                                                            ?.toString() ??
-                                                        '',
-                                                    style: context.bodyText
-                                                        .copyWith(
-                                                            color:
-                                                                Colors.white),
-                                                  ),
-                                      ],
+                                        ],
+                                      ),
                                     ),
                                   ),
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
                           ),
                         );
@@ -536,36 +690,87 @@ class _TribeChatPageState extends State<TribeChatPage> {
                     ),
             ),
             if (_replyMessage != null)
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                color: context.surfacePrimary,
-                child: Row(
-                  children: [
-                    const Icon(Icons.reply_rounded,
-                        color: Colors.white70, size: 18),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        _replyMessage!['content']?.toString() ??
-                            "Image Attachment",
-                        style: const TextStyle(
-                            color: Colors.white70, fontStyle: FontStyle.italic),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+              Builder(
+                builder: (context) {
+                  final replySenderRaw = _replyMessage!['sender'];
+                  final Map<String, dynamic>? replySender = replySenderRaw is List
+                      ? (replySenderRaw.isNotEmpty ? replySenderRaw.first as Map<String, dynamic>? : null)
+                      : (replySenderRaw as Map<String, dynamic>?);
+                  final replySenderName = replySender != null
+                      ? replySender['name']?.toString() ?? 'Someone'
+                      : 'Someone';
+                  final bool isReplyToMe = _replyMessage!['sender_id'] == myUserId;
+                  final String replyDisplayName = isReplyToMe ? "You" : replySenderName;
+
+                  return Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: context.canvasBackground,
+                      border: Border(
+                        top: BorderSide(color: context.surfaceSecondary, width: 1),
                       ),
                     ),
-                    IconButton(
-                      icon: const Icon(Icons.close_rounded,
-                          size: 16, color: Colors.white70),
-                      onPressed: () {
-                        setState(() {
-                          _replyMessage = null;
-                        });
-                      },
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: context.surfacePrimary,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 4,
+                            height: 44,
+                            decoration: BoxDecoration(
+                              color: context.accentSecondary,
+                              borderRadius: const BorderRadius.only(
+                                topLeft: Radius.circular(4),
+                                bottomLeft: Radius.circular(4),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  replyDisplayName,
+                                  style: TextStyle(
+                                    color: context.accentSecondary,
+                                    fontSize: 12.5,
+                                    fontWeight: FontWeight.bold,
+                                    fontFamily: 'Inter',
+                                  ),
+                                ),
+                                const SizedBox(height: 3),
+                                Text(
+                                  _replyMessage!['content']?.toString() ?? 'Attachment',
+                                  style: const TextStyle(
+                                    color: Colors.white70,
+                                    fontSize: 12,
+                                    fontFamily: 'Inter',
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.close_rounded,
+                                color: Colors.white38, size: 18),
+                            onPressed: () {
+                              setState(() {
+                                _replyMessage = null;
+                              });
+                            },
+                          ),
+                        ],
+                      ),
                     ),
-                  ],
-                ),
+                  );
+                },
               ),
             if (isBlocked)
               Container(
@@ -639,4 +844,383 @@ class _TribeChatPageState extends State<TribeChatPage> {
       ),
     );
   }
+
+  // ── Report Dialog ──
+
+  void _showReportDialog(Map<String, dynamic> message, TribeProvider provider) {
+    String selectedReason = 'Spam';
+    final detailsController = TextEditingController();
+    bool isSubmitting = false;
+
+    showDialog(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setStateBuilder) {
+            return GlassmorphicAlertDialog(
+              title: Text(
+                "Report Message",
+                style: context.screenHeading.copyWith(fontWeight: FontWeight.bold),
+              ),
+              content: SizedBox(
+                width: double.maxFinite,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        "Please select the reason for flagging this content:",
+                        style: context.bodyText.copyWith(color: context.textSecondary),
+                      ),
+                      const SizedBox(height: 12),
+                      ...['Spam', 'Harassment or Abuse', 'Inappropriate Content', 'Other'].map((reason) {
+                        final isSelected = selectedReason == reason;
+                        return InkWell(
+                          onTap: isSubmitting ? null : () {
+                            setStateBuilder(() {
+                              selectedReason = reason;
+                            });
+                          },
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 8.0),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  isSelected
+                                      ? Icons.radio_button_checked_rounded
+                                      : Icons.radio_button_off_rounded,
+                                  color: isSelected
+                                      ? context.accentPrimary
+                                      : context.textMuted,
+                                  size: 20,
+                                ),
+                                const SizedBox(width: 12),
+                                Text(
+                                  reason,
+                                  style: context.bodyText.copyWith(
+                                    color: isSelected
+                                        ? context.textPrimary
+                                        : context.textSecondary,
+                                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      }),
+                      const SizedBox(height: 16),
+                      Text(
+                        "Additional Details (Optional):",
+                        style: context.bodyText.copyWith(color: context.textSecondary),
+                      ),
+                      const SizedBox(height: 8),
+                      TextField(
+                        controller: detailsController,
+                        maxLines: 3,
+                        enabled: !isSubmitting,
+                        decoration: InputDecoration(
+                          hintText: "Enter details here...",
+                          hintStyle: TextStyle(color: context.textMuted, fontSize: 13),
+                          fillColor: context.surfaceSecondary,
+                          filled: true,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: BorderSide(color: context.borderMuted),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: BorderSide(color: context.accentPrimary),
+                          ),
+                          contentPadding: const EdgeInsets.all(12),
+                        ),
+                        style: context.bodyText,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              actions: isSubmitting
+                  ? [
+                      const Center(
+                        child: Padding(
+                          padding: EdgeInsets.all(8.0),
+                          child: SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                        ),
+                      )
+                    ]
+                  : [
+                      TextButton(
+                        onPressed: () => Navigator.of(dialogContext).pop(),
+                        child: Text("Cancel", style: TextStyle(color: context.textSecondary)),
+                      ),
+                      TextButton(
+                        onPressed: () async {
+                          setStateBuilder(() {
+                            isSubmitting = true;
+                          });
+
+                          try {
+                            await provider.reportTribeMessage(
+                              reportedUserId: message['sender_id'] as int,
+                              messageId: message['id'] as String,
+                              messageContent: message['content'] as String? ?? '',
+                              reason: selectedReason,
+                              additionalDetails: detailsController.text.trim().isEmpty
+                                  ? null
+                                  : detailsController.text.trim(),
+                            );
+
+                            if (mounted) {
+                              Navigator.of(dialogContext).pop();
+                              ScaffoldMessenger.of(this.context).showSnackBar(
+                                const SnackBar(
+                                  content: Text("Thank you, this content has been flagged for review."),
+                                  backgroundColor: Colors.green,
+                                  behavior: SnackBarBehavior.floating,
+                                ),
+                              );
+                            }
+                          } catch (e) {
+                            if (mounted) {
+                              setStateBuilder(() {
+                                isSubmitting = false;
+                              });
+                              ScaffoldMessenger.of(this.context).showSnackBar(
+                                SnackBar(
+                                  content: Text("Failed to report message: $e"),
+                                  backgroundColor: Colors.redAccent,
+                                  behavior: SnackBarBehavior.floating,
+                                ),
+                              );
+                            }
+                          }
+                        },
+                        child: const Text("Submit Report", style: TextStyle(color: Colors.orangeAccent)),
+                      ),
+                    ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  // ── Block Confirmation ──
+
+  void _showBlockConfirmation(Map<String, dynamic> message, TribeProvider provider) {
+    final senderRaw = message['sender'];
+    final Map<String, dynamic>? sender = senderRaw is List
+        ? (senderRaw.isNotEmpty ? senderRaw.first as Map<String, dynamic>? : null)
+        : (senderRaw as Map<String, dynamic>?);
+    final senderName = sender?['name']?.toString() ?? 'this user';
+
+    showDialog(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return GlassmorphicAlertDialog(
+          title: Text(
+            "Block $senderName?",
+            style: context.screenHeading.copyWith(fontWeight: FontWeight.bold),
+          ),
+          content: Text(
+            "You won't see their messages in any Mafia chat. You can unblock them later from your settings.",
+            style: context.bodyText.copyWith(color: context.textSecondary),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: Text("Cancel", style: TextStyle(color: context.textSecondary)),
+            ),
+            TextButton(
+              onPressed: () async {
+                Navigator.of(dialogContext).pop();
+                try {
+                  await provider.blockUserInTribe(message['sender_id'] as int);
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text("$senderName has been blocked."),
+                        backgroundColor: Colors.redAccent,
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                  }
+                } catch (e) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text("Failed to block user: $e"),
+                        backgroundColor: Colors.redAccent,
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                  }
+                }
+              },
+              child: const Text("Block", style: TextStyle(color: Colors.red)),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _scrollToAndHighlightMessage(
+      String replyToId, List<Map<String, dynamic>> messages) async {
+    final targetIndex = messages.indexWhere((m) => m['id'] == replyToId);
+    if (targetIndex == -1 || !_scrollController.hasClients) return;
+
+    final totalMessages = messages.length;
+    final scrollExtent = _scrollController.position.maxScrollExtent;
+    // In our reverse list, newest (bottom) is at index 0 (0.0 offset),
+    // and oldest (top) is at index totalMessages - 1 (maxScrollExtent offset).
+    final double fraction = targetIndex / totalMessages;
+    final double estimatedOffset =
+        (fraction * scrollExtent).clamp(0.0, scrollExtent);
+
+    // Jump close to target if not yet built
+    GlobalKey? targetKey = _messageKeys[replyToId];
+    if (targetKey == null || targetKey.currentContext == null) {
+      _scrollController.jumpTo(estimatedOffset);
+      await Future.delayed(const Duration(milliseconds: 50));
+    }
+
+    // Precise scroll using ensureVisible
+    for (int attempt = 0; attempt < 3; attempt++) {
+      targetKey = _messageKeys[replyToId];
+      if (targetKey != null && targetKey.currentContext != null) {
+        await Scrollable.ensureVisible(
+          targetKey.currentContext!,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeInOut,
+          alignment: 0.4,
+        );
+        break;
+      }
+      await Future.delayed(const Duration(milliseconds: 80));
+    }
+
+    // Flash highlight
+    if (mounted) {
+      setState(() {
+        _highlightedMessageId = replyToId;
+      });
+
+      Future.delayed(const Duration(milliseconds: 1500), () {
+        if (mounted) {
+          setState(() {
+            _highlightedMessageId = null;
+          });
+        }
+      });
+    }
+  }
 }
+
+class SwipeToReply extends StatefulWidget {
+  final Widget child;
+  final VoidCallback onReply;
+
+  const SwipeToReply({
+    super.key,
+    required this.child,
+    required this.onReply,
+  });
+
+  @override
+  State<SwipeToReply> createState() => _SwipeToReplyState();
+}
+
+class _SwipeToReplyState extends State<SwipeToReply>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  double _dragOffset = 0.0;
+  bool _triggerThresholdReached = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 200),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _onHorizontalDragUpdate(DragUpdateDetails details) {
+    if (details.delta.dx < 0 && _dragOffset <= 0) return;
+
+    setState(() {
+      _dragOffset = (_dragOffset + details.delta.dx * 0.6).clamp(0.0, 70.0);
+      if (_dragOffset >= 50.0 && !_triggerThresholdReached) {
+        _triggerThresholdReached = true;
+        HapticFeedback.lightImpact();
+      } else if (_dragOffset < 50.0 && _triggerThresholdReached) {
+        _triggerThresholdReached = false;
+      }
+    });
+  }
+
+  void _onHorizontalDragEnd(DragEndDetails details) {
+    if (_triggerThresholdReached) {
+      widget.onReply();
+    }
+    setState(() {
+      _dragOffset = 0.0;
+      _triggerThresholdReached = false;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onHorizontalDragUpdate: _onHorizontalDragUpdate,
+      onHorizontalDragEnd: _onHorizontalDragEnd,
+      behavior: HitTestBehavior.translucent,
+      child: Stack(
+        clipBehavior: Clip.none,
+        alignment: Alignment.centerLeft,
+        children: [
+          Positioned(
+            left: -40 + (_dragOffset * 0.4),
+            child: Opacity(
+              opacity: (_dragOffset / 70.0).clamp(0.0, 1.0),
+              child: Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: context.accentSecondary.withValues(alpha: 0.2),
+                ),
+                child: Icon(
+                  Icons.reply_rounded,
+                  color: context.accentSecondary,
+                  size: 18,
+                ),
+              ),
+            ),
+          ),
+          Transform.translate(
+            offset: Offset(_dragOffset, 0),
+            child: SizedBox(
+              width: double.infinity,
+              child: widget.child,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+

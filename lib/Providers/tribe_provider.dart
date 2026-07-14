@@ -44,6 +44,10 @@ class TribeProvider with ChangeNotifier {
   final Map<String, RealtimeChannel> _membersSubscriptions = {};
   final Map<String, RealtimeChannel> _activitySubscriptions = {};
 
+  // Blocked-user cache (populated once, updated on block)
+  Set<int> _blockedUserIds = {};
+  Set<int> get blockedUserIds => _blockedUserIds;
+
   String? activeTribeId;
 
   void setActiveTribe(String? tribeId) {
@@ -975,5 +979,48 @@ class TribeProvider with ChangeNotifier {
 
   Future<List<Map<String, dynamic>>> searchPublicTribes(String query) async {
     return _repository.searchPublicTribes(query);
+  }
+
+  // ── Moderation ──
+
+  Future<void> fetchBlockedUserIds() async {
+    final myUserId = _userId;
+    if (myUserId == null) return;
+    try {
+      _blockedUserIds = await _repository.getBlockedUserIds(myUserId);
+      notifyListeners();
+    } catch (e) {
+      print("Error fetching blocked users: $e");
+    }
+  }
+
+  Future<void> reportTribeMessage({
+    required int reportedUserId,
+    String? messageId,
+    String? messageContent,
+    required String reason,
+    String? additionalDetails,
+  }) async {
+    final myUserId = _userId;
+    if (myUserId == null) throw Exception("User not authenticated.");
+    await _repository.reportTribeMessage(
+      reporterId: myUserId,
+      reportedUserId: reportedUserId,
+      messageId: messageId,
+      messageContent: messageContent,
+      reason: reason,
+      additionalDetails: additionalDetails,
+    );
+  }
+
+  Future<void> blockUserInTribe(int blockedUserId) async {
+    final myUserId = _userId;
+    if (myUserId == null) throw Exception("User not authenticated.");
+    await _repository.blockUserInTribe(
+      blockerId: myUserId,
+      blockedId: blockedUserId,
+    );
+    _blockedUserIds.add(blockedUserId);
+    notifyListeners();
   }
 }

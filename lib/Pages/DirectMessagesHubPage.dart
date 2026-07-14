@@ -702,7 +702,12 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
                         setState(() {
                           _selectedTab = 'tribes';
                         });
-                        Provider.of<TribeProvider>(context, listen: false).fetchMyTribes(silent: true);
+                        final tribeProvider = Provider.of<TribeProvider>(context, listen: false);
+                        if (tribeProvider.myTribes.isEmpty) {
+                          tribeProvider.fetchMyTribes(silent: false);
+                        } else {
+                          tribeProvider.fetchMyTribes(silent: true);
+                        }
                       },
                       child: AnimatedContainer(
                         duration: const Duration(milliseconds: 200),
@@ -1331,6 +1336,7 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
 
     // Only show active tribes -- invites are handled in the global Notification page
     final activeTribes = tribes.where((t) => t['status'] == 'active').toList();
+    final bool isLoading = (provider.state is TribeLoading || provider.state is TribeInitial) && activeTribes.isEmpty;
 
     return RefreshIndicator(
       onRefresh: () => provider.fetchMyTribes(silent: true),
@@ -1348,7 +1354,9 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
             ],
           ),
           const SizedBox(height: 8),
-          if (activeTribes.isEmpty)
+          if (isLoading)
+            _buildTribesSkeleton(context)
+          else if (activeTribes.isEmpty)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 40.0),
               child: Center(
@@ -1709,6 +1717,119 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
               padding: const EdgeInsets.only(top: 4.0),
               child: Container(
                   width: double.infinity, height: 12, color: Colors.white10),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildTribesSkeleton(BuildContext context) {
+    return Column(
+      children: List.generate(4, (index) {
+        return Card(
+          color: context.surfacePrimary,
+          margin: const EdgeInsets.symmetric(vertical: 6),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          child: ListTile(
+            contentPadding: const EdgeInsets.all(12),
+            leading: const _ShimmerBox(
+              width: 46,
+              height: 46,
+              shape: BoxShape.circle,
+            ),
+            title: Row(
+              children: [
+                const _ShimmerBox(
+                  width: 120,
+                  height: 14,
+                  borderRadius: 4,
+                ),
+                const SizedBox(width: 8),
+                const _ShimmerBox(
+                  width: 40,
+                  height: 10,
+                  borderRadius: 3,
+                ),
+              ],
+            ),
+            subtitle: const Padding(
+              padding: EdgeInsets.only(top: 8.0),
+              child: _ShimmerBox(
+                width: double.infinity,
+                height: 12,
+                borderRadius: 4,
+              ),
+            ),
+            trailing: Icon(
+              Icons.arrow_forward_ios_rounded,
+              color: Colors.white.withValues(alpha: 0.15),
+              size: 14,
+            ),
+          ),
+        );
+      }),
+    );
+  }
+}
+
+class _ShimmerBox extends StatefulWidget {
+  final double width;
+  final double height;
+  final double borderRadius;
+  final BoxShape shape;
+
+  const _ShimmerBox({
+    required this.width,
+    required this.height,
+    this.borderRadius = 4.0,
+    this.shape = BoxShape.rectangle,
+  });
+
+  @override
+  State<_ShimmerBox> createState() => _ShimmerBoxState();
+}
+
+class _ShimmerBoxState extends State<_ShimmerBox>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _animation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1000),
+    );
+    _animation = Tween<double>(begin: 0.35, end: 0.7).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+    );
+    _controller.repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _animation,
+      builder: (context, child) {
+        return Opacity(
+          opacity: _animation.value,
+          child: Container(
+            width: widget.width,
+            height: widget.height,
+            decoration: BoxDecoration(
+              shape: widget.shape,
+              color: Colors.white.withValues(alpha: 0.15),
+              borderRadius: widget.shape == BoxShape.circle
+                  ? null
+                  : BorderRadius.circular(widget.borderRadius),
             ),
           ),
         );

@@ -37,6 +37,18 @@ abstract class TribeRepository {
   Future<void> softDeleteTribeMessage(String messageId);
   Future<void> updateTribeMessage(String messageId, String newContent);
 
+  // Moderation
+  Future<void> reportTribeMessage({
+    required int reporterId,
+    required int reportedUserId,
+    String? messageId,
+    String? messageContent,
+    required String reason,
+    String? additionalDetails,
+  });
+  Future<void> blockUserInTribe({required int blockerId, required int blockedId});
+  Future<Set<int>> getBlockedUserIds(int userId);
+
   // Activity Log
   Future<List<Map<String, dynamic>>> getTribeActivityLog(String tribeId);
   Future<void> insertTribeActivityLog(Map<String, dynamic> logData);
@@ -272,7 +284,7 @@ class SupabaseTribeRepository implements TribeRepository {
     final response = await _client
         .from('tribe_messages')
         .select(
-            '*, sender:profiles!sender_id(id, name, avatar_url), reply_to:tribe_messages!reply_to_message_id(*, sender:profiles!sender_id(id, name, avatar_url))')
+            '*, sender:profiles!sender_id(id, name, avatar_url), reply_to:reply_to_message_id(*, sender:profiles!sender_id(id, name, avatar_url))')
         .eq('tribe_id', tribeId)
         .order('created_at', ascending: true);
     return List<Map<String, dynamic>>.from(response as List);
@@ -285,7 +297,7 @@ class SupabaseTribeRepository implements TribeRepository {
         .from('tribe_messages')
         .insert(messageData)
         .select(
-            '*, sender:profiles!sender_id(id, name, avatar_url), reply_to:tribe_messages!reply_to_message_id(*, sender:profiles!sender_id(id, name, avatar_url))')
+            '*, sender:profiles!sender_id(id, name, avatar_url), reply_to:reply_to_message_id(*, sender:profiles!sender_id(id, name, avatar_url))')
         .single();
     return Map<String, dynamic>.from(response);
   }
@@ -395,5 +407,45 @@ class SupabaseTribeRepository implements TribeRepository {
   @override
   void removeChannel(RealtimeChannel channel) {
     _client.removeChannel(channel);
+  }
+
+  // ── Moderation ──
+
+  @override
+  Future<void> reportTribeMessage({
+    required int reporterId,
+    required int reportedUserId,
+    String? messageId,
+    String? messageContent,
+    required String reason,
+    String? additionalDetails,
+  }) async {
+    await _client.from('content_reports').insert({
+      'reporter_id': reporterId,
+      'reported_user_id': reportedUserId,
+      'message_id': messageId,
+      'message_content': messageContent,
+      'reason': reason,
+      'additional_details': additionalDetails,
+    });
+  }
+
+  @override
+  Future<void> blockUserInTribe({required int blockerId, required int blockedId}) async {
+    await _client.from('blocked_users').upsert({
+      'blocker_id': blockerId,
+      'blocked_id': blockedId,
+    });
+  }
+
+  @override
+  Future<Set<int>> getBlockedUserIds(int userId) async {
+    final response = await _client
+        .from('blocked_users')
+        .select('blocked_id')
+        .eq('blocker_id', userId);
+    return (response as List)
+        .map((row) => row['blocked_id'] as int)
+        .toSet();
   }
 }
