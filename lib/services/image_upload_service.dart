@@ -61,4 +61,29 @@ class ImageUploadService {
         .from('avatars')
         .getPublicUrl(fileName);
   }
+
+  static Future<String> uploadTribeAvatarImage(
+      String tribeId, Uint8List compressedBytes) async {
+    try {
+      await Supabase.instance.client.storage
+          .createBucket('Tribe_avatar', const BucketOptions(public: true));
+    } catch (_) {
+      // Safe to ignore if bucket already exists
+    }
+
+    final String fileName = '$tribeId.jpg';
+
+    await Supabase.instance.client.storage.from('Tribe_avatar').uploadBinary(
+          fileName,
+          compressedBytes,
+          fileOptions: const FileOptions(
+            contentType: 'image/jpeg',
+            upsert: true,
+          ),
+        );
+
+    return Supabase.instance.client.storage
+        .from('Tribe_avatar')
+        .getPublicUrl(fileName);
+  }
 }

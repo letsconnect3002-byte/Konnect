@@ -55,6 +55,9 @@ class SupabaseNotificationRepository implements NotificationRepository {
           if (parsed['changed_fields'] is List) {
             n['changed_fields'] = List<String>.from(parsed['changed_fields']);
           }
+          if (parsed['real_type'] != null) {
+            n['type'] = parsed['real_type'].toString();
+          }
         } catch (e) {
           print("Error parsing notification note JSON: $e");
         }

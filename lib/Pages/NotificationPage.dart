@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:connect/Config/app_theme.dart';
 import 'package:connect/Pages/ConnectionProfilePage.dart';
 import 'package:connect/Pages/IndividualChatPage.dart';
@@ -5,6 +6,7 @@ import 'package:connect/Pages/PlanDetailPage.dart';
 import 'package:connect/Providers/connection_provider.dart';
 import 'package:connect/Providers/notification_provider.dart';
 import 'package:connect/Providers/plans_provider.dart';
+import 'package:connect/Providers/tribe_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -256,6 +258,11 @@ class _NotificationPageState extends State<NotificationPage> {
         type == 'plan_reminder_30' ||
         type == 'plan_reminder_start') {
       return PlanNotificationCard(notification: notification, provider: provider);
+    }
+    if (type == 'tribe_invite' ||
+        type == 'tribe_request' ||
+        type == 'tribe_approved') {
+      return _buildTribeNotificationItem(notification, provider);
     }
     final otherUser = notification['other_user'] as Map<String, dynamic>? ?? {};
     final String name = otherUser['name'] ?? 'Unknown User';
@@ -856,6 +863,295 @@ class _NotificationPageState extends State<NotificationPage> {
                     ),
                   ),
                 ],
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTribeNotificationItem(
+      Map<String, dynamic> notification, NotificationProvider provider) {
+    final String type = notification['type'] ?? 'tribe_invite';
+    final otherUser = notification['other_user'] as Map<String, dynamic>? ?? {};
+    final String name = otherUser['name'] ?? 'Unknown User';
+    final String avatarUrl =
+        otherUser['avatar_url'] ?? otherUser['avatarUrl'] ?? '';
+    final String timeStr =
+        _getRelativeTime(notification['created_at'] as String?);
+    final bool isUnseen = notification['is_seen'] == false;
+
+    final String? rawNote = notification['note'] as String?;
+    String tribeName = 'a Mafia';
+    String? tribeId;
+    if (rawNote != null && rawNote.startsWith('{')) {
+      try {
+        final parsed = jsonDecode(rawNote);
+        tribeName = parsed['tribe_name']?.toString() ?? 'a Mafia';
+        tribeId = parsed['tribe_id']?.toString();
+      } catch (_) {}
+    }
+
+    const Color accentColor = Color(0xFF8B5CF6);
+
+    String actionText;
+    IconData actionIcon;
+    if (type == 'tribe_invite') {
+      actionText = " invited you to join ";
+      actionIcon = Icons.mail_rounded;
+    } else if (type == 'tribe_request') {
+      actionText = " requested to join ";
+      actionIcon = Icons.person_add_rounded;
+    } else {
+      actionText = " approved your request to join ";
+      actionIcon = Icons.check_circle_rounded;
+    }
+
+    return Dismissible(
+      key: Key(notification['id'].toString()),
+      direction: DismissDirection.endToStart,
+      background: Container(
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.only(right: 24),
+        decoration: BoxDecoration(
+          color: const Color(0xFFEF4444).withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: const Icon(
+          Icons.delete_outline_rounded,
+          color: Color(0xFFEF4444),
+          size: 24,
+        ),
+      ),
+      onDismissed: (direction) {
+        HapticFeedback.mediumImpact();
+        provider.deleteNotification(notification['id']);
+      },
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () {
+            HapticFeedback.lightImpact();
+            provider.markAsSeen(notification['id']);
+          },
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(2),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: isUnseen
+                        ? Border.all(
+                            color: accentColor.withValues(alpha: 0.6),
+                            width: 2,
+                          )
+                        : null,
+                  ),
+                  child: Container(
+                    width: 40,
+                    height: 40,
+                    decoration: const BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Color(0xFF1A1B2E),
+                    ),
+                    child: ClipOval(
+                      child: avatarUrl.startsWith('http')
+                          ? Image.network(
+                              avatarUrl,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) =>
+                                  Center(
+                                child: Icon(
+                                  actionIcon,
+                                  color:
+                                      isUnseen ? accentColor : Colors.white60,
+                                  size: 18,
+                                ),
+                              ),
+                            )
+                          : Center(
+                              child: Icon(
+                                actionIcon,
+                                color: isUnseen ? accentColor : Colors.white60,
+                                size: 18,
+                              ),
+                            ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      RichText(
+                        text: TextSpan(
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 13.5,
+                            fontFamily: 'Inter',
+                            height: 1.3,
+                          ),
+                          children: [
+                            TextSpan(
+                              text: name,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                            TextSpan(
+                              text: actionText,
+                              style: const TextStyle(color: Colors.white70),
+                            ),
+                            TextSpan(
+                              text: tribeName,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                            if (timeStr.isNotEmpty)
+                              TextSpan(
+                                text: " \u2022 $timeStr",
+                                style: const TextStyle(
+                                  color: Color(0xFF5C5E78),
+                                  fontWeight: FontWeight.normal,
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                      if ((type == 'tribe_invite' || type == 'tribe_request') && tribeId != null) ...[
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            SizedBox(
+                              width: 76,
+                              height: 30,
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  gradient: const LinearGradient(
+                                    colors: [
+                                      Color(0xFF8B5CF6),
+                                      Color(0xFF6D28D9)
+                                    ],
+                                  ),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: ElevatedButton(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.transparent,
+                                    foregroundColor: Colors.white,
+                                    shadowColor: Colors.transparent,
+                                    padding: EdgeInsets.zero,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                  ),
+                                  onPressed: () async {
+                                    HapticFeedback.lightImpact();
+                                    final tribeProvider =
+                                        Provider.of<TribeProvider>(context,
+                                            listen: false);
+                                    try {
+                                      if (type == 'tribe_invite') {
+                                        await tribeProvider
+                                            .joinTribeDirectly(tribeId!);
+                                      } else {
+                                        final requesterId = (otherUser['id'] as num?)?.toInt();
+                                        if (requesterId == null) throw Exception("Invalid requester.");
+                                        await tribeProvider
+                                            .approveRequest(tribeId!, requesterId);
+                                      }
+                                      provider
+                                          .markAsSeen(notification['id']);
+                                    } catch (e) {
+                                      if (mounted) {
+                                        ScaffoldMessenger.of(context)
+                                            .showSnackBar(
+                                          SnackBar(
+                                              content: Text(
+                                                  "Action failed: $e")),
+                                        );
+                                      }
+                                    }
+                                  },
+                                  child: const Text(
+                                    "Accept",
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                      fontFamily: 'Inter',
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            SizedBox(
+                              width: 76,
+                              height: 30,
+                              child: ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFF1F2030),
+                                  foregroundColor: const Color(0xFF8B8C9E),
+                                  shadowColor: Colors.transparent,
+                                  padding: EdgeInsets.zero,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                    side: BorderSide(
+                                      color: Colors.white
+                                          .withValues(alpha: 0.03),
+                                      width: 1,
+                                    ),
+                                  ),
+                                ),
+                                onPressed: () async {
+                                  HapticFeedback.lightImpact();
+                                  final tribeProvider =
+                                      Provider.of<TribeProvider>(context,
+                                          listen: false);
+                                  try {
+                                    final targetId = type == 'tribe_invite'
+                                        ? provider.userId!
+                                        : (otherUser['id'] as num?)?.toInt();
+                                    if (targetId == null) throw Exception("Invalid target user.");
+                                    await tribeProvider
+                                        .declineRequestOrInvite(
+                                            tribeId!, targetId);
+                                    provider
+                                        .markAsSeen(notification['id']);
+                                  } catch (e) {
+                                    if (mounted) {
+                                      ScaffoldMessenger.of(context)
+                                          .showSnackBar(
+                                        SnackBar(
+                                            content: Text(
+                                                "Decline failed: $e")),
+                                      );
+                                    }
+                                  }
+                                },
+                                child: const Text(
+                                  "Decline",
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                    fontFamily: 'Inter',
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
               ],
             ),
           ),

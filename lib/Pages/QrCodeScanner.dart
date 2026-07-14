@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:connect/Providers/profile_provider.dart';
 import 'package:connect/Providers/connection_provider.dart';
+import 'package:connect/Providers/tribe_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -220,7 +221,36 @@ class _QRScannerPageState extends State<QRScannerPage> {
           // Pause the camera to prevent additional scans
           controller.pauseCamera();
 
-          if (decodedData.containsKey('userId')) {
+          if (decodedData.containsKey('tribeCode')) {
+            final String tribeCode = decodedData['tribeCode'].toString();
+            setState(() {
+              _isLoading = true;
+            });
+            final tribeProvider = Provider.of<TribeProvider>(context, listen: false);
+            try {
+              await tribeProvider.joinTribeWithInviteCode(tribeCode);
+              setState(() {
+                _isLoading = false;
+              });
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text("Joined tribe successfully!"), backgroundColor: Colors.green),
+                );
+                Navigator.pop(context);
+              }
+            } catch (e) {
+              setState(() {
+                _isLoading = false;
+                _processingScan = false;
+              });
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text("Failed to join tribe: $e"), backgroundColor: Colors.redAccent),
+                );
+              }
+              controller.resumeCamera();
+            }
+          } else if (decodedData.containsKey('userId')) {
             final userIdVal = decodedData['userId'];
             final int idToFetch =
                 userIdVal is int ? userIdVal : int.parse(userIdVal.toString());

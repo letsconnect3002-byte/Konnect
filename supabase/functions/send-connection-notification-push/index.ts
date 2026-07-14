@@ -66,8 +66,40 @@ serve(async (req) => {
     // 4. Formulate the notification content based on the notification type
     let title = "New Notification"
     let bodyText = "You have a new update."
+    let realType = type
+    let tribeName = "a Mafia"
+    let tribeMessage = ""
 
-    if (type === "vip_pass_key") {
+    if (note && note.startsWith("{")) {
+      try {
+        const parsed = JSON.parse(note)
+        if (parsed.real_type) {
+          realType = parsed.real_type
+        }
+        if (parsed.tribe_name) {
+          tribeName = parsed.tribe_name
+        }
+        if (parsed.message) {
+          tribeMessage = parsed.message
+        }
+      } catch (e) {
+        console.error("Error parsing JSON note:", e)
+      }
+    }
+
+    if (realType === "tribe_invite") {
+      title = "Mafia Invitation"
+      bodyText = `${actorName} invited you to join "${tribeName}"`
+    } else if (realType === "tribe_request") {
+      title = "Mafia Request"
+      bodyText = `${actorName} requested to join "${tribeName}"`
+    } else if (realType === "tribe_approved") {
+      title = "Mafia Approved"
+      bodyText = `Your request to join "${tribeName}" was approved`
+    } else if (realType === "tribe_message") {
+      title = `New Message in ${tribeName}`
+      bodyText = `${actorName}: ${tribeMessage}`
+    } else if (type === "vip_pass_key") {
       title = "New Connection"
       bodyText = `${actorName} connected via Private Key`
     } else if (type === "referral_connect") {
@@ -92,7 +124,7 @@ serve(async (req) => {
     let isAlreadyConnected = false
     if (type === "referral" && targetId) {
       const isRequest = note && (note.startsWith("[REFERRAL_REQUEST]") || note.startsWith("[REFERRAL_REQUEST_ACTIONED]"))
-      if (!isRequest) {
+      if (!isRequest && realType === type) {
         const id1 = recipientId < targetId ? recipientId : targetId
         const id2 = recipientId > targetId ? recipientId : targetId
         const { data: conn } = await supabase
@@ -106,7 +138,11 @@ serve(async (req) => {
     }
 
     let apnsCategory = "default_category"
-    if (type === "referral") {
+    if (realType === "tribe_invite") {
+      apnsCategory = "tribe_invite_category"
+    } else if (realType === "tribe_request") {
+      apnsCategory = "tribe_request_category"
+    } else if (type === "referral") {
       const isRequest = note && (note.startsWith("[REFERRAL_REQUEST]") || note.startsWith("[REFERRAL_REQUEST_ACTIONED]"))
       if (isRequest) {
         apnsCategory = note.startsWith("[REFERRAL_REQUEST_ACTIONED]") ? "default_category" : "referral_request_category"
@@ -156,6 +192,7 @@ serve(async (req) => {
             actor_avatar: actorAvatar,
             title: title,
             body: bodyText,
+            note: note ? String(note) : "",
           },
           android: {
             priority: "high",

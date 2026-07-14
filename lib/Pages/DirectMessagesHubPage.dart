@@ -11,6 +11,9 @@ import 'package:provider/provider.dart';
 import 'package:connect/Widgets/connect_hub_bottom_sheet.dart';
 import 'package:skeletonizer/skeletonizer.dart';
 import 'package:connect/Config/app_theme.dart';
+import 'package:connect/Providers/tribe_provider.dart';
+import 'package:connect/Pages/Tribe/TribeChatPage.dart';
+import 'package:connect/Pages/Tribe/TribeCreatePage.dart';
 
 class DirectMessagesHubPage extends StatefulWidget {
   const DirectMessagesHubPage({super.key});
@@ -613,7 +616,7 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
                                     ? Colors.white
                                     : context.textSecondary,
                                 fontWeight: FontWeight.bold,
-                                fontSize: 14,
+                                fontSize: 13,
                                 fontFamily: 'Inter',
                               ),
                             ),
@@ -672,7 +675,7 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
                                     ? Colors.white
                                     : context.textSecondary,
                                 fontWeight: FontWeight.bold,
-                                fontSize: 14,
+                                fontSize: 13,
                                 fontFamily: 'Inter',
                               ),
                             ),
@@ -692,6 +695,55 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
                       ),
                     ),
                   ),
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () {
+                        HapticFeedback.lightImpact();
+                        setState(() {
+                          _selectedTab = 'tribes';
+                        });
+                        Provider.of<TribeProvider>(context, listen: false).fetchMyTribes(silent: true);
+                      },
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        curve: Curves.easeOutCubic,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(12),
+                          color: _selectedTab == 'tribes'
+                              ? context.accentSecondary
+                              : Colors.transparent,
+                          boxShadow: _selectedTab == 'tribes'
+                              ? [
+                                  BoxShadow(
+                                    color: context.accentSecondary
+                                        .withValues(alpha: 0.3),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ]
+                              : null,
+                        ),
+                        alignment: Alignment.center,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              "Mafias",
+                              style: TextStyle(
+                                color: _selectedTab == 'tribes'
+                                    ? Colors.white
+                                    : context.textSecondary,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                                fontFamily: 'Inter',
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -701,7 +753,10 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 1. Search Box
+          if (_selectedTab == 'tribes') ...[
+            Expanded(child: _buildTribesTabBody(context)),
+          ] else ...[
+            // 1. Search Box
           Padding(
             padding: const EdgeInsets.only(
                 left: AppDimensions.marginStandard,
@@ -1111,6 +1166,7 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
                             ),
             ),
           ),
+          ],
         ],
       ),
       floatingActionButton: Padding(
@@ -1118,12 +1174,16 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
         child: FloatingActionButton(
           onPressed: () {
             HapticFeedback.mediumImpact();
-            showModalBottomSheet(
-              context: context,
-              isScrollControlled: true,
-              backgroundColor: Colors.transparent,
-              builder: (context) => const ConnectHubBottomSheet(),
-            );
+            if (_selectedTab == 'tribes') {
+              _showTribeActionsDialog(context);
+            } else {
+              showModalBottomSheet(
+                context: context,
+                isScrollControlled: true,
+                backgroundColor: Colors.transparent,
+                builder: (context) => const ConnectHubBottomSheet(),
+              );
+            }
           },
           backgroundColor: context.accentSecondary,
           elevation: 8,
@@ -1261,6 +1321,353 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildTribesTabBody(BuildContext context) {
+    final provider = Provider.of<TribeProvider>(context);
+
+    final tribes = provider.myTribes;
+
+    // Only show active tribes -- invites are handled in the global Notification page
+    final activeTribes = tribes.where((t) => t['status'] == 'active').toList();
+
+    return RefreshIndicator(
+      onRefresh: () => provider.fetchMyTribes(silent: true),
+      color: context.accentSecondary,
+      backgroundColor: context.surfaceSecondary,
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.only(left: 16, right: 16, top: 12, bottom: 100),
+        children: [
+          // ── Active Tribes Section ──
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text("Your Mafias", style: context.cardTitle.copyWith(fontWeight: FontWeight.bold)),
+            ],
+          ),
+          const SizedBox(height: 8),
+          if (activeTribes.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 40.0),
+              child: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.house_rounded, color: context.textMuted, size: 40),
+                    const SizedBox(height: 12),
+                    Text(
+                      "You are not in any Mafia yet.",
+                      style: context.bodyText.copyWith(color: context.textMuted),
+                    ),
+                    const SizedBox(height: 12),
+                    ElevatedButton(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (context) => const TribeCreatePage()),
+                        );
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: context.accentSecondary,
+                        foregroundColor: Colors.white,
+                      ),
+                      child: const Text("Create a Mafia"),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          else
+            ...activeTribes.map((item) {
+              final tribe = item['tribe'] as Map<String, dynamic>? ?? {};
+              final name = tribe['name'] ?? 'Mafia';
+              final desc = tribe['description'] ?? '';
+              final role = item['role'] as Map<String, dynamic>? ?? {};
+
+              return Card(
+                color: context.surfacePrimary,
+                margin: const EdgeInsets.symmetric(vertical: 6),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                child: ListTile(
+                  contentPadding: const EdgeInsets.all(12),
+                   leading: () {
+                     final avatarUrl = tribe['avatar_url']?.toString() ?? '';
+                     return Container(
+                       width: 46,
+                       height: 46,
+                       decoration: BoxDecoration(
+                         shape: BoxShape.circle,
+                         border: Border.all(color: context.accentSecondary.withValues(alpha: 0.35), width: 1.5),
+                         color: context.surfaceSecondary,
+                         image: avatarUrl.isNotEmpty
+                             ? DecorationImage(
+                                 image: NetworkImage(avatarUrl),
+                                 fit: BoxFit.cover,
+                               )
+                             : null,
+                       ),
+                       alignment: Alignment.center,
+                        child: avatarUrl.isEmpty
+                            ? const Icon(Icons.group_rounded, size: 20, color: Colors.white70)
+                            : null,
+                      );
+                   }(),
+                  title: Row(
+                    children: [
+                      Text(name, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: context.accentSecondary.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          role['name'] ?? 'Member',
+                          style: TextStyle(color: context.accentSecondary, fontSize: 8, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ],
+                  ),
+                  subtitle: Padding(
+                    padding: const EdgeInsets.only(top: 4.0),
+                    child: Text(
+                      desc.isEmpty ? 'No description' : desc,
+                      style: TextStyle(color: context.textMuted, fontSize: 12),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  trailing: const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white24, size: 16),
+                  onTap: () {
+                    HapticFeedback.lightImpact();
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => TribeChatPage(tribeId: tribe['id'] as String, tribeName: name),
+                      ),
+                    );
+                  },
+                  onLongPress: () {
+                    final roleSlug = role['slug']?.toString();
+                    if (roleSlug == 'don') {
+                      HapticFeedback.heavyImpact();
+                      _showDeleteTribeConfirmDialog(context, tribe['id'] as String, name);
+                    }
+                  },
+                ),
+              );
+            }),
+        ],
+      ),
+    );
+  }
+
+  void _showTribeActionsDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          child: GlassmorphicContainer(
+            borderRadius: BorderRadius.circular(24),
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text("Mafia Actions", style: context.screenHeading.copyWith(fontWeight: FontWeight.bold, fontSize: 18)),
+                    GestureDetector(
+                      onTap: () => Navigator.pop(context),
+                      child: const Icon(Icons.close_rounded, color: Colors.white70),
+                    )
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Material(
+                  color: Colors.transparent,
+                  child: ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.group_add_rounded, color: Colors.white),
+                    title: const Text("Create a Mafia", style: TextStyle(color: Colors.white)),
+                    onTap: () {
+                      Navigator.pop(context);
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const TribeCreatePage()),
+                      );
+                    },
+                  ),
+                ),
+                Material(
+                  color: Colors.transparent,
+                  child: ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.qr_code_scanner_rounded, color: Colors.white),
+                    title: const Text("Join Mafia with Code", style: TextStyle(color: Colors.white)),
+                    onTap: () {
+                      Navigator.pop(context);
+                      _showJoinWithCodeDialog(context);
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _showJoinWithCodeDialog(BuildContext context) {
+    final codeController = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (context) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          child: GlassmorphicContainer(
+            borderRadius: BorderRadius.circular(24),
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text("Join Mafia", style: context.screenHeading.copyWith(fontWeight: FontWeight.bold, fontSize: 18)),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: codeController,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: InputDecoration(
+                    labelText: "Invite Code",
+                    labelStyle: TextStyle(color: context.textSecondary, fontSize: 13),
+                    hintText: "Enter code here",
+                    hintStyle: TextStyle(color: context.textMuted, fontSize: 13),
+                    fillColor: context.surfaceSecondary,
+                    filled: true,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: context.borderMuted),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: context.borderMuted),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: context.accentSecondary),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                      child: const Text("Cancel", style: TextStyle(color: Colors.white70)),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                    const SizedBox(width: 12),
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: context.accentSecondary,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                      child: const Text("Join", style: TextStyle(fontWeight: FontWeight.bold)),
+                      onPressed: () async {
+                        final navigator = Navigator.of(context);
+                        final code = codeController.text.trim();
+                        if (code.isEmpty) return;
+                        
+                        final provider = Provider.of<TribeProvider>(context, listen: false);
+                        try {
+                          await provider.joinTribeWithInviteCode(code);
+                          navigator.pop();
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text("Successfully joined Mafia!"), backgroundColor: Colors.green),
+                          );
+                        } catch (e) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text("Failed to join: $e"), backgroundColor: Colors.redAccent),
+                          );
+                        }
+                      },
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _showDeleteTribeConfirmDialog(BuildContext context, String tribeId, String tribeName) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          child: GlassmorphicContainer(
+            borderRadius: BorderRadius.circular(24),
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text("Delete Mafia", style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 18)),
+                const SizedBox(height: 12),
+                Text("Are you sure you want to permanently delete \"$tribeName\"? This action is irreversible.", style: const TextStyle(color: Colors.white70, fontSize: 14)),
+                const SizedBox(height: 24),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                      child: const Text("Cancel", style: TextStyle(color: Colors.white70)),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                    const SizedBox(width: 12),
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.redAccent,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                      child: const Text("Delete", style: TextStyle(fontWeight: FontWeight.bold)),
+                      onPressed: () async {
+                        final navigator = Navigator.of(context);
+                        final scaffoldMessenger = ScaffoldMessenger.of(context);
+                        final provider = Provider.of<TribeProvider>(context, listen: false);
+                        try {
+                          await provider.deleteTribe(tribeId);
+                          navigator.pop();
+                          scaffoldMessenger.showSnackBar(
+                            SnackBar(content: Text("Mafia \"$tribeName\" deleted successfully.")),
+                          );
+                        } catch (e) {
+                          scaffoldMessenger.showSnackBar(
+                            SnackBar(content: Text("Error deleting Mafia: $e")),
+                          );
+                        }
+                      },
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 

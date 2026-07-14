@@ -11,10 +11,13 @@ import 'package:connect/Pages/DirectMessagesHubPage.dart';
 import 'package:connect/Pages/OtherProfilesPage.dart';
 import 'package:connect/Pages/yet_to_be_built_profile_page.dart';
 import 'package:connect/Pages/IndividualChatPage.dart';
+import 'package:connect/Pages/Tribe/TribeChatPage.dart';
 import 'package:connect/Pages/PlansPage.dart';
 import 'package:connect/Providers/profile_provider.dart';
 import 'package:connect/Providers/connection_provider.dart';
 import 'package:connect/Providers/chat_provider.dart';
+import 'package:connect/Providers/tribe_provider.dart';
+import 'package:connect/Repositories/tribe_repository.dart';
 import 'package:connect/Widgets/in_app_notification_banner.dart';
 import 'package:connect/Pages/YourNetworkPage.dart';
 import 'package:connect/Pages/NotificationPage.dart';
@@ -243,8 +246,34 @@ Future<void> showConnectionLocalNotification({
       type == 'plan_update' ||
       type == 'plan_reminder_30' ||
       type == 'plan_reminder_start';
+  final bool isTribeInvite = type == 'tribe_invite';
+  final bool isTribeRequest = type == 'tribe_request';
 
-  if (type == 'plan_invite') {
+  if (isTribeInvite) {
+    androidActions = [
+      const AndroidNotificationAction(
+        'action_tribe_accept',
+        'Accept',
+      ),
+      const AndroidNotificationAction(
+        'action_tribe_decline',
+        'Decline',
+      ),
+    ];
+    iosCategory = 'tribe_invite_category';
+  } else if (isTribeRequest) {
+    androidActions = [
+      const AndroidNotificationAction(
+        'action_tribe_accept',
+        'Accept',
+      ),
+      const AndroidNotificationAction(
+        'action_tribe_decline',
+        'Decline',
+      ),
+    ];
+    iosCategory = 'tribe_request_category';
+  } else if (type == 'plan_invite') {
     androidActions = [
       const AndroidNotificationAction(
         'action_plan_accept',
@@ -394,6 +423,19 @@ void handleLocalNotificationClickPayload(String payload) {
       );
       return;
     }
+    if (action == 'tribe_message') {
+      final tribeId = data['tribe_id'] as String?;
+      final tribeName = data['tribe_name'] as String? ?? 'Mafia';
+      if (tribeId != null) {
+        navigatorKey.currentState?.push(
+          MaterialPageRoute(
+            builder: (routeContext) =>
+                TribeChatPage(tribeId: tribeId, tribeName: tribeName),
+          ),
+        );
+      }
+      return;
+    }
     final senderIdStr = data['sender_id'] as String?;
     if (senderIdStr != null) {
       final senderId = int.tryParse(senderIdStr);
@@ -422,9 +464,139 @@ Future<void> onNotificationActionReceived(NotificationResponse response) async {
 
   try {
     final Map<String, dynamic> data = jsonDecode(payload);
-    final isConnectionNotif = data['is_connection_notification'] == true;
     final client =
         SupabaseClient(SupabaseConfig.url, SupabaseConfig.serviceRoleKey);
+
+    final isTribeMessage = data['action'] == 'tribe_message';
+    if (isTribeMessage) {
+      if (actionId == 'action_tribe_reply') {
+        final String? replyText = response.input;
+        print("PushNotificationsAction: Tribe Direct Reply triggered. Text: $replyText");
+        if (replyText != null && replyText.trim().isNotEmpty) {
+          final String? tribeId = data['tribe_id']?.toString();
+          final senderIdStr = data['sender_id']?.toString();
+          if (tribeId != null && senderIdStr != null) {
+            final ownerId = await LocalDatabaseHelper.instance.getActiveUserId();
+            if (ownerId != null) {
+              final String newMessageId = const Uuid().v4();
+              final String createdAt = DateTime.now().toUtc().toIso8601String();
+
+              try {
+                await client.from('tribe_messages').insert({
+                  'id': newMessageId,
+                  'tribe_id': tribeId,
+                  'sender_id': ownerId,
+                  'content': replyText.trim(),
+                  'message_type': 'text',
+                  'created_at': createdAt,
+                  'updated_at': createdAt,
+                });
+                print("PushNotificationsAction: Tribe message sent to Supabase successfully");
+              } catch (supabaseError) {
+                print("PushNotificationsAction: Supabase insert error for tribe message: $supabaseError");
+              }
+
+              int count = 1;
+              List<String> lines = [];
+              try {
+                final prefs = await SharedPreferences.getInstance();
+                final key = 'unread_tribe_messages_$tribeId';
+                lines = prefs.getStringList(key) ?? [];
+                lines.add("You: ${replyText.trim()}");
+                await prefs.setStringList(key, lines);
+                count = lines.length;
+              } catch (e) {
+                print("PushNotificationsAction: Error updating SharedPreferences on reply: $e");
+              }
+
+              try {
+                final tribeName = data['tribe_name']?.toString() ?? 'Mafia';
+                const AndroidNotificationChannel tribeChannel = AndroidNotificationChannel(
+                  'tribe_messages_channel',
+                  'Mafia Messages',
+                  description: 'Notifications for Mafia group chat messages',
+                  importance: Importance.max,
+                );
+
+                await flutterLocalNotificationsPlugin
+                    .resolvePlatformSpecificImplementation<
+                        AndroidFlutterLocalNotificationsPlugin>()
+                    ?.createNotificationChannel(tribeChannel);
+
+                final androidDetails = AndroidNotificationDetails(
+                  tribeChannel.id,
+                  tribeChannel.name,
+                  channelDescription: tribeChannel.description,
+                  importance: Importance.max,
+                  priority: Priority.high,
+                  showWhen: true,
+                  number: count,
+                  category: AndroidNotificationCategory.message,
+                  styleInformation: count > 1
+                      ? InboxStyleInformation(
+                          lines,
+                          contentTitle: "New Messages in $tribeName",
+                          summaryText: '$count messages',
+                        )
+                      : null,
+                  actions: [
+                    const AndroidNotificationAction(
+                      'action_tribe_reply',
+                      'Reply',
+                      inputs: [
+                        AndroidNotificationActionInput(
+                          label: 'Type message...',
+                        ),
+                      ],
+                      allowGeneratedReplies: true,
+                    ),
+                  ],
+                );
+
+                final iosDetails = DarwinNotificationDetails(
+                  presentAlert: true,
+                  presentBadge: true,
+                  presentSound: true,
+                  threadIdentifier: tribeId,
+                  categoryIdentifier: 'tribe_message_category',
+                );
+
+                final details = NotificationDetails(
+                  android: androidDetails,
+                  iOS: iosDetails,
+                );
+
+                final Map<String, dynamic> fullPayload = {
+                  'action': 'tribe_message',
+                  'message_id': newMessageId,
+                  'tribe_id': tribeId,
+                  'tribe_name': tribeName,
+                  'sender_id': senderIdStr,
+                  'sender_name': data['sender_name'] ?? 'New Message',
+                  'payload': replyText.trim(),
+                  'is_connection_notification': false,
+                };
+
+                final notifId = getNotificationId(tribeId);
+                await flutterLocalNotificationsPlugin.show(
+                  id: notifId,
+                  title: count > 1 ? "New Messages in $tribeName" : "New Message in $tribeName",
+                  body: count > 1 ? lines.last : "You: ${replyText.trim()}",
+                  notificationDetails: details,
+                  payload: jsonEncode(fullPayload),
+                );
+                print("PushNotificationsAction: Updated local notification with reply. ID: $notifId");
+              } catch (e) {
+                print("PushNotificationsAction: Error updating local notification tray on reply: $e");
+              }
+            }
+          }
+        }
+      }
+      return;
+    }
+
+    final isConnectionNotif = data['is_connection_notification'] == true;
 
     if (isConnectionNotif) {
       final String? notificationId =
@@ -621,6 +793,152 @@ Future<void> onNotificationActionReceived(NotificationResponse response) async {
             await client
                 .from('connection_notifications')
                 .update({'is_seen': true}).eq('id', notificationId);
+          }
+        } else if (actionId == 'action_tribe_accept') {
+          print("PushNotificationsAction: Tribe Accept action triggered");
+          final myUserId = await LocalDatabaseHelper.instance.getActiveUserId();
+
+          String? tribeId;
+          String? realType;
+          final noteStr = data['note']?.toString();
+          if (noteStr != null && noteStr.startsWith('{')) {
+            try {
+              final parsed = jsonDecode(noteStr);
+              tribeId = parsed['tribe_id']?.toString();
+              realType = parsed['real_type']?.toString();
+            } catch (_) {}
+          }
+
+          print(
+              "PushNotificationsAction: myUserId: $myUserId, tribeId: $tribeId, realType: $realType");
+
+          if (myUserId != null && tribeId != null) {
+            final nowStr = DateTime.now().toUtc().toIso8601String();
+
+            if (realType == 'tribe_request') {
+              final requesterIdStr = data['actor_id']?.toString() ??
+                  data['other_user_id']?.toString();
+              final requesterId =
+                  requesterIdStr != null ? int.tryParse(requesterIdStr) : null;
+              if (requesterId != null) {
+                final rolesRes = await client
+                    .from('tribe_roles')
+                    .select('id')
+                    .eq('tribe_id', tribeId)
+                    .eq('is_default', true)
+                    .maybeSingle();
+                final defaultRoleId =
+                    rolesRes != null ? rolesRes['id'] as String? : null;
+                if (defaultRoleId != null) {
+                  await client
+                      .from('tribe_members')
+                      .update({
+                        'status': 'active',
+                        'role_id': defaultRoleId,
+                        'joined_at': nowStr,
+                        'updated_at': nowStr,
+                      })
+                      .eq('tribe_id', tribeId)
+                      .eq('user_id', requesterId);
+
+                  await client.from('tribe_activity_log').insert({
+                    'tribe_id': tribeId,
+                    'actor_id': requesterId,
+                    'action_type': 'joined',
+                    'created_at': nowStr,
+                  });
+
+                  final tribeRes = await client
+                      .from('tribes')
+                      .select('name')
+                      .eq('id', tribeId)
+                      .maybeSingle();
+                  final tribeName = tribeRes != null
+                      ? tribeRes['name']?.toString() ?? 'Tribe'
+                      : 'Tribe';
+                  await client.from('connection_notifications').insert({
+                    'user_id': requesterId,
+                    'other_user_id': myUserId,
+                    'type': 'referral',
+                    'note': jsonEncode({
+                      'tribe_id': tribeId,
+                      'tribe_name': tribeName,
+                      'real_type': 'tribe_approved'
+                    }),
+                    'is_seen': false,
+                  });
+                }
+              }
+            } else {
+              await client
+                  .from('tribe_members')
+                  .update({
+                    'status': 'active',
+                    'joined_at': nowStr,
+                    'updated_at': nowStr,
+                  })
+                  .eq('tribe_id', tribeId)
+                  .eq('user_id', myUserId);
+
+              await client.from('tribe_activity_log').insert({
+                'tribe_id': tribeId,
+                'actor_id': myUserId,
+                'action_type': 'joined',
+                'created_at': nowStr,
+              });
+            }
+
+            await client.from('connection_notifications').update({
+              'is_seen': true,
+            }).eq('id', notificationId);
+          }
+        } else if (actionId == 'action_tribe_decline') {
+          print("PushNotificationsAction: Tribe Decline action triggered");
+          final myUserId = await LocalDatabaseHelper.instance.getActiveUserId();
+
+          String? tribeId;
+          String? realType;
+          final noteStr = data['note']?.toString();
+          if (noteStr != null && noteStr.startsWith('{')) {
+            try {
+              final parsed = jsonDecode(noteStr);
+              tribeId = parsed['tribe_id']?.toString();
+              realType = parsed['real_type']?.toString();
+            } catch (_) {}
+          }
+
+          print(
+              "PushNotificationsAction: myUserId: $myUserId, tribeId: $tribeId, realType: $realType");
+
+          if (myUserId != null && tribeId != null) {
+            final nowStr = DateTime.now().toUtc().toIso8601String();
+
+            final targetId = realType == 'tribe_request'
+                ? (int.tryParse(data['actor_id']?.toString() ??
+                        data['other_user_id']?.toString() ??
+                        '') ??
+                    myUserId)
+                : myUserId;
+
+            await client
+                .from('tribe_members')
+                .update({
+                  'status': 'declined',
+                  'updated_at': nowStr,
+                })
+                .eq('tribe_id', tribeId)
+                .eq('user_id', targetId);
+
+            await client.from('tribe_activity_log').insert({
+              'tribe_id': tribeId,
+              'actor_id': myUserId,
+              'action_type': 'declined_invite',
+              'created_at': nowStr,
+            });
+
+            await client.from('connection_notifications').update({
+              'is_seen': true,
+            }).eq('id', notificationId);
           }
         } else if (actionId == 'action_chat' || actionId == 'action_message') {
           print("PushNotificationsAction: Chat/Message action triggered");
@@ -918,6 +1236,44 @@ List<DarwinNotificationCategory> buildDarwinNotificationCategories() {
         DarwinNotificationCategoryOption.hiddenPreviewShowTitle,
       },
     ),
+    DarwinNotificationCategory(
+      'tribe_invite_category',
+      actions: <DarwinNotificationAction>[
+        DarwinNotificationAction.plain(
+          'action_tribe_accept',
+          'Accept',
+        ),
+        DarwinNotificationAction.plain(
+          'action_tribe_decline',
+          'Decline',
+          options: <DarwinNotificationActionOption>{
+            DarwinNotificationActionOption.destructive,
+          },
+        ),
+      ],
+      options: <DarwinNotificationCategoryOption>{
+        DarwinNotificationCategoryOption.hiddenPreviewShowTitle,
+      },
+    ),
+    DarwinNotificationCategory(
+      'tribe_request_category',
+      actions: <DarwinNotificationAction>[
+        DarwinNotificationAction.plain(
+          'action_tribe_accept',
+          'Accept',
+        ),
+        DarwinNotificationAction.plain(
+          'action_tribe_decline',
+          'Decline',
+          options: <DarwinNotificationActionOption>{
+            DarwinNotificationActionOption.destructive,
+          },
+        ),
+      ],
+      options: <DarwinNotificationCategoryOption>{
+        DarwinNotificationCategoryOption.hiddenPreviewShowTitle,
+      },
+    ),
   ];
 }
 
@@ -1123,6 +1479,121 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
             "PushNotifications: Error handling background message delete: $e");
       }
     }
+  } else if (action == 'tribe_message') {
+    final tribeId = data['tribe_id']?.toString();
+    final senderIdStr = data['sender_id']?.toString();
+    final payload = data['payload']?.toString();
+    final tribeName = data['tribe_name']?.toString() ?? 'Mafia';
+    final senderName = data['sender_name']?.toString() ?? 'New Message';
+
+    if (messageId != null &&
+        tribeId != null &&
+        senderIdStr != null &&
+        payload != null) {
+      final senderId = int.tryParse(senderIdStr);
+      if (senderId != null) {
+        try {
+          final activeUserId =
+              await LocalDatabaseHelper.instance.getActiveUserId();
+          if (activeUserId != null && senderId == activeUserId) {
+            print(
+                "PushNotifications: Received own Mafia message in background. Ignoring.");
+            return;
+          }
+
+          // Use tribeId for generating a stable notification ID
+          final int notifId = getNotificationId(tribeId);
+
+          // Track unread messages in SharedPreferences
+          final prefs = await SharedPreferences.getInstance();
+          final key = 'unread_tribe_messages_$tribeId';
+          List<String> lines = prefs.getStringList(key) ?? [];
+          lines.add("$senderName: $payload");
+          await prefs.setStringList(key, lines);
+
+          final count = lines.length;
+
+          const AndroidNotificationChannel tribeChannel = AndroidNotificationChannel(
+            'tribe_messages_channel',
+            'Mafia Messages',
+            description: 'Notifications for Mafia group chat messages',
+            importance: Importance.max,
+          );
+
+          await flutterLocalNotificationsPlugin
+              .resolvePlatformSpecificImplementation<
+                  AndroidFlutterLocalNotificationsPlugin>()
+              ?.createNotificationChannel(tribeChannel);
+
+          final androidDetails = AndroidNotificationDetails(
+            tribeChannel.id,
+            tribeChannel.name,
+            channelDescription: tribeChannel.description,
+            importance: Importance.max,
+            priority: Priority.high,
+            showWhen: true,
+            number: count,
+            category: AndroidNotificationCategory.message,
+            styleInformation: count > 1
+                ? InboxStyleInformation(
+                    lines,
+                    contentTitle: "New Messages in $tribeName",
+                    summaryText: '$count messages',
+                  )
+                : null,
+            actions: [
+              const AndroidNotificationAction(
+                'action_tribe_reply',
+                'Reply',
+                inputs: [
+                  AndroidNotificationActionInput(
+                    label: 'Type message...',
+                  ),
+                ],
+                allowGeneratedReplies: true,
+              ),
+            ],
+          );
+
+          final iosDetails = DarwinNotificationDetails(
+            presentAlert: true,
+            presentBadge: true,
+            presentSound: true,
+            threadIdentifier: tribeId,
+            categoryIdentifier: 'tribe_message_category',
+          );
+
+          final details = NotificationDetails(
+            android: androidDetails,
+            iOS: iosDetails,
+          );
+
+          final Map<String, dynamic> fullPayload = {
+            'action': 'tribe_message',
+            'message_id': messageId,
+            'tribe_id': tribeId,
+            'tribe_name': tribeName,
+            'sender_id': senderIdStr,
+            'sender_name': senderName,
+            'payload': payload,
+            'is_connection_notification': false,
+          };
+
+          await flutterLocalNotificationsPlugin.show(
+            id: notifId,
+            title: count > 1 ? "New Messages in $tribeName" : "New Message in $tribeName",
+            body: count > 1 ? lines.last : "$senderName: $payload",
+            notificationDetails: details,
+            payload: jsonEncode(fullPayload),
+          );
+          print(
+              "PushNotifications: Mafia message background notification displayed. ID: $notifId");
+        } catch (e) {
+          print(
+              "PushNotifications: Error showing local Mafia notification in background: $e");
+        }
+      }
+    }
   } else if (action == 'connection_notification') {
     final notificationId =
         data['notification_id']?.toString() ?? data['id']?.toString();
@@ -1138,8 +1609,16 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
             .maybeSingle();
 
         if (notifRow != null) {
-          final type = notifRow['type']?.toString() ?? 'referral';
+          var type = notifRow['type']?.toString() ?? 'referral';
           final note = notifRow['note']?.toString();
+          if (note != null && note.startsWith('{')) {
+            try {
+              final parsed = jsonDecode(note);
+              if (parsed['real_type'] != null) {
+                type = parsed['real_type'].toString();
+              }
+            } catch (_) {}
+          }
 
           final actor = notifRow['other_user'] as Map<String, dynamic>? ?? {};
           final actorName = actor['name']?.toString() ?? 'Someone';
@@ -1170,7 +1649,11 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
           } else if (type == "plan_invite" ||
               type == "plan_update" ||
               type == "plan_reminder_30" ||
-              type == "plan_reminder_start") {
+              type == "plan_reminder_start" ||
+              type == "tribe_invite" ||
+              type == "tribe_request" ||
+              type == "tribe_approved" ||
+              type == "tribe_message") {
             String planId = note ?? '';
             List<String> changedFields = [];
             if (note != null && note.startsWith('{')) {
@@ -1262,6 +1745,48 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
             } else if (type == "plan_reminder_start") {
               title = "Plan Starting Now";
               body = "\"$planTitle\" is starting now!";
+            } else if (type == "tribe_invite") {
+              String tribeName = "a Mafia";
+              if (note != null && note.startsWith('{')) {
+                try {
+                  final parsed = jsonDecode(note);
+                  tribeName = parsed['tribe_name']?.toString() ?? "a Mafia";
+                } catch (_) {}
+              }
+              title = "Mafia Invitation";
+              body = "$actorName invited you to join \"$tribeName\"";
+            } else if (type == "tribe_request") {
+              String tribeName = "a Mafia";
+              if (note != null && note.startsWith('{')) {
+                try {
+                  final parsed = jsonDecode(note);
+                  tribeName = parsed['tribe_name']?.toString() ?? "a Mafia";
+                } catch (_) {}
+              }
+              title = "Mafia Request";
+              body = "$actorName requested to join \"$tribeName\"";
+            } else if (type == "tribe_approved") {
+              String tribeName = "a Mafia";
+              if (note != null && note.startsWith('{')) {
+                try {
+                  final parsed = jsonDecode(note);
+                  tribeName = parsed['tribe_name']?.toString() ?? "a Mafia";
+                } catch (_) {}
+              }
+              title = "Mafia Approved";
+              body = "Your request to join \"$tribeName\" was approved";
+            } else if (type == "tribe_message") {
+              String tribeName = "Mafia";
+              String message = "";
+              if (note != null && note.startsWith('{')) {
+                try {
+                  final parsed = jsonDecode(note);
+                  tribeName = parsed['tribe_name']?.toString() ?? "Mafia";
+                  message = parsed['message']?.toString() ?? "";
+                } catch (_) {}
+              }
+              title = "New Message in $tribeName";
+              body = "$actorName: $message";
             }
           } else {
             title = "New Connection";
@@ -1495,6 +2020,16 @@ class MyApp extends StatelessWidget {
               connectionProvider.state is UserConnectionLoaded,
             );
             return networkProvider;
+          },
+        ),
+        ChangeNotifierProxyProvider<ProfileProvider, TribeProvider>(
+          create: (_) => TribeProvider(
+            tribeRepository: SupabaseTribeRepository(),
+            notificationRepository: SupabaseNotificationRepository(),
+          ),
+          update: (_, profileProvider, tribeProvider) {
+            tribeProvider!.updateUserId(profileProvider.userId);
+            return tribeProvider;
           },
         ),
       ],
@@ -1902,6 +2437,61 @@ class _AppShellGateState extends State<AppShellGate> {
                     "PushNotifications: Error updating providers after delete: $e");
               }
             }
+          } else if (action == 'tribe_message') {
+            final tribeId = data['tribe_id']?.toString();
+            final senderIdStr = data['sender_id']?.toString();
+            final payload = data['payload']?.toString();
+            final tribeName = data['tribe_name']?.toString() ?? 'Mafia';
+            final senderName = data['sender_name']?.toString() ?? 'New Message';
+            final senderAvatar = data['sender_avatar']?.toString() ?? '';
+
+            if (messageId != null &&
+                tribeId != null &&
+                senderIdStr != null &&
+                payload != null) {
+              final senderId = int.tryParse(senderIdStr);
+              if (senderId != null) {
+                final tribeProvider =
+                    Provider.of<TribeProvider>(context, listen: false);
+                final isCurrentTribe = tribeProvider.activeTribeId == tribeId;
+
+                if (!isCurrentTribe) {
+                  try {
+                    final activeUserId =
+                        await LocalDatabaseHelper.instance.getActiveUserId();
+                    if (activeUserId != null && senderId == activeUserId) {
+                      print(
+                          "PushNotifications: Foreground received own Mafia message. Skipping banner.");
+                      return;
+                    }
+
+                    final overlayState = navigatorKey.currentState?.overlay;
+                    if (overlayState != null) {
+                      InAppNotificationBanner.show(
+                        overlayState: overlayState,
+                        senderId: senderId,
+                        senderName: "New Message in $tribeName",
+                        avatarUrl: senderAvatar,
+                        message: "$senderName: $payload",
+                        onTap: () {
+                          navigatorKey.currentState?.push(
+                            MaterialPageRoute(
+                              builder: (routeContext) => TribeChatPage(
+                                  tribeId: tribeId, tribeName: tribeName),
+                            ),
+                          );
+                        },
+                      );
+                      print(
+                          "PushNotifications: Foreground in-app Mafia notification banner displayed.");
+                    }
+                  } catch (e) {
+                    print(
+                        "PushNotifications: Error showing in-app Mafia banner: $e");
+                  }
+                }
+              }
+            }
           } else if (action == 'connection_notification') {
             final notificationId =
                 data['notification_id']?.toString() ?? data['id']?.toString();
@@ -1917,8 +2507,16 @@ class _AppShellGateState extends State<AppShellGate> {
                     .maybeSingle();
 
                 if (notifRow != null) {
-                  final type = notifRow['type']?.toString() ?? 'referral';
+                  var type = notifRow['type']?.toString() ?? 'referral';
                   final note = notifRow['note']?.toString();
+                  if (note != null && note.startsWith('{')) {
+                    try {
+                      final parsed = jsonDecode(note);
+                      if (parsed['real_type'] != null) {
+                        type = parsed['real_type'].toString();
+                      }
+                    } catch (_) {}
+                  }
 
                   final actor =
                       notifRow['other_user'] as Map<String, dynamic>? ?? {};
@@ -1954,7 +2552,11 @@ class _AppShellGateState extends State<AppShellGate> {
                   } else if (type == "plan_invite" ||
                       type == "plan_update" ||
                       type == "plan_reminder_30" ||
-                      type == "plan_reminder_start") {
+                      type == "plan_reminder_start" ||
+                      type == "tribe_invite" ||
+                      type == "tribe_request" ||
+                      type == "tribe_approved" ||
+                      type == "tribe_message") {
                     String planId = note ?? '';
                     List<String> changedFields = [];
                     if (note != null && note.startsWith('{')) {
@@ -2052,6 +2654,52 @@ class _AppShellGateState extends State<AppShellGate> {
                     } else if (type == "plan_reminder_start") {
                       title = "Plan Starting Now";
                       body = "\"$planTitle\" is starting now!";
+                    } else if (type == "tribe_invite") {
+                      String tribeName = "a Mafia";
+                      if (note != null && note.startsWith('{')) {
+                        try {
+                          final parsed = jsonDecode(note);
+                          tribeName =
+                              parsed['tribe_name']?.toString() ?? "a Mafia";
+                        } catch (_) {}
+                      }
+                      title = "Mafia Invitation";
+                      body = "$actorName invited you to join \"$tribeName\"";
+                    } else if (type == "tribe_message") {
+                      String tribeName = "Mafia";
+                      String message = "";
+                      if (note != null && note.startsWith('{')) {
+                        try {
+                          final parsed = jsonDecode(note);
+                          tribeName =
+                              parsed['tribe_name']?.toString() ?? "Mafia";
+                          message = parsed['message']?.toString() ?? "";
+                        } catch (_) {}
+                      }
+                      title = "New Message in $tribeName";
+                      body = "$actorName: $message";
+                    } else if (type == "tribe_request") {
+                      String tribeName = "a Mafia";
+                      if (note != null && note.startsWith('{')) {
+                        try {
+                          final parsed = jsonDecode(note);
+                          tribeName =
+                              parsed['tribe_name']?.toString() ?? "a Mafia";
+                        } catch (_) {}
+                      }
+                      title = "Mafia Request";
+                      body = "$actorName requested to join \"$tribeName\"";
+                    } else if (type == "tribe_approved") {
+                      String tribeName = "a Mafia";
+                      if (note != null && note.startsWith('{')) {
+                        try {
+                          final parsed = jsonDecode(note);
+                          tribeName =
+                              parsed['tribe_name']?.toString() ?? "a Mafia";
+                        } catch (_) {}
+                      }
+                      title = "Mafia Approved";
+                      body = "Your request to join \"$tribeName\" was approved";
                     }
                   } else {
                     title = "New Connection";
