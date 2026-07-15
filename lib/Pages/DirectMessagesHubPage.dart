@@ -84,8 +84,10 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
   }
 
   Future<void> _handleRefresh(BuildContext context) async {
-    final profileProvider = Provider.of<ProfileProvider>(context, listen: false);
-    final connectionProvider = Provider.of<ConnectionProvider>(context, listen: false);
+    final profileProvider =
+        Provider.of<ProfileProvider>(context, listen: false);
+    final connectionProvider =
+        Provider.of<ConnectionProvider>(context, listen: false);
     final chatProvider = Provider.of<ChatProvider>(context, listen: false);
 
     final myUserId = profileProvider.userId;
@@ -213,7 +215,8 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
     );
   }
 
-  void _showReportUserDialog(BuildContext context, Map<String, dynamic> connection, ConnectionProvider provider) {
+  void _showReportUserDialog(BuildContext context,
+      Map<String, dynamic> connection, ConnectionProvider provider) {
     final name = connection['name'] ?? 'this contact';
     final intId = connection['id'] as int? ?? 0;
     final chatProvider = Provider.of<ChatProvider>(context, listen: false);
@@ -231,7 +234,8 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
             return GlassmorphicAlertDialog(
               title: Text(
                 "Report & Disconnect $name",
-                style: context.screenHeading.copyWith(fontWeight: FontWeight.bold),
+                style:
+                    context.screenHeading.copyWith(fontWeight: FontWeight.bold),
               ),
               content: SizedBox(
                 width: double.maxFinite,
@@ -242,17 +246,25 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
                     children: [
                       Text(
                         "Please select the reason for reporting this user:",
-                        style: context.bodyText.copyWith(color: context.textSecondary),
+                        style: context.bodyText
+                            .copyWith(color: context.textSecondary),
                       ),
                       const SizedBox(height: 12),
-                      ...['Spam', 'Harassment or Abuse', 'Inappropriate Behavior', 'Other'].map((reason) {
+                      ...[
+                        'Spam',
+                        'Harassment or Abuse',
+                        'Inappropriate Behavior',
+                        'Other'
+                      ].map((reason) {
                         final isSelected = selectedReason == reason;
                         return InkWell(
-                          onTap: isSubmitting ? null : () {
-                            setStateBuilder(() {
-                              selectedReason = reason;
-                            });
-                          },
+                          onTap: isSubmitting
+                              ? null
+                              : () {
+                                  setStateBuilder(() {
+                                    selectedReason = reason;
+                                  });
+                                },
                           child: Padding(
                             padding: const EdgeInsets.symmetric(vertical: 8.0),
                             child: Row(
@@ -273,7 +285,9 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
                                     color: isSelected
                                         ? context.textPrimary
                                         : context.textSecondary,
-                                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                    fontWeight: isSelected
+                                        ? FontWeight.bold
+                                        : FontWeight.normal,
                                   ),
                                 ),
                               ],
@@ -284,7 +298,8 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
                       const SizedBox(height: 16),
                       Text(
                         "Additional Details (Optional):",
-                        style: context.bodyText.copyWith(color: context.textSecondary),
+                        style: context.bodyText
+                            .copyWith(color: context.textSecondary),
                       ),
                       const SizedBox(height: 8),
                       TextField(
@@ -293,7 +308,8 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
                         enabled: !isSubmitting,
                         decoration: InputDecoration(
                           hintText: "Enter details here...",
-                          hintStyle: TextStyle(color: context.textMuted, fontSize: 13),
+                          hintStyle:
+                              TextStyle(color: context.textMuted, fontSize: 13),
                           fillColor: context.surfaceSecondary,
                           filled: true,
                           border: OutlineInputBorder(
@@ -302,7 +318,8 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
                           ),
                           focusedBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(8),
-                            borderSide: BorderSide(color: context.accentPrimary),
+                            borderSide:
+                                BorderSide(color: context.accentPrimary),
                           ),
                           contentPadding: const EdgeInsets.all(12),
                         ),
@@ -328,35 +345,39 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
                   : [
                       TextButton(
                         onPressed: () => Navigator.of(dialogContext).pop(),
-                        child: Text("Cancel", style: TextStyle(color: context.textSecondary)),
+                        child: Text("Cancel",
+                            style: TextStyle(color: context.textSecondary)),
                       ),
                       TextButton(
                         onPressed: () async {
                           setStateBuilder(() {
                             isSubmitting = true;
                           });
-                          
+
                           try {
                             // 1. Report User
                             await chatProvider.reportMessage(
                               reportedUserId: intId,
                               reason: selectedReason,
-                              additionalDetails: detailsController.text.trim().isEmpty 
-                                  ? null 
-                                  : detailsController.text.trim(),
+                              additionalDetails:
+                                  detailsController.text.trim().isEmpty
+                                      ? null
+                                      : detailsController.text.trim(),
                             );
-                            
+
                             // 2. Delete Connection
                             await provider.deleteProfile(intId,
                                 onRoomCleanup: (profileId, roomId) async {
-                              await chatProvider.handleRoomCleanup(profileId, roomId);
+                              await chatProvider.handleRoomCleanup(
+                                  profileId, roomId);
                             });
-                            
+
                             if (mounted) {
                               Navigator.of(dialogContext).pop();
                               scaffoldMessenger.showSnackBar(
                                 const SnackBar(
-                                  content: Text("Connection deleted and contact reported."),
+                                  content: Text(
+                                      "Connection deleted and contact reported."),
                                   backgroundColor: Colors.green,
                                   behavior: SnackBarBehavior.floating,
                                 ),
@@ -377,7 +398,10 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
                             }
                           }
                         },
-                        child: const Text("Submit & Delete", style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
+                        child: const Text("Submit & Delete",
+                            style: TextStyle(
+                                color: Colors.redAccent,
+                                fontWeight: FontWeight.bold)),
                       ),
                     ],
             );
@@ -465,7 +489,8 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
       final bMsg =
           bRoomId != null ? chatProvider.lastMessagesByRoom[bRoomId] : null;
 
-      debugPrint("[DMHub] Sorting connection ${a['name']} (Room: $aRoomId, lastMsg: ${aMsg != null ? aMsg['payload'] : 'null'}) vs ${b['name']} (Room: $bRoomId, lastMsg: ${bMsg != null ? bMsg['payload'] : 'null'})");
+      debugPrint(
+          "[DMHub] Sorting connection ${a['name']} (Room: $aRoomId, lastMsg: ${aMsg != null ? aMsg['payload'] : 'null'}) vs ${b['name']} (Room: $bRoomId, lastMsg: ${bMsg != null ? bMsg['payload'] : 'null'})");
 
       if (aMsg == null && bMsg == null) return 0;
       if (aMsg == null) return 1;
@@ -702,7 +727,8 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
                         setState(() {
                           _selectedTab = 'tribes';
                         });
-                        final tribeProvider = Provider.of<TribeProvider>(context, listen: false);
+                        final tribeProvider =
+                            Provider.of<TribeProvider>(context, listen: false);
                         if (tribeProvider.myTribes.isEmpty) {
                           tribeProvider.fetchMyTribes(silent: false);
                         } else {
@@ -762,194 +788,220 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
             Expanded(child: _buildTribesTabBody(context)),
           ] else ...[
             // 1. Search Box
-          Padding(
-            padding: const EdgeInsets.only(
-                left: AppDimensions.marginStandard,
-                right: AppDimensions.marginStandard,
-                top: 12,
-                bottom: 0),
-            child: Container(
-              height: 44,
-              decoration: BoxDecoration(
-                color: context.surfaceSecondary,
-                borderRadius:
-                    BorderRadius.circular(AppDimensions.radiusComponent),
-                border: Border.all(color: context.surfaceSecondary),
-              ),
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Row(
-                children: [
-                  Icon(Icons.search_rounded,
-                      color: context.textMuted, size: 18),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: TextField(
-                      controller: _searchController,
-                      style:
-                          context.bodyText.copyWith(color: context.textPrimary),
-                      cursorColor: context.accentSecondary,
-                      textAlignVertical: TextAlignVertical.center,
-                      decoration: InputDecoration(
-                        hintText: 'Search connections...',
-                        hintStyle: context.bodyText.copyWith(
-                          color: context.textMuted,
+            Padding(
+              padding: const EdgeInsets.only(
+                  left: AppDimensions.marginStandard,
+                  right: AppDimensions.marginStandard,
+                  top: 12,
+                  bottom: 0),
+              child: Container(
+                height: 44,
+                decoration: BoxDecoration(
+                  color: context.surfaceSecondary,
+                  borderRadius:
+                      BorderRadius.circular(AppDimensions.radiusComponent),
+                  border: Border.all(color: context.surfaceSecondary),
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Row(
+                  children: [
+                    Icon(Icons.search_rounded,
+                        color: context.textMuted, size: 18),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: TextField(
+                        controller: _searchController,
+                        style: context.bodyText
+                            .copyWith(color: context.textPrimary),
+                        cursorColor: context.accentSecondary,
+                        textAlignVertical: TextAlignVertical.center,
+                        decoration: InputDecoration(
+                          hintText: 'Search connections...',
+                          hintStyle: context.bodyText.copyWith(
+                            color: context.textMuted,
+                          ),
+                          border: InputBorder.none,
+                          isDense: true,
+                          contentPadding: EdgeInsets.zero,
                         ),
-                        border: InputBorder.none,
-                        isDense: true,
-                        contentPadding: EdgeInsets.zero,
+                        onChanged: (val) {
+                          setState(() {
+                            _searchQuery = val;
+                          });
+                        },
                       ),
-                      onChanged: (val) {
-                        setState(() {
-                          _searchQuery = val;
-                        });
-                      },
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
-          ),
-          const SizedBox(height: 8),
+            const SizedBox(height: 8),
 
-          Expanded(
-            child: RefreshIndicator(
-              onRefresh: () => _handleRefresh(context),
-              color: context.accentSecondary,
-              backgroundColor: context.surfaceSecondary,
-              child: isMessagesLoading
-                  ? Skeletonizer(
-                      enabled: true,
-                      child: _buildSkeletonChatRooms(),
-                    )
-                  : (connections.isEmpty && _searchQuery.isEmpty)
-                      ? _buildOnboardingHeroCard(context)
-                      : filteredConnections.isEmpty
-                          ? ListView(
-                              physics: const AlwaysScrollableScrollPhysics(),
-                              children: [
-                                SizedBox(
-                                  height: MediaQuery.of(context).size.height * 0.5,
-                                  child: Center(
-                                    child: Column(
-                                      mainAxisAlignment: MainAxisAlignment.center,
-                                      children: [
-                                        Icon(
-                                          _searchQuery.isEmpty
-                                              ? Icons.chat_bubble_outline_rounded
-                                              : Icons.search_off_rounded,
-                                          color: context.textMuted,
-                                          size: 40,
-                                        ),
-                                        const SizedBox(height: 16),
-                                        Text(
-                                          _searchQuery.isEmpty
-                                              ? "No ${_selectedTab == 'casual' ? 'casual' : 'professional'} conversations yet"
-                                              : "No results match your search",
-                                          style: context.bodyText.copyWith(
-                                            color: context.textSecondary,
+            Expanded(
+              child: RefreshIndicator(
+                onRefresh: () => _handleRefresh(context),
+                color: context.accentSecondary,
+                backgroundColor: context.surfaceSecondary,
+                child: isMessagesLoading
+                    ? Skeletonizer(
+                        enabled: true,
+                        child: _buildSkeletonChatRooms(),
+                      )
+                    : (connections.isEmpty && _searchQuery.isEmpty)
+                        ? _buildOnboardingHeroCard(context)
+                        : filteredConnections.isEmpty
+                            ? ListView(
+                                physics: const AlwaysScrollableScrollPhysics(),
+                                children: [
+                                  SizedBox(
+                                    height: MediaQuery.of(context).size.height *
+                                        0.5,
+                                    child: Center(
+                                      child: Column(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        children: [
+                                          Icon(
+                                            _searchQuery.isEmpty
+                                                ? Icons
+                                                    .chat_bubble_outline_rounded
+                                                : Icons.search_off_rounded,
+                                            color: context.textMuted,
+                                            size: 40,
                                           ),
-                                        ),
-                                      ],
+                                          const SizedBox(height: 16),
+                                          Text(
+                                            _searchQuery.isEmpty
+                                                ? "No ${_selectedTab == 'casual' ? 'casual' : 'professional'} conversations yet"
+                                                : "No results match your search",
+                                            style: context.bodyText.copyWith(
+                                              color: context.textSecondary,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
                                     ),
                                   ),
-                                ),
-                              ],
-                            )
-                          : ListView.separated(
-                              physics: const AlwaysScrollableScrollPhysics(),
-                              padding: const EdgeInsets.only(
-                                  left: AppDimensions.marginStandard,
-                                  right: AppDimensions.marginStandard,
-                                  top: 8,
-                                  bottom: 100),
-                              itemCount: filteredConnections.length,
-                              separatorBuilder: (context, index) =>
-                                  const SizedBox(height: 5.0),
-                              itemBuilder: (context, index) {
-                                final connection = filteredConnections[index];
-                                final name = connection['name'] ?? 'Unknown';
-                                final avatar = _getAvatarUrl(
-                                    name,
-                                    connection['avatarUrl'] ??
-                                        connection['avatar_url']);
+                                ],
+                              )
+                            : ListView.separated(
+                                physics: const AlwaysScrollableScrollPhysics(),
+                                padding: const EdgeInsets.only(
+                                    left: AppDimensions.marginStandard,
+                                    right: AppDimensions.marginStandard,
+                                    top: 8,
+                                    bottom: 100),
+                                itemCount: filteredConnections.length,
+                                separatorBuilder: (context, index) =>
+                                    const SizedBox(height: 5.0),
+                                itemBuilder: (context, index) {
+                                  final connection = filteredConnections[index];
+                                  final name = connection['name'] ?? 'Unknown';
+                                  final avatar = _getAvatarUrl(
+                                      name,
+                                      connection['avatarUrl'] ??
+                                          connection['avatar_url']);
 
-                                final roomId = chatProvider
-                                    .connectionRooms[connection['id']];
+                                  final roomId = chatProvider
+                                      .connectionRooms[connection['id']];
 
-                                final lastMsg = roomId != null
-                                    ? chatProvider.lastMessagesByRoom[roomId]
-                                    : null;
+                                  final lastMsg = roomId != null
+                                      ? chatProvider.lastMessagesByRoom[roomId]
+                                      : null;
 
-                                final String lastMessageText = lastMsg != null
-                                    ? lastMsg['payload'] ?? ''
-                                    : '';
+                                  final String lastMessageText = lastMsg != null
+                                      ? lastMsg['payload'] ?? ''
+                                      : '';
 
-                                final String msgTime = lastMsg != null
-                                    ? _formatMessageTime(
-                                        lastMsg['created_at'] as String?)
-                                    : '';
+                                  final String msgTime = lastMsg != null
+                                      ? _formatMessageTime(
+                                          lastMsg['created_at'] as String?)
+                                      : '';
 
-                                final bool isUnread = lastMsg != null &&
-                                    lastMsg['sender_id'] != myUserId &&
-                                    lastMsg['status'] != 'read';
+                                  final bool isUnread = lastMsg != null &&
+                                      lastMsg['sender_id'] != myUserId &&
+                                      lastMsg['status'] != 'read';
 
-                                final bool isTyping = roomId != null &&
-                                    chatProvider.isRoomTyping(roomId);
+                                  final bool isTyping = roomId != null &&
+                                      chatProvider.isRoomTyping(roomId);
 
-                                final draft = chatProvider
-                                    .getDraft(connection['id'] as int? ?? 0);
+                                  final draft = chatProvider
+                                      .getDraft(connection['id'] as int? ?? 0);
 
-                                return Container(
-                                  // decoration: BoxDecoration(
-                                  //   color: context.surfacePrimary,
-                                  //   borderRadius: BorderRadius.circular(
-                                  //       AppDimensions.radiusPremiumCard / 1.5),
-                                  //   border: Border.all(
-                                  //     color: context.surfaceSecondary
-                                  //         .withValues(alpha: 0.5),
-                                  //     width: 1.0,
-                                  //   ),
-                                  // ),
-                                  child: Material(
-                                    color: Colors.transparent,
-                                    clipBehavior: Clip.antiAlias,
-                                    borderRadius: BorderRadius.circular(
-                                        AppDimensions.radiusPremiumCard),
-                                    child: ListTile(
-                                      onTap: () {
-                                        HapticFeedback.lightImpact();
-                                        Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (context) =>
-                                                IndividualChatPage(
-                                                    connectionData: connection),
+                                  return Container(
+                                    // decoration: BoxDecoration(
+                                    //   color: context.surfacePrimary,
+                                    //   borderRadius: BorderRadius.circular(
+                                    //       AppDimensions.radiusPremiumCard / 1.5),
+                                    //   border: Border.all(
+                                    //     color: context.surfaceSecondary
+                                    //         .withValues(alpha: 0.5),
+                                    //     width: 1.0,
+                                    //   ),
+                                    // ),
+                                    child: Material(
+                                      color: Colors.transparent,
+                                      clipBehavior: Clip.antiAlias,
+                                      borderRadius: BorderRadius.circular(
+                                          AppDimensions.radiusPremiumCard),
+                                      child: ListTile(
+                                        onTap: () {
+                                          HapticFeedback.lightImpact();
+                                          Navigator.push(
+                                            context,
+                                            MaterialPageRoute(
+                                              builder: (context) =>
+                                                  IndividualChatPage(
+                                                      connectionData:
+                                                          connection),
+                                            ),
+                                          );
+                                        },
+                                        onLongPress: () {
+                                          HapticFeedback.mediumImpact();
+                                          _showDeleteConfirmation(context,
+                                              connection, connectionProvider);
+                                        },
+                                        contentPadding:
+                                            const EdgeInsets.symmetric(
+                                                horizontal: 14, vertical: 0),
+                                        leading: Container(
+                                          width: 44,
+                                          height: 44,
+                                          decoration: const BoxDecoration(
+                                            shape: BoxShape.circle,
                                           ),
-                                        );
-                                      },
-                                      onLongPress: () {
-                                        HapticFeedback.mediumImpact();
-                                        _showDeleteConfirmation(context,
-                                            connection, connectionProvider);
-                                      },
-                                      contentPadding: const EdgeInsets.symmetric(
-                                          horizontal: 14, vertical: 0),
-                                      leading: Container(
-                                        width: 44,
-                                        height: 44,
-                                        decoration: const BoxDecoration(
-                                          shape: BoxShape.circle,
-                                        ),
-                                        child: ClipOval(
-                                          child: avatar.isNotEmpty
-                                              ? Image.network(
-                                                  avatar,
-                                                  fit: BoxFit.cover,
-                                                  errorBuilder: (context, error,
-                                                          stackTrace) =>
-                                                      Container(
-                                                    color:
-                                                        context.surfaceSecondary,
+                                          child: ClipOval(
+                                            child: avatar.isNotEmpty
+                                                ? Image.network(
+                                                    avatar,
+                                                    fit: BoxFit.cover,
+                                                    errorBuilder: (context,
+                                                            error,
+                                                            stackTrace) =>
+                                                        Container(
+                                                      color: context
+                                                          .surfaceSecondary,
+                                                      alignment:
+                                                          Alignment.center,
+                                                      child: Text(
+                                                        name.isNotEmpty
+                                                            ? name
+                                                                .substring(0, 1)
+                                                                .toUpperCase()
+                                                            : "?",
+                                                        style: TextStyle(
+                                                            color: context
+                                                                .textPrimary,
+                                                            fontWeight:
+                                                                FontWeight.bold,
+                                                            fontSize: 15),
+                                                      ),
+                                                    ),
+                                                  )
+                                                : Container(
+                                                    color: context
+                                                        .surfaceSecondary,
                                                     alignment: Alignment.center,
                                                     child: Text(
                                                       name.isNotEmpty
@@ -958,219 +1010,215 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
                                                               .toUpperCase()
                                                           : "?",
                                                       style: TextStyle(
-                                                          color:
-                                                              context.textPrimary,
+                                                          color: context
+                                                              .textPrimary,
                                                           fontWeight:
                                                               FontWeight.bold,
                                                           fontSize: 15),
                                                     ),
                                                   ),
-                                                )
-                                              : Container(
-                                                  color: context.surfaceSecondary,
-                                                  alignment: Alignment.center,
-                                                  child: Text(
-                                                    name.isNotEmpty
-                                                        ? name
-                                                            .substring(0, 1)
-                                                            .toUpperCase()
-                                                        : "?",
-                                                    style: TextStyle(
-                                                        color:
-                                                            context.textPrimary,
+                                          ),
+                                        ),
+                                        title: Row(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            Expanded(
+                                              child: Row(
+                                                children: [
+                                                  Flexible(
+                                                    child: Text(
+                                                      name,
+                                                      style: context.cardTitle
+                                                          .copyWith(
                                                         fontWeight:
                                                             FontWeight.bold,
-                                                        fontSize: 15),
-                                                  ),
-                                                ),
-                                        ),
-                                      ),
-                                      title: Row(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.spaceBetween,
-                                        children: [
-                                          Expanded(
-                                            child: Row(
-                                              children: [
-                                                Flexible(
-                                                  child: Text(
-                                                    name,
-                                                    style: context.cardTitle.copyWith(
-                                                      fontWeight: FontWeight.bold,
-                                                      color: context.textPrimary,
+                                                        color:
+                                                            context.textPrimary,
+                                                      ),
+                                                      overflow:
+                                                          TextOverflow.ellipsis,
+                                                      maxLines: 1,
                                                     ),
-                                                    overflow: TextOverflow.ellipsis,
-                                                    maxLines: 1,
                                                   ),
-                                                ),
-                                                if (connection['isBlockedByMe'] == true) ...[
-                                                  const SizedBox(width: 8),
-                                                  Container(
-                                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                                    decoration: BoxDecoration(
-                                                      color: Colors.redAccent.withValues(alpha: 0.2),
-                                                      borderRadius: BorderRadius.circular(4),
-                                                      border: Border.all(color: Colors.redAccent.withValues(alpha: 0.4), width: 0.5),
-                                                    ),
-                                                    child: const Text(
-                                                      "Blocked",
-                                                      style: TextStyle(
-                                                        color: Colors.redAccent,
-                                                        fontSize: 10,
-                                                        fontWeight: FontWeight.bold,
+                                                  if (connection[
+                                                          'isBlockedByMe'] ==
+                                                      true) ...[
+                                                    const SizedBox(width: 8),
+                                                    Container(
+                                                      padding: const EdgeInsets
+                                                          .symmetric(
+                                                          horizontal: 6,
+                                                          vertical: 2),
+                                                      decoration: BoxDecoration(
+                                                        color: Colors.redAccent
+                                                            .withValues(
+                                                                alpha: 0.2),
+                                                        borderRadius:
+                                                            BorderRadius
+                                                                .circular(4),
+                                                        border: Border.all(
+                                                            color: Colors
+                                                                .redAccent
+                                                                .withValues(
+                                                                    alpha: 0.4),
+                                                            width: 0.5),
+                                                      ),
+                                                      child: const Text(
+                                                        "Blocked",
+                                                        style: TextStyle(
+                                                          color:
+                                                              Colors.redAccent,
+                                                          fontSize: 10,
+                                                          fontWeight:
+                                                              FontWeight.bold,
+                                                        ),
                                                       ),
                                                     ),
-                                                  ),
+                                                  ],
                                                 ],
-                                              ],
-                                            ),
-                                          ),
-                                          if (msgTime.isNotEmpty && connection['isBlocked'] != true) ...[
-                                            const SizedBox(width: 8),
-                                            Text(
-                                              msgTime,
-                                              style: context.captionText.copyWith(
-                                                color: isUnread
-                                                    ? context.accentSecondary
-                                                    : context.textMuted,
-                                                fontWeight: isUnread
-                                                    ? FontWeight.bold
-                                                    : FontWeight.normal,
                                               ),
                                             ),
+                                            if (msgTime.isNotEmpty &&
+                                                connection['isBlocked'] !=
+                                                    true) ...[
+                                              const SizedBox(width: 8),
+                                              Text(
+                                                msgTime,
+                                                style: context.captionText
+                                                    .copyWith(
+                                                  color: isUnread
+                                                      ? context.accentSecondary
+                                                      : context.textMuted,
+                                                  fontWeight: isUnread
+                                                      ? FontWeight.bold
+                                                      : FontWeight.normal,
+                                                ),
+                                              ),
+                                            ],
                                           ],
-                                        ],
-                                      ),
-                                      subtitle: connection['isBlockedByMe'] == true
-                                          ? Text(
-                                              "Blocked contact",
-                                              style: context.bodyText.copyWith(
-                                                color: Colors.redAccent.withValues(alpha: 0.7),
-                                                fontSize: 12.5,
-                                              ),
-                                            )
-                                          : connection['hasBlockedMe'] == true
-                                              ? Text(
-                                                  "Unavailable",
-                                                  style: context.bodyText.copyWith(
-                                                    color: Colors.redAccent.withValues(alpha: 0.7),
-                                                    fontSize: 12.5,
-                                                  ),
-                                                )
-                                              : lastMessageText.isEmpty &&
-                                                      !isTyping &&
-                                                      (draft == null || draft.isEmpty)
-                                                  ? null
-                                                  : Padding(
-                                                      padding:
-                                                          const EdgeInsets.only(top: 4.0),
-                                                      child: Row(
-                                                        children: [
-                                                          Expanded(
-                                                            child: isTyping
-                                                                ? Text(
-                                                                    "typing...",
-                                                                    maxLines: 1,
-                                                                    overflow: TextOverflow
-                                                                        .ellipsis,
-                                                                    style: context
-                                                                        .bodyText
-                                                                        .copyWith(
+                                        ),
+                                        subtitle:
+                                            connection['isBlockedByMe'] == true
+                                                ? Text(
+                                                    "Blocked contact",
+                                                    style: context.bodyText
+                                                        .copyWith(
+                                                      color: Colors.redAccent
+                                                          .withValues(
+                                                              alpha: 0.7),
+                                                      fontSize: 12.5,
+                                                    ),
+                                                  )
+                                                : connection['hasBlockedMe'] ==
+                                                        true
+                                                    ? Text(
+                                                        "Unavailable",
+                                                        style: context.bodyText
+                                                            .copyWith(
+                                                          color: Colors
+                                                              .redAccent
+                                                              .withValues(
+                                                                  alpha: 0.7),
+                                                          fontSize: 12.5,
+                                                        ),
+                                                      )
+                                                    : lastMessageText.isEmpty &&
+                                                            !isTyping &&
+                                                            (draft == null ||
+                                                                draft.isEmpty)
+                                                        ? null
+                                                        : Padding(
+                                                            padding:
+                                                                const EdgeInsets
+                                                                    .only(
+                                                                    top: 4.0),
+                                                            child: Row(
+                                                              children: [
+                                                                Expanded(
+                                                                  child: isTyping
+                                                                      ? Text(
+                                                                          "typing...",
+                                                                          maxLines:
+                                                                              1,
+                                                                          overflow:
+                                                                              TextOverflow.ellipsis,
+                                                                          style: context
+                                                                              .bodyText
+                                                                              .copyWith(
+                                                                            color:
+                                                                                context.accentSecondary,
+                                                                            fontSize:
+                                                                                12.5,
+                                                                            fontWeight:
+                                                                                FontWeight.w600,
+                                                                            fontStyle:
+                                                                                FontStyle.italic,
+                                                                          ),
+                                                                        )
+                                                                      : (draft != null && draft.isNotEmpty)
+                                                                          ? RichText(
+                                                                              maxLines: 1,
+                                                                              overflow: TextOverflow.ellipsis,
+                                                                              text: TextSpan(
+                                                                                children: [
+                                                                                  const TextSpan(
+                                                                                    text: "Draft: ",
+                                                                                    style: TextStyle(
+                                                                                      color: Colors.blueAccent,
+                                                                                      fontWeight: FontWeight.bold,
+                                                                                      fontSize: 12.5,
+                                                                                      fontFamily: 'Inter',
+                                                                                    ),
+                                                                                  ),
+                                                                                  TextSpan(
+                                                                                    text: draft,
+                                                                                    style: TextStyle(
+                                                                                      color: context.textSecondary,
+                                                                                      fontSize: 12.5,
+                                                                                      fontFamily: 'Inter',
+                                                                                    ),
+                                                                                  ),
+                                                                                ],
+                                                                              ),
+                                                                            )
+                                                                          : Text(
+                                                                              lastMessageText,
+                                                                              maxLines: 1,
+                                                                              overflow: TextOverflow.ellipsis,
+                                                                              style: context.bodyText.copyWith(
+                                                                                color: isUnread ? context.textPrimary : context.textSecondary,
+                                                                                fontSize: 12.5,
+                                                                                fontWeight: isUnread ? FontWeight.w600 : FontWeight.normal,
+                                                                              ),
+                                                                            ),
+                                                                ),
+                                                                if (isUnread)
+                                                                  Container(
+                                                                    margin: const EdgeInsets
+                                                                        .only(
+                                                                        left:
+                                                                            8),
+                                                                    width: 8,
+                                                                    height: 8,
+                                                                    decoration:
+                                                                        BoxDecoration(
                                                                       color: context
                                                                           .accentSecondary,
-                                                                      fontSize: 12.5,
-                                                                      fontWeight:
-                                                                          FontWeight.w600,
-                                                                      fontStyle: FontStyle
-                                                                          .italic,
+                                                                      shape: BoxShape
+                                                                          .circle,
                                                                     ),
-                                                                  )
-                                                        : (draft != null &&
-                                                                draft.isNotEmpty)
-                                                            ? RichText(
-                                                                maxLines: 1,
-                                                                overflow:
-                                                                    TextOverflow
-                                                                        .ellipsis,
-                                                                text: TextSpan(
-                                                                  children: [
-                                                                    const TextSpan(
-                                                                      text:
-                                                                          "Draft: ",
-                                                                      style:
-                                                                          TextStyle(
-                                                                        color: Colors
-                                                                            .blueAccent,
-                                                                        fontWeight:
-                                                                            FontWeight
-                                                                                .bold,
-                                                                        fontSize:
-                                                                            12.5,
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                      ),
-                                                                    ),
-                                                                    TextSpan(
-                                                                      text: draft,
-                                                                      style:
-                                                                          TextStyle(
-                                                                        color: context
-                                                                            .textSecondary,
-                                                                        fontSize:
-                                                                            12.5,
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                      ),
-                                                                    ),
-                                                                  ],
-                                                                ),
-                                                              )
-                                                            : Text(
-                                                                lastMessageText,
-                                                                maxLines: 1,
-                                                                overflow:
-                                                                    TextOverflow
-                                                                        .ellipsis,
-                                                                style: context
-                                                                    .bodyText
-                                                                    .copyWith(
-                                                                  color: isUnread
-                                                                      ? context
-                                                                          .textPrimary
-                                                                      : context
-                                                                          .textSecondary,
-                                                                  fontSize: 12.5,
-                                                                  fontWeight: isUnread
-                                                                      ? FontWeight
-                                                                          .w600
-                                                                      : FontWeight
-                                                                          .normal,
-                                                                ),
-                                                              ),
-                                                  ),
-                                                  if (isUnread)
-                                                    Container(
-                                                      margin:
-                                                          const EdgeInsets.only(
-                                                              left: 8),
-                                                      width: 8,
-                                                      height: 8,
-                                                      decoration: BoxDecoration(
-                                                        color: context
-                                                            .accentSecondary,
-                                                        shape: BoxShape.circle,
-                                                      ),
-                                                    ),
-                                                ],
-                                              ),
-                                            ),
+                                                                  ),
+                                                              ],
+                                                            ),
+                                                          ),
+                                      ),
                                     ),
-                                  ),
-                                );
-                              },
-                            ),
+                                  );
+                                },
+                              ),
+              ),
             ),
-          ),
           ],
         ],
       ),
@@ -1336,7 +1384,9 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
 
     // Only show active tribes -- invites are handled in the global Notification page
     final activeTribes = tribes.where((t) => t['status'] == 'active').toList();
-    final bool isLoading = (provider.state is TribeLoading || provider.state is TribeInitial) && activeTribes.isEmpty;
+    final bool isLoading =
+        (provider.state is TribeLoading || provider.state is TribeInitial) &&
+            activeTribes.isEmpty;
 
     return RefreshIndicator(
       onRefresh: () => provider.fetchMyTribes(silent: true),
@@ -1344,13 +1394,16 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
       backgroundColor: context.surfaceSecondary,
       child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.only(left: 16, right: 16, top: 12, bottom: 100),
+        padding:
+            const EdgeInsets.only(left: 16, right: 16, top: 12, bottom: 100),
         children: [
           // ── Active Tribes Section ──
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text("Your Mafias", style: context.cardTitle.copyWith(fontWeight: FontWeight.bold)),
+              Text("Your Mafias",
+                  style:
+                      context.cardTitle.copyWith(fontWeight: FontWeight.bold)),
             ],
           ),
           const SizedBox(height: 8),
@@ -1363,18 +1416,21 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.house_rounded, color: context.textMuted, size: 40),
+                    Icon(Icons.house_rounded,
+                        color: context.textMuted, size: 40),
                     const SizedBox(height: 12),
                     Text(
                       "You are not in any Mafia yet.",
-                      style: context.bodyText.copyWith(color: context.textMuted),
+                      style:
+                          context.bodyText.copyWith(color: context.textMuted),
                     ),
                     const SizedBox(height: 12),
                     ElevatedButton(
                       onPressed: () {
                         Navigator.push(
                           context,
-                          MaterialPageRoute(builder: (context) => const TribeCreatePage()),
+                          MaterialPageRoute(
+                              builder: (context) => const TribeCreatePage()),
                         );
                       },
                       style: ElevatedButton.styleFrom(
@@ -1395,46 +1451,60 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
               final role = item['role'] as Map<String, dynamic>? ?? {};
 
               return Card(
-                color: context.surfacePrimary,
-                margin: const EdgeInsets.symmetric(vertical: 6),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                color: Colors.transparent,
+                elevation: 0,
+                margin: const EdgeInsets.symmetric(vertical: 1),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
                 child: ListTile(
-                  contentPadding: const EdgeInsets.all(12),
-                   leading: () {
-                     final avatarUrl = tribe['avatar_url']?.toString() ?? '';
-                     return Container(
-                       width: 46,
-                       height: 46,
-                       decoration: BoxDecoration(
-                         shape: BoxShape.circle,
-                         border: Border.all(color: context.accentSecondary.withValues(alpha: 0.35), width: 1.5),
-                         color: context.surfaceSecondary,
-                         image: avatarUrl.isNotEmpty
-                             ? DecorationImage(
-                                 image: NetworkImage(avatarUrl),
-                                 fit: BoxFit.cover,
-                               )
-                             : null,
-                       ),
-                       alignment: Alignment.center,
-                        child: avatarUrl.isEmpty
-                            ? const Icon(Icons.group_rounded, size: 20, color: Colors.white70)
+                  contentPadding: const EdgeInsets.all(6),
+                  leading: () {
+                    final avatarUrl = tribe['avatar_url']?.toString() ?? '';
+                    return Container(
+                      width: 46,
+                      height: 46,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                            color:
+                                context.accentSecondary.withValues(alpha: 0.35),
+                            width: 1.5),
+                        color: context.surfaceSecondary,
+                        image: avatarUrl.isNotEmpty
+                            ? DecorationImage(
+                                image: NetworkImage(avatarUrl),
+                                fit: BoxFit.cover,
+                              )
                             : null,
-                      );
-                   }(),
+                      ),
+                      alignment: Alignment.center,
+                      child: avatarUrl.isEmpty
+                          ? const Icon(Icons.group_rounded,
+                              size: 20, color: Colors.white70)
+                          : null,
+                    );
+                  }(),
                   title: Row(
                     children: [
-                      Text(name, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                      Text(name,
+                          style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold)),
                       const SizedBox(width: 8),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 2),
                         decoration: BoxDecoration(
-                          color: context.accentSecondary.withValues(alpha: 0.15),
+                          color:
+                              context.accentSecondary.withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: Text(
                           role['name'] ?? 'Member',
-                          style: TextStyle(color: context.accentSecondary, fontSize: 8, fontWeight: FontWeight.bold),
+                          style: TextStyle(
+                              color: context.accentSecondary,
+                              fontSize: 8,
+                              fontWeight: FontWeight.bold),
                         ),
                       ),
                     ],
@@ -1448,13 +1518,15 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                  trailing: const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white24, size: 16),
+                  trailing: const Icon(Icons.arrow_forward_ios_rounded,
+                      color: Colors.white24, size: 16),
                   onTap: () {
                     HapticFeedback.lightImpact();
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => TribeChatPage(tribeId: tribe['id'] as String, tribeName: name),
+                        builder: (context) => TribeChatPage(
+                            tribeId: tribe['id'] as String, tribeName: name),
                       ),
                     );
                   },
@@ -1462,7 +1534,8 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
                     final roleSlug = role['slug']?.toString();
                     if (roleSlug == 'don') {
                       HapticFeedback.heavyImpact();
-                      _showDeleteTribeConfirmDialog(context, tribe['id'] as String, name);
+                      _showDeleteTribeConfirmDialog(
+                          context, tribe['id'] as String, name);
                     }
                   },
                 ),
@@ -1490,10 +1563,13 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text("Mafia Actions", style: context.screenHeading.copyWith(fontWeight: FontWeight.bold, fontSize: 18)),
+                    Text("Mafia Actions",
+                        style: context.screenHeading.copyWith(
+                            fontWeight: FontWeight.bold, fontSize: 18)),
                     GestureDetector(
                       onTap: () => Navigator.pop(context),
-                      child: const Icon(Icons.close_rounded, color: Colors.white70),
+                      child: const Icon(Icons.close_rounded,
+                          color: Colors.white70),
                     )
                   ],
                 ),
@@ -1502,13 +1578,16 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
                   color: Colors.transparent,
                   child: ListTile(
                     contentPadding: EdgeInsets.zero,
-                    leading: const Icon(Icons.group_add_rounded, color: Colors.white),
-                    title: const Text("Create a Mafia", style: TextStyle(color: Colors.white)),
+                    leading: const Icon(Icons.group_add_rounded,
+                        color: Colors.white),
+                    title: const Text("Create a Mafia",
+                        style: TextStyle(color: Colors.white)),
                     onTap: () {
                       Navigator.pop(context);
                       Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (context) => const TribeCreatePage()),
+                        MaterialPageRoute(
+                            builder: (context) => const TribeCreatePage()),
                       );
                     },
                   ),
@@ -1517,8 +1596,10 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
                   color: Colors.transparent,
                   child: ListTile(
                     contentPadding: EdgeInsets.zero,
-                    leading: const Icon(Icons.qr_code_scanner_rounded, color: Colors.white),
-                    title: const Text("Join Mafia with Code", style: TextStyle(color: Colors.white)),
+                    leading: const Icon(Icons.qr_code_scanner_rounded,
+                        color: Colors.white),
+                    title: const Text("Join Mafia with Code",
+                        style: TextStyle(color: Colors.white)),
                     onTap: () {
                       Navigator.pop(context);
                       _showJoinWithCodeDialog(context);
@@ -1548,16 +1629,20 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text("Join Mafia", style: context.screenHeading.copyWith(fontWeight: FontWeight.bold, fontSize: 18)),
+                Text("Join Mafia",
+                    style: context.screenHeading
+                        .copyWith(fontWeight: FontWeight.bold, fontSize: 18)),
                 const SizedBox(height: 16),
                 TextField(
                   controller: codeController,
                   style: const TextStyle(color: Colors.white),
                   decoration: InputDecoration(
                     labelText: "Invite Code",
-                    labelStyle: TextStyle(color: context.textSecondary, fontSize: 13),
+                    labelStyle:
+                        TextStyle(color: context.textSecondary, fontSize: 13),
                     hintText: "Enter code here",
-                    hintStyle: TextStyle(color: context.textMuted, fontSize: 13),
+                    hintStyle:
+                        TextStyle(color: context.textMuted, fontSize: 13),
                     fillColor: context.surfaceSecondary,
                     filled: true,
                     border: OutlineInputBorder(
@@ -1579,7 +1664,8 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
                     TextButton(
-                      child: const Text("Cancel", style: TextStyle(color: Colors.white70)),
+                      child: const Text("Cancel",
+                          style: TextStyle(color: Colors.white70)),
                       onPressed: () => Navigator.pop(context),
                     ),
                     const SizedBox(width: 12),
@@ -1587,24 +1673,31 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: context.accentSecondary,
                         foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10)),
                       ),
-                      child: const Text("Join", style: TextStyle(fontWeight: FontWeight.bold)),
+                      child: const Text("Join",
+                          style: TextStyle(fontWeight: FontWeight.bold)),
                       onPressed: () async {
                         final navigator = Navigator.of(context);
                         final code = codeController.text.trim();
                         if (code.isEmpty) return;
-                        
-                        final provider = Provider.of<TribeProvider>(context, listen: false);
+
+                        final provider =
+                            Provider.of<TribeProvider>(context, listen: false);
                         try {
                           await provider.joinTribeWithInviteCode(code);
                           navigator.pop();
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text("Successfully joined Mafia!"), backgroundColor: Colors.green),
+                            const SnackBar(
+                                content: Text("Successfully joined Mafia!"),
+                                backgroundColor: Colors.green),
                           );
                         } catch (e) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text("Failed to join: $e"), backgroundColor: Colors.redAccent),
+                            SnackBar(
+                                content: Text("Failed to join: $e"),
+                                backgroundColor: Colors.redAccent),
                           );
                         }
                       },
@@ -1619,7 +1712,8 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
     );
   }
 
-  void _showDeleteTribeConfirmDialog(BuildContext context, String tribeId, String tribeName) {
+  void _showDeleteTribeConfirmDialog(
+      BuildContext context, String tribeId, String tribeName) {
     showDialog(
       context: context,
       builder: (context) {
@@ -1633,15 +1727,23 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text("Delete Mafia", style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 18)),
+                const Text("Delete Mafia",
+                    style: TextStyle(
+                        color: Colors.redAccent,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 18)),
                 const SizedBox(height: 12),
-                Text("Are you sure you want to permanently delete \"$tribeName\"? This action is irreversible.", style: const TextStyle(color: Colors.white70, fontSize: 14)),
+                Text(
+                    "Are you sure you want to permanently delete \"$tribeName\"? This action is irreversible.",
+                    style:
+                        const TextStyle(color: Colors.white70, fontSize: 14)),
                 const SizedBox(height: 24),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
                     TextButton(
-                      child: const Text("Cancel", style: TextStyle(color: Colors.white70)),
+                      child: const Text("Cancel",
+                          style: TextStyle(color: Colors.white70)),
                       onPressed: () => Navigator.pop(context),
                     ),
                     const SizedBox(width: 12),
@@ -1649,18 +1751,23 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.redAccent,
                         foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10)),
                       ),
-                      child: const Text("Delete", style: TextStyle(fontWeight: FontWeight.bold)),
+                      child: const Text("Delete",
+                          style: TextStyle(fontWeight: FontWeight.bold)),
                       onPressed: () async {
                         final navigator = Navigator.of(context);
                         final scaffoldMessenger = ScaffoldMessenger.of(context);
-                        final provider = Provider.of<TribeProvider>(context, listen: false);
+                        final provider =
+                            Provider.of<TribeProvider>(context, listen: false);
                         try {
                           await provider.deleteTribe(tribeId);
                           navigator.pop();
                           scaffoldMessenger.showSnackBar(
-                            SnackBar(content: Text("Mafia \"$tribeName\" deleted successfully.")),
+                            SnackBar(
+                                content: Text(
+                                    "Mafia \"$tribeName\" deleted successfully.")),
                           );
                         } catch (e) {
                           scaffoldMessenger.showSnackBar(
@@ -1728,9 +1835,11 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
     return Column(
       children: List.generate(4, (index) {
         return Card(
-          color: context.surfacePrimary,
+          color: Colors.transparent,
+          elevation: 0,
           margin: const EdgeInsets.symmetric(vertical: 6),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           child: ListTile(
             contentPadding: const EdgeInsets.all(12),
             leading: const _ShimmerBox(

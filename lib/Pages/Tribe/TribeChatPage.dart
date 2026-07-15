@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:connect/Config/app_theme.dart';
 import 'package:connect/Providers/tribe_provider.dart';
 import 'package:connect/Providers/profile_provider.dart';
@@ -35,6 +36,7 @@ class _TribeChatPageState extends State<TribeChatPage> {
   final Map<String, GlobalKey> _messageKeys = {};
   String? _highlightedMessageId;
   bool _isLoadingMessages = true;
+  final Set<String> _animatedMessageIds = {};
 
   @override
   void initState() {
@@ -224,6 +226,15 @@ class _TribeChatPageState extends State<TribeChatPage> {
           item['_is_message'] == true &&
           item['sender_id'] != myUserId &&
           blockedIds.contains(item['sender_id']));
+    }
+
+    if (_animatedMessageIds.isEmpty && messages.isNotEmpty && !_isLoadingMessages) {
+      for (final msg in messages) {
+        final id = msg['id'] as String?;
+        if (id != null) {
+          _animatedMessageIds.add(id);
+        }
+      }
     }
 
     final membership = provider.myTribes.firstWhereOrNull(
@@ -472,7 +483,12 @@ class _TribeChatPageState extends State<TribeChatPage> {
                         final msgId = item['id'] as String;
                         final key = _messageKeys.putIfAbsent(msgId, () => GlobalKey());
 
-                         return SwipeToReply(
+                        final hasAlreadyAnimated = _animatedMessageIds.contains(msgId);
+                        if (!hasAlreadyAnimated) {
+                          _animatedMessageIds.add(msgId);
+                        }
+
+                        final childWidget = SwipeToReply(
                           key: key,
                           onReply: () {
                             if (isDeleted) return;
@@ -685,6 +701,24 @@ class _TribeChatPageState extends State<TribeChatPage> {
                               ),
                             ),
                           ),
+                        );
+
+                        return RepaintBoundary(
+                          key: ValueKey('${msgId}_bubble'),
+                          child: hasAlreadyAnimated
+                              ? childWidget
+                              : childWidget
+                                  .animate()
+                                  .fadeIn(
+                                      duration: 150.ms,
+                                      curve: Curves.easeOut)
+                                  .scale(
+                                    duration: 200.ms,
+                                    curve: Curves.easeOutBack,
+                                    alignment: isMe
+                                        ? Alignment.bottomRight
+                                        : Alignment.bottomLeft,
+                                  ),
                         );
                       },
                     ),

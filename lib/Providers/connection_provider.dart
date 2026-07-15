@@ -311,7 +311,7 @@ class ConnectionProvider with ChangeNotifier {
           id1, id2, columnToUpdate, newAccessType);
       print(
           "Updated connection access: $myUserId shares $newAccessType with $otherUserId");
-      await fetchConnections();
+      await fetchConnections(silent: true);
     } catch (e) {
       print("Error updating connection access: $e");
       _setError(e);
@@ -397,7 +397,7 @@ class ConnectionProvider with ChangeNotifier {
         if (onRoomCleanup != null) {
           await onRoomCleanup(id, roomId);
         }
-        await fetchConnections();
+        await fetchConnections(silent: true);
       } catch (e) {
         print("Error deleting someone else's profile/chat: $e");
         _setError(e);
@@ -420,7 +420,7 @@ class ConnectionProvider with ChangeNotifier {
       print("Logged block: blocker $myUserId, blocked $id");
 
       // 2. Refresh connections lists to show blocked status instantly
-      await fetchConnections();
+      await fetchConnections(silent: true);
     } catch (e) {
       print("Error blocking user: $e");
       _setError(e);
@@ -442,7 +442,7 @@ class ConnectionProvider with ChangeNotifier {
       print("Logged unblock: blocker $myUserId, unblocked $id");
 
       // Refresh connections lists
-      await fetchConnections();
+      await fetchConnections(silent: true);
     } catch (e) {
       print("Error unblocking user: $e");
       _setError(e);

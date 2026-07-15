@@ -248,7 +248,7 @@ class ChatProvider with ChangeNotifier {
       }
     } else if (connectionsChanged && userId != null) {
       debugPrint("[ChatProvider] Connections list changed. Reloading chat rooms and updating subscriptions...");
-      loadChatRooms();
+      loadChatRooms(silent: true);
     }
   }
 
@@ -260,13 +260,15 @@ class ChatProvider with ChangeNotifier {
         newConnections.last['id'] != _externalConnections.last['id'];
   }
 
-  Future<void> loadChatRooms() async {
+  Future<void> loadChatRooms({bool silent = false}) async {
     final myUserId = _userId;
     if (myUserId == null) return;
 
     try {
-      _state = ChatLoading();
-      notifyListeners();
+      if (!silent) {
+        _state = ChatLoading();
+        notifyListeners();
+      }
 
       final myRoomIds = await _repository.fetchUserRoomIds(myUserId);
 

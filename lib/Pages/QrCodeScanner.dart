@@ -94,29 +94,32 @@ class _QRScannerPageState extends State<QRScannerPage> {
           Container(
             color: Colors.black.withOpacity(0.6),
             child: Center(
-              child: GlassmorphicContainer(
-                borderRadius:
-                    BorderRadius.circular(AppDimensions.radiusPremiumCard),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                      vertical: 24, horizontal: 16),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      CircularProgressIndicator(
-                        valueColor: AlwaysStoppedAnimation<Color>(
-                            context.accentPrimary),
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        "Loading their card...",
-                        style: context.bodyText.copyWith(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
+              child: Material(
+                color: Colors.transparent,
+                child: GlassmorphicContainer(
+                  borderRadius:
+                      BorderRadius.circular(AppDimensions.radiusPremiumCard),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                        vertical: 24, horizontal: 16),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        CircularProgressIndicator(
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                              context.accentPrimary),
                         ),
-                      ),
-                    ],
+                        const SizedBox(height: 16),
+                        Text(
+                          "Loading their card...",
+                          style: context.bodyText.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -226,7 +229,8 @@ class _QRScannerPageState extends State<QRScannerPage> {
             setState(() {
               _isLoading = true;
             });
-            final tribeProvider = Provider.of<TribeProvider>(context, listen: false);
+            final tribeProvider =
+                Provider.of<TribeProvider>(context, listen: false);
             try {
               await tribeProvider.joinTribeWithInviteCode(tribeCode);
               setState(() {
@@ -234,7 +238,9 @@ class _QRScannerPageState extends State<QRScannerPage> {
               });
               if (mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text("Joined tribe successfully!"), backgroundColor: Colors.green),
+                  const SnackBar(
+                      content: Text("Joined tribe successfully!"),
+                      backgroundColor: Colors.green),
                 );
                 Navigator.pop(context);
               }
@@ -245,7 +251,9 @@ class _QRScannerPageState extends State<QRScannerPage> {
               });
               if (mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text("Failed to join tribe: $e"), backgroundColor: Colors.redAccent),
+                  SnackBar(
+                      content: Text("Failed to join tribe: $e"),
+                      backgroundColor: Colors.redAccent),
                 );
               }
               controller.resumeCamera();
