@@ -10,6 +10,7 @@ import 'package:connect/Config/app_theme.dart';
 import 'package:connect/Providers/tribe_provider.dart';
 import 'package:connect/Providers/profile_provider.dart';
 import 'package:connect/Providers/connection_provider.dart';
+import 'package:connect/Providers/notification_provider.dart';
 import 'package:connect/Pages/Tribe/TribeRoleBuilderPage.dart';
 import 'package:connect/Models/mafia_role_details.dart';
 
@@ -364,10 +365,12 @@ class _TribeDetailsPageState extends State<TribeDetailsPage> {
                                       color: Colors.green),
                                   onPressed: () async {
                                     final nav = Navigator.of(context);
+                                    final notifProvider = Provider.of<NotificationProvider>(context, listen: false);
                                     try {
                                       await tribeProvider.approveRequest(
                                           widget.tribeId,
                                           mem['user_id'] as int);
+                                      await notifProvider.fetchNotifications();
                                       nav.pop();
                                       ScaffoldMessenger.of(context)
                                           .showSnackBar(
@@ -390,11 +393,13 @@ class _TribeDetailsPageState extends State<TribeDetailsPage> {
                                       color: Colors.redAccent),
                                   onPressed: () async {
                                     final nav = Navigator.of(context);
+                                    final notifProvider = Provider.of<NotificationProvider>(context, listen: false);
                                     try {
                                       await tribeProvider
                                           .declineRequestOrInvite(
                                               widget.tribeId,
                                               mem['user_id'] as int);
+                                      await notifProvider.fetchNotifications();
                                       nav.pop();
                                     } catch (e) {
                                       ScaffoldMessenger.of(context)

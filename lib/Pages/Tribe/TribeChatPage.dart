@@ -148,17 +148,24 @@ class _TribeChatPageState extends State<TribeChatPage> {
         : (actor != null ? actor['name']?.toString() ?? 'Someone' : 'Someone');
     final actionType = log['action_type']?.toString();
 
+    // Extract target name from metadata (for actions that affect another user)
+    final metadata = log['metadata'] as Map<String, dynamic>? ?? {};
+    final String targetName = metadata['target_name']?.toString() ?? 'a member';
+
     switch (actionType) {
       case 'joined':
         return isMe ? "You joined the Mafia" : "$actorName joined the Mafia";
       case 'left':
         return isMe ? "You left the Mafia" : "$actorName left the Mafia";
       case 'removed':
+        // actor = the admin who removed; target = the person who was removed
         return isMe
-            ? "You were removed from the Mafia"
-            : "$actorName was removed from the Mafia";
+            ? "You removed $targetName from the Mafia"
+            : "$actorName removed $targetName from the Mafia";
       case 'invited':
-        return isMe ? "You invited a user" : "$actorName invited a user";
+        return isMe
+            ? "You invited $targetName"
+            : "$actorName invited $targetName";
       case 'requested_to_join':
         return isMe
             ? "You requested to join the Mafia"
@@ -169,8 +176,8 @@ class _TribeChatPageState extends State<TribeChatPage> {
             : "$actorName declined invitation";
       case 'role_changed':
         return isMe
-            ? "You updated a member role"
-            : "$actorName updated a member role";
+            ? "You updated $targetName's role"
+            : "$actorName updated $targetName's role";
       default:
         return isMe
             ? "You performed an action"
@@ -472,7 +479,6 @@ class _TribeChatPageState extends State<TribeChatPage> {
                         final senderAvatar = sender != null
                             ? sender['avatar_url']?.toString() ?? ''
                             : '';
-                        final isMe = item['sender_id'] == myUserId;
                         final isDeleted = item['is_deleted'] == true;
 
                         final replyToRaw = item['reply_to'];
@@ -508,7 +514,7 @@ class _TribeChatPageState extends State<TribeChatPage> {
                             child: AnimatedContainer(
                               duration: const Duration(milliseconds: 300),
                               curve: Curves.easeInOut,
-                              margin: const EdgeInsets.symmetric(vertical: 4.0),
+                              margin: const EdgeInsets.symmetric(vertical: 10.0),
                               padding: const EdgeInsets.symmetric(horizontal: 4.0),
                               color: msgId == _highlightedMessageId
                                   ? Colors.white.withValues(alpha: 0.08)
@@ -516,188 +522,165 @@ class _TribeChatPageState extends State<TribeChatPage> {
                                       ? context.accentSecondary
                                           .withValues(alpha: 0.15)
                                       : Colors.transparent),
-                              child: Column(
-                                crossAxisAlignment: isMe
-                                    ? CrossAxisAlignment.end
-                                    : CrossAxisAlignment.start,
-                                children: [
-                                  // Sender header row (avatar + name) for other members
-                                  if (!isMe) ...[
-                                    Padding(
-                                      padding: const EdgeInsets.only(left: 4.0, bottom: 4.0),
-                                      child: Row(
-                                        mainAxisSize: MainAxisSize.min,
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 12.0),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    if (replyTo != null) ...[
+                                      Row(
+                                        crossAxisAlignment: CrossAxisAlignment.center,
                                         children: [
-                                          CircleAvatar(
-                                            radius: 12,
-                                            backgroundColor: context.surfaceSecondary,
-                                            backgroundImage: senderAvatar.isNotEmpty
-                                                ? NetworkImage(senderAvatar)
-                                                : null,
-                                            child: senderAvatar.isEmpty
-                                                ? Text(
-                                                    senderName.isNotEmpty
-                                                        ? senderName.substring(0, 1).toUpperCase()
-                                                        : '?',
-                                                    style: const TextStyle(
-                                                        fontSize: 10,
-                                                        color: Colors.white))
-                                                : null,
+                                          SizedBox(
+                                            width: 36,
+                                            height: 32,
+                                            child: CustomPaint(
+                                              painter: ThreadConnectorTopPainter(
+                                                color: Colors.white.withValues(alpha: 0.15),
+                                              ),
+                                            ),
                                           ),
-                                          const SizedBox(width: 6),
-                                          Text(
-                                            senderName,
-                                            style: TextStyle(
-                                              color: context.accentSecondary,
-                                              fontWeight: FontWeight.w600,
-                                              fontSize: 12,
+                                          const SizedBox(width: 12),
+                                          Expanded(
+                                            child: GestureDetector(
+                                              onTap: () {
+                                                _scrollToAndHighlightMessage(
+                                                    replyTo['id'] as String,
+                                                    mergedList);
+                                              },
+                                              behavior: HitTestBehavior.opaque,
+                                              child: _buildThreadReplyBlock(replyTo, context),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 8),
+                                    ],
+                                    IntrinsicHeight(
+                                      child: Row(
+                                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                                        children: [
+                                          // Left Column (Avatar + optional top connector line)
+                                          SizedBox(
+                                            width: 36,
+                                            child: Column(
+                                              children: [
+                                                if (replyTo != null)
+                                                  Container(
+                                                    width: 1.5,
+                                                    height: 12,
+                                                    color: Colors.white.withValues(alpha: 0.15),
+                                                  ),
+                                                CircleAvatar(
+                                                  radius: 18,
+                                                  backgroundColor: context.surfaceSecondary,
+                                                  backgroundImage: senderAvatar.isNotEmpty
+                                                      ? NetworkImage(senderAvatar)
+                                                      : null,
+                                                  child: senderAvatar.isEmpty
+                                                      ? Text(
+                                                          senderName.isNotEmpty
+                                                              ? senderName.substring(0, 1).toUpperCase()
+                                                              : '?',
+                                                          style: const TextStyle(
+                                                              fontSize: 14,
+                                                              color: Colors.white,
+                                                              fontWeight: FontWeight.bold),
+                                                        )
+                                                      : null,
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                          const SizedBox(width: 12),
+                                          // Right Column (Header + content)
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                if (replyTo != null)
+                                                  const SizedBox(height: 4),
+                                                Row(
+                                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                                  children: [
+                                                    Row(
+                                                      children: [
+                                                        Text(
+                                                          senderName,
+                                                          style: const TextStyle(
+                                                            color: Colors.white,
+                                                            fontWeight: FontWeight.bold,
+                                                            fontSize: 14,
+                                                          ),
+                                                        ),
+                                                        if (item['sender_id'] == myUserId) ...[
+                                                          const SizedBox(width: 6),
+                                                          Container(
+                                                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                                                            decoration: BoxDecoration(
+                                                              color: context.accentSecondary.withValues(alpha: 0.15),
+                                                              borderRadius: BorderRadius.circular(4),
+                                                              border: Border.all(
+                                                                color: context.accentSecondary.withValues(alpha: 0.3),
+                                                                width: 0.5,
+                                                              ),
+                                                            ),
+                                                            child: Text(
+                                                              "You",
+                                                              style: TextStyle(
+                                                                color: context.accentSecondary,
+                                                                fontSize: 9,
+                                                                fontWeight: FontWeight.bold,
+                                                              ),
+                                                            ),
+                                                          ),
+                                                        ],
+                                                      ],
+                                                    ),
+                                                    Text(
+                                                      _formatMessageTime(item['created_at'] as String?),
+                                                      style: TextStyle(
+                                                        color: Colors.white.withValues(alpha: 0.4),
+                                                        fontSize: 11,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                                const SizedBox(height: 8),
+                                                isDeleted
+                                                    ? Text(
+                                                        "This message was deleted",
+                                                        style: context.bodyText.copyWith(
+                                                          color: Colors.white38,
+                                                          fontStyle: FontStyle.italic,
+                                                        ),
+                                                      )
+                                                    : item['message_type'] == 'image'
+                                                        ? ClipRRect(
+                                                            borderRadius: BorderRadius.circular(8),
+                                                            child: Image.network(
+                                                              item['attachment_url']?.toString() ?? '',
+                                                              width: 200,
+                                                              fit: BoxFit.cover,
+                                                              errorBuilder: (context, error, stackTrace) =>
+                                                                  const Icon(Icons.broken_image_rounded, size: 40),
+                                                            ),
+                                                          )
+                                                        : Text(
+                                                            item['content']?.toString() ?? '',
+                                                            style: context.bodyText.copyWith(
+                                                              color: Colors.white,
+                                                              height: 1.4,
+                                                            ),
+                                                          ),
+                                              ],
                                             ),
                                           ),
                                         ],
                                       ),
                                     ),
                                   ],
-                                  // Message bubble
-                                  ConstrainedBox(
-                                    constraints: BoxConstraints(
-                                      maxWidth: MediaQuery.of(context).size.width * 0.75,
-                                    ),
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 12, vertical: 10),
-                                      decoration: BoxDecoration(
-                                        color: isMe
-                                            ? context.accentSecondary
-                                                .withValues(alpha: 0.8)
-                                            : context.surfacePrimary,
-                                        borderRadius: BorderRadius.only(
-                                          topLeft: const Radius.circular(16),
-                                          topRight: const Radius.circular(16),
-                                          bottomLeft: isMe
-                                              ? const Radius.circular(16)
-                                              : Radius.zero,
-                                          bottomRight: isMe
-                                              ? Radius.zero
-                                              : const Radius.circular(16),
-                                        ),
-                                      ),
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          if (replyTo != null) ...[
-                                            Builder(
-                                              builder: (context) {
-                                                final replyToSenderRaw = replyTo['sender'];
-                                                final Map<String, dynamic>? replyToSender = replyToSenderRaw is List
-                                                    ? (replyToSenderRaw.isNotEmpty ? replyToSenderRaw.first as Map<String, dynamic>? : null)
-                                                    : (replyToSenderRaw as Map<String, dynamic>?);
-                                                final replyToSenderName = replyToSender != null
-                                                    ? replyToSender['name']?.toString() ?? 'Someone'
-                                                    : 'Someone';
-                                                final bool isReplyToMe = replyTo['sender_id'] == myUserId;
-                                                final String replyToDisplayName = isReplyToMe ? "You" : replyToSenderName;
-
-                                                return GestureDetector(
-                                                  onTap: () {
-                                                    _scrollToAndHighlightMessage(
-                                                        replyTo['id'] as String,
-                                                        mergedList);
-                                                  },
-                                                  child: Container(
-                                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-                                                    margin: const EdgeInsets.only(bottom: 6),
-                                                    decoration: BoxDecoration(
-                                                      color: Colors.black.withValues(alpha: isMe ? 0.15 : 0.22),
-                                                      borderRadius: BorderRadius.circular(6),
-                                                    ),
-                                                    child: IntrinsicHeight(
-                                                      child: Row(
-                                                        mainAxisSize: MainAxisSize.min,
-                                                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                                                        children: [
-                                                          Container(
-                                                            width: 3,
-                                                            decoration: BoxDecoration(
-                                                              color: isMe ? const Color(0xFF00F2FE) : context.accentSecondary,
-                                                              borderRadius: BorderRadius.circular(1.5),
-                                                            ),
-                                                          ),
-                                                          const SizedBox(width: 8),
-                                                          Flexible(
-                                                            child: Column(
-                                                              crossAxisAlignment: CrossAxisAlignment.start,
-                                                              mainAxisSize: MainAxisSize.min,
-                                                              children: [
-                                                                Text(
-                                                                  replyToDisplayName,
-                                                                  style: TextStyle(
-                                                                    color: isMe ? const Color(0xFF00F2FE) : context.accentSecondary,
-                                                                    fontSize: 11,
-                                                                    fontWeight: FontWeight.bold,
-                                                                  ),
-                                                                  maxLines: 1,
-                                                                  overflow: TextOverflow.ellipsis,
-                                                                ),
-                                                                const SizedBox(height: 2),
-                                                                Text(
-                                                                  replyTo['content']?.toString() ?? 'Attachment',
-                                                                  style: const TextStyle(
-                                                                    color: Colors.white70,
-                                                                    fontSize: 11,
-                                                                  ),
-                                                                  maxLines: 1,
-                                                                  overflow: TextOverflow.ellipsis,
-                                                                ),
-                                                              ],
-                                                            ),
-                                                          ),
-                                                        ],
-                                                      ),
-                                                    ),
-                                                  ),
-                                                );
-                                              },
-                                            ),
-                                          ],
-                                          isDeleted
-                                              ? Text(
-                                                  "This message was deleted",
-                                                  style:
-                                                      context.bodyText.copyWith(
-                                                    color: Colors.white38,
-                                                    fontStyle: FontStyle.italic,
-                                                  ),
-                                                )
-                                              : item['message_type'] == 'image'
-                                                  ? ClipRRect(
-                                                      borderRadius:
-                                                          BorderRadius.circular(
-                                                              8),
-                                                      child: Image.network(
-                                                        item['attachment_url']
-                                                                ?.toString() ??
-                                                            '',
-                                                        width: 200,
-                                                        fit: BoxFit.cover,
-                                                        errorBuilder: (context, error, stackTrace) =>
-                                                            const Icon(Icons.broken_image_rounded, size: 40),
-                                                      ),
-                                                    )
-                                                  : Text(
-                                                      item['content']
-                                                              ?.toString() ??
-                                                          '',
-                                                      style: context.bodyText
-                                                          .copyWith(
-                                                              color:
-                                                                  Colors.white),
-                                                    ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                ],
+                                ),
                               ),
                             ),
                           ),
@@ -715,9 +698,7 @@ class _TribeChatPageState extends State<TribeChatPage> {
                                   .scale(
                                     duration: 200.ms,
                                     curve: Curves.easeOutBack,
-                                    alignment: isMe
-                                        ? Alignment.bottomRight
-                                        : Alignment.bottomLeft,
+                                    alignment: Alignment.bottomLeft,
                                   ),
                         );
                       },
@@ -1155,6 +1136,97 @@ class _TribeChatPageState extends State<TribeChatPage> {
       });
     }
   }
+
+  String _formatMessageTime(String? isoString) {
+    if (isoString == null) return '';
+    try {
+      final dateTime = DateTime.parse(isoString).toLocal();
+      final now = DateTime.now();
+
+      final hour = dateTime.hour > 12
+          ? dateTime.hour - 12
+          : (dateTime.hour == 0 ? 12 : dateTime.hour);
+      final minute = dateTime.minute.toString().padLeft(2, '0');
+      final period = dateTime.hour >= 12 ? 'PM' : 'AM';
+      final timeStr = "$hour:$minute $period";
+
+      if (dateTime.year == now.year &&
+          dateTime.month == now.month &&
+          dateTime.day == now.day) {
+        return "Today, $timeStr";
+      }
+
+      final yesterday = DateTime(now.year, now.month, now.day - 1);
+      if (dateTime.year == yesterday.year &&
+          dateTime.month == yesterday.month &&
+          dateTime.day == yesterday.day) {
+        return "Yesterday, $timeStr";
+      }
+
+      return "${dateTime.day}/${dateTime.month}/${dateTime.year}, $timeStr";
+    } catch (_) {
+      return '';
+    }
+  }
+
+  Widget _buildThreadReplyBlock(Map<String, dynamic> replyTo, BuildContext context) {
+    final replyToSenderRaw = replyTo['sender'];
+    final Map<String, dynamic>? replyToSender = replyToSenderRaw is List
+        ? (replyToSenderRaw.isNotEmpty ? replyToSenderRaw.first as Map<String, dynamic>? : null)
+        : (replyToSenderRaw as Map<String, dynamic>?);
+    final replyToSenderName = replyToSender != null
+        ? replyToSender['name']?.toString() ?? 'Someone'
+        : 'Someone';
+    final replyToSenderAvatar = replyToSender != null
+        ? replyToSender['avatar_url']?.toString() ?? ''
+        : '';
+    final myUserId = Provider.of<ProfileProvider>(context, listen: false).userId;
+    final bool isReplyToMe = replyTo['sender_id'] == myUserId;
+    final String replyToDisplayName = isReplyToMe ? "You" : replyToSenderName;
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        CircleAvatar(
+          radius: 9,
+          backgroundColor: context.surfaceSecondary,
+          backgroundImage: replyToSenderAvatar.isNotEmpty
+              ? NetworkImage(replyToSenderAvatar)
+              : null,
+          child: replyToSenderAvatar.isEmpty
+              ? Text(
+                  replyToSenderName.isNotEmpty
+                      ? replyToSenderName.substring(0, 1).toUpperCase()
+                      : '?',
+                  style: const TextStyle(
+                      fontSize: 8,
+                      color: Colors.white))
+              : null,
+        ),
+        const SizedBox(width: 6),
+        Text(
+          replyToDisplayName,
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+            fontSize: 12,
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            replyTo['content']?.toString() ?? 'Attachment',
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.6),
+              fontSize: 12,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
+    );
+  }
 }
 
 class SwipeToReply extends StatefulWidget {
@@ -1258,3 +1330,29 @@ class _SwipeToReplyState extends State<SwipeToReply>
   }
 }
 
+class ThreadConnectorTopPainter extends CustomPainter {
+  final Color color;
+  const ThreadConnectorTopPainter({required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.5;
+
+    final path = Path();
+    path.moveTo(size.width, size.height / 2);
+    path.quadraticBezierTo(
+      size.width / 2,
+      size.height / 2,
+      size.width / 2,
+      size.height,
+    );
+
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}

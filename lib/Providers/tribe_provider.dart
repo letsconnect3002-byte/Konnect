@@ -7,9 +7,13 @@ import 'package:connect/Repositories/notification_repository.dart';
 import 'package:collection/collection.dart';
 
 sealed class TribeState {}
+
 class TribeInitial extends TribeState {}
+
 class TribeLoading extends TribeState {}
+
 class TribeLoaded extends TribeState {}
+
 class TribeError extends TribeState {
   final AppError error;
   TribeError(this.error);
@@ -23,7 +27,8 @@ class TribeProvider with ChangeNotifier {
     TribeRepository? tribeRepository,
     NotificationRepository? notificationRepository,
   })  : _repository = tribeRepository ?? SupabaseTribeRepository(),
-        _notificationRepository = notificationRepository ?? SupabaseNotificationRepository();
+        _notificationRepository =
+            notificationRepository ?? SupabaseNotificationRepository();
 
   int? _userId;
   int? get userId => _userId;
@@ -54,10 +59,18 @@ class TribeProvider with ChangeNotifier {
     activeTribeId = tribeId;
   }
 
-  List<Map<String, dynamic>> getMembers(String tribeId) => _tribeMembers[tribeId] ?? [];
+  List<Map<String, dynamic>> getMembers(String tribeId) =>
+      _tribeMembers[tribeId] ?? [];
   List<Map<String, dynamic>> getRoles(String tribeId) {
     final list = List<Map<String, dynamic>>.from(_tribeRoles[tribeId] ?? []);
-    const order = ['don', 'consigliere', 'underboss', 'capo', 'soldier', 'associate'];
+    const order = [
+      'don',
+      'consigliere',
+      'underboss',
+      'capo',
+      'soldier',
+      'associate'
+    ];
     list.sort((a, b) {
       final slugA = (a['slug']?.toString() ?? '').toLowerCase();
       final slugB = (b['slug']?.toString() ?? '').toLowerCase();
@@ -78,8 +91,11 @@ class TribeProvider with ChangeNotifier {
     });
     return list;
   }
-  List<Map<String, dynamic>> getMessages(String tribeId) => _tribeMessages[tribeId] ?? [];
-  List<Map<String, dynamic>> getActivityLog(String tribeId) => _tribeActivityLog[tribeId] ?? [];
+
+  List<Map<String, dynamic>> getMessages(String tribeId) =>
+      _tribeMessages[tribeId] ?? [];
+  List<Map<String, dynamic>> getActivityLog(String tribeId) =>
+      _tribeActivityLog[tribeId] ?? [];
 
   void updateUserId(int? newUserId) {
     if (_userId != newUserId) {
@@ -107,7 +123,7 @@ class TribeProvider with ChangeNotifier {
   // ── Access Control Checker ──
   bool hasPermission(String tribeId, String permissionKey) {
     if (_userId == null) return false;
-    
+
     // Fallback logic check creator
     final tribe = _myTribes.firstWhere(
       (t) => t['tribe_id'] == tribeId || t['id'] == tribeId,
@@ -187,20 +203,23 @@ class TribeProvider with ChangeNotifier {
   void subscribeToTribeRealtime(String tribeId) {
     if (_messagesSubscriptions.containsKey(tribeId)) return;
 
-    final msgSub = _repository.subscribeToTribeMessages(tribeId, (payload) async {
+    final msgSub =
+        _repository.subscribeToTribeMessages(tribeId, (payload) async {
       print("Realtime tribe message received: $payload");
       await fetchTribeMessagesAndLog(tribeId);
     });
     _messagesSubscriptions[tribeId] = msgSub;
 
-    final memSub = _repository.subscribeToTribeMembers(tribeId, (payload) async {
+    final memSub =
+        _repository.subscribeToTribeMembers(tribeId, (payload) async {
       print("Realtime tribe member received: $payload");
       await fetchTribeDetails(tribeId);
       await fetchMyTribes(silent: true);
     });
     _membersSubscriptions[tribeId] = memSub;
 
-    final actSub = _repository.subscribeToTribeActivity(tribeId, (payload) async {
+    final actSub =
+        _repository.subscribeToTribeActivity(tribeId, (payload) async {
       print("Realtime tribe activity received: $payload");
       await fetchTribeMessagesAndLog(tribeId);
     });
@@ -366,8 +385,9 @@ class TribeProvider with ChangeNotifier {
         'updated_at': nowStr,
       };
 
-      final result = await _repository.createTribe(tribeData, rolesSeed, creatorMemberData);
-      
+      final result = await _repository.createTribe(
+          tribeData, rolesSeed, creatorMemberData);
+
       // Log creation activity
       final tribeId = result['id'] as String;
       final activityLog = {
@@ -407,7 +427,8 @@ class TribeProvider with ChangeNotifier {
 
       // Check default role
       final roles = await _repository.getTribeRoles(tribeId);
-      final defaultRole = roles.firstWhereOrNull((r) => r['is_default'] == true);
+      final defaultRole =
+          roles.firstWhereOrNull((r) => r['is_default'] == true);
       if (defaultRole == null) throw Exception("No default role found.");
 
       final nowStr = DateTime.now().toUtc().toIso8601String();
@@ -427,7 +448,8 @@ class TribeProvider with ChangeNotifier {
           'role_id': defaultRole['id'],
           'joined_at': nowStr,
         };
-        await _repository.updateTribeMemberStatus(tribeId, myUserId, updates, activityLog);
+        await _repository.updateTribeMemberStatus(
+            tribeId, myUserId, updates, activityLog);
       } else {
         // Insert new row
         final memberData = {
@@ -470,7 +492,8 @@ class TribeProvider with ChangeNotifier {
         final updates = {
           'status': 'requested',
         };
-        await _repository.updateTribeMemberStatus(tribeId, myUserId, updates, activityLog);
+        await _repository.updateTribeMemberStatus(
+            tribeId, myUserId, updates, activityLog);
       } else {
         final memberData = {
           'tribe_id': tribeId,
@@ -491,7 +514,11 @@ class TribeProvider with ChangeNotifier {
           userId: creatorId,
           otherUserId: myUserId,
           type: 'referral',
-          note: jsonEncode({'tribe_id': tribeId, 'tribe_name': tribe['name'], 'real_type': 'tribe_request'}),
+          note: jsonEncode({
+            'tribe_id': tribeId,
+            'tribe_name': tribe['name'],
+            'real_type': 'tribe_request'
+          }),
         );
       }
 
@@ -547,10 +574,25 @@ class TribeProvider with ChangeNotifier {
       final nowStr = DateTime.now().toUtc().toIso8601String();
       final existing = await _repository.getTribeMember(tribeId, inviteeId);
 
+      // Resolve the invitee's display name for the activity log
+      String inviteeName = 'a user';
+      final allMembers =
+          _tribeMembers[tribeId] ?? await _repository.getTribeMembers(tribeId);
+      final inviteeMember =
+          allMembers.firstWhereOrNull((m) => m['user_id'] == inviteeId);
+      if (inviteeMember != null) {
+        final profile = inviteeMember['profile'] as Map<String, dynamic>?;
+        inviteeName = profile?['name']?.toString() ?? 'a user';
+      }
+
       final activityLog = {
         'tribe_id': tribeId,
         'actor_id': myUserId,
         'action_type': 'invited',
+        'metadata': {
+          'target_user_id': inviteeId,
+          'target_name': inviteeName,
+        },
         'created_at': nowStr,
       };
 
@@ -560,7 +602,8 @@ class TribeProvider with ChangeNotifier {
           'invited_by': myUserId,
           'role_id': roleId,
         };
-        await _repository.updateTribeMemberStatus(tribeId, inviteeId, updates, activityLog);
+        await _repository.updateTribeMemberStatus(
+            tribeId, inviteeId, updates, activityLog);
       } else {
         final memberData = {
           'tribe_id': tribeId,
@@ -580,7 +623,11 @@ class TribeProvider with ChangeNotifier {
         userId: inviteeId,
         otherUserId: myUserId,
         type: 'referral',
-        note: jsonEncode({'tribe_id': tribeId, 'tribe_name': tribe['name'], 'real_type': 'tribe_invite'}),
+        note: jsonEncode({
+          'tribe_id': tribeId,
+          'tribe_name': tribe['name'],
+          'real_type': 'tribe_invite'
+        }),
       );
 
       await fetchTribeDetails(tribeId);
@@ -612,7 +659,8 @@ class TribeProvider with ChangeNotifier {
       }
 
       final roles = await _repository.getTribeRoles(tribeId);
-      final defaultRole = roles.firstWhereOrNull((r) => r['is_default'] == true);
+      final defaultRole =
+          roles.firstWhereOrNull((r) => r['is_default'] == true);
       if (defaultRole == null) throw Exception("No default role found.");
 
       final nowStr = DateTime.now().toUtc().toIso8601String();
@@ -629,14 +677,28 @@ class TribeProvider with ChangeNotifier {
         'created_at': nowStr,
       };
 
-      await _repository.updateTribeMemberStatus(tribeId, requesterId, updates, activityLog);
+      await _repository.updateTribeMemberStatus(
+          tribeId, requesterId, updates, activityLog);
 
       // Notify user they joined
       await _notificationRepository.insertNotification(
         userId: requesterId,
         otherUserId: myUserId,
         type: 'referral',
-        note: jsonEncode({'tribe_id': tribeId, 'tribe_name': tribe['name'], 'real_type': 'tribe_approved'}),
+        note: jsonEncode({
+          'tribe_id': tribeId,
+          'tribe_name': tribe['name'],
+          'real_type': 'tribe_approved'
+        }),
+      );
+
+      // Mark the original tribe_request notification as actioned
+      // so the NotificationPage won't show Accept/Decline buttons anymore
+      await _notificationRepository.markTribeNotificationActioned(
+        recipientUserId: myUserId,
+        otherUserId: requesterId,
+        tribeId: tribeId,
+        newRealType: 'tribe_request_approved',
       );
 
       await fetchTribeDetails(tribeId);
@@ -669,7 +731,18 @@ class TribeProvider with ChangeNotifier {
         'created_at': nowStr,
       };
 
-      await _repository.updateTribeMemberStatus(tribeId, targetUserId, updates, activityLog);
+      await _repository.updateTribeMemberStatus(
+          tribeId, targetUserId, updates, activityLog);
+
+      // Mark the original tribe_request or tribe_invite notification as actioned
+      await _notificationRepository.markTribeNotificationActioned(
+        recipientUserId: myUserId,
+        otherUserId: targetUserId,
+        tribeId: tribeId,
+        newRealType:
+            isSelf ? 'tribe_invite_declined' : 'tribe_request_declined',
+      );
+
       await fetchTribeDetails(tribeId);
       await fetchMyTribes(silent: true);
     } catch (e) {
@@ -692,14 +765,27 @@ class TribeProvider with ChangeNotifier {
         'status': 'removed',
       };
 
+      // Resolve the target member's display name for the activity log
+      final members =
+          _tribeMembers[tribeId] ?? await _repository.getTribeMembers(tribeId);
+      final targetMember =
+          members.firstWhereOrNull((m) => m['user_id'] == memberUserId);
+      final targetProfile = targetMember?['profile'] as Map<String, dynamic>?;
+      final targetName = targetProfile?['name']?.toString() ?? 'a member';
+
       final activityLog = {
         'tribe_id': tribeId,
         'actor_id': myUserId,
         'action_type': 'removed',
+        'metadata': {
+          'target_user_id': memberUserId,
+          'target_name': targetName,
+        },
         'created_at': nowStr,
       };
 
-      await _repository.updateTribeMemberStatus(tribeId, memberUserId, updates, activityLog);
+      await _repository.updateTribeMemberStatus(
+          tribeId, memberUserId, updates, activityLog);
       await fetchTribeDetails(tribeId);
     } catch (e) {
       print("Error removing member: $e");
@@ -713,10 +799,13 @@ class TribeProvider with ChangeNotifier {
 
     try {
       final nowStr = DateTime.now().toUtc().toIso8601String();
-      final members = _tribeMembers[tribeId] ?? await _repository.getTribeMembers(tribeId);
-      final activeMembers = members.where((m) => m['status'] == 'active').toList();
-      
-      final myMember = activeMembers.firstWhereOrNull((m) => m['user_id'] == myUserId);
+      final members =
+          _tribeMembers[tribeId] ?? await _repository.getTribeMembers(tribeId);
+      final activeMembers =
+          members.where((m) => m['status'] == 'active').toList();
+
+      final myMember =
+          activeMembers.firstWhereOrNull((m) => m['user_id'] == myUserId);
       if (myMember == null) return;
 
       final myRole = myMember['role'] as Map<String, dynamic>?;
@@ -729,9 +818,11 @@ class TribeProvider with ChangeNotifier {
         }).toList();
 
         if (otherDons.isEmpty) {
-          final otherActive = activeMembers.where((m) => m['user_id'] != myUserId).toList();
+          final otherActive =
+              activeMembers.where((m) => m['user_id'] != myUserId).toList();
           if (otherActive.isNotEmpty) {
-            throw Exception("You are the last Don. Designate another Don before leaving.");
+            throw Exception(
+                "You are the last Don. Designate another Don before leaving.");
           } else {
             // Absolute last member — delete tribe to prevent zombies
             await _repository.deleteTribe(tribeId);
@@ -752,7 +843,8 @@ class TribeProvider with ChangeNotifier {
         'created_at': nowStr,
       };
 
-      await _repository.updateTribeMemberStatus(tribeId, myUserId, updates, activityLog);
+      await _repository.updateTribeMemberStatus(
+          tribeId, myUserId, updates, activityLog);
       await fetchMyTribes(silent: true);
     } catch (e) {
       print("Error leaving tribe: $e");
@@ -760,7 +852,8 @@ class TribeProvider with ChangeNotifier {
     }
   }
 
-  Future<void> changeMemberRole(String tribeId, int memberUserId, String? roleId) async {
+  Future<void> changeMemberRole(
+      String tribeId, int memberUserId, String? roleId) async {
     final myUserId = _userId;
     if (myUserId == null) return;
 
@@ -771,8 +864,13 @@ class TribeProvider with ChangeNotifier {
     try {
       final nowStr = DateTime.now().toUtc().toIso8601String();
       final members = _tribeMembers[tribeId] ?? [];
-      final member = members.firstWhereOrNull((m) => m['user_id'] == memberUserId);
+      final member =
+          members.firstWhereOrNull((m) => m['user_id'] == memberUserId);
       final prevRoleId = member != null ? member['role_id'] : null;
+
+      // Resolve the target member's display name for the activity log
+      final targetProfile = member?['profile'] as Map<String, dynamic>?;
+      final targetName = targetProfile?['name']?.toString() ?? 'a member';
 
       final updates = {
         'role_id': roleId,
@@ -785,11 +883,14 @@ class TribeProvider with ChangeNotifier {
         'metadata': {
           'previous_role_id': prevRoleId,
           'new_role_id': roleId,
+          'target_user_id': memberUserId,
+          'target_name': targetName,
         },
         'created_at': nowStr,
       };
 
-      await _repository.changeMemberRole(tribeId, memberUserId, roleId, updates, activityLog);
+      await _repository.changeMemberRole(
+          tribeId, memberUserId, roleId, updates, activityLog);
       await fetchTribeDetails(tribeId);
     } catch (e) {
       print("Error changing member role: $e");
@@ -798,7 +899,8 @@ class TribeProvider with ChangeNotifier {
   }
 
   // ── Chat Messaging ──
-  Future<void> sendTribeTextMessage(String tribeId, String content, {String? replyToId}) async {
+  Future<void> sendTribeTextMessage(String tribeId, String content,
+      {String? replyToId}) async {
     final myUserId = _userId;
     if (myUserId == null) return;
 
@@ -828,7 +930,8 @@ class TribeProvider with ChangeNotifier {
     }
   }
 
-  Future<void> sendTribeImageMessage(String tribeId, String imageUrl, {String? replyToId}) async {
+  Future<void> sendTribeImageMessage(String tribeId, String imageUrl,
+      {String? replyToId}) async {
     final myUserId = _userId;
     if (myUserId == null) return;
 
@@ -868,7 +971,8 @@ class TribeProvider with ChangeNotifier {
     }
   }
 
-  Future<void> updateTribeMessage(String tribeId, String messageId, String newContent) async {
+  Future<void> updateTribeMessage(
+      String tribeId, String messageId, String newContent) async {
     try {
       await _repository.updateTribeMessage(messageId, newContent);
       await fetchTribeMessagesAndLog(tribeId);
@@ -919,7 +1023,8 @@ class TribeProvider with ChangeNotifier {
     }
     try {
       final nowStr = DateTime.now().toUtc().toIso8601String();
-      final slug = roleName.trim().toLowerCase().replaceAll(RegExp(r'\s+'), '_');
+      final slug =
+          roleName.trim().toLowerCase().replaceAll(RegExp(r'\s+'), '_');
       final roleData = {
         'tribe_id': tribeId,
         'slug': slug,
@@ -938,7 +1043,8 @@ class TribeProvider with ChangeNotifier {
     }
   }
 
-  Future<void> updateCustomRole(String tribeId, String roleId, Map<String, dynamic> updates) async {
+  Future<void> updateCustomRole(
+      String tribeId, String roleId, Map<String, dynamic> updates) async {
     if (!hasPermission(tribeId, 'manage_roles')) {
       throw Exception("You do not have permission to manage roles.");
     }
@@ -957,12 +1063,17 @@ class TribeProvider with ChangeNotifier {
     }
     try {
       // Reassign members holding this role to the default role first
-      final roles = _tribeRoles[tribeId] ?? await _repository.getTribeRoles(tribeId);
-      final defaultRole = roles.firstWhereOrNull((r) => r['is_default'] == true);
-      if (defaultRole == null) throw Exception("No default role found to fall back.");
+      final roles =
+          _tribeRoles[tribeId] ?? await _repository.getTribeRoles(tribeId);
+      final defaultRole =
+          roles.firstWhereOrNull((r) => r['is_default'] == true);
+      if (defaultRole == null)
+        throw Exception("No default role found to fall back.");
 
-      final members = _tribeMembers[tribeId] ?? await _repository.getTribeMembers(tribeId);
-      final affectedMembers = members.where((m) => m['role_id'] == roleId).toList();
+      final members =
+          _tribeMembers[tribeId] ?? await _repository.getTribeMembers(tribeId);
+      final affectedMembers =
+          members.where((m) => m['role_id'] == roleId).toList();
 
       for (final mem in affectedMembers) {
         final memUserId = mem['user_id'] as int;

@@ -471,12 +471,14 @@ Future<void> onNotificationActionReceived(NotificationResponse response) async {
     if (isTribeMessage) {
       if (actionId == 'action_tribe_reply') {
         final String? replyText = response.input;
-        print("PushNotificationsAction: Tribe Direct Reply triggered. Text: $replyText");
+        print(
+            "PushNotificationsAction: Tribe Direct Reply triggered. Text: $replyText");
         if (replyText != null && replyText.trim().isNotEmpty) {
           final String? tribeId = data['tribe_id']?.toString();
           final senderIdStr = data['sender_id']?.toString();
           if (tribeId != null && senderIdStr != null) {
-            final ownerId = await LocalDatabaseHelper.instance.getActiveUserId();
+            final ownerId =
+                await LocalDatabaseHelper.instance.getActiveUserId();
             if (ownerId != null) {
               final String newMessageId = const Uuid().v4();
               final String createdAt = DateTime.now().toUtc().toIso8601String();
@@ -491,9 +493,11 @@ Future<void> onNotificationActionReceived(NotificationResponse response) async {
                   'created_at': createdAt,
                   'updated_at': createdAt,
                 });
-                print("PushNotificationsAction: Tribe message sent to Supabase successfully");
+                print(
+                    "PushNotificationsAction: Tribe message sent to Supabase successfully");
               } catch (supabaseError) {
-                print("PushNotificationsAction: Supabase insert error for tribe message: $supabaseError");
+                print(
+                    "PushNotificationsAction: Supabase insert error for tribe message: $supabaseError");
               }
 
               int count = 1;
@@ -506,12 +510,14 @@ Future<void> onNotificationActionReceived(NotificationResponse response) async {
                 await prefs.setStringList(key, lines);
                 count = lines.length;
               } catch (e) {
-                print("PushNotificationsAction: Error updating SharedPreferences on reply: $e");
+                print(
+                    "PushNotificationsAction: Error updating SharedPreferences on reply: $e");
               }
 
               try {
                 final tribeName = data['tribe_name']?.toString() ?? 'Mafia';
-                const AndroidNotificationChannel tribeChannel = AndroidNotificationChannel(
+                const AndroidNotificationChannel tribeChannel =
+                    AndroidNotificationChannel(
                   'tribe_messages_channel',
                   'Mafia Messages',
                   description: 'Notifications for Mafia group chat messages',
@@ -580,14 +586,18 @@ Future<void> onNotificationActionReceived(NotificationResponse response) async {
                 final notifId = getNotificationId(tribeId);
                 await flutterLocalNotificationsPlugin.show(
                   id: notifId,
-                  title: count > 1 ? "New Messages in $tribeName" : "New Message in $tribeName",
+                  title: count > 1
+                      ? "New Messages in $tribeName"
+                      : "New Message in $tribeName",
                   body: count > 1 ? lines.last : "You: ${replyText.trim()}",
                   notificationDetails: details,
                   payload: jsonEncode(fullPayload),
                 );
-                print("PushNotificationsAction: Updated local notification with reply. ID: $notifId");
+                print(
+                    "PushNotificationsAction: Updated local notification with reply. ID: $notifId");
               } catch (e) {
-                print("PushNotificationsAction: Error updating local notification tray on reply: $e");
+                print(
+                    "PushNotificationsAction: Error updating local notification tray on reply: $e");
               }
             }
           }
@@ -1513,7 +1523,8 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
           final count = lines.length;
 
-          const AndroidNotificationChannel tribeChannel = AndroidNotificationChannel(
+          const AndroidNotificationChannel tribeChannel =
+              AndroidNotificationChannel(
             'tribe_messages_channel',
             'Mafia Messages',
             description: 'Notifications for Mafia group chat messages',
@@ -1581,7 +1592,9 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
           await flutterLocalNotificationsPlugin.show(
             id: notifId,
-            title: count > 1 ? "New Messages in $tribeName" : "New Message in $tribeName",
+            title: count > 1
+                ? "New Messages in $tribeName"
+                : "New Message in $tribeName",
             body: count > 1 ? lines.last : "$senderName: $payload",
             notificationDetails: details,
             payload: jsonEncode(fullPayload),

@@ -261,7 +261,10 @@ class _NotificationPageState extends State<NotificationPage> {
     }
     if (type == 'tribe_invite' ||
         type == 'tribe_request' ||
-        type == 'tribe_approved') {
+        type == 'tribe_approved' ||
+        type == 'tribe_request_approved' ||
+        type == 'tribe_request_declined' ||
+        type == 'tribe_invite_declined') {
       return _buildTribeNotificationItem(notification, provider);
     }
     final otherUser = notification['other_user'] as Map<String, dynamic>? ?? {};
@@ -903,10 +906,25 @@ class _NotificationPageState extends State<NotificationPage> {
     } else if (type == 'tribe_request') {
       actionText = " requested to join ";
       actionIcon = Icons.person_add_rounded;
+    } else if (type == 'tribe_request_approved') {
+      actionText = "'s request to join ";
+      actionIcon = Icons.check_circle_rounded;
+    } else if (type == 'tribe_request_declined') {
+      actionText = "'s request to join ";
+      actionIcon = Icons.cancel_rounded;
+    } else if (type == 'tribe_invite_declined') {
+      actionText = " declined invite to ";
+      actionIcon = Icons.cancel_rounded;
     } else {
       actionText = " approved your request to join ";
       actionIcon = Icons.check_circle_rounded;
     }
+
+    // Determine if this notification has already been actioned
+    final bool isActioned = type == 'tribe_request_approved' ||
+        type == 'tribe_request_declined' ||
+        type == 'tribe_invite_declined' ||
+        type == 'tribe_approved';
 
     return Dismissible(
       key: Key(notification['id'].toString()),
@@ -1025,7 +1043,7 @@ class _NotificationPageState extends State<NotificationPage> {
                           ],
                         ),
                       ),
-                      if ((type == 'tribe_invite' || type == 'tribe_request') && tribeId != null) ...[
+                      if ((type == 'tribe_invite' || type == 'tribe_request') && tribeId != null && !isActioned) ...[
                         const SizedBox(height: 8),
                         Row(
                           children: [
@@ -1067,8 +1085,7 @@ class _NotificationPageState extends State<NotificationPage> {
                                         await tribeProvider
                                             .approveRequest(tribeId!, requesterId);
                                       }
-                                      provider
-                                          .markAsSeen(notification['id']);
+                                      await provider.fetchNotifications();
                                     } catch (e) {
                                       if (mounted) {
                                         ScaffoldMessenger.of(context)
@@ -1123,8 +1140,7 @@ class _NotificationPageState extends State<NotificationPage> {
                                     await tribeProvider
                                         .declineRequestOrInvite(
                                             tribeId!, targetId);
-                                    provider
-                                        .markAsSeen(notification['id']);
+                                    await provider.fetchNotifications();
                                   } catch (e) {
                                     if (mounted) {
                                       ScaffoldMessenger.of(context)
@@ -1147,6 +1163,24 @@ class _NotificationPageState extends State<NotificationPage> {
                               ),
                             ),
                           ],
+                        ),
+                      ],
+                      if (isActioned) ...[
+                        const SizedBox(height: 6),
+                        Text(
+                          type == 'tribe_request_approved'
+                              ? "Approved"
+                              : type == 'tribe_approved'
+                                  ? "Joined"
+                                  : "Declined",
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            fontFamily: 'Inter',
+                            color: (type == 'tribe_request_approved' || type == 'tribe_approved')
+                                ? Colors.green.withValues(alpha: 0.7)
+                                : Colors.redAccent.withValues(alpha: 0.7),
+                          ),
                         ),
                       ],
                     ],

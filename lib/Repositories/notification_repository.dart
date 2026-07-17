@@ -21,6 +21,12 @@ abstract class NotificationRepository {
   Future<void> markAllAsSeen(int userId);
   Future<void> deleteNotification(String notificationId);
   Future<void> deleteNotificationsBetweenUsers(int idA, int idB);
+  Future<void> markTribeNotificationActioned({
+    required int recipientUserId,
+    required int otherUserId,
+    required String tribeId,
+    required String newRealType,
+  });
   RealtimeChannel subscribeToNotifications(
       int userId, void Function(dynamic payload) callback);
   void removeChannel(RealtimeChannel channel);
@@ -171,6 +177,43 @@ class SupabaseNotificationRepository implements NotificationRepository {
     await _client
         .from('connection_notifications')
         .update({'note': newNote, 'is_seen': true}).eq('id', notificationId);
+  }
+
+  @override
+  Future<void> markTribeNotificationActioned({
+    required int recipientUserId,
+    required int otherUserId,
+    required String tribeId,
+    required String newRealType,
+  }) async {
+    // Find the matching tribe_request/tribe_invite notification
+    final rows = await _client
+        .from('connection_notifications')
+        .select('id, note')
+        .eq('user_id', recipientUserId)
+        .eq('other_user_id', otherUserId)
+        .eq('type', 'referral')
+        .order('created_at', ascending: false);
+
+    for (final row in rows) {
+      final noteStr = row['note'] as String?;
+      if (noteStr == null || !noteStr.startsWith('{')) continue;
+      try {
+        final parsed = jsonDecode(noteStr) as Map<String, dynamic>;
+        if (parsed['tribe_id']?.toString() == tribeId &&
+            (parsed['real_type'] == 'tribe_request' ||
+             parsed['real_type'] == 'tribe_invite')) {
+          // Update real_type to the actioned variant
+          parsed['real_type'] = newRealType;
+          final updatedNote = jsonEncode(parsed);
+          await _client
+              .from('connection_notifications')
+              .update({'note': updatedNote, 'is_seen': true})
+              .eq('id', row['id']);
+          break; // Only update the first matching notification
+        }
+      } catch (_) {}
+    }
   }
 
   @override

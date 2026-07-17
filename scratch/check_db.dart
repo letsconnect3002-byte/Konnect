@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 void main() async {
@@ -7,12 +8,17 @@ void main() async {
   );
 
   try {
-    final response = await client.from('profiles').select().limit(1).maybeSingle();
-    print("SUCCESS FETCH PROFILES: $response");
-    if (response != null) {
-      print("COLUMNS: ${response.keys.toList()}");
+    final response = await client
+        .from('connection_notifications')
+        .select('*, other_user:profiles!other_user_id(name), recipient:profiles!user_id(name)')
+        .order('created_at', ascending: false)
+        .limit(10);
+    
+    print("SUCCESS FETCH NOTIFICATIONS:");
+    for (var n in response) {
+      print("ID: ${n['id']}, user_id (${n['recipient']?['name']}): ${n['user_id']}, other_user_id (${n['other_user']?['name']}): ${n['other_user_id']}, type: ${n['type']}, note: ${n['note']}");
     }
   } catch (e) {
-    print("ERROR FETCHING PROFILES: $e");
+    print("ERROR FETCHING NOTIFICATIONS: $e");
   }
 }
