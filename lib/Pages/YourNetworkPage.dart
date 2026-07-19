@@ -158,7 +158,8 @@ class _YourNetworkPageState extends State<YourNetworkPage> {
         return BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 16.0, sigmaY: 16.0),
           child: Container(
-            padding: const EdgeInsets.only(top: 8, bottom: 24, left: 24, right: 24),
+            padding:
+                const EdgeInsets.only(top: 8, bottom: 24, left: 24, right: 24),
             decoration: BoxDecoration(
               color: const Color(0xFF16181C).withValues(alpha: 0.85),
               borderRadius: const BorderRadius.vertical(
@@ -184,7 +185,8 @@ class _YourNetworkPageState extends State<YourNetworkPage> {
                 }
               }(),
               builder: (context, snapshot) {
-                final isLoading = snapshot.connectionState == ConnectionState.waiting;
+                final isLoading =
+                    snapshot.connectionState == ConnectionState.waiting;
                 final data = snapshot.data;
 
                 final linkedin = data?['linkedin'] as String? ?? '';
@@ -224,8 +226,10 @@ class _YourNetworkPageState extends State<YourNetworkPage> {
                             shape: BoxShape.circle,
                             border: Border.all(
                               color: degree == "2nd"
-                                  ? const Color(0xFF3B82F6).withValues(alpha: 0.4)
-                                  : const Color(0xFF8B5CF6).withValues(alpha: 0.4),
+                                  ? const Color(0xFF3B82F6)
+                                      .withValues(alpha: 0.4)
+                                  : const Color(0xFF8B5CF6)
+                                      .withValues(alpha: 0.4),
                               width: 2.0,
                             ),
                           ),
@@ -234,8 +238,9 @@ class _YourNetworkPageState extends State<YourNetworkPage> {
                                 ? Image.network(
                                     avatarUrl,
                                     fit: BoxFit.cover,
-                                    errorBuilder: (context, error, stackTrace) =>
-                                        Container(
+                                    errorBuilder:
+                                        (context, error, stackTrace) =>
+                                            Container(
                                       color: context.surfaceSecondary,
                                       alignment: Alignment.center,
                                       child: Text(
@@ -463,7 +468,8 @@ class _YourNetworkPageState extends State<YourNetworkPage> {
     final networkProvider = Provider.of<NetworkProvider>(context);
     final userId =
         Provider.of<ConnectionProvider>(context, listen: false).userId;
-    final networkList = networkProvider.networkList;    return Scaffold(
+    final networkList = networkProvider.networkList;
+    return Scaffold(
       backgroundColor: context.canvasBackground,
       body: SafeArea(
         child: networkProvider.isLoading
@@ -472,36 +478,24 @@ class _YourNetworkPageState extends State<YourNetworkPage> {
                   valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF7C3AED)),
                 ),
               )
-            : ListView.builder(
+            : SingleChildScrollView(
                 controller: _scrollController,
                 physics: const BouncingScrollPhysics(),
-                padding: const EdgeInsets.only(bottom: 80),
-                itemCount: 5 +
-                    (networkList.isEmpty ? 1 : networkList.length) +
-                    (networkProvider.isLoadingMore ? 1 : 0),
-                itemBuilder: (context, index) {
-                  if (index == 0) {
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
                     // Header Section
-                    return Padding(
-                      padding: const EdgeInsets.fromLTRB(
-                          AppDimensions.marginStandard,
-                          20,
-                          AppDimensions.marginStandard,
-                          12),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(26, 20, 26, 0),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                "Your Network",
-                                style: context.displayHeader.copyWith(
-                                  fontSize: 28,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ],
+                          Text(
+                            "Your Network",
+                            style: context.displayHeader.copyWith(
+                              fontSize: 28,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                           const SizedBox(height: 4),
                           Text(
@@ -513,202 +507,241 @@ class _YourNetworkPageState extends State<YourNetworkPage> {
                           ),
                         ],
                       ),
-                    );
-                  } else if (index == 1) {
+                    ),
+
                     // Visual Network Map
-                    return Padding(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: AppDimensions.marginStandard),
-                      child: const NetworkMap(),
-                    );
-                  } else if (index == 2) {
-                    // Inline Search Bar
-                    return Padding(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: AppDimensions.marginStandard,
-                          vertical: 4),
+                    const Padding(
+                      padding:
+                          EdgeInsets.symmetric(horizontal: 16, vertical: 60),
+                      child: NetworkMap(),
+                    ),
+
+                    // Unified Floating Content Container (overlaps map by 20px)
+                    Transform.translate(
+                      offset: const Offset(0, -20),
                       child: Container(
-                        height: 42,
                         decoration: BoxDecoration(
                           color: context.surfacePrimary,
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(
-                            color: Colors.white.withValues(alpha: 0.04),
+                          borderRadius: const BorderRadius.vertical(
+                            top: Radius.circular(38.0),
                           ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.25),
+                              blurRadius: 20,
+                              offset: const Offset(0, -6),
+                            ),
+                          ],
                         ),
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                        child: Row(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            Icon(Icons.search_rounded,
-                                size: 18, color: context.textMuted),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: TextField(
-                                controller: _searchController,
-                                onChanged: (val) {
-                                  if (userId != null) {
-                                    networkProvider.search(userId, val);
-                                  }
-                                },
-                                style: TextStyle(
-                                    color: context.textPrimary,
-                                    fontSize: 13.5),
-                                decoration: InputDecoration(
-                                  hintText: "Search by name, title, or company...",
-                                  hintStyle: TextStyle(
-                                      color: context.textMuted,
-                                      fontSize: 13.5),
-                                  border: InputBorder.none,
-                                  isDense: true,
-                                  contentPadding: EdgeInsets.zero,
+                            const SizedBox(height: 28),
+
+                            // Inline Search Bar
+                            Padding(
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 26),
+                              child: Container(
+                                height: 44,
+                                decoration: BoxDecoration(
+                                  color: context.surfaceSecondary,
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: Colors.white.withValues(alpha: 0.04),
+                                  ),
+                                ),
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 14),
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.search_rounded,
+                                        size: 18, color: context.textMuted),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: TextField(
+                                        controller: _searchController,
+                                        onChanged: (val) {
+                                          if (userId != null) {
+                                            networkProvider.search(userId, val);
+                                          }
+                                        },
+                                        style: TextStyle(
+                                            color: context.textPrimary,
+                                            fontSize: 13.5),
+                                        decoration: InputDecoration(
+                                          hintText:
+                                              "Search by name, title, or company...",
+                                          hintStyle: TextStyle(
+                                              color: context.textMuted,
+                                              fontSize: 13.5),
+                                          border: InputBorder.none,
+                                          isDense: true,
+                                          contentPadding: EdgeInsets.zero,
+                                        ),
+                                      ),
+                                    ),
+                                    if (_searchController.text.isNotEmpty)
+                                      GestureDetector(
+                                        onTap: () {
+                                          _searchController.clear();
+                                          if (userId != null) {
+                                            networkProvider.search(userId, '');
+                                          }
+                                        },
+                                        child: Icon(Icons.close_rounded,
+                                            size: 16, color: context.textMuted),
+                                      ),
+                                  ],
                                 ),
                               ),
                             ),
-                            if (_searchController.text.isNotEmpty)
-                              GestureDetector(
-                                onTap: () {
-                                  _searchController.clear();
-                                  if (userId != null) {
-                                    networkProvider.search(userId, '');
-                                  }
-                                },
-                                child: Icon(Icons.close_rounded,
-                                    size: 16, color: context.textMuted),
+
+                            const SizedBox(height: 24),
+
+                            // Metrics Row
+                            Padding(
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 26),
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: _buildMetricCard(
+                                      title: "Primary",
+                                      count: networkProvider.primaryCount
+                                          .toString(),
+                                      ringColor: const Color(0xFF10B981),
+                                      progressValue: 0.75,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: _buildMetricCard(
+                                      title: "Secondary",
+                                      count: networkProvider.secondaryCount
+                                          .toString(),
+                                      ringColor: const Color(0xFF3B82F6),
+                                      progressValue: 0.6,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: _buildMetricCard(
+                                      title: "Tertiary",
+                                      count: networkProvider.tertiaryCount
+                                          .toString(),
+                                      ringColor: const Color(0xFF8B5CF6),
+                                      progressValue: 0.45,
+                                    ),
+                                  ),
+                                ],
                               ),
+                            ),
+
+                            const SizedBox(height: 28),
+
+                            // Sorted List Header Row
+                            Padding(
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 26),
+                              child: Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    "PEOPLE YOU CAN REACH",
+                                    style: context.captionText.copyWith(
+                                      color: context.textSecondary,
+                                      letterSpacing: 1.5,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  // GestureDetector(
+                                  //   onTap: () {
+                                  //     HapticFeedback.lightImpact();
+                                  //     final newSort =
+                                  //         networkProvider.currentSort ==
+                                  //                 "mutual"
+                                  //             ? "name"
+                                  //             : "mutual";
+                                  //     if (userId != null) {
+                                  //       networkProvider.setSort(
+                                  //           userId, newSort);
+                                  //     }
+                                  //   },
+                                  //   child: Row(
+                                  //     children: [
+                                  //       Text(
+                                  //         "Sort: ${networkProvider.currentSort == "mutual" ? "Mutual" : "Name"}",
+                                  //         style: context.captionText.copyWith(
+                                  //           color: context.textSecondary,
+                                  //           fontWeight: FontWeight.w600,
+                                  //         ),
+                                  //       ),
+                                  //       const SizedBox(width: 4),
+                                  //       Icon(
+                                  //         Icons.keyboard_arrow_down_rounded,
+                                  //         size: 14,
+                                  //         color: context.textSecondary,
+                                  //       ),
+                                  //     ],
+                                  //   ),
+                                  // ),
+                                ],
+                              ),
+                            ),
+
+                            const SizedBox(height: 16),
+
+                            // People List / Empty State
+                            if (networkList.isEmpty)
+                              Padding(
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 40),
+                                child: Center(
+                                  child: Text(
+                                    "No reachable connections found.",
+                                    style: context.bodyText
+                                        .copyWith(color: context.textMuted),
+                                  ),
+                                ),
+                              )
+                            else
+                              Padding(
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 26),
+                                child: Column(
+                                  children: [
+                                    for (var item in networkList)
+                                      _buildConnectionCard(context, item),
+                                    if (networkProvider.isLoadingMore)
+                                      const Padding(
+                                        padding:
+                                            EdgeInsets.symmetric(vertical: 16),
+                                        child: Center(
+                                          child: SizedBox(
+                                            width: 24,
+                                            height: 24,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2.0,
+                                              valueColor:
+                                                  AlwaysStoppedAnimation<Color>(
+                                                      Color(0xFF7C3AED)),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
+
+                            const SizedBox(height: 80),
                           ],
                         ),
                       ),
-                    );
-                  } else if (index == 3) {
-                    // Metrics Row Cards
-                    return Padding(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: AppDimensions.marginStandard,
-                          vertical: 12),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: _buildMetricCard(
-                              title: "Primary",
-                              count: networkProvider.primaryCount.toString(),
-                              ringColor: const Color(0xFF10B981), // Emerald Green
-                              progressValue: 0.75,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: _buildMetricCard(
-                              title: "Secondary",
-                              count: networkProvider.secondaryCount.toString(),
-                              ringColor: const Color(0xFF3B82F6), // Royal Blue
-                              progressValue: 0.6,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: _buildMetricCard(
-                              title: "Tertiary",
-                              count: networkProvider.tertiaryCount.toString(),
-                              ringColor: const Color(0xFF8B5CF6), // Amethyst Purple
-                              progressValue: 0.45,
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  } else if (index == 4) {
-                    // Sorted List Header Row
-                    return Padding(
-                      padding: const EdgeInsets.fromLTRB(
-                          AppDimensions.marginStandard,
-                          12,
-                          AppDimensions.marginStandard,
-                          8),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            "PEOPLE YOU CAN REACH",
-                            style: context.captionText.copyWith(
-                              color: context.textSecondary,
-                              letterSpacing: 1.5,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          GestureDetector(
-                            onTap: () {
-                              HapticFeedback.lightImpact();
-                              final newSort =
-                                  networkProvider.currentSort == "mutual"
-                                      ? "name"
-                                      : "mutual";
-                              if (userId != null) {
-                                networkProvider.setSort(userId, newSort);
-                              }
-                            },
-                            child: Row(
-                              children: [
-                                Text(
-                                  "Sort: ${networkProvider.currentSort == "mutual" ? "Mutual" : "Name"}",
-                                  style: context.captionText.copyWith(
-                                    color: context.textSecondary,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                                const SizedBox(width: 4),
-                                Icon(
-                                  Icons.keyboard_arrow_down_rounded,
-                                  size: 14,
-                                  color: context.textSecondary,
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  }
-
-                  // Handle Empty List State
-                  if (networkList.isEmpty) {
-                    return Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 40),
-                      child: Center(
-                        child: Text(
-                          "No reachable connections found.",
-                          style: context.bodyText
-                              .copyWith(color: context.textMuted),
-                        ),
-                      ),
-                    );
-                  }
-
-                  // Handle connection cards
-                  final int connectionIndex = index - 5;
-                  if (connectionIndex >= networkList.length) {
-                    return const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 16),
-                      child: Center(
-                        child: SizedBox(
-                          width: 24,
-                          height: 24,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2.0,
-                            valueColor: AlwaysStoppedAnimation<Color>(
-                                Color(0xFF7C3AED)),
-                          ),
-                        ),
-                      ),
-                    );
-                  }
-
-                  final item = networkList[connectionIndex];
-                  return Padding(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: AppDimensions.marginStandard),
-                    child: _buildConnectionCard(context, item),
-                  );
-                },
+                    ),
+                  ],
+                ),
               ),
       ),
     );
@@ -876,8 +909,8 @@ class _YourNetworkPageState extends State<YourNetworkPage> {
                               style: TextStyle(
                                 color: context.textPrimary,
                                 fontWeight: FontWeight.bold,
-                                  fontSize: 16,
-                                  fontFamily: 'Outfit',
+                                fontSize: 16,
+                                fontFamily: 'Outfit',
                               ),
                             ),
                           ),
@@ -975,8 +1008,8 @@ class _YourNetworkPageState extends State<YourNetworkPage> {
                                   shape: BoxShape.circle,
                                   color: context.surfaceSecondary,
                                   border: Border.all(
-                                    color: const Color(
-                                        0xFF1E2025), // Background color separation border
+                                    color: context
+                                        .surfacePrimary, // Background color separation border
                                     width: 1.5,
                                   ),
                                 ),
@@ -1318,8 +1351,9 @@ class _ReferBottomSheetState extends State<_ReferBottomSheet> {
                                     ? Image.network(
                                         avatar,
                                         fit: BoxFit.cover,
-                                        errorBuilder: (context, error, stackTrace) =>
-                                            Center(
+                                        errorBuilder:
+                                            (context, error, stackTrace) =>
+                                                Center(
                                           child: Text(
                                             _getInitials(name),
                                             style: TextStyle(

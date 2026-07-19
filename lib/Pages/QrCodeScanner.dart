@@ -251,8 +251,8 @@ class _QRScannerPageState extends State<QRScannerPage> {
               });
               if (mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                      content: Text("Failed to join tribe: $e"),
+                  const SnackBar(
+                      content: Text("The Mafia key is invalid or does not exist."),
                       backgroundColor: Colors.redAccent),
                 );
               }
@@ -505,7 +505,7 @@ class _ProfileCardState extends State<ProfileCard> {
     } catch (e) {
       navigator.pop(); // Dismiss progress dialog
       messenger.showSnackBar(
-        SnackBar(content: Text("Error saving connection: $e")),
+        const SnackBar(content: Text("Could not connect with this user. Please try again.")),
       );
     }
   }

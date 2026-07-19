@@ -27,8 +27,9 @@ class _NotificationPageState extends State<NotificationPage> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
-        Provider.of<NotificationProvider>(context, listen: false)
-            .fetchNotifications();
+        final provider = Provider.of<NotificationProvider>(context, listen: false);
+        provider.subscribeToNotifications();
+        provider.fetchNotifications();
       }
     });
   }
@@ -264,7 +265,8 @@ class _NotificationPageState extends State<NotificationPage> {
         type == 'tribe_approved' ||
         type == 'tribe_request_approved' ||
         type == 'tribe_request_declined' ||
-        type == 'tribe_invite_declined') {
+        type == 'tribe_invite_declined' ||
+        type == 'tribe_removed') {
       return _buildTribeNotificationItem(notification, provider);
     }
     final otherUser = notification['other_user'] as Map<String, dynamic>? ?? {};
@@ -743,7 +745,7 @@ class _NotificationPageState extends State<NotificationPage> {
                                     provider.markAsSeen(notification['id']);
                                   }).catchError((err) {
                                     messenger.showSnackBar(
-                                      SnackBar(content: Text("Error: $err")),
+                                      const SnackBar(content: Text("Could not connect. Please try again.")),
                                     );
                                   });
                                 },
@@ -915,6 +917,9 @@ class _NotificationPageState extends State<NotificationPage> {
     } else if (type == 'tribe_invite_declined') {
       actionText = " declined invite to ";
       actionIcon = Icons.cancel_rounded;
+    } else if (type == 'tribe_removed') {
+      actionText = " removed you from ";
+      actionIcon = Icons.remove_circle_rounded;
     } else {
       actionText = " approved your request to join ";
       actionIcon = Icons.check_circle_rounded;
@@ -924,7 +929,8 @@ class _NotificationPageState extends State<NotificationPage> {
     final bool isActioned = type == 'tribe_request_approved' ||
         type == 'tribe_request_declined' ||
         type == 'tribe_invite_declined' ||
-        type == 'tribe_approved';
+        type == 'tribe_approved' ||
+        type == 'tribe_removed';
 
     return Dismissible(
       key: Key(notification['id'].toString()),
@@ -1090,9 +1096,9 @@ class _NotificationPageState extends State<NotificationPage> {
                                       if (mounted) {
                                         ScaffoldMessenger.of(context)
                                             .showSnackBar(
-                                          SnackBar(
+                                          const SnackBar(
                                               content: Text(
-                                                  "Action failed: $e")),
+                                                  "Could not approve request. Please try again.")),
                                         );
                                       }
                                     }
@@ -1145,9 +1151,9 @@ class _NotificationPageState extends State<NotificationPage> {
                                     if (mounted) {
                                       ScaffoldMessenger.of(context)
                                           .showSnackBar(
-                                        SnackBar(
+                                        const SnackBar(
                                             content: Text(
-                                                "Decline failed: $e")),
+                                                "Could not decline request. Please try again.")),
                                       );
                                     }
                                   }
@@ -1172,7 +1178,9 @@ class _NotificationPageState extends State<NotificationPage> {
                               ? "Approved"
                               : type == 'tribe_approved'
                                   ? "Joined"
-                                  : "Declined",
+                                  : type == 'tribe_removed'
+                                      ? "Removed"
+                                      : "Declined",
                           style: TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.w600,
@@ -1615,7 +1623,7 @@ class _NotificationPageState extends State<NotificationPage> {
                                                   );
                                                 }).catchError((err) {
                                                   ScaffoldMessenger.of(context).showSnackBar(
-                                                    SnackBar(content: Text("Error: $err")),
+                                                    const SnackBar(content: Text("Could not send introduction. Please try again.")),
                                                   );
                                                 });
                                               }
@@ -1697,8 +1705,8 @@ class _NotificationPageState extends State<NotificationPage> {
                                           }).catchError((err) {
                                             ScaffoldMessenger.of(context)
                                                 .showSnackBar(
-                                              SnackBar(
-                                                  content: Text("Error: $err")),
+                                              const SnackBar(
+                                                  content: Text("Could not connect. Please try again.")),
                                             );
                                           });
                                         },

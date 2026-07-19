@@ -581,7 +581,7 @@ class _TribeRoleBuilderPageState extends State<TribeRoleBuilderPage> {
                                 if (context.mounted) Navigator.pop(context);
                               } catch (e) {
                                 ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text("Failed to save: $e")),
+                                  const SnackBar(content: Text("Could not save role. Please try again.")),
                                 );
                               }
                             },
@@ -769,9 +769,9 @@ class _TribeRoleBuilderPageState extends State<TribeRoleBuilderPage> {
                                     } catch (e) {
                                       ScaffoldMessenger.of(context)
                                           .showSnackBar(
-                                        SnackBar(
+                                        const SnackBar(
                                             content: Text(
-                                                "Failed to delete role: $e")),
+                                                "Could not delete role. Please try again.")),
                                       );
                                     }
                                   },

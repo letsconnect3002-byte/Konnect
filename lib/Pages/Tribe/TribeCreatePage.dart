@@ -96,7 +96,7 @@ class _TribeCreatePageState extends State<TribeCreatePage> {
           _isUploadingImage = false;
         });
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Upload failed: $e")),
+          const SnackBar(content: Text("Could not upload image. Please try again.")),
         );
       }
     }
@@ -143,7 +143,7 @@ class _TribeCreatePageState extends State<TribeCreatePage> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Error creating Mafia: $e")),
+          const SnackBar(content: Text("Could not create Mafia. Please check your entries and try again.")),
         );
       }
     } finally {

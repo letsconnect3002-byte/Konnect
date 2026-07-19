@@ -160,7 +160,7 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
                       } catch (e) {
                         if (!mounted) return;
                         scaffoldMessenger.showSnackBar(
-                          SnackBar(content: Text("Error unblocking user: $e")),
+                          const SnackBar(content: Text("Could not unblock user. Please try again.")),
                         );
                       }
                     },
@@ -186,7 +186,7 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
                       } catch (e) {
                         if (!mounted) return;
                         scaffoldMessenger.showSnackBar(
-                          SnackBar(content: Text("Error blocking user: $e")),
+                          const SnackBar(content: Text("Could not block user. Please try again.")),
                         );
                       }
                     },
@@ -211,7 +211,7 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
                 } catch (e) {
                   if (!mounted) return;
                   scaffoldMessenger.showSnackBar(
-                    SnackBar(content: Text("Error deleting connection: $e")),
+                    const SnackBar(content: Text("Could not disconnect contact. Please try again.")),
                   );
                 }
               },
@@ -373,8 +373,8 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
                                 isSubmitting = false;
                               });
                               ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text("Failed to report user: $e"),
+                                const SnackBar(
+                                  content: Text("Could not file report. Please check your network and try again."),
                                   backgroundColor: Colors.redAccent,
                                   behavior: SnackBarBehavior.floating,
                                 ),

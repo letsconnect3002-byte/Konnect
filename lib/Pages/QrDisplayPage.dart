@@ -211,11 +211,11 @@ class _QrDisplayPageState extends State<QrDisplayPage> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               if (hasError)
-                Padding(
-                  padding: const EdgeInsets.all(16.0),
+                const Padding(
+                  padding: EdgeInsets.all(16.0),
                   child: Text(
-                    'Error generating QR code: $errorMessage',
-                    style: const TextStyle(color: Colors.redAccent),
+                    "Could not generate QR code. Please try again.",
+                    style: TextStyle(color: Colors.redAccent),
                   ),
                 )
               else

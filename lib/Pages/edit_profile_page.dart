@@ -220,8 +220,8 @@ class _EditProfilePageState extends State<EditProfilePage> {
       print("Error saving profile: $e");
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text("Error saving profile: $e"),
+          const SnackBar(
+            content: Text("Could not save profile changes. Please try again."),
             backgroundColor: Colors.redAccent,
           ),
         );

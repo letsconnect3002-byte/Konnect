@@ -195,8 +195,8 @@ class _TribeDetailsPageState extends State<TribeDetailsPage> {
                               );
                             } catch (e) {
                               ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                    content: Text("Failed to invite: $e"),
+                                const SnackBar(
+                                    content: Text("Could not send invitation. Please verify the username and try again."),
                                     backgroundColor: Colors.redAccent),
                               );
                             }
@@ -381,9 +381,9 @@ class _TribeDetailsPageState extends State<TribeDetailsPage> {
                                     } catch (e) {
                                       ScaffoldMessenger.of(context)
                                           .showSnackBar(
-                                        SnackBar(
+                                        const SnackBar(
                                             content:
-                                                Text("Failed to approve: $e")),
+                                                Text("Could not approve request. Please try again.")),
                                       );
                                     }
                                   },
@@ -404,9 +404,9 @@ class _TribeDetailsPageState extends State<TribeDetailsPage> {
                                     } catch (e) {
                                       ScaffoldMessenger.of(context)
                                           .showSnackBar(
-                                        SnackBar(
+                                        const SnackBar(
                                             content:
-                                                Text("Failed to decline: $e")),
+                                                Text("Could not decline request. Please try again.")),
                                       );
                                     }
                                   },
@@ -481,8 +481,8 @@ class _TribeDetailsPageState extends State<TribeDetailsPage> {
                               navigator.pop();
                             } catch (e) {
                               ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                    content: Text("Failed to change role: $e")),
+                                const SnackBar(
+                                    content: Text("Could not change member role. Please try again.")),
                               );
                             }
                           },
@@ -656,7 +656,7 @@ class _TribeDetailsPageState extends State<TribeDetailsPage> {
         nav.pop(); // Pop chat
       } catch (e) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Failed to leave: $e")),
+          const SnackBar(content: Text("Could not leave Mafia. Please try again.")),
         );
       }
     }
@@ -721,7 +721,7 @@ class _TribeDetailsPageState extends State<TribeDetailsPage> {
         nav.pop(); // Pop chat
       } catch (e) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Failed to delete: $e")),
+          const SnackBar(content: Text("Could not delete Mafia. Please try again.")),
         );
       }
     }
@@ -759,7 +759,7 @@ class _TribeDetailsPageState extends State<TribeDetailsPage> {
         _isLoading = false;
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Error updating mafia: $e")),
+        const SnackBar(content: Text("Could not save changes. Please try again.")),
       );
     }
   }
@@ -1498,9 +1498,9 @@ class _TribeDetailsPageState extends State<TribeDetailsPage> {
                                                       ScaffoldMessenger.of(
                                                               context)
                                                           .showSnackBar(
-                                                        SnackBar(
+                                                        const SnackBar(
                                                             content: Text(
-                                                                "Failed to remove member: $e")),
+                                                                "Could not remove member. Please try again.")),
                                                       );
                                                     }
                                                   }

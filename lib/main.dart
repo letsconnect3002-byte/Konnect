@@ -30,6 +30,8 @@ import 'package:connect/Providers/plans_provider.dart';
 import 'package:connect/Repositories/plans_repository.dart';
 import 'package:connect/Providers/network_provider.dart';
 import 'package:connect/Repositories/network_repository.dart';
+import 'package:connect/Repositories/pulse_repository.dart';
+import 'package:connect/Providers/pulse_provider.dart';
 import 'package:timezone/data/latest.dart' as tz_latest;
 import 'package:timezone/timezone.dart' as tz;
 import 'package:audio_session/audio_session.dart' as session;
@@ -248,6 +250,8 @@ Future<void> showConnectionLocalNotification({
       type == 'plan_reminder_start';
   final bool isTribeInvite = type == 'tribe_invite';
   final bool isTribeRequest = type == 'tribe_request';
+  final bool isInformational =
+      type == 'tribe_removed' || type == 'tribe_approved';
 
   if (isTribeInvite) {
     androidActions = [
@@ -290,7 +294,7 @@ Future<void> showConnectionLocalNotification({
       ),
     ];
     iosCategory = 'plan_invite_category';
-  } else if (isConnectionConfirmation || isPlanNotif) {
+  } else if (isConnectionConfirmation || isPlanNotif || isInformational) {
     androidActions = [];
     iosCategory = 'default_category';
   } else if (isReferralRequest) {
@@ -1666,7 +1670,8 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
               type == "tribe_invite" ||
               type == "tribe_request" ||
               type == "tribe_approved" ||
-              type == "tribe_message") {
+              type == "tribe_message" ||
+              type == "tribe_removed") {
             String planId = note ?? '';
             List<String> changedFields = [];
             if (note != null && note.startsWith('{')) {
@@ -1800,6 +1805,16 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
               }
               title = "New Message in $tribeName";
               body = "$actorName: $message";
+            } else if (type == "tribe_removed") {
+              String tribeName = "a Mafia";
+              if (note != null && note.startsWith('{')) {
+                try {
+                  final parsed = jsonDecode(note);
+                  tribeName = parsed['tribe_name']?.toString() ?? "a Mafia";
+                } catch (_) {}
+              }
+              title = "Removed from Mafia";
+              body = "You were removed from \"$tribeName\"";
             }
           } else {
             title = "New Connection";
@@ -2043,6 +2058,18 @@ class MyApp extends StatelessWidget {
           update: (_, profileProvider, tribeProvider) {
             tribeProvider!.updateUserId(profileProvider.userId);
             return tribeProvider;
+          },
+        ),
+        ChangeNotifierProxyProvider2<ProfileProvider, ConnectionProvider, PulseProvider>(
+          create: (_) => PulseProvider(
+            pulseRepository: SupabasePulseRepository(),
+          ),
+          update: (_, profileProvider, connectionProvider, pulseProvider) {
+            pulseProvider!.updateFromProviders(
+              profileProvider.userId,
+              connectionProvider.connections,
+            );
+            return pulseProvider;
           },
         ),
       ],
@@ -2569,7 +2596,8 @@ class _AppShellGateState extends State<AppShellGate> {
                       type == "tribe_invite" ||
                       type == "tribe_request" ||
                       type == "tribe_approved" ||
-                      type == "tribe_message") {
+                      type == "tribe_message" ||
+                      type == "tribe_removed") {
                     String planId = note ?? '';
                     List<String> changedFields = [];
                     if (note != null && note.startsWith('{')) {
@@ -2691,6 +2719,17 @@ class _AppShellGateState extends State<AppShellGate> {
                       }
                       title = "New Message in $tribeName";
                       body = "$actorName: $message";
+                    } else if (type == "tribe_removed") {
+                      String tribeName = "a Mafia";
+                      if (note != null && note.startsWith('{')) {
+                        try {
+                          final parsed = jsonDecode(note);
+                          tribeName =
+                              parsed['tribe_name']?.toString() ?? "a Mafia";
+                        } catch (_) {}
+                      }
+                      title = "Removed from Mafia";
+                      body = "You were removed from \"$tribeName\"";
                     } else if (type == "tribe_request") {
                       String tribeName = "a Mafia";
                       if (note != null && note.startsWith('{')) {

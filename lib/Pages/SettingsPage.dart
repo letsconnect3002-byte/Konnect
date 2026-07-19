@@ -205,8 +205,8 @@ class _SettingsPageState extends State<SettingsPage> {
         } catch (e) {
           setState(() => _isDeleting = false);
           messenger.showSnackBar(
-            SnackBar(
-              content: Text("Error deleting account: $e"),
+            const SnackBar(
+              content: Text("Could not delete account. Please try again or contact support."),
               backgroundColor: Colors.red,
               behavior: SnackBarBehavior.floating,
             ),

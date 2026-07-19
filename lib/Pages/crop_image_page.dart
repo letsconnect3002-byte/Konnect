@@ -69,8 +69,8 @@ class _CropImagePageState extends State<CropImagePage> {
       debugPrint("Error decoding image: $e");
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text("Error loading image: $e"),
+          const SnackBar(
+            content: Text("Could not load image. Please select another photo."),
             backgroundColor: Colors.redAccent,
           ),
         );
@@ -137,8 +137,8 @@ class _CropImagePageState extends State<CropImagePage> {
       debugPrint("Error cropping image: $e");
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text("Cropping failed: $e"),
+          const SnackBar(
+            content: Text("Failed to crop image. Please try again."),
             backgroundColor: Colors.redAccent,
           ),
         );

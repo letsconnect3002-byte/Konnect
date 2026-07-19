@@ -165,8 +165,8 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
     } catch (e) {
       debugPrint("Error finishing onboarding: $e");
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-            content: Text("Error completing onboarding: $e"),
+        const SnackBar(
+            content: Text("Could not complete profile setup. Please try again."),
             backgroundColor: Colors.red),
       );
     } finally {

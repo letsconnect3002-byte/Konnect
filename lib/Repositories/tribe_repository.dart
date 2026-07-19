@@ -60,6 +60,8 @@ abstract class TribeRepository {
       String tribeId, void Function(dynamic payload) callback);
   RealtimeChannel subscribeToTribeActivity(
       String tribeId, void Function(dynamic payload) callback);
+  RealtimeChannel subscribeToUserMemberships(
+      int userId, void Function(dynamic payload) callback);
   void removeChannel(RealtimeChannel channel);
 }
 
@@ -385,21 +387,45 @@ class SupabaseTribeRepository implements TribeRepository {
   @override
   RealtimeChannel subscribeToTribeActivity(
       String tribeId, void Function(dynamic payload) callback) {
-    final channel =
-        _client.channel('public:tribe_activity_$tribeId').onPostgresChanges(
-              event: PostgresChangeEvent.all,
-              schema: 'public',
-              table: 'tribe_activity_log',
-              filter: PostgresChangeFilter(
-                type: PostgresChangeFilterType.eq,
-                column: 'tribe_id',
-                value: tribeId,
-              ),
-              callback: callback,
-            );
+    final channel = _client
+        .channel('public:tribe_activity_log_tribe_$tribeId')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'tribe_activity_log',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'tribe_id',
+            value: tribeId,
+          ),
+          callback: callback,
+        );
     channel.subscribe((status, [error]) {
       print(
-          "Realtime tribe_activity subscription status: $status, error: $error");
+          "Realtime tribe activity subscription status for tribe $tribeId: $status, error: $error");
+    });
+    return channel;
+  }
+
+  @override
+  RealtimeChannel subscribeToUserMemberships(
+      int userId, void Function(dynamic payload) callback) {
+    final channel = _client
+        .channel('public:tribe_members_user_$userId')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'tribe_members',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'user_id',
+            value: userId.toString(),
+          ),
+          callback: callback,
+        );
+    channel.subscribe((status, [error]) {
+      print(
+          "Realtime user memberships subscription status for user $userId: $status, error: $error");
     });
     return channel;
   }

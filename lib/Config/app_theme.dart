@@ -401,19 +401,22 @@ class GlassmorphicContainer extends StatelessWidget {
 /// A reusable flexible space background widget designed for AppBars
 /// to render a frosted glass background beneath scrolling content.
 class GlassmorphicFlexibleSpace extends StatelessWidget {
-  const GlassmorphicFlexibleSpace({super.key});
+  final bool showBorder;
+  const GlassmorphicFlexibleSpace({super.key, this.showBorder = true});
 
   @override
   Widget build(BuildContext context) {
-    return const GlassmorphicContainer(
+    return GlassmorphicContainer(
       borderRadius: BorderRadius.zero,
-      border: Border(
-        bottom: BorderSide(
-          color: Colors.white10,
-          width: 0.5,
-        ),
-      ),
-      child: SizedBox.expand(),
+      border: showBorder
+          ? const Border(
+              bottom: BorderSide(
+                color: Colors.white10,
+                width: 0.5,
+              ),
+            )
+          : null,
+      child: const SizedBox.expand(),
     );
   }
 }

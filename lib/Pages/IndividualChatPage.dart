@@ -1590,8 +1590,8 @@ class _IndividualChatPageState extends State<IndividualChatPage>
                                 isSubmitting = false;
                               });
                               ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text("Failed to report message: $e"),
+                                const SnackBar(
+                                  content: Text("Could not report message. Please try again."),
                                   backgroundColor: Colors.redAccent,
                                   behavior: SnackBarBehavior.floating,
                                 ),

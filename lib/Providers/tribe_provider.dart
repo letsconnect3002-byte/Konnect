@@ -48,6 +48,7 @@ class TribeProvider with ChangeNotifier {
   final Map<String, RealtimeChannel> _messagesSubscriptions = {};
   final Map<String, RealtimeChannel> _membersSubscriptions = {};
   final Map<String, RealtimeChannel> _activitySubscriptions = {};
+  RealtimeChannel? _membershipsSubscription;
 
   // Blocked-user cache (populated once, updated on block)
   Set<int> _blockedUserIds = {};
@@ -101,8 +102,10 @@ class TribeProvider with ChangeNotifier {
     if (_userId != newUserId) {
       _userId = newUserId;
       if (_userId != null) {
+        subscribeToUserMemberships();
         fetchMyTribes(silent: true);
       } else {
+        unsubscribeFromUserMemberships();
         _unsubscribeAll();
         _myTribes.clear();
         _tribeMembers.clear();
@@ -237,7 +240,29 @@ class TribeProvider with ChangeNotifier {
     if (actSub != null) _repository.removeChannel(actSub);
   }
 
+  void subscribeToUserMemberships() {
+    final myUserId = _userId;
+    if (myUserId == null) return;
+    unsubscribeFromUserMemberships();
+
+    _membershipsSubscription = _repository.subscribeToUserMemberships(
+      myUserId,
+      (payload) async {
+        print("Realtime connection memberships change: ${payload.toString()}");
+        await fetchMyTribes(silent: true);
+      },
+    );
+  }
+
+  void unsubscribeFromUserMemberships() {
+    if (_membershipsSubscription != null) {
+      _repository.removeChannel(_membershipsSubscription!);
+      _membershipsSubscription = null;
+    }
+  }
+
   void _unsubscribeAll() {
+    unsubscribeFromUserMemberships();
     final tribeIds = _messagesSubscriptions.keys.toList();
     for (final id in tribeIds) {
       unsubscribeFromTribeRealtime(id);
@@ -760,6 +785,7 @@ class TribeProvider with ChangeNotifier {
     }
 
     try {
+      final tribe = await _repository.getTribeById(tribeId);
       final nowStr = DateTime.now().toUtc().toIso8601String();
       final updates = {
         'status': 'removed',
@@ -786,6 +812,20 @@ class TribeProvider with ChangeNotifier {
 
       await _repository.updateTribeMemberStatus(
           tribeId, memberUserId, updates, activityLog);
+
+      if (tribe != null) {
+        await _notificationRepository.insertNotification(
+          userId: memberUserId,
+          otherUserId: myUserId,
+          type: 'referral',
+          note: jsonEncode({
+            'tribe_id': tribeId,
+            'tribe_name': tribe['name'],
+            'real_type': 'tribe_removed',
+          }),
+        );
+      }
+
       await fetchTribeDetails(tribeId);
     } catch (e) {
       print("Error removing member: $e");
