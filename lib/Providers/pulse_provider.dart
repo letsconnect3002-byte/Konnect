@@ -32,7 +32,8 @@ class PulseProvider with ChangeNotifier {
       );
       if (conn.isEmpty) return false;
 
-      final sharedCard = (conn['shared_card'] ?? 'both').toString().toLowerCase();
+      final sharedCard =
+          (conn['shared_card'] ?? 'both').toString().toLowerCase();
       final visibility = pulse.visibility.toLowerCase();
 
       if (visibility == 'both') return true;
@@ -61,7 +62,8 @@ class PulseProvider with ChangeNotifier {
   RealtimeChannel? _pulsesSubscription;
   RealtimeChannel? _updatesSubscription;
 
-  void updateFromProviders(int? myUserId, List<Map<String, dynamic>> connections) {
+  void updateFromProviders(
+      int? myUserId, List<Map<String, dynamic>> connections) {
     _connections = connections;
     final newConnectionIds = connections.map((c) => c['id'] as int).toList();
     bool shouldReload = false;
@@ -108,7 +110,8 @@ class PulseProvider with ChangeNotifier {
         schema: 'public',
         table: 'user_pulses',
         callback: (payload) async {
-          debugPrint("[PulseProvider] Realtime user_pulses change: ${payload.eventType}");
+          debugPrint(
+              "[PulseProvider] Realtime user_pulses change: ${payload.eventType}");
           // 500ms delay ensures pulse_hidden_users writes complete before we fetch feed
           await Future.delayed(const Duration(milliseconds: 500));
           _refreshFeedAndMyPulseSilent();
@@ -122,7 +125,8 @@ class PulseProvider with ChangeNotifier {
         schema: 'public',
         table: 'pulse_updates',
         callback: (payload) {
-          debugPrint("[PulseProvider] Realtime pulse_updates change: ${payload.eventType}");
+          debugPrint(
+              "[PulseProvider] Realtime pulse_updates change: ${payload.eventType}");
           final record = payload.newRecord;
           if (record.containsKey('pulse_id') && record['pulse_id'] != null) {
             final pulseId = record['pulse_id'] as String;
@@ -179,7 +183,8 @@ class PulseProvider with ChangeNotifier {
     notifyListeners();
 
     try {
-      _connectionPulses = await _pulseRepository.fetchActivePulsesForConnections(userId, _connectionIds);
+      _connectionPulses = await _pulseRepository
+          .fetchActivePulsesForConnections(userId, _connectionIds);
     } catch (e) {
       debugPrint("[PulseProvider] Error fetching connections pulse feed: $e");
     } finally {
@@ -193,7 +198,8 @@ class PulseProvider with ChangeNotifier {
     if (userId == null) return;
     try {
       final myPulseFuture = _pulseRepository.fetchUserPulse(userId);
-      final feedFuture = _pulseRepository.fetchActivePulsesForConnections(userId, _connectionIds);
+      final feedFuture = _pulseRepository.fetchActivePulsesForConnections(
+          userId, _connectionIds);
       final results = await Future.wait([myPulseFuture, feedFuture]);
       _myPulse = results[0] as UserPulse?;
       _connectionPulses = results[1] as List<UserPulse>;

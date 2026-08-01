@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:connect/main.dart';
 
 sealed class ChatState {}
 
@@ -576,8 +577,28 @@ class ChatProvider with ChangeNotifier {
           _playReceiveSound();
           await refreshActiveRoomMessages();
         } else {
-          debugPrint("[ChatProvider] Receiver is in the messaging hub. Notifying listeners to trigger list sorting...");
+          debugPrint("[ChatProvider] Receiver is on another page. Triggering in-app notification banner...");
+          _playReceiveSound();
           notifyListeners();
+
+          final senderConnection = _externalConnections.firstWhere(
+            (c) => c['id'] == senderId,
+            orElse: () => <String, dynamic>{},
+          );
+          final senderName =
+              senderConnection['name']?.toString() ?? 'New Message';
+          final senderAvatar = senderConnection['avatarUrl']?.toString() ??
+              senderConnection['avatar_url']?.toString() ??
+              '';
+
+          showInAppMessageBanner(
+            messageId: msgId,
+            roomId: rId,
+            senderId: senderId,
+            senderName: senderName,
+            avatarUrl: senderAvatar,
+            message: payloadText,
+          );
         }
         await updateUnreadCount();
       },
@@ -611,11 +632,15 @@ class ChatProvider with ChangeNotifier {
         if (messageId != null) {
           final localMsg = await _repository.getMessageByIdLocally(messageId);
           if (localMsg != null) {
-            final localStatus = localMsg['status'] as String?;
-            if (localStatus != 'read') {
-              await _repository.deleteMessageLocally(messageId);
-            } else {
+            final senderId = localMsg['sender_id'] as int?;
+            if (senderId == _userId) {
+              // Outgoing message sent by me: deletion from Supabase store-and-forward means recipient read it!
               await _repository.updateMessageStatusLocally(messageId, 'read');
+            } else {
+              final localStatus = localMsg['status'] as String?;
+              if (localStatus != 'read') {
+                await _repository.deleteMessageLocally(messageId);
+              }
             }
           }
 
@@ -697,6 +722,7 @@ class ChatProvider with ChangeNotifier {
       await _repository.updateMessageStatusInSupabase(
         messageId,
         isActiveInChat ? 'read' : 'delivered',
+        receiverAcked: true,
       );
     } catch (e) {
       print("Error acknowledging delivery: $e");
@@ -969,8 +995,11 @@ class ChatProvider with ChangeNotifier {
 
       for (final msg in deliveredMsgs) {
         final msgId = msg['id'] as String;
-        await acknowledgeDelivery(msgId, isActiveInChat: true);
-        await _repository.updateMessageStatusLocally(msgId, 'read');
+        final localMsg = await _repository.getMessageByIdLocally(msgId);
+        if (localMsg != null) {
+          await acknowledgeDelivery(msgId, isActiveInChat: true);
+          await _repository.updateMessageStatusLocally(msgId, 'read');
+        }
       }
 
       await refreshActiveRoomMessages();

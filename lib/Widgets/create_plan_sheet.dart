@@ -38,9 +38,42 @@ class _CreatePlanSheetState extends State<CreatePlanSheet> {
   @override
   void initState() {
     super.initState();
+    _titleController.addListener(_onFormChanged);
+    _customCategoryController.addListener(_onFormChanged);
     if (_isEditing) {
       _populateFromExisting();
     }
+  }
+
+  void _onFormChanged() {
+    if (mounted) setState(() {});
+  }
+
+  String? _getValidationError() {
+    final title = _titleController.text.trim();
+    if (title.isEmpty) {
+      return "Enter a title for your plan";
+    }
+
+    if (_selectedCategory == 'other') {
+      final customCat = _customCategoryController.text.trim();
+      if (customCat.isEmpty) {
+        return "Specify a custom category name";
+      }
+    }
+
+    if (_hasEndTime) {
+      if (_endTime == null) {
+        return "Select an end time for your plan";
+      }
+      final startsAt = _combineDateAndTime(_startDate, _startTime);
+      final endsAt = _combineDateAndTime(_endDate ?? _startDate, _endTime!);
+      if (!endsAt.isAfter(startsAt)) {
+        return "End time must be after start time";
+      }
+    }
+
+    return null;
   }
 
   void _populateFromExisting() {
@@ -87,6 +120,8 @@ class _CreatePlanSheetState extends State<CreatePlanSheet> {
 
   @override
   void dispose() {
+    _titleController.removeListener(_onFormChanged);
+    _customCategoryController.removeListener(_onFormChanged);
     _titleController.dispose();
     _descriptionController.dispose();
     _locationController.dispose();
@@ -152,16 +187,20 @@ class _CreatePlanSheetState extends State<CreatePlanSheet> {
   }
 
   Future<void> _save() async {
-    final title = _titleController.text.trim();
-    if (title.isEmpty) {
+    final validationError = _getValidationError();
+    if (validationError != null) {
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Please enter a title', style: AppTypography.bodyText),
-          backgroundColor: AppColors.surfacePrimary,
+          content: Text(validationError, style: AppTypography.bodyText),
+          backgroundColor: AppColors.surfaceSecondary,
+          behavior: SnackBarBehavior.floating,
         ),
       );
       return;
     }
+
+    final title = _titleController.text.trim();
 
     String categoryToSend = _selectedCategory;
     if (_selectedCategory == 'other') {
@@ -515,32 +554,108 @@ class _CreatePlanSheetState extends State<CreatePlanSheet> {
 
                   const SizedBox(height: 24),
 
-                  // Submit button
-                  GestureDetector(
-                    onTap: _saving ? null : _save,
-                    child: Container(
-                      width: double.infinity,
-                      height: 48,
-                      decoration: BoxDecoration(
-                        color: AppColors.accentPrimary,
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      child: Center(
-                        child: _saving
-                            ? const SizedBox(
-                                width: 22,
-                                height: 22,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.white,
+                  // Submit button & validation feedback
+                  Builder(
+                    builder: (context) {
+                      final validationError = _getValidationError();
+                      final isValid = validationError == null;
+
+                      return Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (!isValid && !_saving) ...[
+                            AnimatedContainer(
+                              duration: const Duration(milliseconds: 180),
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+                              decoration: BoxDecoration(
+                                color: AppColors.accentPrimary.withValues(alpha: 0.08),
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(
+                                  color: AppColors.accentPrimary.withValues(alpha: 0.25),
                                 ),
-                              )
-                            : Text(
-                                _isEditing ? 'Save Changes' : 'Create Plan',
-                                style: AppTypography.cardTitle,
                               ),
-                      ),
-                    ),
+                              child: Row(
+                                children: [
+                                  const Icon(
+                                    Icons.info_outline_rounded,
+                                    size: 16,
+                                    color: AppColors.accentPrimary,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      validationError,
+                                      style: AppTypography.captionText.copyWith(
+                                        color: AppColors.accentPrimary,
+                                        fontSize: 12.5,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                          ],
+                          GestureDetector(
+                            onTap: (_saving || !isValid)
+                                ? () {
+                                    if (!isValid) {
+                                      HapticFeedback.lightImpact();
+                                      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: Text(
+                                            validationError,
+                                            style: AppTypography.bodyText.copyWith(color: Colors.white),
+                                          ),
+                                          backgroundColor: AppColors.surfaceSecondary,
+                                          behavior: SnackBarBehavior.floating,
+                                          duration: const Duration(seconds: 2),
+                                        ),
+                                      );
+                                    }
+                                  }
+                                : _save,
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 200),
+                              width: double.infinity,
+                              height: 48,
+                              decoration: BoxDecoration(
+                                color: isValid
+                                    ? AppColors.accentPrimary
+                                    : AppColors.surfaceSecondary,
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(
+                                  color: isValid
+                                      ? AppColors.accentPrimary
+                                      : AppColors.borderMuted,
+                                ),
+                              ),
+                              child: Center(
+                                child: _saving
+                                    ? const SizedBox(
+                                        width: 22,
+                                        height: 22,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          color: Colors.white,
+                                        ),
+                                      )
+                                    : Text(
+                                        _isEditing ? 'Save Changes' : 'Create Plan',
+                                        style: AppTypography.cardTitle.copyWith(
+                                          color: isValid
+                                              ? Colors.white
+                                              : AppColors.textMuted,
+                                        ),
+                                      ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      );
+                    },
                   ),
                 ],
               ),

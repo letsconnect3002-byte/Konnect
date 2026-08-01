@@ -4,18 +4,21 @@ import 'package:provider/provider.dart';
 import 'package:connect/Config/app_theme.dart';
 import 'package:connect/Providers/pulse_provider.dart';
 import 'package:connect/Providers/connection_provider.dart';
+import 'package:connect/Providers/profile_provider.dart';
 import 'package:connect/Models/pulse.dart';
 import 'package:connect/Widgets/pulse_user_picker.dart';
 import 'package:connect/Utils/error_handler.dart';
 
-class CreatePulseSheet extends StatefulWidget {
-  const CreatePulseSheet({super.key});
+class CreatePulsePage extends StatefulWidget {
+  const CreatePulsePage({super.key});
 
   @override
-  State<CreatePulseSheet> createState() => _CreatePulseSheetState();
+  State<CreatePulsePage> createState() => _CreatePulsePageState();
 }
 
-class _CreatePulseSheetState extends State<CreatePulseSheet> with SingleTickerProviderStateMixin {
+typedef CreatePulseSheet = CreatePulsePage;
+
+class _CreatePulsePageState extends State<CreatePulsePage> with SingleTickerProviderStateMixin {
   String _selectedType = 'status'; // 'status' or 'ask'
   PulseTag? _selectedTag;
   final TextEditingController _textController = TextEditingController();
@@ -27,6 +30,7 @@ class _CreatePulseSheetState extends State<CreatePulseSheet> with SingleTickerPr
   @override
   void initState() {
     super.initState();
+    _textController.addListener(_onTextChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       final pulseProvider = Provider.of<PulseProvider>(context, listen: false);
@@ -54,8 +58,13 @@ class _CreatePulseSheetState extends State<CreatePulseSheet> with SingleTickerPr
     });
   }
 
+  void _onTextChanged() {
+    if (mounted) setState(() {});
+  }
+
   @override
   void dispose() {
+    _textController.removeListener(_onTextChanged);
     _textController.dispose();
     super.dispose();
   }
@@ -64,6 +73,7 @@ class _CreatePulseSheetState extends State<CreatePulseSheet> with SingleTickerPr
   Widget build(BuildContext context) {
     final pulseProvider = Provider.of<PulseProvider>(context);
     final connectionProvider = Provider.of<ConnectionProvider>(context);
+    final profileProvider = Provider.of<ProfileProvider>(context);
     final allTags = pulseProvider.tags;
     
     // Filter tags by selected type
@@ -79,67 +89,35 @@ class _CreatePulseSheetState extends State<CreatePulseSheet> with SingleTickerPr
       durations.sort();
     }
 
-    return DraggableScrollableSheet(
-      initialChildSize: 0.85,
-      minChildSize: 0.5,
-      maxChildSize: 0.95,
-      builder: (context, scrollController) {
-        return Container(
-          decoration: BoxDecoration(
-            color: context.surfacePrimary,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
-            border: Border.all(color: context.surfaceSecondary, width: 1.5),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.4),
-                blurRadius: 20,
-                offset: const Offset(0, -5),
-              ),
-            ],
+    return Scaffold(
+      backgroundColor: context.canvasBackground,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        automaticallyImplyLeading: false,
+        title: Text(
+          "Create Pulse",
+          style: context.displayHeader.copyWith(
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
           ),
-          padding: const EdgeInsets.only(top: 8),
-          child: Column(
-            children: [
-              // Handlebar indicator
-              Center(
-                child: Container(
-                  width: 36,
-                  height: 4.5,
-                  decoration: BoxDecoration(
-                    color: context.textMuted.withValues(alpha: 0.4),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-
-              // Title
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      "Create Pulse",
-                      style: context.displayHeader.copyWith(
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    IconButton(
-                      icon: Icon(Icons.close_rounded, color: context.textSecondary),
-                      onPressed: () => Navigator.pop(context),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 12),
-
-              Expanded(
-                child: ListView(
-                  controller: scrollController,
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-                  children: [
+        ),
+        actions: [
+          IconButton(
+            icon: Icon(Icons.close_rounded, color: context.textPrimary, size: 24),
+            onPressed: () => Navigator.pop(context),
+            tooltip: "Cancel",
+          ),
+          const SizedBox(width: 8),
+        ],
+      ),
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+          children: [
+            // Centered Live Pulse Preview
+            _buildLivePreview(context, profileProvider, pulseProvider),
+            const SizedBox(height: 24),
                     // Segmented Selector for Status / Ask
                     Container(
                       height: 42,
@@ -525,14 +503,203 @@ class _CreatePulseSheetState extends State<CreatePulseSheet> with SingleTickerPr
                       },
                     ),
                     const SizedBox(height: 24),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLivePreview(
+    BuildContext context,
+    ProfileProvider profileProvider,
+    PulseProvider pulseProvider,
+  ) {
+    final avatarUrl = profileProvider.avatarUrl.isNotEmpty
+        ? profileProvider.avatarUrl
+        : (pulseProvider.myPulse?.userAvatarUrl ?? '');
+    final name = profileProvider.name.isNotEmpty
+        ? profileProvider.name
+        : (pulseProvider.myPulse?.userName ?? 'You');
+
+    final String emoji = _getEmojiForIcon(_selectedTag?.icon ?? '');
+    final String tagName = _selectedTag?.name ?? '';
+    final String noteText = _textController.text.trim();
+    final String bubbleContent;
+    if (_selectedTag != null) {
+      if (noteText.isNotEmpty) {
+        bubbleContent = "$emoji $tagName • $noteText";
+      } else {
+        bubbleContent = "$emoji $tagName";
+      }
+    } else {
+      bubbleContent = "+ Add Pulse";
+    }
+
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            margin: const EdgeInsets.only(bottom: 12),
+            decoration: BoxDecoration(
+              color: context.accentSecondary.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: context.accentSecondary.withValues(alpha: 0.25), width: 1),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.remove_red_eye_rounded, size: 12, color: context.accentSecondary),
+                const SizedBox(width: 5),
+                Text(
+                  "LIVE PREVIEW",
+                  style: TextStyle(
+                    color: context.accentSecondary,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 1.1,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          SizedBox(
+            width: 120,
+            child: Column(
+              children: [
+                Stack(
+                  alignment: Alignment.topCenter,
+                  clipBehavior: Clip.none,
+                  children: [
+                    // Avatar Circle
+                    Container(
+                      width: 62,
+                      height: 62,
+                      margin: const EdgeInsets.only(top: 26),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: _selectedTag != null
+                              ? context.accentSecondary
+                              : context.surfaceSecondary,
+                          width: 2.5,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.25),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: ClipOval(
+                        child: avatarUrl.isNotEmpty
+                            ? Image.network(avatarUrl, fit: BoxFit.cover)
+                            : Container(
+                                color: context.surfaceSecondary,
+                                alignment: Alignment.center,
+                                child: Text(
+                                  name.isNotEmpty ? name[0].toUpperCase() : 'Y',
+                                  style: TextStyle(
+                                    color: context.textPrimary,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 22,
+                                  ),
+                                ),
+                              ),
+                      ),
+                    ),
+
+                    // Note Bubble Floating Above
+                    Positioned(
+                      top: 0,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                        constraints: const BoxConstraints(maxWidth: 110),
+                        decoration: BoxDecoration(
+                          color: context.surfaceSecondary.withValues(alpha: 0.95),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(
+                            color: _selectedTag == null
+                                ? Colors.white.withValues(alpha: 0.08)
+                                : context.accentSecondary.withValues(alpha: 0.3),
+                            width: 1.2,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.3),
+                              blurRadius: 8,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: Text(
+                          bubbleContent,
+                          textAlign: TextAlign.center,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: _selectedTag == null ? context.textMuted : Colors.white,
+                            fontSize: 10.5,
+                            fontWeight: _selectedTag == null ? FontWeight.normal : FontWeight.bold,
+                            height: 1.2,
+                          ),
+                        ),
+                      ),
+                    ),
                   ],
                 ),
-              ),
-            ],
+                const SizedBox(height: 8),
+                Text(
+                  "My Pulse",
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: context.textSecondary,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
           ),
-        );
-      },
+        ],
+      ),
     );
+  }
+
+  String _getEmojiForIcon(String iconName) {
+    switch (iconName) {
+      case 'briefcase':
+        return "💼";
+      case 'coffee':
+        return "☕";
+      case 'flight':
+        return "✈️";
+      case 'fitness_center':
+        return "🏋️";
+      case 'school':
+        return "🎓";
+      case 'groups':
+        return "👥";
+      case 'chat':
+        return "💬";
+      case 'person_add':
+        return "🙋";
+      case 'rate_review':
+        return "📝";
+      case 'work':
+        return "💼";
+      case 'help':
+        return "ℹ️";
+      case 'handshake':
+        return "🤝";
+      case 'hub':
+        return "🌐";
+      default:
+        return "✨";
+    }
   }
 
   Widget _buildVisibilityTab(String value, String title) {

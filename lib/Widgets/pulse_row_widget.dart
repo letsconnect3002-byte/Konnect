@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:connect/Config/app_theme.dart';
 import 'package:connect/Models/pulse.dart';
 import 'package:connect/Providers/pulse_provider.dart';
+import 'package:connect/Providers/profile_provider.dart';
 import 'package:connect/Widgets/create_pulse_sheet.dart';
 import 'package:connect/Widgets/view_pulse_sheet.dart';
 
@@ -77,6 +78,14 @@ class PulseRowWidget extends StatelessWidget {
 
   Widget _buildOwnPulseItem(BuildContext context, PulseProvider provider, UserPulse? pulse) {
     final hasPulse = pulse != null && !pulse.isExpired;
+    final profileProvider = Provider.of<ProfileProvider>(context);
+    final avatarUrl = profileProvider.avatarUrl.isNotEmpty
+        ? profileProvider.avatarUrl
+        : (pulse?.userAvatarUrl ?? '');
+    final userName = profileProvider.name.isNotEmpty
+        ? profileProvider.name
+        : (pulse?.userName ?? '');
+
     return GestureDetector(
       onTap: () {
         HapticFeedback.lightImpact();
@@ -91,11 +100,11 @@ class PulseRowWidget extends StatelessWidget {
             ),
           );
         } else {
-          showModalBottomSheet(
-            context: context,
-            isScrollControlled: true,
-            backgroundColor: Colors.transparent,
-            builder: (ctx) => const CreatePulseSheet(),
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (ctx) => const CreatePulsePage(),
+            ),
           );
         }
       },
@@ -120,20 +129,20 @@ class PulseRowWidget extends StatelessWidget {
                     ),
                   ),
                   child: ClipOval(
-                    child: Container(
-                      color: context.surfaceSecondary,
-                      alignment: Alignment.center,
-                      child: hasPulse
-                          ? Text(
-                              _getEmojiForIcon(pulse.tag?.icon ?? ''),
-                              style: const TextStyle(fontSize: 22),
-                            )
-                          : Icon(
-                              Icons.add_rounded,
-                              color: context.textSecondary,
-                              size: 24,
+                    child: avatarUrl.isNotEmpty
+                        ? Image.network(avatarUrl, fit: BoxFit.cover)
+                        : Container(
+                            color: context.surfaceSecondary,
+                            alignment: Alignment.center,
+                            child: Text(
+                              userName.isNotEmpty ? userName[0].toUpperCase() : 'Y',
+                              style: TextStyle(
+                                color: context.textPrimary,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 18,
+                              ),
                             ),
-                    ),
+                          ),
                   ),
                 ),
 
@@ -144,7 +153,7 @@ class PulseRowWidget extends StatelessWidget {
                     duration: const Duration(milliseconds: 300),
                     child: hasPulse
                         ? _buildBubble(
-                            text: "${_getEmojiForIcon(pulse.tag?.icon ?? '')} ${pulse.text ?? pulse.tag?.name ?? ''}",
+                            text: _formatPulseBubbleText(pulse),
                             context: context,
                           )
                         : _buildBubble(
@@ -229,7 +238,7 @@ class PulseRowWidget extends StatelessWidget {
                 Positioned(
                   top: 0,
                   child: _buildBubble(
-                    text: "${_getEmojiForIcon(pulse.tag?.icon ?? '')} ${pulse.text ?? pulse.tag?.name ?? ''}",
+                    text: _formatPulseBubbleText(pulse),
                     context: context,
                   ),
                 ),
@@ -252,14 +261,30 @@ class PulseRowWidget extends StatelessWidget {
     );
   }
 
+  String _formatPulseBubbleText(UserPulse pulse) {
+    final emoji = _getEmojiForIcon(pulse.tag?.icon ?? '');
+    final tagName = pulse.tag?.name ?? '';
+    final details = pulse.text?.trim() ?? '';
+
+    if (tagName.isNotEmpty && details.isNotEmpty) {
+      return "$emoji $tagName • $details";
+    } else if (tagName.isNotEmpty) {
+      return "$emoji $tagName";
+    } else if (details.isNotEmpty) {
+      return "$emoji $details";
+    } else {
+      return "$emoji Pulse";
+    }
+  }
+
   Widget _buildBubble({
     required String text,
     required BuildContext context,
     bool isPlaceholder = false,
   }) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4.5),
-      constraints: const BoxConstraints(maxWidth: 80),
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+      constraints: const BoxConstraints(maxWidth: 105),
       decoration: BoxDecoration(
         color: context.surfaceSecondary.withValues(alpha: 0.85),
         borderRadius: BorderRadius.circular(12),

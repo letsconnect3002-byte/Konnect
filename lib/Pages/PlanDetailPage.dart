@@ -19,11 +19,20 @@ class _PlanDetailPageState extends State<PlanDetailPage> {
   List<Map<String, dynamic>> _invites = [];
   List<Map<String, dynamic>> _edits = [];
   bool _loading = true;
+  bool _submittingRsvp = false;
+  bool _showDeclineReasonInput = false;
+  final _declineReasonController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     _loadData();
+  }
+
+  @override
+  void dispose() {
+    _declineReasonController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadData() async {
@@ -249,6 +258,19 @@ class _PlanDetailPageState extends State<PlanDetailPage> {
     final plansProvider = Provider.of<PlansProvider>(context, listen: false);
     final isCreator = plansProvider.userId == creatorId;
 
+    Map<String, dynamic>? myInvite;
+    final currentUserId = plansProvider.userId;
+    if (currentUserId != null && _invites.isNotEmpty) {
+      for (final i in _invites) {
+        if (i['invitee_id'] == currentUserId) {
+          myInvite = i;
+          break;
+        }
+      }
+    }
+    final myStatus = myInvite?['status'] as String?;
+    final bool canInvite = isCreator || (myInvite != null && myStatus == 'accepted');
+
     final acceptedCount =
         _invites.where((i) => i['status'] == 'accepted').length + 1; // +1 for creator
     final pendingCount =
@@ -437,6 +459,10 @@ class _PlanDetailPageState extends State<PlanDetailPage> {
                     ),
                   ],
 
+                  // RSVP Card for Invited User
+                  if (!isCreator && myInvite != null)
+                    _buildRsvpCard(myInvite),
+
                   const SizedBox(height: 24),
                   // Divider
                   Container(height: 1, color: AppColors.borderMuted),
@@ -476,34 +502,59 @@ class _PlanDetailPageState extends State<PlanDetailPage> {
                   }),
 
                   const SizedBox(height: 12),
-                  // Invite more button
-                  GestureDetector(
-                    onTap: _showInviteConnectionsSheet,
-                    child: Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      decoration: BoxDecoration(
-                        border: Border.all(
-                          color: AppColors.borderMuted,
+                  // Invite more button (only if creator OR accepted invitee)
+                  if (canInvite)
+                    GestureDetector(
+                      onTap: _showInviteConnectionsSheet,
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        decoration: BoxDecoration(
+                          border: Border.all(
+                            color: AppColors.borderMuted,
+                          ),
+                          borderRadius:
+                              BorderRadius.circular(AppDimensions.radiusComponent),
                         ),
-                        borderRadius:
-                            BorderRadius.circular(AppDimensions.radiusComponent),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.person_add_alt_1_outlined,
+                                size: 18, color: AppColors.accentPrimary),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Invite More People',
+                              style: AppTypography.bodyText
+                                  .copyWith(color: AppColors.accentPrimary),
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
+                  else if (!isCreator && myStatus == 'pending')
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 14),
+                      decoration: BoxDecoration(
+                        color: AppColors.surfaceSecondary,
+                        borderRadius: BorderRadius.circular(AppDimensions.radiusComponent),
+                        border: Border.all(color: AppColors.borderMuted),
                       ),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.person_add_alt_1_outlined,
-                              size: 18, color: AppColors.accentPrimary),
+                          Icon(Icons.info_outline_rounded, size: 16, color: AppColors.textMuted),
                           const SizedBox(width: 8),
                           Text(
-                            'Invite More People',
-                            style: AppTypography.bodyText
-                                .copyWith(color: AppColors.accentPrimary),
+                            'Accept this invitation to invite your connections',
+                            style: AppTypography.captionText.copyWith(
+                              color: AppColors.textMuted,
+                              fontSize: 12,
+                            ),
                           ),
                         ],
                       ),
                     ),
-                  ),
 
                   // Edits section
                   if (_edits.isNotEmpty) ...[
@@ -666,6 +717,309 @@ class _PlanDetailPageState extends State<PlanDetailPage> {
               style: AppTypography.captionText
                   .copyWith(color: AppColors.textMuted, fontSize: 10),
             ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _handleRsvpResponse(String status, {String? reason}) async {
+    setState(() => _submittingRsvp = true);
+    HapticFeedback.mediumImpact();
+    final plansProvider = Provider.of<PlansProvider>(context, listen: false);
+    try {
+      await plansProvider.respondToPlanInviteByPlanId(
+        planId: widget.planId,
+        status: status,
+        declineReason: reason,
+      );
+      if (mounted) {
+        setState(() {
+          _submittingRsvp = false;
+          _showDeclineReasonInput = false;
+        });
+        await _loadData();
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _submittingRsvp = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("Error updating RSVP status: $e", style: AppTypography.bodyText),
+            backgroundColor: AppColors.surfaceSecondary,
+          ),
+        );
+      }
+    }
+  }
+
+  Widget _buildRsvpCard(Map<String, dynamic> myInvite) {
+    final status = myInvite['status'] as String? ?? 'pending';
+
+    if (status == 'accepted') {
+      return Container(
+        margin: const EdgeInsets.only(top: 16),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: AppColors.accentPrimary.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppColors.accentPrimary.withValues(alpha: 0.25)),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.check_circle_rounded, color: AppColors.accentPrimary, size: 20),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                "You accepted this invitation",
+                style: AppTypography.bodyText.copyWith(
+                  color: AppColors.accentPrimary,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
+                ),
+              ),
+            ),
+            GestureDetector(
+              onTap: _submittingRsvp ? null : () => _handleRsvpResponse('declined'),
+              child: Text(
+                "Change",
+                style: AppTypography.captionText.copyWith(
+                  color: AppColors.textSecondary,
+                  decoration: TextDecoration.underline,
+                  fontSize: 12,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (status == 'declined') {
+      return Container(
+        margin: const EdgeInsets.only(top: 16),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: const Color(0xFFEF4444).withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0xFFEF4444).withValues(alpha: 0.25)),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.cancel_rounded, color: Color(0xFFEF4444), size: 20),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                "You declined this invitation",
+                style: AppTypography.bodyText.copyWith(
+                  color: const Color(0xFFEF4444),
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
+                ),
+              ),
+            ),
+            GestureDetector(
+              onTap: _submittingRsvp ? null : () => _handleRsvpResponse('accepted'),
+              child: Text(
+                "Change to Going",
+                style: AppTypography.captionText.copyWith(
+                  color: AppColors.accentPrimary,
+                  decoration: TextDecoration.underline,
+                  fontSize: 12,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // Pending status: Show RSVP prompt & action buttons
+    return Container(
+      margin: const EdgeInsets.only(top: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.accentPrimary.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: AppColors.accentPrimary.withValues(alpha: 0.3),
+          width: 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(
+                Icons.mark_email_unread_outlined,
+                color: AppColors.accentPrimary,
+                size: 20,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  "You're invited to this plan!",
+                  style: AppTypography.cardTitle.copyWith(
+                    color: AppColors.accentPrimary,
+                    fontSize: 14,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            "Will you be attending?",
+            style: AppTypography.bodyText.copyWith(
+              color: AppColors.textSecondary,
+              fontSize: 12.5,
+            ),
+          ),
+          const SizedBox(height: 14),
+
+          if (!_showDeclineReasonInput) ...[
+            Row(
+              children: [
+                // Accept Button
+                Expanded(
+                  child: GestureDetector(
+                    onTap: _submittingRsvp ? null : () => _handleRsvpResponse('accepted'),
+                    child: Container(
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: AppColors.accentPrimary,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Center(
+                        child: _submittingRsvp
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                              )
+                            : Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  const Icon(Icons.check_circle_rounded, size: 16, color: Colors.white),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    "Accept",
+                                    style: AppTypography.captionText.copyWith(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                // Decline Button
+                Expanded(
+                  child: GestureDetector(
+                    onTap: _submittingRsvp ? null : () => setState(() => _showDeclineReasonInput = true),
+                    child: Container(
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: AppColors.surfaceSecondary,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: AppColors.borderMuted),
+                      ),
+                      child: Center(
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.cancel_outlined, size: 16, color: AppColors.textSecondary),
+                            const SizedBox(width: 6),
+                            Text(
+                              "Decline",
+                              style: AppTypography.captionText.copyWith(
+                                color: AppColors.textSecondary,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ] else ...[
+            // Decline reason input
+            Text(
+              "Why can't you make it? (optional)",
+              style: AppTypography.captionText.copyWith(
+                color: AppColors.textSecondary,
+                fontSize: 12,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Container(
+              decoration: BoxDecoration(
+                color: AppColors.surfaceSecondary,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: AppColors.borderMuted),
+              ),
+              child: TextField(
+                controller: _declineReasonController,
+                style: AppTypography.bodyText.copyWith(fontSize: 13),
+                decoration: InputDecoration(
+                  hintText: 'e.g. Prior commitment',
+                  hintStyle: AppTypography.bodyText.copyWith(
+                    color: AppColors.textMuted,
+                    fontSize: 13,
+                  ),
+                  border: InputBorder.none,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                GestureDetector(
+                  onTap: _submittingRsvp
+                      ? null
+                      : () => _handleRsvpResponse('declined', reason: _declineReasonController.text.trim()),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFEF4444),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      'Confirm Decline',
+                      style: AppTypography.captionText.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                GestureDetector(
+                  onTap: () => setState(() => _showDeclineReasonInput = false),
+                  child: Padding(
+                    padding: const EdgeInsets.all(8),
+                    child: Text(
+                      'Cancel',
+                      style: AppTypography.captionText.copyWith(
+                        color: AppColors.textSecondary,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
         ],
       ),
     );

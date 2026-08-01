@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:ui';
@@ -19,6 +20,7 @@ import 'package:connect/Providers/chat_provider.dart';
 import 'package:connect/Providers/tribe_provider.dart';
 import 'package:connect/Repositories/tribe_repository.dart';
 import 'package:connect/Widgets/in_app_notification_banner.dart';
+import 'package:connect/Widgets/profile_nudge_banner.dart';
 import 'package:connect/Pages/YourNetworkPage.dart';
 import 'package:connect/Pages/NotificationPage.dart';
 import 'package:connect/Repositories/profile_repository.dart';
@@ -48,6 +50,43 @@ import 'package:connect/Pages/ResetPasswordScreen.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+
+final Set<String> _recentlyShownBanners = {};
+
+void showInAppMessageBanner({
+  required String messageId,
+  required String roomId,
+  required int senderId,
+  required String senderName,
+  required String avatarUrl,
+  required String message,
+}) {
+  if (_recentlyShownBanners.contains(messageId)) return;
+  _recentlyShownBanners.add(messageId);
+  Timer(const Duration(seconds: 10),
+      () => _recentlyShownBanners.remove(messageId));
+
+  final overlayState = navigatorKey.currentState?.overlay;
+  if (overlayState != null) {
+    InAppNotificationBanner.show(
+      overlayState: overlayState,
+      senderId: senderId,
+      senderName: senderName,
+      avatarUrl: avatarUrl,
+      message: message,
+      onTap: () {
+        navigatorKey.currentState?.push(
+          MaterialPageRoute(
+            builder: (routeContext) => IndividualChatPage(
+              otherUserId: senderId,
+            ),
+          ),
+        );
+      },
+    );
+    print("InAppBanner: Message banner displayed for messageId: $messageId");
+  }
+}
 
 final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
     FlutterLocalNotificationsPlugin();
@@ -2060,7 +2099,8 @@ class MyApp extends StatelessWidget {
             return tribeProvider;
           },
         ),
-        ChangeNotifierProxyProvider2<ProfileProvider, ConnectionProvider, PulseProvider>(
+        ChangeNotifierProxyProvider2<ProfileProvider, ConnectionProvider,
+            PulseProvider>(
           create: (_) => PulseProvider(
             pulseRepository: SupabasePulseRepository(),
           ),
@@ -2287,13 +2327,14 @@ class _AppShellGateState extends State<AppShellGate> {
       try {
         String? token;
         if (Platform.isIOS) {
-          final apnsToken = await messaging.getAPNSToken();
-          if (apnsToken != null) {
-            token = await messaging.getToken();
-          } else {
-            print(
-                "PushNotifications: APNS token is not set yet. FCM token retrieval will be deferred to token refresh.");
+          int retries = 0;
+          while (retries < 5) {
+            final apnsToken = await messaging.getAPNSToken();
+            if (apnsToken != null) break;
+            await Future.delayed(const Duration(milliseconds: 1000));
+            retries++;
           }
+          token = await messaging.getToken();
         } else {
           token = await messaging.getToken();
         }
@@ -2394,23 +2435,15 @@ class _AppShellGateState extends State<AppShellGate> {
                   try {
                     final activeUserId =
                         await LocalDatabaseHelper.instance.getActiveUserId();
-                    if (activeUserId != null && senderId == activeUserId) {
-                      print(
-                          "PushNotifications: Foreground received own message. Skipping banner.");
-                      return;
-                    }
-
-                    final overlayState = navigatorKey.currentState?.overlay;
-                    if (overlayState != null) {
-                      InAppNotificationBanner.show(
-                        overlayState: overlayState,
+                    if (activeUserId == null || senderId != activeUserId) {
+                      showInAppMessageBanner(
+                        messageId: messageId,
+                        roomId: roomId,
                         senderId: senderId,
                         senderName: senderName,
-                        avatarUrl: data['sender_avatar'] ?? '',
+                        avatarUrl: data['sender_avatar']?.toString() ?? '',
                         message: payload,
                       );
-                      print(
-                          "PushNotifications: Foreground in-app notification banner displayed for messageId: $messageId.");
                     }
                   } catch (e) {
                     print(
@@ -2427,13 +2460,25 @@ class _AppShellGateState extends State<AppShellGate> {
                 if (localMsg != null) {
                   final roomId = localMsg['room_id'] as String?;
                   final senderId = localMsg['sender_id'] as int?;
+                  final activeUserId =
+                      await LocalDatabaseHelper.instance.getActiveUserId();
 
-                  // Delete from SQLite first
-                  final localStatus = localMsg['status'] as String?;
-                  if (localStatus != 'read') {
-                    await LocalDatabaseHelper.instance.deleteMessage(messageId);
+                  if (senderId != null &&
+                      activeUserId != null &&
+                      senderId == activeUserId) {
+                    // Outgoing message sent by me: deletion from Supabase store-and-forward means recipient read it!
+                    await LocalDatabaseHelper.instance
+                        .updateMessageStatus(messageId, 'read');
                     print(
-                        "PushNotifications: Foreground message deleted from SQLite.");
+                        "PushNotifications: Foreground outgoing message updated to read in SQLite.");
+                  } else {
+                    final localStatus = localMsg['status'] as String?;
+                    if (localStatus != 'read') {
+                      await LocalDatabaseHelper.instance
+                          .deleteMessage(messageId);
+                      print(
+                          "PushNotifications: Foreground message deleted from SQLite.");
+                    }
                   }
 
                   // Rebuild or cancel the notification based on remaining unread messages
@@ -2836,6 +2881,15 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
     _setupNotificationTapListeners();
   }
 
+  Future<void> _handleDismissProfileNudge() async {
+    setState(() {
+      _dismissedProfileNudge = true;
+    });
+    final profileProvider =
+        Provider.of<ProfileProvider>(context, listen: false);
+    await profileProvider.dismissProfileNudge();
+  }
+
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
@@ -2862,11 +2916,42 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
     FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
       _handleNotificationClick(message);
     });
+
+    // Handle foreground message (when user is actively on the app during trigger time)
+    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+      final action = message.data['action'] as String?;
+      if (action == 'complete_profile') {
+        if (mounted) {
+          final profileProvider =
+              Provider.of<ProfileProvider>(context, listen: false);
+          profileProvider.resetNudgeDismissalLocal();
+          setState(() {
+            _dismissedProfileNudge = false;
+          });
+        }
+      }
+    });
   }
 
   void _handleNotificationClick(RemoteMessage message) {
     final data = message.data;
-    final senderIdStr = data['sender_id'] as String?;
+    final action = data['action'] as String?;
+
+    if (action == 'complete_profile') {
+      if (mounted) {
+        setSelectedIndex(4);
+      }
+      return;
+    }
+
+    if (action == 'new_pulse') {
+      if (mounted) {
+        setSelectedIndex(0);
+      }
+      return;
+    }
+
+    final senderIdStr = (data['sender_id'] ?? data['publisher_id']) as String?;
 
     if (senderIdStr != null) {
       final senderId = int.tryParse(senderIdStr);
@@ -2889,8 +2974,12 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
     });
   }
 
+  bool _dismissedProfileNudge = false;
+
   @override
   Widget build(BuildContext context) {
+    final topPadding = MediaQuery.of(context).padding.top;
+
     return Scaffold(
       backgroundColor: context.canvasBackground,
       body: Stack(
@@ -2899,6 +2988,18 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
             index: _currentIndex,
             children: _screens,
           ),
+          if (!_dismissedProfileNudge)
+            Positioned(
+              top: topPadding + 6,
+              left: 0,
+              right: 0,
+              child: ProfileNudgeBanner(
+                onOpenProfile: () {
+                  setSelectedIndex(4);
+                },
+                onDismiss: _handleDismissProfileNudge,
+              ),
+            ),
           Positioned(
             left: 0,
             right: 0,

@@ -112,6 +112,68 @@ class ProfileProvider with ChangeNotifier {
   int? get userId => _state is ProfileLoaded ? (_state as ProfileLoaded).userId : null;
   bool get isCreated => _state is ProfileLoaded ? (_state as ProfileLoaded).isCreated : false;
   bool get hasData => userId != null && name.isNotEmpty;
+
+  List<String> get missingEssentialFields {
+    final List<String> missing = [];
+
+    final cleanName = name.trim();
+    if (cleanName.isEmpty || cleanName.toLowerCase() == 'jane doe') {
+      missing.add('Name');
+    }
+
+    if (avatarUrl.trim().isEmpty) {
+      missing.add('Profile Photo');
+    }
+
+    if (profession.trim().isEmpty && company.trim().isEmpty) {
+      missing.add('Headline');
+    }
+
+    final hasContact = email.trim().isNotEmpty ||
+        professionalEmail.trim().isNotEmpty ||
+        phoneNumber.trim().isNotEmpty ||
+        professionalPhoneNumber.trim().isNotEmpty;
+    if (!hasContact) {
+      missing.add('Contact Info');
+    }
+
+    return missing;
+  }
+
+  bool get isEssentialProfileComplete => missingEssentialFields.isEmpty;
+
+  DateTime? _profileNudgeDismissedAt;
+  DateTime? get profileNudgeDismissedAt => _profileNudgeDismissedAt;
+
+  bool get shouldShowProfileNudge {
+    if (isEssentialProfileComplete || !hasData) return false;
+    if (_profileNudgeDismissedAt != null) {
+      final diff = DateTime.now().toUtc().difference(_profileNudgeDismissedAt!);
+      if (diff.inHours < 48) return false;
+    }
+    return true;
+  }
+
+  void resetNudgeDismissalLocal() {
+    _profileNudgeDismissedAt = null;
+    notifyListeners();
+  }
+
+  Future<void> dismissProfileNudge() async {
+    final now = DateTime.now().toUtc();
+    _profileNudgeDismissedAt = now;
+    notifyListeners();
+    final myUserId = userId;
+    if (myUserId != null) {
+      try {
+        await _repository.updateProfileField(myUserId, 'profile_nudge_dismissed_at', now.toIso8601String());
+        print("Successfully synced profile_nudge_dismissed_at to Supabase: ${now.toIso8601String()}");
+      } catch (e) {
+        print("Error syncing profile_nudge_dismissed_at to Supabase: $e");
+      }
+    }
+  }
+
   AppError? get lastError => _state is ProfileError ? (_state as ProfileError).error : null;
 
   void _setError(Object e) {
@@ -602,6 +664,14 @@ class ProfileProvider with ChangeNotifier {
         gender = response['gender'] ?? '';
         showProfileToConnections =
             response['show_profile_to_connections'] == true;
+
+        if (response['profile_nudge_dismissed_at'] != null) {
+          _profileNudgeDismissedAt =
+              DateTime.tryParse(response['profile_nudge_dismissed_at'].toString())
+                  ?.toUtc();
+        } else {
+          _profileNudgeDismissedAt = null;
+        }
 
 
         vibeTag = response['vibe_tag'] ?? '';
