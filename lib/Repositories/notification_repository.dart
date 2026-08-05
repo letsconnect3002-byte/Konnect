@@ -15,6 +15,13 @@ abstract class NotificationRepository {
     required int referredUserId,
     String? note,
   });
+  Future<void> sendFeedNotification({
+    required int recipientUserId,
+    required int actorUserId,
+    required String type,
+    required String postId,
+    required String rootPostId,
+  });
   Future<void> markAsSeen(String notificationId);
   Future<void> updateNotificationNote(String notificationId, String newNote);
   Future<List<Map<String, dynamic>>> getSentReferralRequests(int senderUserId);
@@ -161,6 +168,31 @@ class SupabaseNotificationRepository implements NotificationRepository {
       'referred_user_id': referredUserId,
       'type': 'referral',
       'note': note,
+      'is_seen': false,
+    });
+  }
+
+  @override
+  Future<void> sendFeedNotification({
+    required int recipientUserId,
+    required int actorUserId,
+    required String type,
+    required String postId,
+    required String rootPostId,
+  }) async {
+    if (recipientUserId == actorUserId) return;
+
+    final noteJson = jsonEncode({
+      'real_type': type,
+      'post_id': postId,
+      'root_post_id': rootPostId,
+    });
+
+    await _client.from('connection_notifications').insert({
+      'user_id': recipientUserId,
+      'other_user_id': actorUserId,
+      'type': type,
+      'note': noteJson,
       'is_seen': false,
     });
   }

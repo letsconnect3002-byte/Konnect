@@ -3,10 +3,12 @@ import 'package:connect/Config/app_theme.dart';
 import 'package:connect/Pages/ConnectionProfilePage.dart';
 import 'package:connect/Pages/IndividualChatPage.dart';
 import 'package:connect/Pages/PlanDetailPage.dart';
+import 'package:connect/Pages/ThreadDetailPage.dart';
 import 'package:connect/Providers/connection_provider.dart';
 import 'package:connect/Providers/notification_provider.dart';
 import 'package:connect/Providers/plans_provider.dart';
 import 'package:connect/Providers/tribe_provider.dart';
+import 'package:connect/main.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -251,6 +253,175 @@ class _NotificationPageState extends State<NotificationPage> {
     );
   }
 
+  Widget _buildFeedNotificationItem(
+      Map<String, dynamic> notification, NotificationProvider provider) {
+    final otherUser = notification['other_user'] as Map<String, dynamic>? ?? {};
+    final String name = otherUser['name'] ?? 'Connection';
+    final String avatarUrl =
+        otherUser['avatar_url'] ?? otherUser['avatarUrl'] ?? '';
+    final String timeStr =
+        _getRelativeTime(notification['created_at'] as String?);
+    final bool isUnseen = notification['is_seen'] == false;
+    final String type = notification['type'] ?? 'feed_reply';
+
+    String rootPostId = notification['root_post_id']?.toString() ??
+        notification['rootPostId']?.toString() ??
+        '';
+    String targetPostId = notification['post_id']?.toString() ??
+        notification['postId']?.toString() ??
+        '';
+    String realType = type;
+    final String? rawNote = notification['note'] as String?;
+    if (rawNote != null && rawNote.startsWith('{')) {
+      try {
+        final parsed = jsonDecode(rawNote);
+        if (parsed['real_type'] != null) realType = parsed['real_type'].toString();
+        if (parsed['root_post_id'] != null && rootPostId.isEmpty) {
+          rootPostId = parsed['root_post_id'].toString();
+        }
+        if (parsed['post_id'] != null && targetPostId.isEmpty) {
+          targetPostId = parsed['post_id'].toString();
+        }
+      } catch (_) {}
+    }
+    if (rootPostId.isEmpty && targetPostId.isNotEmpty) {
+      rootPostId = targetPostId;
+    }
+
+    String actionText = 'replied to your post.';
+    IconData iconData = Icons.chat_bubble_outline_rounded;
+
+    if (realType == 'feed_reply_mention') {
+      actionText = 'replied to your post and mentioned you on their post.';
+      iconData = Icons.alternate_email_rounded;
+    } else if (realType == 'feed_mention') {
+      actionText = 'mentioned you on their post.';
+      iconData = Icons.alternate_email_rounded;
+    } else if (realType == 'feed_post') {
+      actionText = 'has uploaded a post, tap to see.';
+      iconData = Icons.dynamic_feed_rounded;
+    }
+
+    return Dismissible(
+      key: Key(notification['id'].toString()),
+      direction: DismissDirection.endToStart,
+      onDismissed: (_) {
+        provider.deleteNotification(notification['id'].toString());
+      },
+      child: InkWell(
+        onTap: () {
+          HapticFeedback.lightImpact();
+          if (isUnseen) {
+            provider.markAsSeen(notification['id'].toString());
+          }
+          if (rootPostId.isNotEmpty) {
+            appShellKey.currentState?.setSelectedIndex(2);
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => ThreadDetailPage(
+                  rootPostId: rootPostId,
+                  highlightPostId: targetPostId.isNotEmpty ? targetPostId : rootPostId,
+                ),
+              ),
+            );
+          }
+        },
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          decoration: BoxDecoration(
+            color: isUnseen
+                ? context.accentPrimary.withValues(alpha: 0.12)
+                : context.surfaceSecondary,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: isUnseen
+                  ? context.accentPrimary.withValues(alpha: 0.3)
+                  : Colors.white.withValues(alpha: 0.05),
+            ),
+          ),
+          child: Row(
+            children: [
+              Stack(
+                children: [
+                  CircleAvatar(
+                    radius: 20,
+                    backgroundColor: context.accentPrimary,
+                    backgroundImage: avatarUrl.isNotEmpty ? NetworkImage(avatarUrl) : null,
+                    child: avatarUrl.isEmpty
+                        ? Text(
+                            _getInitials(name),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                            ),
+                          )
+                        : null,
+                  ),
+                  Positioned(
+                    right: 0,
+                    bottom: 0,
+                    child: Container(
+                      padding: const EdgeInsets.all(2),
+                      decoration: BoxDecoration(
+                        color: context.accentPrimary,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(iconData, size: 10, color: Colors.white),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    RichText(
+                      text: TextSpan(
+                        style: TextStyle(
+                          color: context.textPrimary,
+                          fontSize: 13,
+                          height: 1.3,
+                        ),
+                        children: [
+                          TextSpan(
+                            text: "$name ",
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          TextSpan(text: actionText),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      timeStr,
+                      style: TextStyle(
+                        color: context.textMuted,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (isUnseen)
+                Container(
+                  width: 8,
+                  height: 8,
+                  decoration: BoxDecoration(
+                    color: context.accentPrimary,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildNotificationItem(
       Map<String, dynamic> notification, NotificationProvider provider) {
     final String type = notification['type'] ?? 'qr_code';
@@ -259,6 +430,12 @@ class _NotificationPageState extends State<NotificationPage> {
         type == 'plan_reminder_30' ||
         type == 'plan_reminder_start') {
       return PlanNotificationCard(notification: notification, provider: provider);
+    }
+    if (type == 'feed_reply' ||
+        type == 'feed_mention' ||
+        type == 'feed_reply_mention' ||
+        type == 'feed_post') {
+      return _buildFeedNotificationItem(notification, provider);
     }
     if (type == 'tribe_invite' ||
         type == 'tribe_request' ||

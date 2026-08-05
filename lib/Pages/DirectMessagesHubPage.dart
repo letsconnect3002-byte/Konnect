@@ -1227,6 +1227,7 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
       floatingActionButton: Padding(
         padding: const EdgeInsets.only(bottom: 70.0),
         child: FloatingActionButton(
+          heroTag: 'dm_hub_fab',
           onPressed: () {
             HapticFeedback.mediumImpact();
             if (_selectedTab == 'tribes') {

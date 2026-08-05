@@ -37,6 +37,20 @@ serve(async (req) => {
       return new Response("QR code connection notification skipped", { status: 200 })
     }
 
+    // Skip feed notification types as they are exclusively handled by send-feed-notification-push
+    let checkRealType = type
+    if (note && note.startsWith("{")) {
+      try {
+        const parsed = JSON.parse(note)
+        if (parsed.real_type) checkRealType = parsed.real_type
+      } catch (_) {}
+    }
+    const feedTypes = ["feed_reply", "feed_mention", "feed_reply_mention"]
+    if (feedTypes.includes(type) || feedTypes.includes(checkRealType)) {
+      console.log("Skipping feed notification in send-connection-notification-push (handled by send-feed-notification-push).")
+      return new Response("Feed notification handled by send-feed-notification-push", { status: 200 })
+    }
+
     // 1. Initialize Supabase Client with Service Role Key
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
@@ -183,6 +197,10 @@ serve(async (req) => {
       const fcmBody = {
         message: {
           token: fcmToken,
+          notification: {
+            title: title,
+            body: bodyText,
+          },
           data: {
             action: "connection_notification",
             notification_id: String(notificationId),
@@ -196,6 +214,15 @@ serve(async (req) => {
           },
           android: {
             priority: "high",
+            notification: {
+              title: title,
+              body: bodyText,
+              channel_id: "connections_channel",
+              sound: "default",
+              default_sound: true,
+              default_vibrate_timings: true,
+              notification_priority: "PRIORITY_MAX",
+            },
           },
           apns: {
             headers: {

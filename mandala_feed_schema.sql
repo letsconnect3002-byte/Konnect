@@ -1,0 +1,428 @@
+-- =====================================================================
+-- MANDALA — CIRCLE FEED
+-- MVP schema: posts, replies, seen-tracking, reachability, feed retrieval
+--
+-- Run this once in the Supabase SQL editor. It's written to be safely
+-- re-runnable (IF NOT EXISTS / CREATE OR REPLACE / DROP-then-CREATE for
+-- triggers) in case you need to tweak and re-apply during development.
+--
+-- Deliberately NOT included, per current scope:
+--   - Row Level Security policies (flagged as a pre-launch item, not an
+--     MVP blocker — see the notes in the agent prompt doc)
+--   - Table partitioning, cached reachability, cleanup jobs — none of
+--     these are needed at MVP scale; notes on when to add them are in
+--     the accompanying prompt doc.
+-- =====================================================================
+
+begin;
+
+-- ---------------------------------------------------------------------
+-- 1. POSTS TABLE
+-- ---------------------------------------------------------------------
+-- root_post_id is always set (self-referencing for a top-level post,
+-- inherited from the parent for a reply). This means "top-level post"
+-- is always just `id = root_post_id`, and "everything in this thread"
+-- is always just `root_post_id = :id` — no nullable special-casing
+-- needed anywhere that queries this table.
+
+create table if not exists public.posts (
+  id uuid primary key default gen_random_uuid(),
+  author_id bigint not null references public.profiles(id),
+  content text not null,
+  reply_to_post_id uuid references public.posts(id),
+  root_post_id uuid not null references public.posts(id),
+  reply_count integer not null default 0,
+  is_deleted boolean not null default false,
+  created_at timestamp with time zone not null default timezone('utc'::text, now()),
+  updated_at timestamp with time zone not null default timezone('utc'::text, now()),
+  constraint posts_content_length check (char_length(content) between 1 and 500)
+);
+
+-- Feed queries: "recent top-level posts from these authors, not deleted"
+create index if not exists posts_author_created_idx
+  on public.posts (author_id, created_at desc)
+  where is_deleted = false;
+
+-- Thread queries: "everything under this root, oldest first"
+create index if not exists posts_root_created_idx
+  on public.posts (root_post_id, created_at asc);
+
+-- ---------------------------------------------------------------------
+-- 2. TRIGGERS — root_post_id resolution + reply_count maintenance
+-- ---------------------------------------------------------------------
+-- These stay server-side deliberately: root_post_id has to be correct
+-- and consistent regardless of what the client sends (it's what the
+-- feed/thread queries filter and index on), and reply_count has to be
+-- updated atomically — a client-side "read then write +1" is a race
+-- condition the moment two replies land close together.
+
+create or replace function public.posts_before_insert()
+returns trigger
+language plpgsql
+as $$
+declare
+  parent_root uuid;
+begin
+  if new.reply_to_post_id is null then
+    -- top-level post: it is its own root
+    new.root_post_id := new.id;
+  else
+    select root_post_id into parent_root
+    from public.posts
+    where id = new.reply_to_post_id;
+
+    if parent_root is null then
+      raise exception 'Cannot reply to a post that does not exist';
+    end if;
+
+    new.root_post_id := parent_root;
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_posts_before_insert on public.posts;
+create trigger trg_posts_before_insert
+  before insert on public.posts
+  for each row
+  execute function public.posts_before_insert();
+
+
+create or replace function public.posts_after_insert()
+returns trigger
+language plpgsql
+as $$
+begin
+  if new.reply_to_post_id is not null then
+    update public.posts
+    set reply_count = reply_count + 1
+    where id = new.root_post_id;
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_posts_after_insert on public.posts;
+create trigger trg_posts_after_insert
+  after insert on public.posts
+  for each row
+  execute function public.posts_after_insert();
+
+-- ---------------------------------------------------------------------
+-- 3. SEEN TRACKING
+-- ---------------------------------------------------------------------
+-- Composite primary key does two jobs: it's the index the "have I seen
+-- this" check needs, and it makes the write naturally idempotent
+-- (ON CONFLICT DO NOTHING costs nothing extra on a repeat).
+
+create table if not exists public.post_seen (
+  viewer_id bigint not null references public.profiles(id),
+  post_id uuid not null references public.posts(id),
+  seen_at timestamp with time zone not null default timezone('utc'::text, now()),
+  primary key (viewer_id, post_id)
+);
+
+-- ---------------------------------------------------------------------
+-- 4. REPORTING — reuse the existing pipeline
+-- ---------------------------------------------------------------------
+-- No content snapshot column needed: posts are soft-deleted, so the
+-- reported content is still readable via post_id even after removal.
+
+alter table public.content_reports
+  add column if not exists post_id uuid references public.posts(id);
+
+-- ---------------------------------------------------------------------
+-- 5. SUPPORTING INDEX ON user_connections
+-- ---------------------------------------------------------------------
+-- The existing primary key (user_id_1, user_id_2) only makes lookups
+-- starting from user_id_1 fast. network_graph's second branch looks
+-- things up from user_id_2, so it needs its own index too.
+
+create index if not exists user_connections_user_2_idx
+  on public.user_connections (user_id_2);
+
+-- ---------------------------------------------------------------------
+-- 6. REACHABILITY — bounded 3-hop walk, computed live at read time
+-- ---------------------------------------------------------------------
+-- No cache table for MVP. This runs on every feed load, which is fine
+-- at MVP-scale connection graphs. Add a precomputed/cached version
+-- later only if feed loads start measurably slowing down.
+
+create or replace function public.get_network_reach(
+  p_viewer_id bigint,
+  p_max_degree int default 3
+)
+returns table (reachable_user_id bigint, degree int)
+language sql
+stable
+as $$
+  with recursive reach as (
+    select ng.connected_user_id as user_id, 1 as degree
+    from public.network_graph ng
+    where ng.primary_user_id = p_viewer_id
+
+    union all
+
+    select ng.connected_user_id, r.degree + 1
+    from reach r
+    join public.network_graph ng on ng.primary_user_id = r.user_id
+    where r.degree < p_max_degree
+  )
+  select user_id as reachable_user_id, min(degree) as degree
+  from reach
+  where user_id <> p_viewer_id
+    and not exists (
+      select 1 from public.blocked_users b
+      where (b.blocker_id = p_viewer_id and b.blocked_id = user_id)
+         or (b.blocker_id = user_id and b.blocked_id = p_viewer_id)
+    )
+  group by user_id;
+$$;
+
+-- ---------------------------------------------------------------------
+-- 7. THE FEED — unseen-first, then seen, both by recency
+-- ---------------------------------------------------------------------
+-- One call returns one page, already filtered, bucketed, and ordered.
+-- Cursor-paginated (never OFFSET) so page N costs the same as page 1
+-- regardless of how deep someone scrolls.
+
+create or replace function public.get_feed(
+  p_viewer_id bigint,
+  p_bucket text default 'unseen',
+  p_cursor_created_at timestamptz default null,
+  p_cursor_post_id uuid default null,
+  p_limit int default 20
+)
+returns table (
+  post_id uuid,
+  author_id bigint,
+  author_name text,
+  author_avatar_url text,
+  content text,
+  created_at timestamptz,
+  reply_count int,
+  active_reply_count int,
+  degree int,
+  user_reaction text,
+  reaction_counts jsonb
+)
+language plpgsql
+stable
+as $$
+begin
+  if p_bucket not in ('unseen', 'seen') then
+    raise exception 'p_bucket must be ''unseen'' or ''seen''';
+  end if;
+
+  return query
+  with visible_authors as (
+    select p_viewer_id as user_id, 0 as deg
+    union all
+    select r.reachable_user_id, r.degree as deg
+    from public.get_network_reach(p_viewer_id) r
+  )
+  select
+    p.id,
+    p.author_id,
+    pr.name,
+    pr.avatar_url,
+    p.content,
+    p.created_at,
+    p.reply_count,
+    (
+      select count(*)::int
+      from public.posts r
+      where r.root_post_id = p.id
+        and r.id != p.id
+        and r.is_deleted = false
+    ) as active_reply_count,
+    va.deg as degree,
+    (
+      select pr_user.reaction_type
+      from public.post_reactions pr_user
+      where pr_user.post_id = p.id and pr_user.user_id = p_viewer_id
+      limit 1
+    ) as user_reaction,
+    coalesce(
+      (
+        select jsonb_object_agg(sub.reaction_type, sub.cnt)
+        from (
+          select pr_agg.reaction_type, count(*)::int as cnt
+          from public.post_reactions pr_agg
+          where pr_agg.post_id = p.id
+          group by pr_agg.reaction_type
+        ) sub
+      ),
+      '{}'::jsonb
+    ) as reaction_counts
+  from public.posts p
+  join visible_authors va on va.user_id = p.author_id
+  join public.profiles pr on pr.id = p.author_id
+  where p.id = p.root_post_id          -- feed shows top-level posts only
+    and p.is_deleted = false
+    and (
+      (p_bucket = 'unseen' and not exists (
+        select 1 from public.post_seen ps
+        where ps.viewer_id = p_viewer_id and ps.post_id = p.id
+      ))
+      or
+      (p_bucket = 'seen' and exists (
+        select 1 from public.post_seen ps
+        where ps.viewer_id = p_viewer_id and ps.post_id = p.id
+      ))
+    )
+    and (
+      p_cursor_created_at is null
+      or (p.created_at, p.id) < (p_cursor_created_at, p_cursor_post_id)
+    )
+  order by p.created_at desc, p.id desc
+  limit least(p_limit, 50);
+end;
+$$;
+
+-- ---------------------------------------------------------------------
+-- 8. A THREAD — root post + every reply, in one call
+-- ---------------------------------------------------------------------
+-- Includes soft-deleted rows on purpose: the client renders those as
+-- "this post was removed" placeholders rather than breaking the thread.
+
+create or replace function public.get_thread(
+  p_root_post_id uuid,
+  p_viewer_id bigint default null
+)
+returns table (
+  post_id uuid,
+  author_id bigint,
+  author_name text,
+  author_avatar_url text,
+  content text,
+  created_at timestamptz,
+  reply_count int,
+  is_deleted boolean,
+  reply_to_post_id uuid,
+  user_reaction text,
+  reaction_counts jsonb
+)
+language sql
+stable
+as $$
+  select
+    p.id,
+    p.author_id,
+    pr.name,
+    pr.avatar_url,
+    p.content,
+    p.created_at,
+    p.reply_count,
+    p.is_deleted,
+    p.reply_to_post_id,
+    (
+      select pr_user.reaction_type
+      from public.post_reactions pr_user
+      where pr_user.post_id = p.id and pr_user.user_id = p_viewer_id
+      limit 1
+    ) as user_reaction,
+    coalesce(
+      (
+        select jsonb_object_agg(sub.reaction_type, sub.cnt)
+        from (
+          select pr_agg.reaction_type, count(*)::int as cnt
+          from public.post_reactions pr_agg
+          where pr_agg.post_id = p.id
+          group by pr_agg.reaction_type
+        ) sub
+      ),
+      '{}'::jsonb
+    ) as reaction_counts
+  from public.posts p
+  join public.profiles pr on pr.id = p.author_id
+  where p.root_post_id = p_root_post_id
+  order by p.created_at asc;
+$$;
+
+-- ---------------------------------------------------------------------
+-- 9. MARK POSTS SEEN — one batched call covers many posts
+-- ---------------------------------------------------------------------
+
+create or replace function public.mark_posts_seen(
+  p_viewer_id bigint,
+  p_post_ids uuid[]
+)
+returns void
+language sql
+as $$
+  insert into public.post_seen (viewer_id, post_id)
+  select p_viewer_id, unnest(p_post_ids)
+  on conflict (viewer_id, post_id) do nothing;
+$$;
+
+-- ---------------------------------------------------------------------
+-- 10. UNSEEN COUNT — for a "N new" badge, capped so it stays cheap
+-- ---------------------------------------------------------------------
+
+create or replace function public.get_unseen_count(
+  p_viewer_id bigint,
+  p_cap int default 20
+)
+returns int
+language sql
+stable
+as $$
+  select count(*)::int from (
+    select p.id
+    from public.posts p
+    join (
+      select reachable_user_id as user_id from public.get_network_reach(p_viewer_id)
+    ) va on va.user_id = p.author_id
+    where p.id = p.root_post_id
+      and p.is_deleted = false
+      and p.author_id != p_viewer_id
+      and not exists (
+        select 1 from public.post_seen ps
+        where ps.viewer_id = p_viewer_id and ps.post_id = p.id
+      )
+    limit p_cap
+  ) capped;
+$$;
+
+-- ---------------------------------------------------------------------
+-- 11. MUTUAL CONNECTIONS — optional helper for the Connect modal
+-- ---------------------------------------------------------------------
+-- Only needed if your existing referral pipeline doesn't already
+-- expose a reusable "who connects me to this person" query. If it
+-- does, skip this and call that instead.
+
+create or replace function public.get_mutual_connections(
+  p_viewer_id bigint,
+  p_target_id bigint
+)
+returns table (mutual_user_id bigint, mutual_name text, mutual_avatar_url text)
+language sql
+stable
+as $$
+  select pr.id, pr.name, pr.avatar_url
+  from public.network_graph ng1
+  join public.network_graph ng2
+    on ng2.primary_user_id = p_target_id
+   and ng2.connected_user_id = ng1.connected_user_id
+  join public.profiles pr on pr.id = ng1.connected_user_id
+  where ng1.primary_user_id = p_viewer_id;
+$$;
+
+-- ---------------------------------------------------------------------
+-- 12. FEED NOTIFICATION PUSH TRIGGER
+-- ---------------------------------------------------------------------
+create or replace trigger send_feed_notification_push_trigger
+after insert on public.connection_notifications
+for each row
+when (NEW.type in ('feed_reply', 'feed_mention', 'feed_reply_mention'))
+execute function supabase_functions.http_request(
+  'https://gvzblxozqftheowpazvx.supabase.co/functions/v1/send-feed-notification-push',
+  'POST',
+  '{"Content-Type":"application/json","Authorization":"Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd2emJseG96cWZ0aGVvd3BhenZ4Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3OTMzMTA0NCwiZXhwIjoyMDk0OTA3MDQ0fQ.1nBIvX9ZEIChCu9pKW7mq2kW4-ZCCZYyQQHxxCiBUcs"}',
+  '{}',
+  '10000'
+);
+
+commit;

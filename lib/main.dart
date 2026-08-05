@@ -23,6 +23,7 @@ import 'package:connect/Widgets/in_app_notification_banner.dart';
 import 'package:connect/Widgets/profile_nudge_banner.dart';
 import 'package:connect/Pages/YourNetworkPage.dart';
 import 'package:connect/Pages/NotificationPage.dart';
+import 'package:connect/Pages/ThreadDetailPage.dart';
 import 'package:connect/Repositories/profile_repository.dart';
 import 'package:connect/Repositories/connection_repository.dart';
 import 'package:connect/Repositories/chat_repository.dart';
@@ -34,6 +35,9 @@ import 'package:connect/Providers/network_provider.dart';
 import 'package:connect/Repositories/network_repository.dart';
 import 'package:connect/Repositories/pulse_repository.dart';
 import 'package:connect/Providers/pulse_provider.dart';
+import 'package:connect/Pages/CircleFeedPage.dart';
+import 'package:connect/Providers/feed_provider.dart';
+import 'package:connect/Repositories/feed_repository.dart';
 import 'package:timezone/data/latest.dart' as tz_latest;
 import 'package:timezone/timezone.dart' as tz;
 import 'package:audio_session/audio_session.dart' as session;
@@ -397,6 +401,8 @@ Future<void> showConnectionLocalNotification({
     'Connections',
     description: 'Notifications for connection requests and referrals',
     importance: Importance.max,
+    playSound: true,
+    enableVibration: true,
   );
 
   // Ensure channel is registered
@@ -415,6 +421,8 @@ Future<void> showConnectionLocalNotification({
     channelDescription: connectionChannel.description,
     importance: Importance.max,
     priority: Priority.high,
+    playSound: true,
+    enableVibration: true,
     showWhen: true,
     category: AndroidNotificationCategory.promo,
     actions: androidActions,
@@ -458,6 +466,24 @@ void handleLocalNotificationClickPayload(String payload) {
   try {
     final data = jsonDecode(payload);
     final action = data['action'] as String?;
+    if (action == 'feed_notification') {
+      final rootPostId =
+          data['root_post_id']?.toString() ?? data['post_id']?.toString() ?? '';
+      final postId = data['post_id']?.toString() ?? '';
+      if (rootPostId.isNotEmpty) {
+        appShellKey.currentState?.setSelectedIndex(2);
+        navigatorKey.currentState?.popUntil((route) => route.isFirst);
+        navigatorKey.currentState?.push(
+          MaterialPageRoute(
+            builder: (routeContext) => ThreadDetailPage(
+              rootPostId: rootPostId,
+              highlightPostId: postId.isNotEmpty ? postId : rootPostId,
+            ),
+          ),
+        );
+      }
+      return;
+    }
     if (action == 'connection_notification') {
       navigatorKey.currentState?.push(
         MaterialPageRoute(
@@ -1650,7 +1676,13 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
         }
       }
     }
-  } else if (action == 'connection_notification') {
+  } else if (action == 'connection_notification' ||
+      action == 'feed_notification') {
+    if (message.notification != null) {
+      print(
+          "PushNotifications: System notification already presented by FCM OS. Skipping duplicate local notification.");
+      return;
+    }
     final notificationId =
         data['notification_id']?.toString() ?? data['id']?.toString();
     if (notificationId != null) {
@@ -1854,6 +1886,16 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
               }
               title = "Removed from Mafia";
               body = "You were removed from \"$tribeName\"";
+            } else if (type == "feed_reply_mention") {
+              title = "New Reply & Mention";
+              body =
+                  "$actorName replied to your post and mentioned you on their post.";
+            } else if (type == "feed_reply") {
+              title = "New Reply";
+              body = "$actorName replied to your post.";
+            } else if (type == "feed_mention") {
+              title = "New Mention";
+              body = "$actorName mentioned you on their post.";
             }
           } else {
             title = "New Connection";
@@ -2110,6 +2152,15 @@ class MyApp extends StatelessWidget {
               connectionProvider.connections,
             );
             return pulseProvider;
+          },
+        ),
+        ChangeNotifierProxyProvider<ProfileProvider, FeedProvider>(
+          create: (_) => FeedProvider(
+            repository: SupabaseFeedRepository(),
+          ),
+          update: (_, profileProvider, feedProvider) {
+            feedProvider!.updateViewerId(profileProvider.userId);
+            return feedProvider;
           },
         ),
       ],
@@ -2828,9 +2879,74 @@ class _AppShellGateState extends State<AppShellGate> {
                     "PushNotifications: Error showing foreground connection_notification: $e");
               }
             }
+          } else if (action == 'feed_notification') {
+            final actorAvatar = data['actor_avatar']?.toString() ?? '';
+            final title = data['title']?.toString() ?? 'Network Feed Update';
+            final body = data['body']?.toString() ?? '';
+            final rootPostId = data['root_post_id']?.toString() ??
+                data['post_id']?.toString() ??
+                '';
+            final postId = data['post_id']?.toString() ?? '';
+
+            final overlayState = navigatorKey.currentState?.overlay;
+            if (overlayState != null && rootPostId.isNotEmpty) {
+              InAppNotificationBanner.show(
+                overlayState: overlayState,
+                senderId: 0,
+                senderName: title,
+                avatarUrl: actorAvatar,
+                message: body,
+                onTap: () {
+                  appShellKey.currentState?.setSelectedIndex(2);
+                  navigatorKey.currentState?.popUntil((route) => route.isFirst);
+                  navigatorKey.currentState?.push(
+                    MaterialPageRoute(
+                      builder: (routeContext) => ThreadDetailPage(
+                        rootPostId: rootPostId,
+                        highlightPostId:
+                            postId.isNotEmpty ? postId : rootPostId,
+                      ),
+                    ),
+                  );
+                },
+              );
+              print(
+                  "PushNotifications: Foreground feed notification banner displayed.");
+            }
           }
         } catch (e) {
           print("PushNotifications: Error in foreground message handler: $e");
+        }
+      });
+
+      FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
+        print(
+            "PushNotifications: Notification tapped in background state: ${message.messageId}");
+        final data = message.data;
+        final action = data['action'] as String?;
+        if (action == 'feed_notification') {
+          final rootPostId = data['root_post_id']?.toString() ??
+              data['post_id']?.toString() ??
+              '';
+          final postId = data['post_id']?.toString() ?? '';
+          if (rootPostId.isNotEmpty) {
+            appShellKey.currentState?.setSelectedIndex(2);
+            navigatorKey.currentState?.popUntil((route) => route.isFirst);
+            navigatorKey.currentState?.push(
+              MaterialPageRoute(
+                builder: (routeContext) => ThreadDetailPage(
+                  rootPostId: rootPostId,
+                  highlightPostId: postId.isNotEmpty ? postId : rootPostId,
+                ),
+              ),
+            );
+          }
+        } else if (action == 'connection_notification') {
+          navigatorKey.currentState?.push(
+            MaterialPageRoute(
+              builder: (routeContext) => const NotificationPage(),
+            ),
+          );
         }
       });
     } catch (e) {
@@ -2874,9 +2990,10 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
     _screens = [
       const DirectMessagesHubPage(), // index 0 — Home / Chats
       const OtherProfilesPage(), // index 1 — Mandal / Connections
-      const YourNetworkPage(), // index 2 — Your Network
-      const PlansPage(), // index 3 — Plans
-      const YetToBeBuiltProfilePage(), // index 4 — My Card
+      const CircleFeedPage(), // index 2 — Circle Feed
+      const YourNetworkPage(), // index 3 — Your Network
+      const PlansPage(), // index 4 — Plans
+      const YetToBeBuiltProfilePage(), // index 5 — My Card
     ];
     _setupNotificationTapListeners();
   }
@@ -2939,7 +3056,7 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
 
     if (action == 'complete_profile') {
       if (mounted) {
-        setSelectedIndex(4);
+        setSelectedIndex(5);
       }
       return;
     }
@@ -2995,7 +3112,7 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
               right: 0,
               child: ProfileNudgeBanner(
                 onOpenProfile: () {
-                  setSelectedIndex(4);
+                  setSelectedIndex(5);
                 },
                 onDismiss: _handleDismissProfileNudge,
               ),
@@ -3018,7 +3135,7 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
     return SafeArea(
       top: false,
       child: Padding(
-        padding: const EdgeInsets.only(left: 20.0, right: 20.0, bottom: 10.0),
+        padding: const EdgeInsets.only(left: 16.0, right: 16.0, bottom: 10.0),
         child: Container(
           // Parent container holds the shadow so that ClipRRect does not clip it
           decoration: BoxDecoration(
@@ -3049,9 +3166,10 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
                   _buildNavItem(
                       index: 0, icon: Icons.chat_bubble_outline_rounded),
                   _buildNavItem(index: 1, icon: Icons.people_outline_rounded),
-                  _buildNavItem(index: 2, icon: Icons.search_rounded),
-                  _buildNavItem(index: 3, icon: Icons.event_outlined),
-                  _buildNavItem(index: 4, icon: Icons.person_outline_rounded),
+                  _buildNavItem(index: 2, icon: Icons.dynamic_feed_rounded),
+                  _buildNavItem(index: 3, icon: Icons.search_rounded),
+                  _buildNavItem(index: 4, icon: Icons.event_outlined),
+                  _buildNavItem(index: 5, icon: Icons.person_outline_rounded),
                 ],
               ),
             ),
@@ -3068,6 +3186,7 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
     final bool isActive = (_currentIndex == index);
     final Color itemColor = isActive ? Colors.white : const Color(0xFF8FA39E);
     final provider = Provider.of<ChatProvider>(context);
+    final feedProvider = Provider.of<FeedProvider>(context);
 
     Widget iconWidget = Icon(
       icon,
@@ -3089,6 +3208,26 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
               height: 8,
               decoration: const BoxDecoration(
                 color: Color(0xFFEF4444), // Vibrant Red
+                shape: BoxShape.circle,
+              ),
+            ),
+          ),
+        ],
+      );
+    } else if (index == 2 && feedProvider.unseenCount > 0) {
+      // If it's the Circle Feed tab (index 2) and there are unseen posts, overlay an accent dot badge
+      iconWidget = Stack(
+        clipBehavior: Clip.none,
+        children: [
+          iconWidget,
+          Positioned(
+            right: -2,
+            top: -2,
+            child: Container(
+              width: 8,
+              height: 8,
+              decoration: BoxDecoration(
+                color: context.accentPrimary,
                 shape: BoxShape.circle,
               ),
             ),
