@@ -10,6 +10,7 @@ import 'package:connect/Providers/connection_provider.dart';
 import 'package:connect/Pages/ConnectionProfilePage.dart';
 import 'package:connect/Widgets/referral_intro_sheet.dart';
 import 'package:connect/Widgets/post_engagement_bar.dart';
+import 'package:connect/Widgets/link_preview_card.dart';
 
 class PostCard extends StatelessWidget {
   final FeedPost post;
@@ -53,6 +54,8 @@ class PostCard extends StatelessWidget {
   void _showOptions(BuildContext context, int myUserId) {
     final isMe = (post.authorId == myUserId);
     final feedProvider = Provider.of<FeedProvider>(context, listen: false);
+    final connectionProvider =
+        Provider.of<ConnectionProvider>(context, listen: false);
 
     showModalBottomSheet(
       context: context,
@@ -112,9 +115,73 @@ class PostCard extends StatelessWidget {
                   _showReportDialog(context, feedProvider);
                 },
               ),
+              ListTile(
+                leading: const Icon(Icons.block_rounded,
+                    color: Colors.redAccent),
+                title: Text("Block ${post.authorName}",
+                    style: const TextStyle(
+                        color: Colors.redAccent,
+                        fontWeight: FontWeight.w600)),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _showBlockUserDialog(
+                      context, feedProvider, connectionProvider);
+                },
+              ),
             ],
           ],
         ),
+      ),
+    );
+  }
+
+  void _showBlockUserDialog(BuildContext context, FeedProvider feedProvider,
+      ConnectionProvider connectionProvider) {
+    showDialog(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        backgroundColor: context.surfacePrimary,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text("Block ${post.authorName}?",
+            style: TextStyle(
+                color: context.textPrimary,
+                fontSize: 16,
+                fontWeight: FontWeight.bold)),
+        content: Text(
+          "You will no longer see posts, comments, or profile details from ${post.authorName}.",
+          style: TextStyle(color: context.textSecondary, fontSize: 13),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogCtx),
+            child: Text("Cancel", style: TextStyle(color: context.textMuted)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.redAccent),
+            onPressed: () async {
+              Navigator.pop(dialogCtx);
+              try {
+                await connectionProvider.blockUser(post.authorId);
+                feedProvider.removePostsByAuthor(post.authorId);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                      content:
+                          Text("${post.authorName} has been blocked.")),
+                );
+              } catch (e) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                      content: Text("Failed to block user."),
+                      backgroundColor: Colors.redAccent),
+                );
+              }
+            },
+            child: const Text("Block User",
+                style: TextStyle(
+                    color: Colors.white, fontWeight: FontWeight.bold)),
+          ),
+        ],
       ),
     );
   }
@@ -719,77 +786,97 @@ class _FormattedPostContent extends StatelessWidget {
 
     final RegExp mentionRegex = RegExp(pattern, caseSensitive: false);
 
-    final List<InlineSpan> spans = [];
-    final matches = mentionRegex.allMatches(content);
+    final urlRegex = RegExp(r'https?://[^\s]+', caseSensitive: false);
+    final urlMatch = urlRegex.firstMatch(content);
+    final String? detectedUrl = urlMatch?.group(0);
 
-    int lastIndex = 0;
-    for (final match in matches) {
-      if (match.start > lastIndex) {
-        spans.add(TextSpan(text: content.substring(lastIndex, match.start)));
+    // Strip raw URL strings from text display so only commentary and rich preview card are shown
+    final String displayContent =
+        detectedUrl != null ? content.replaceAll(urlRegex, '').trim() : content;
+
+    final List<InlineSpan> spans = [];
+    if (displayContent.isNotEmpty) {
+      final matches = mentionRegex.allMatches(displayContent);
+
+      int lastIndex = 0;
+      for (final match in matches) {
+        if (match.start > lastIndex) {
+          spans.add(TextSpan(text: displayContent.substring(lastIndex, match.start)));
+        }
+
+        final String mentionText = match.group(0) ?? '';
+        final String rawName = mentionText.startsWith('@')
+            ? mentionText.substring(1).trim()
+            : mentionText;
+
+        final cleanMyName = myName.toLowerCase();
+        final cleanRawName = rawName.toLowerCase();
+        final bool isMe = cleanMyName.isNotEmpty &&
+            (cleanRawName == cleanMyName ||
+                cleanMyName.startsWith(cleanRawName) ||
+                cleanRawName.startsWith(cleanMyName));
+
+        final String displayMention = isMe ? "@Me" : mentionText;
+
+        spans.add(
+          TextSpan(
+            text: displayMention,
+            style: TextStyle(
+              color: context.accentPrimary,
+              fontWeight: FontWeight.bold,
+            ),
+            recognizer: TapGestureRecognizer()
+              ..onTap = () {
+                HapticFeedback.lightImpact();
+                final matches = connections.where((c) {
+                  final name = (c['name'] ?? '').toString().toLowerCase();
+                  return name == rawName.toLowerCase();
+                }).toList();
+
+                if (matches.isNotEmpty) {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) =>
+                          ConnectionProfilePage(profileData: matches.first),
+                    ),
+                  );
+                }
+              },
+          ),
+        );
+
+        lastIndex = match.end;
       }
 
-      final String mentionText = match.group(0) ?? '';
-      final String rawName = mentionText.startsWith('@')
-          ? mentionText.substring(1).trim()
-          : mentionText;
+      if (lastIndex < displayContent.length) {
+        spans.add(TextSpan(text: displayContent.substring(lastIndex)));
+      }
 
-      final cleanMyName = myName.toLowerCase();
-      final cleanRawName = rawName.toLowerCase();
-      final bool isMe = cleanMyName.isNotEmpty &&
-          (cleanRawName == cleanMyName ||
-              cleanMyName.startsWith(cleanRawName) ||
-              cleanRawName.startsWith(cleanMyName));
+      if (spans.isEmpty) {
+        spans.add(TextSpan(text: displayContent));
+      }
+    }
 
-      final String displayMention = isMe ? "@Me" : mentionText;
-
-      spans.add(
-        TextSpan(
-          text: displayMention,
-          style: TextStyle(
-            color: context.accentPrimary,
-            fontWeight: FontWeight.bold,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (displayContent.isNotEmpty) ...[
+          RichText(
+            text: TextSpan(
+              style: TextStyle(
+                color: context.textPrimary,
+                fontSize: 14,
+                height: 1.45,
+              ),
+              children: spans,
+            ),
           ),
-          recognizer: TapGestureRecognizer()
-            ..onTap = () {
-              HapticFeedback.lightImpact();
-              final matches = connections.where((c) {
-                final name = (c['name'] ?? '').toString().toLowerCase();
-                return name == rawName.toLowerCase();
-              }).toList();
-
-              if (matches.isNotEmpty) {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) =>
-                        ConnectionProfilePage(profileData: matches.first),
-                  ),
-                );
-              }
-            },
-        ),
-      );
-
-      lastIndex = match.end;
-    }
-
-    if (lastIndex < content.length) {
-      spans.add(TextSpan(text: content.substring(lastIndex)));
-    }
-
-    if (spans.isEmpty) {
-      spans.add(TextSpan(text: content));
-    }
-
-    return RichText(
-      text: TextSpan(
-        style: TextStyle(
-          color: context.textPrimary,
-          fontSize: 14,
-          height: 1.45,
-        ),
-        children: spans,
-      ),
+          if (detectedUrl != null) const SizedBox(height: 8),
+        ],
+        if (detectedUrl != null) LinkPreviewCard(url: detectedUrl),
+      ],
     );
   }
 }

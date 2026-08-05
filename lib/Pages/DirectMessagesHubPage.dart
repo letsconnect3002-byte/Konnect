@@ -14,7 +14,6 @@ import 'package:connect/Config/app_theme.dart';
 import 'package:connect/Providers/tribe_provider.dart';
 import 'package:connect/Pages/Tribe/TribeChatPage.dart';
 import 'package:connect/Pages/Tribe/TribeCreatePage.dart';
-import 'package:connect/Widgets/pulse_row_widget.dart';
 
 class DirectMessagesHubPage extends StatefulWidget {
   const DirectMessagesHubPage({super.key});
@@ -391,7 +390,8 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
                               });
                               scaffoldMessenger.showSnackBar(
                                 const SnackBar(
-                                  content: Text("Could not file report. Please check your network and try again."),
+                                  content: Text(
+                                      "Could not file report. Please check your network and try again."),
                                   backgroundColor: Colors.redAccent,
                                   behavior: SnackBarBehavior.floating,
                                 ),
@@ -450,7 +450,8 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: const Text("Could not retrieve messages. Please check your connection."),
+              content: const Text(
+                  "Could not retrieve messages. Please check your connection."),
               backgroundColor: const Color(0xFFEF4444),
               behavior: SnackBarBehavior.floating,
               action: SnackBarAction(
@@ -788,7 +789,6 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
           if (_selectedTab == 'tribes') ...[
             Expanded(child: _buildTribesTabBody(context)),
           ] else ...[
-            const PulseRowWidget(),
             // 1. Search Box
             Padding(
               padding: const EdgeInsets.only(
@@ -1699,7 +1699,8 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
                         } catch (e) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
-                                content: Text("Could not join Mafia. Please check the code and try again."),
+                                content: Text(
+                                    "Could not join Mafia. Please check the code and try again."),
                                 backgroundColor: Colors.redAccent),
                           );
                         }
@@ -1774,7 +1775,9 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
                           );
                         } catch (e) {
                           scaffoldMessenger.showSnackBar(
-                            const SnackBar(content: Text("Could not delete Mafia. Please try again.")),
+                            const SnackBar(
+                                content: Text(
+                                    "Could not delete Mafia. Please try again.")),
                           );
                         }
                       },

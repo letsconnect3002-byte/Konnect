@@ -315,7 +315,7 @@ class _NotificationPageState extends State<NotificationPage> {
             provider.markAsSeen(notification['id'].toString());
           }
           if (rootPostId.isNotEmpty) {
-            appShellKey.currentState?.setSelectedIndex(2);
+            appShellKey.currentState?.setSelectedIndex(0);
             Navigator.pushReplacement(
               context,
               MaterialPageRoute(

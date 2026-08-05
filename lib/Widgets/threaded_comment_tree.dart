@@ -639,6 +639,11 @@ class _ThreadNodeWidgetState extends State<_ThreadNodeWidget>
                     ),
             ),
           ),
+        if (widget.isRootNode)
+          Container(
+            height: 1,
+            color: Colors.white.withValues(alpha: 0.06),
+          ),
       ],
     );
   }

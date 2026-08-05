@@ -2,6 +2,8 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 	<dict>
+		<key>AppGroupId</key>
+		<string>group.com.jana.app</string>
 		<key>GIDClientID</key>
 		<string>698580767225-lbmollstcmlhu2qdndma602hae616m6f.apps.googleusercontent.com</string>
 		<key>GIDServerClientID</key>

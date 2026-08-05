@@ -10,38 +10,18 @@ import 'package:connect/Models/feed_post.dart';
 import 'package:connect/Widgets/post_card.dart';
 import 'package:connect/Widgets/dwell_detector.dart';
 import 'package:connect/Widgets/threaded_comment_tree.dart';
+import 'package:connect/Widgets/link_preview_card.dart';
+import 'package:connect/Widgets/pulse_row_widget.dart';
+import 'package:connect/Providers/pulse_provider.dart';
 
 class CircleFeedPage extends StatefulWidget {
   const CircleFeedPage({super.key});
 
   @override
   State<CircleFeedPage> createState() => _CircleFeedPageState();
-}
 
-class _CircleFeedPageState extends State<CircleFeedPage> {
-  final ScrollController _scrollController = ScrollController();
-
-  @override
-  void initState() {
-    super.initState();
-    _scrollController.addListener(_onScroll);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final profileProvider =
-          Provider.of<ProfileProvider>(context, listen: false);
-      final feedProvider = Provider.of<FeedProvider>(context, listen: false);
-      feedProvider.updateViewerId(profileProvider.userId);
-    });
-  }
-
-  void _onScroll() {
-    if (_scrollController.position.pixels >=
-        _scrollController.position.maxScrollExtent - 300) {
-      final feedProvider = Provider.of<FeedProvider>(context, listen: false);
-      feedProvider.fetchNextPage();
-    }
-  }
-
-  void _openComposeSheet(BuildContext context) {
+  static void openComposeSheet(BuildContext context,
+      {String? initialText, String? initialUrl}) {
     HapticFeedback.lightImpact();
     final connectionProvider =
         Provider.of<ConnectionProvider>(context, listen: false);
@@ -51,11 +31,37 @@ class _CircleFeedPageState extends State<CircleFeedPage> {
         .where((n) => n.isNotEmpty)
         .toList();
 
+    final urlRegex = RegExp(r'https?://[^\s]+', caseSensitive: false);
+
+    // 1. Extract initial attached URL from initialUrl or initialText
+    String? attachedUrl = (initialUrl != null && initialUrl.trim().isNotEmpty)
+        ? initialUrl.trim()
+        : null;
+
+    final rawInitialText = initialText ?? '';
+    if (attachedUrl == null || attachedUrl.isEmpty) {
+      final match = urlRegex.firstMatch(rawInitialText);
+      if (match != null) {
+        attachedUrl = match.group(0);
+      }
+    }
+
+    // 2. Completely strip all URLs from rawInitialText for user text input box
+    String initialUserText = rawInitialText.replaceAll(urlRegex, '').trim();
+    if (attachedUrl != null && attachedUrl.isNotEmpty) {
+      initialUserText = initialUserText.replaceAll(attachedUrl, '').trim();
+    }
+
     final controller = _MentionTextEditingController(
       accentColor: context.accentPrimary,
       connectionNames: connectionNames,
     );
+    controller.text = initialUserText;
+    controller.selection =
+        TextSelection.collapsed(offset: initialUserText.length);
+
     bool isSubmitting = false;
+    bool isPreviewDetached = false;
 
     showModalBottomSheet(
       context: context,
@@ -67,13 +73,18 @@ class _CircleFeedPageState extends State<CircleFeedPage> {
               Provider.of<ConnectionProvider>(context, listen: false);
           final connections = connectionProvider.connections;
           final bottomPadding = MediaQuery.of(context).viewInsets.bottom;
-          final text = controller.text;
-          final trimmedText = text.trim();
-          final charCount = text.length;
-          final isValid =
-              trimmedText.isNotEmpty && charCount <= 500 && !isSubmitting;
+
+          final trimmedText = controller.text.trim();
+          final charCount = controller.text.length;
+
+          final String? activeUrl = isPreviewDetached ? null : attachedUrl;
+          final bool isValid = (trimmedText.isNotEmpty ||
+                  (activeUrl != null && activeUrl.isNotEmpty)) &&
+              charCount <= 500 &&
+              !isSubmitting;
 
           // Mention detection
+          final text = controller.text;
           final cursorPos = controller.selection.baseOffset;
           String mentionQuery = '';
           int atIndex = -1;
@@ -104,8 +115,9 @@ class _CircleFeedPageState extends State<CircleFeedPage> {
             HapticFeedback.lightImpact();
             final name = conn['name']?.toString() ?? 'User';
             final String replacement = "@$name ";
+            final String currentText = controller.text;
             final String newText =
-                text.replaceRange(atIndex, cursorPos, replacement);
+                currentText.replaceRange(atIndex, cursorPos, replacement);
             controller.text = newText;
             final newCursorPos = atIndex + replacement.length;
             controller.selection =
@@ -176,7 +188,22 @@ class _CircleFeedPageState extends State<CircleFeedPage> {
                     controller: controller,
                     maxLines: 4,
                     autofocus: true,
-                    onChanged: (_) => setSheetState(() {}),
+                    onChanged: (val) {
+                      final matches = urlRegex.allMatches(val).toList();
+                      if (matches.isNotEmpty) {
+                        if (attachedUrl == null && !isPreviewDetached) {
+                          attachedUrl = matches.first.group(0);
+                        }
+                        final textWithoutUrls =
+                            val.replaceAll(urlRegex, '').trim();
+                        controller.value = TextEditingValue(
+                          text: textWithoutUrls,
+                          selection: TextSelection.collapsed(
+                              offset: textWithoutUrls.length),
+                        );
+                      }
+                      setSheetState(() {});
+                    },
                     style: TextStyle(color: context.textPrimary, fontSize: 14),
                     decoration: InputDecoration(
                       hintText: "What's on your mind? Use @ to mention someone",
@@ -191,6 +218,25 @@ class _CircleFeedPageState extends State<CircleFeedPage> {
                       ),
                     ),
                   ),
+                  if (activeUrl != null && activeUrl.isNotEmpty) ...[
+                    const SizedBox(height: 10),
+                    LinkPreviewCard(
+                      url: activeUrl,
+                      onRemove: () {
+                        setSheetState(() {
+                          isPreviewDetached = true;
+                          attachedUrl = null;
+                          final textWithoutUrls =
+                              controller.text.replaceAll(urlRegex, '').trim();
+                          controller.value = TextEditingValue(
+                            text: textWithoutUrls,
+                            selection: TextSelection.collapsed(
+                                offset: textWithoutUrls.length),
+                          );
+                        });
+                      },
+                    ),
+                  ],
                   if (mentionSuggestions.isNotEmpty) ...[
                     const SizedBox(height: 8),
                     Container(
@@ -328,9 +374,17 @@ class _CircleFeedPageState extends State<CircleFeedPage> {
                               final feedProvider = Provider.of<FeedProvider>(
                                   context,
                                   listen: false);
+
+                              String postContent = trimmedText;
+                              if (activeUrl != null && activeUrl.isNotEmpty) {
+                                postContent = postContent.isNotEmpty
+                                    ? "$postContent\n$activeUrl"
+                                    : activeUrl;
+                              }
+
                               try {
                                 await feedProvider.createPost(
-                                  trimmedText,
+                                  postContent,
                                   authorName: profileProvider.name,
                                   authorAvatarUrl: profileProvider.avatarUrl,
                                   connections: connections,
@@ -369,6 +423,34 @@ class _CircleFeedPageState extends State<CircleFeedPage> {
         },
       ),
     );
+  }
+}
+
+class _CircleFeedPageState extends State<CircleFeedPage> {
+  final ScrollController _scrollController = ScrollController();
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController.addListener(_onScroll);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final profileProvider =
+          Provider.of<ProfileProvider>(context, listen: false);
+      final feedProvider = Provider.of<FeedProvider>(context, listen: false);
+      feedProvider.updateViewerId(profileProvider.userId);
+    });
+  }
+
+  void _onScroll() {
+    if (_scrollController.position.pixels >=
+        _scrollController.position.maxScrollExtent - 300) {
+      final feedProvider = Provider.of<FeedProvider>(context, listen: false);
+      feedProvider.fetchNextPage();
+    }
+  }
+
+  void _openComposeSheet(BuildContext context) {
+    CircleFeedPage.openComposeSheet(context);
   }
 
   Widget _buildCaughtUpDivider(BuildContext context) {
@@ -422,7 +504,7 @@ class _CircleFeedPageState extends State<CircleFeedPage> {
         title: Row(
           children: [
             Text(
-              "Network Feed",
+              "Jana",
               style: TextStyle(
                 color: context.textPrimary,
                 fontSize: 22,
@@ -449,14 +531,14 @@ class _CircleFeedPageState extends State<CircleFeedPage> {
             ],
           ],
         ),
-        actions: [
-          IconButton(
-            icon: Icon(Icons.edit_note_rounded,
-                color: context.accentPrimary, size: 26),
-            onPressed: () => _openComposeSheet(context),
-          ),
-          const SizedBox(width: 8),
-        ],
+        // actions: [
+        //   IconButton(
+        //     icon: Icon(Icons.edit_note_rounded,
+        //         color: context.accentPrimary, size: 26),
+        //     onPressed: () => _openComposeSheet(context),
+        //   ),
+        //   const SizedBox(width: 8),
+        // ],
       ),
       body: Stack(
         children: [
@@ -482,58 +564,75 @@ class _CircleFeedPageState extends State<CircleFeedPage> {
                   children: [
                     RefreshIndicator(
                       onRefresh: () async {
-                        await feedProvider.fetchInitialFeed();
+                        final pulseProvider =
+                            Provider.of<PulseProvider>(context, listen: false);
+                        await Future.wait([
+                          feedProvider.fetchInitialFeed(),
+                          pulseProvider.loadFeed(),
+                          pulseProvider.loadMyPulse(),
+                        ]);
                       },
                       backgroundColor: context.surfacePrimary,
                       color: context.accentPrimary,
                       child: feedProvider.posts.isEmpty
                           ? SingleChildScrollView(
                               physics: const AlwaysScrollableScrollPhysics(),
-                              child: Container(
-                                height:
-                                    MediaQuery.of(context).size.height * 0.7,
-                                alignment: Alignment.center,
-                                padding:
-                                    const EdgeInsets.symmetric(horizontal: 32),
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Text(
-                                      "No post shared by your network yet, be first to do so.",
-                                      textAlign: TextAlign.center,
-                                      style: TextStyle(
-                                        color: context.textSecondary,
-                                        fontSize: 14,
-                                        height: 1.4,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 20),
-                                    ElevatedButton.icon(
-                                      onPressed: () =>
-                                          _openComposeSheet(context),
-                                      icon: const Icon(Icons.add_rounded,
-                                          color: Colors.white, size: 18),
-                                      label: const Text("Share First Post",
+                              child: Column(
+                                children: [
+                                  const PulseRowWidget(),
+                                  Container(
+                                    height: MediaQuery.of(context).size.height *
+                                        0.6,
+                                    alignment: Alignment.center,
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 32),
+                                    child: Column(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        Text(
+                                          "No post shared by your network yet, be first to do so.",
+                                          textAlign: TextAlign.center,
                                           style: TextStyle(
-                                              color: Colors.white,
-                                              fontWeight: FontWeight.bold)),
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: context.accentPrimary,
-                                        shape: RoundedRectangleBorder(
-                                            borderRadius:
-                                                BorderRadius.circular(12)),
-                                      ),
+                                            color: context.textSecondary,
+                                            fontSize: 14,
+                                            height: 1.4,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 20),
+                                        ElevatedButton.icon(
+                                          onPressed: () =>
+                                              _openComposeSheet(context),
+                                          icon: const Icon(Icons.add_rounded,
+                                              color: Colors.white, size: 18),
+                                          label: const Text("Share First Post",
+                                              style: TextStyle(
+                                                  color: Colors.white,
+                                                  fontWeight: FontWeight.bold)),
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor:
+                                                context.accentPrimary,
+                                            shape: RoundedRectangleBorder(
+                                                borderRadius:
+                                                    BorderRadius.circular(12)),
+                                          ),
+                                        ),
+                                      ],
                                     ),
-                                  ],
-                                ),
+                                  ),
+                                ],
                               ),
                             )
                           : ListView.builder(
                               controller: _scrollController,
                               physics: const AlwaysScrollableScrollPhysics(),
-                              itemCount: feedProvider.posts.length + 1,
+                              itemCount: feedProvider.posts.length + 2,
                               itemBuilder: (context, index) {
-                                if (index == feedProvider.posts.length) {
+                                if (index == 0) {
+                                  return const PulseRowWidget();
+                                }
+
+                                if (index == feedProvider.posts.length + 1) {
                                   if (feedProvider.isLoadingMore) {
                                     return const Padding(
                                       padding:
@@ -545,17 +644,18 @@ class _CircleFeedPageState extends State<CircleFeedPage> {
                                   return const SizedBox(height: 80);
                                 }
 
-                                final post = feedProvider.posts[index];
+                                final post = feedProvider.posts[index - 1];
+                                final postIndex = index - 1;
 
-                                final bool showDividerHere =
-                                    feedProvider.hasShownCaughtUpDivider &&
-                                        index > 0 &&
-                                        feedProvider.posts[index - 1].degree ==
-                                            post.degree;
+                                final bool showDividerHere = feedProvider
+                                        .hasShownCaughtUpDivider &&
+                                    postIndex > 0 &&
+                                    feedProvider.posts[postIndex - 1].degree ==
+                                        post.degree;
 
                                 return Column(
                                   children: [
-                                    if (showDividerHere && index == 5)
+                                    if (showDividerHere && postIndex == 5)
                                       _buildCaughtUpDivider(context),
                                     DwellDetector(
                                       onDwell: () {

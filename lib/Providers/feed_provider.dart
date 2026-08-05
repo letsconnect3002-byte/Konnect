@@ -549,6 +549,14 @@ class FeedProvider with ChangeNotifier {
       reason: reason,
       additionalDetails: additionalDetails,
     );
+
+    _posts.removeWhere((p) => p.id == postId);
+    notifyListeners();
+  }
+
+  void removePostsByAuthor(int authorId) {
+    _posts.removeWhere((p) => p.authorId == authorId);
+    notifyListeners();
   }
 
   // -------------------------------------------------------

@@ -67,6 +67,8 @@ dependencies:
   audio_session: ^0.2.4
   just_audio: ^0.10.6
   flutter_timezone: ^5.1.0
+  receive_sharing_intent: ^1.8.0
+  any_link_preview: ^3.0.3
   # flutter_launcher_icons: ^0.14.1
   # flutter_native_splash: ^2.4.2
   # image_gallery_saver: ^2.0.3

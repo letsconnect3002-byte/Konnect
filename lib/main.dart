@@ -38,6 +38,7 @@ import 'package:connect/Providers/pulse_provider.dart';
 import 'package:connect/Pages/CircleFeedPage.dart';
 import 'package:connect/Providers/feed_provider.dart';
 import 'package:connect/Repositories/feed_repository.dart';
+import 'package:connect/Services/share_receiver_service.dart';
 import 'package:timezone/data/latest.dart' as tz_latest;
 import 'package:timezone/timezone.dart' as tz;
 import 'package:audio_session/audio_session.dart' as session;
@@ -471,7 +472,7 @@ void handleLocalNotificationClickPayload(String payload) {
           data['root_post_id']?.toString() ?? data['post_id']?.toString() ?? '';
       final postId = data['post_id']?.toString() ?? '';
       if (rootPostId.isNotEmpty) {
-        appShellKey.currentState?.setSelectedIndex(2);
+        appShellKey.currentState?.setSelectedIndex(0);
         navigatorKey.currentState?.popUntil((route) => route.isFirst);
         navigatorKey.currentState?.push(
           MaterialPageRoute(
@@ -2897,7 +2898,7 @@ class _AppShellGateState extends State<AppShellGate> {
                 avatarUrl: actorAvatar,
                 message: body,
                 onTap: () {
-                  appShellKey.currentState?.setSelectedIndex(2);
+                  appShellKey.currentState?.setSelectedIndex(0);
                   navigatorKey.currentState?.popUntil((route) => route.isFirst);
                   navigatorKey.currentState?.push(
                     MaterialPageRoute(
@@ -2930,7 +2931,7 @@ class _AppShellGateState extends State<AppShellGate> {
               '';
           final postId = data['post_id']?.toString() ?? '';
           if (rootPostId.isNotEmpty) {
-            appShellKey.currentState?.setSelectedIndex(2);
+            appShellKey.currentState?.setSelectedIndex(0);
             navigatorKey.currentState?.popUntil((route) => route.isFirst);
             navigatorKey.currentState?.push(
               MaterialPageRoute(
@@ -2982,20 +2983,51 @@ class AppShell extends StatefulWidget {
 class AppShellState extends State<AppShell> with WidgetsBindingObserver {
   int _currentIndex = 0;
   late final List<Widget> _screens;
+  StreamSubscription? _shareSubscription;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _screens = [
-      const DirectMessagesHubPage(), // index 0 — Home / Chats
-      const OtherProfilesPage(), // index 1 — Mandal / Connections
-      const CircleFeedPage(), // index 2 — Circle Feed
+      const CircleFeedPage(), // index 0 — Home (Circle Feed)
+      const DirectMessagesHubPage(), // index 1 — Message (Chats)
+      const OtherProfilesPage(), // index 2 — Mandal / Connections
       const YourNetworkPage(), // index 3 — Your Network
       const PlansPage(), // index 4 — Plans
       const YetToBeBuiltProfilePage(), // index 5 — My Card
     ];
     _setupNotificationTapListeners();
+    _initShareReceiver();
+  }
+
+  void _initShareReceiver() {
+    ShareReceiverService.instance.init();
+    _shareSubscription =
+        ShareReceiverService.instance.onSharedContent.listen((content) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        setSelectedIndex(0);
+        navigatorKey.currentState?.popUntil((route) => route.isFirst);
+        final navContext = navigatorKey.currentContext;
+        if (navContext != null) {
+          // Extract URL and strip it from the text so the compose sheet
+          // never receives the raw URL inside initialText.
+          final urlRegex = RegExp(r'https?://\S+', caseSensitive: false);
+          final String rawText = content.fullText;
+          String? url = content.extractedUrl;
+          if (url == null || url.trim().isEmpty) {
+            url = urlRegex.firstMatch(rawText)?.group(0);
+          }
+          final String cleanText = rawText.replaceAll(urlRegex, '').trim();
+
+          CircleFeedPage.openComposeSheet(
+            navContext,
+            initialText: cleanText.isNotEmpty ? cleanText : null,
+            initialUrl: url,
+          );
+        }
+      });
+    });
   }
 
   Future<void> _handleDismissProfileNudge() async {
@@ -3009,6 +3041,7 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
 
   @override
   void dispose() {
+    _shareSubscription?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -3163,10 +3196,10 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
+                  _buildNavItem(index: 0, icon: Icons.home_rounded),
                   _buildNavItem(
-                      index: 0, icon: Icons.chat_bubble_outline_rounded),
-                  _buildNavItem(index: 1, icon: Icons.people_outline_rounded),
-                  _buildNavItem(index: 2, icon: Icons.dynamic_feed_rounded),
+                      index: 1, icon: Icons.chat_bubble_outline_rounded),
+                  _buildNavItem(index: 2, icon: Icons.people_outline_rounded),
                   _buildNavItem(index: 3, icon: Icons.search_rounded),
                   _buildNavItem(index: 4, icon: Icons.event_outlined),
                   _buildNavItem(index: 5, icon: Icons.person_outline_rounded),
@@ -3194,8 +3227,8 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
       color: itemColor,
     );
 
-    // If it's the Chats tab (index 0) and there are unread messages, overlay a red dot badge
-    if (index == 0 && provider.totalUnreadCount > 0) {
+    // If it's the Message tab (index 1) and there are unread messages, overlay a red dot badge
+    if (index == 1 && provider.totalUnreadCount > 0) {
       iconWidget = Stack(
         clipBehavior: Clip.none,
         children: [
@@ -3214,8 +3247,8 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
           ),
         ],
       );
-    } else if (index == 2 && feedProvider.unseenCount > 0) {
-      // If it's the Circle Feed tab (index 2) and there are unseen posts, overlay an accent dot badge
+    } else if (index == 0 && feedProvider.unseenCount > 0) {
+      // If it's the Home / Circle Feed tab (index 0) and there are unseen posts, overlay an accent dot badge
       iconWidget = Stack(
         clipBehavior: Clip.none,
         children: [
