@@ -5,6 +5,7 @@ import 'package:connect/Config/app_theme.dart';
 import 'package:connect/Models/feed_post.dart';
 import 'package:connect/Providers/feed_provider.dart';
 import 'package:connect/Widgets/reaction_picker_bar.dart';
+import 'package:connect/services/analytics_service.dart';
 
 class PostEngagementBar extends StatelessWidget {
   final FeedPost post;
@@ -66,6 +67,13 @@ class _ReactionButton extends StatelessWidget {
       targetRect: targetRect,
       activeReaction: post.userReaction,
       onSelectReaction: (selectedKey) {
+        AnalyticsService.logEvent(
+          name: 'post_reaction_selected',
+          parameters: {
+            'post_id': post.id,
+            'reaction_key': selectedKey,
+          },
+        );
         if (onReactionToggle != null) {
           onReactionToggle!(post.id, selectedKey);
         } else {

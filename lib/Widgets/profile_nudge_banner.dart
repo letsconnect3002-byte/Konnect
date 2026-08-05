@@ -3,8 +3,9 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:connect/Config/app_theme.dart';
 import 'package:connect/Providers/profile_provider.dart';
+import 'package:connect/services/analytics_service.dart';
 
-class ProfileNudgeBanner extends StatelessWidget {
+class ProfileNudgeBanner extends StatefulWidget {
   final VoidCallback onDismiss;
   final VoidCallback onOpenProfile;
 
@@ -15,10 +16,24 @@ class ProfileNudgeBanner extends StatelessWidget {
   });
 
   @override
+  State<ProfileNudgeBanner> createState() => _ProfileNudgeBannerState();
+}
+
+class _ProfileNudgeBannerState extends State<ProfileNudgeBanner> {
+  bool _hasLoggedView = false;
+
+  @override
   Widget build(BuildContext context) {
     final profileProvider = Provider.of<ProfileProvider>(context);
     if (!profileProvider.shouldShowProfileNudge) {
       return const SizedBox.shrink();
+    }
+
+    if (!_hasLoggedView) {
+      _hasLoggedView = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        AnalyticsService.logEvent(name: 'profile_nudge_viewed');
+      });
     }
 
     final missing = profileProvider.missingEssentialFields;
@@ -29,7 +44,8 @@ class ProfileNudgeBanner extends StatelessWidget {
       child: GestureDetector(
         onTap: () {
           HapticFeedback.lightImpact();
-          onOpenProfile();
+          AnalyticsService.logEvent(name: 'profile_nudge_clicked');
+          widget.onOpenProfile();
         },
         child: Container(
           padding: const EdgeInsets.fromLTRB(14, 10, 10, 10),
@@ -148,8 +164,9 @@ class ProfileNudgeBanner extends StatelessWidget {
                     ),
                     onPressed: () {
                       HapticFeedback.lightImpact();
+                      AnalyticsService.logEvent(name: 'profile_nudge_dismissed');
                       profileProvider.dismissProfileNudge();
-                      onDismiss();
+                      widget.onDismiss();
                     },
                     tooltip: "Dismiss for 2 days",
                   ),

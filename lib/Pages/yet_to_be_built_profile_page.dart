@@ -146,12 +146,12 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
 
       await provider.saveOrUpdateProfile();
 
-      AnalyticsService.logEvent('quick_identity_complete');
+      AnalyticsService.logEvent(name: 'quick_identity_complete');
 
       if (!mounted) return;
 
       if (openProfessionalEditor) {
-        AnalyticsService.logEvent('full_profile_started');
+        AnalyticsService.logEvent(name: 'full_profile_started');
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
@@ -401,7 +401,7 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                         : _selectedVibe;
                     _selectedVibe = finalVibe;
                     AnalyticsService.logEvent(
-                        'quick_identity_name_vibe', {'vibe': finalVibe});
+                        name: 'quick_identity_name_vibe', parameters: {'vibe': finalVibe});
                     _nextStep();
                   }
                 : null,
@@ -819,8 +819,8 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                     _selectedInterests.clear();
                     _selectedInterests.addAll(finalInterests);
 
-                    AnalyticsService.logEvent('quick_identity_interests',
-                        {'interests': finalInterests});
+                    AnalyticsService.logEvent(name: 'quick_identity_interests',
+                        parameters: {'interests': finalInterests});
                     _nextStep();
                   }
                 : null,

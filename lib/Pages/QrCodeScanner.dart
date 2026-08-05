@@ -11,6 +11,7 @@ import 'package:provider/provider.dart';
 import 'package:qr_code_scanner_plus/qr_code_scanner_plus.dart';
 import 'package:connect/Utils/profile_field_filter.dart';
 import 'package:connect/Config/app_theme.dart';
+import 'package:connect/services/analytics_service.dart';
 
 class QRScannerPage extends StatefulWidget {
   const QRScannerPage({super.key});
@@ -92,7 +93,7 @@ class _QRScannerPageState extends State<QRScannerPage> {
         ),
         if (_isLoading)
           Container(
-            color: Colors.black.withOpacity(0.6),
+            color: Colors.black.withValues(alpha: 0.6),
             child: Center(
               child: Material(
                 color: Colors.transparent,
@@ -193,9 +194,10 @@ class _QRScannerPageState extends State<QRScannerPage> {
     });
 
     controller.scannedDataStream.listen((scanData) async {
-      if (_processingScan) return;
+      if (_processingScan || !mounted) return;
 
       print("Scanned QR Code: ${scanData.code}");
+      AnalyticsService.logEvent(name: 'qr_code_scanned');
 
       setState(() {
         _processingScan = true;
@@ -221,6 +223,13 @@ class _QRScannerPageState extends State<QRScannerPage> {
 
           print("Decoded Data Map: $decodedData");
 
+          if (!mounted) return;
+          // Read providers before async operations to avoid BuildContext async gap warnings
+          final tribeProvider =
+              Provider.of<TribeProvider>(context, listen: false);
+          final profileProvider =
+              Provider.of<ProfileProvider>(context, listen: false);
+
           // Pause the camera to prevent additional scans
           controller.pauseCamera();
 
@@ -229,8 +238,6 @@ class _QRScannerPageState extends State<QRScannerPage> {
             setState(() {
               _isLoading = true;
             });
-            final tribeProvider =
-                Provider.of<TribeProvider>(context, listen: false);
             try {
               await tribeProvider.joinTribeWithInviteCode(tribeCode);
               setState(() {
@@ -268,8 +275,6 @@ class _QRScannerPageState extends State<QRScannerPage> {
               _isLoading = true;
             });
 
-            final profileProvider =
-                Provider.of<ProfileProvider>(context, listen: false);
             final fetchedData =
                 await profileProvider.fetchProfileDataOnly(idToFetch);
             if (fetchedData.isNotEmpty) {

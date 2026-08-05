@@ -7,6 +7,7 @@ import 'package:connect/Providers/pulse_provider.dart';
 import 'package:connect/Providers/connection_provider.dart';
 import 'package:connect/Pages/IndividualChatPage.dart';
 import 'package:connect/Widgets/create_plan_sheet.dart';
+import 'package:connect/services/analytics_service.dart';
 import 'package:connect/Utils/error_handler.dart';
 
 class ViewPulseSheet extends StatefulWidget {
@@ -30,6 +31,13 @@ class _ViewPulseSheetState extends State<ViewPulseSheet> {
   @override
   void initState() {
     super.initState();
+    AnalyticsService.logEvent(
+      name: 'pulse_viewed',
+      parameters: {
+        'pulse_id': widget.pulse.id,
+        'is_own_pulse': widget.isOwnPulse,
+      },
+    );
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         Provider.of<PulseProvider>(context, listen: false).loadUpdates(widget.pulse.id);
@@ -487,6 +495,13 @@ class _ViewPulseSheetState extends State<ViewPulseSheet> {
 
   void _handleAction(BuildContext context, String actionType) {
     HapticFeedback.mediumImpact();
+    AnalyticsService.logEvent(
+      name: 'pulse_action_triggered',
+      parameters: {
+        'action_type': actionType,
+        'pulse_owner_id': widget.pulse.userId,
+      },
+    );
     if (actionType == 'message') {
       final connections = Provider.of<ConnectionProvider>(context, listen: false).connections;
       final conn = connections.firstWhere((c) => c['id'] == widget.pulse.userId, orElse: () => {});
@@ -530,6 +545,7 @@ class _ViewPulseSheetState extends State<ViewPulseSheet> {
 
     try {
       await provider.addPulseUpdate(widget.pulse.id, text);
+      AnalyticsService.logEvent(name: 'pulse_update_added');
       _updateController.clear();
     } catch (e) {
       if (mounted) {
@@ -570,13 +586,15 @@ class _ViewPulseSheetState extends State<ViewPulseSheet> {
           ),
           TextButton(
             onPressed: () async {
+              final navigator = Navigator.of(context);
+              final messenger = ScaffoldMessenger.of(context);
               Navigator.pop(ctx); // Close dialog
               HapticFeedback.mediumImpact();
               try {
                 await provider.deletePulse(widget.pulse.id);
                 if (mounted) {
-                  Navigator.pop(context); // Close view sheet
-                  ScaffoldMessenger.of(context).showSnackBar(
+                  navigator.pop(); // Close view sheet
+                  messenger.showSnackBar(
                     const SnackBar(
                       content: Text("Pulse deleted successfully."),
                       backgroundColor: Color(0xFF10B981),
@@ -586,7 +604,7 @@ class _ViewPulseSheetState extends State<ViewPulseSheet> {
                 }
               } catch (e) {
                 if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
+                  messenger.showSnackBar(
                     SnackBar(
                       content: Text(getFriendlyErrorMessage(e)),
                       backgroundColor: const Color(0xFFEF4444),

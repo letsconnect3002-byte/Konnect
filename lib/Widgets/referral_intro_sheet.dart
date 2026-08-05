@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:connect/Config/app_theme.dart';
 import 'package:connect/Providers/feed_provider.dart';
 import 'package:connect/Providers/notification_provider.dart';
+import 'package:connect/services/analytics_service.dart';
 
 class ReferralIntroSheet extends StatefulWidget {
   final int targetUserId;
@@ -85,6 +86,15 @@ class _ReferralIntroSheetState extends State<ReferralIntroSheet> {
         toUserId: _selectedMutualId!,
         referredUserId: widget.targetUserId,
         note: _noteController.text.trim(),
+      );
+
+      AnalyticsService.logEvent(
+        name: 'referral_intro_requested',
+        parameters: {
+          'target_user_id': widget.targetUserId,
+          'selected_mutual_id': _selectedMutualId!,
+          'has_note': _noteController.text.trim().isNotEmpty,
+        },
       );
 
       if (mounted) {

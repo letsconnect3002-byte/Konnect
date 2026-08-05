@@ -140,6 +140,8 @@ class ProfileProvider with ChangeNotifier {
     return missing;
   }
 
+  int get profileCompletionPct => ((4 - missingEssentialFields.length) * 25);
+
   bool get isEssentialProfileComplete => missingEssentialFields.isEmpty;
 
   DateTime? _profileNudgeDismissedAt;

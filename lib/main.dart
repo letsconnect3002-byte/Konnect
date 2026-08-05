@@ -28,6 +28,7 @@ import 'package:connect/Repositories/profile_repository.dart';
 import 'package:connect/Repositories/connection_repository.dart';
 import 'package:connect/Repositories/chat_repository.dart';
 import 'package:connect/Providers/notification_provider.dart';
+import 'package:connect/services/analytics_service.dart';
 import 'package:connect/Repositories/notification_repository.dart';
 import 'package:connect/Providers/plans_provider.dart';
 import 'package:connect/Repositories/plans_repository.dart';
@@ -38,7 +39,7 @@ import 'package:connect/Providers/pulse_provider.dart';
 import 'package:connect/Pages/CircleFeedPage.dart';
 import 'package:connect/Providers/feed_provider.dart';
 import 'package:connect/Repositories/feed_repository.dart';
-import 'package:connect/Services/share_receiver_service.dart';
+import 'package:connect/services/share_receiver_service.dart';
 import 'package:timezone/data/latest.dart' as tz_latest;
 import 'package:timezone/timezone.dart' as tz;
 import 'package:audio_session/audio_session.dart' as session;
@@ -534,6 +535,13 @@ Future<void> onNotificationActionReceived(NotificationResponse response) async {
 
   try {
     final Map<String, dynamic> data = jsonDecode(payload);
+    AnalyticsService.logEvent(
+      name: 'push_action_executed',
+      parameters: {
+        'action_id': actionId ?? 'default',
+        'category': (data['action'] ?? 'notification').toString(),
+      },
+    );
     final client =
         SupabaseClient(SupabaseConfig.url, SupabaseConfig.serviceRoleKey);
 
@@ -1784,7 +1792,7 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
                         final minutes = diff.inMinutes % 60;
                         final seconds = diff.inSeconds % 60;
 
-                        final pad = (int n) => n.toString().padLeft(2, '0');
+                        String pad(int n) => n.toString().padLeft(2, '0');
 
                         if (days > 0) {
                           startsAtText =
@@ -2247,6 +2255,12 @@ class AuthGate extends StatelessWidget {
         final session = snapshot.data?.session;
         final event = snapshot.data?.event;
 
+        if (session != null) {
+          AnalyticsService.setUserId(session.user.id);
+        } else {
+          AnalyticsService.setUserId(null);
+        }
+
         if (event == AuthChangeEvent.passwordRecovery) {
           return const ResetPasswordScreen();
         }
@@ -2287,6 +2301,8 @@ class _AppShellGateState extends State<AppShellGate> {
   Future<void> _initUser() async {
     final profileProvider =
         Provider.of<ProfileProvider>(context, listen: false);
+    final connectionProvider =
+        Provider.of<ConnectionProvider>(context, listen: false);
     final chatProvider = Provider.of<ChatProvider>(context, listen: false);
 
     try {
@@ -2299,6 +2315,12 @@ class _AppShellGateState extends State<AppShellGate> {
       if (userId != null) {
         // Step 2: Load full profile fields (name, email, phone, etc.)
         await profileProvider.loadProfile(userId);
+        await connectionProvider.fetchConnections();
+
+        AnalyticsService.setUserProperties(
+          connectionCount: connectionProvider.connections.length,
+          profileCompletionPct: profileProvider.profileCompletionPct,
+        );
       }
 
       // ── Show the UI immediately after profile data is ready ──
@@ -2588,6 +2610,7 @@ class _AppShellGateState extends State<AppShellGate> {
                 payload != null) {
               final senderId = int.tryParse(senderIdStr);
               if (senderId != null) {
+                if (!mounted) return;
                 final tribeProvider =
                     Provider.of<TribeProvider>(context, listen: false);
                 final isCurrentTribe = tribeProvider.activeTribeId == tribeId;
@@ -2736,8 +2759,8 @@ class _AppShellGateState extends State<AppShellGate> {
                                 final minutes = diff.inMinutes % 60;
                                 final seconds = diff.inSeconds % 60;
 
-                                final pad =
-                                    (int n) => n.toString().padLeft(2, '0');
+                                String pad(int n) =>
+                                    n.toString().padLeft(2, '0');
 
                                 if (days > 0) {
                                   startsAtText =

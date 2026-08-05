@@ -13,6 +13,7 @@ import 'package:connect/Widgets/threaded_comment_tree.dart';
 import 'package:connect/Widgets/link_preview_card.dart';
 import 'package:connect/Widgets/pulse_row_widget.dart';
 import 'package:connect/Providers/pulse_provider.dart';
+import 'package:connect/services/analytics_service.dart';
 
 class CircleFeedPage extends StatefulWidget {
   const CircleFeedPage({super.key});
@@ -652,7 +653,6 @@ class _CircleFeedPageState extends State<CircleFeedPage> {
                                     postIndex > 0 &&
                                     feedProvider.posts[postIndex - 1].degree ==
                                         post.degree;
-
                                 return Column(
                                   children: [
                                     if (showDividerHere && postIndex == 5)
@@ -661,6 +661,13 @@ class _CircleFeedPageState extends State<CircleFeedPage> {
                                       onDwell: () {
                                         feedProvider
                                             .markPostSeenLocally(post.id);
+                                        AnalyticsService.logEvent(
+                                          name: 'feed_post_dwelled',
+                                          parameters: {
+                                            'post_id': post.id,
+                                            'author_degree': post.degree,
+                                          },
+                                        );
                                       },
                                       child: _FeedPostThreadItem(
                                         key: ValueKey("feed_item_${post.id}"),

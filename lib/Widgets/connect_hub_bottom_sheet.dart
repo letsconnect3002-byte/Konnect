@@ -9,6 +9,7 @@ import 'package:connect/Providers/profile_provider.dart';
 import 'package:connect/Providers/connection_provider.dart';
 import 'package:connect/Pages/QrCodeScanner.dart';
 import 'package:connect/Config/app_theme.dart';
+import 'package:connect/services/analytics_service.dart';
 import 'package:connect/main.dart';
 
 class ConnectHubBottomSheet extends StatefulWidget {
@@ -38,6 +39,7 @@ class _ConnectHubBottomSheetState extends State<ConnectHubBottomSheet>
     _selectedShareType = widget.initialShareType;
     _tabController = TabController(length: 2, vsync: this);
     _tabController.addListener(_onTabChanged);
+    AnalyticsService.logEvent(name: 'connect_hub_opened');
   }
 
   @override
@@ -91,6 +93,10 @@ class _ConnectHubBottomSheetState extends State<ConnectHubBottomSheet>
       final profileProvider =
           Provider.of<ProfileProvider>(context, listen: false);
       final code = await profileProvider.generateInviteCode(_selectedShareType);
+      AnalyticsService.logEvent(
+        name: 'invite_code_generated',
+        parameters: {'share_type': _selectedShareType},
+      );
       if (mounted) {
         setState(() {
           _generatedInviteCode = code;
@@ -121,6 +127,11 @@ class _ConnectHubBottomSheetState extends State<ConnectHubBottomSheet>
 
       await connectionProvider.redeemInviteCode(code, "both");
 
+      AnalyticsService.logEvent(
+        name: 'invite_code_redeemed',
+        parameters: {'success': true},
+      );
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -150,6 +161,10 @@ class _ConnectHubBottomSheetState extends State<ConnectHubBottomSheet>
         Navigator.pop(context); // Close the bottom sheet
       }
     } catch (e) {
+      AnalyticsService.logEvent(
+        name: 'invite_code_redeemed',
+        parameters: {'success': false},
+      );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -531,6 +546,7 @@ class _ConnectHubBottomSheetState extends State<ConnectHubBottomSheet>
                 ],
               ),
             ),
+            // ignore: deprecated_member_use
             Radio<String>(
               value: value,
               groupValue: groupValue,

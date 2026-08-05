@@ -6,6 +6,7 @@ import 'package:connect/Config/app_theme.dart';
 import 'package:connect/Providers/connection_provider.dart';
 import 'package:connect/Providers/profile_provider.dart';
 import 'package:connect/Providers/network_provider.dart';
+import 'package:connect/services/analytics_service.dart';
 
 class NetworkMap extends StatefulWidget {
   const NetworkMap({super.key});
@@ -233,6 +234,10 @@ class _NetworkMapState extends State<NetworkMap>
                       child: GestureDetector(
                         onTap: () {
                           HapticFeedback.lightImpact();
+                          AnalyticsService.logEvent(
+                            name: 'network_map_node_tapped',
+                            parameters: {'degree': 2},
+                          );
                           setState(() {
                             _selectedNodeIndex = j + 1;
                             _selectedNodeName =
@@ -315,6 +320,10 @@ class _NetworkMapState extends State<NetworkMap>
                       child: GestureDetector(
                         onTap: () {
                           HapticFeedback.lightImpact();
+                          AnalyticsService.logEvent(
+                            name: 'network_map_node_tapped',
+                            parameters: {'degree': 1},
+                          );
                           setState(() {
                             _selectedNodeIndex = -(i + 1);
                             _selectedNodeName =
@@ -403,6 +412,10 @@ class _NetworkMapState extends State<NetworkMap>
                 child: GestureDetector(
                   onTap: () {
                     HapticFeedback.lightImpact();
+                    AnalyticsService.logEvent(
+                      name: 'network_map_node_tapped',
+                      parameters: {'degree': 0},
+                    );
                     setState(() {
                       _selectedNodeIndex = 0;
                       _selectedNodeName = "$myName (You)";

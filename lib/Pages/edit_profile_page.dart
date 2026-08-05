@@ -195,7 +195,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
       provider.setValue('avatarUrl', _avatarUrl);
 
       await provider.saveOrUpdateProfile();
-      AnalyticsService.logEvent('full_profile_completed');
+      AnalyticsService.logEvent(name: 'full_profile_completed');
 
       if (mounted) {
         Navigator.pop(context);

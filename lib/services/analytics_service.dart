@@ -1,10 +1,30 @@
-class AnalyticsService {
-  AnalyticsService._();
+import 'package:firebase_analytics/firebase_analytics.dart';
 
-  static void logEvent(String name, [Map<String, dynamic>? parameters]) {
-    print("[Analytics] Event: $name, Parameters: $parameters");
-    // This is a placeholder for FirebaseAnalytics, Mixpanel, Segment, etc.
-    // In a production app, you would delegate to your analytics SDK:
-    // FirebaseAnalytics.instance.logEvent(name: name, parameters: parameters);
+class AnalyticsService {
+  static final FirebaseAnalytics _analytics = FirebaseAnalytics.instance;
+
+  static Future<void> setUserId(String? id) async {
+    await _analytics.setUserId(id: id);
+  }
+
+  static Future<void> setUserProperties({
+    required int connectionCount,
+    required int profileCompletionPct,
+  }) async {
+    await _analytics.setUserProperty(
+      name: 'connection_count',
+      value: connectionCount.toString(),
+    );
+    await _analytics.setUserProperty(
+      name: 'profile_completion_pct',
+      value: profileCompletionPct.toString(),
+    );
+  }
+
+  static Future<void> logEvent({
+    required String name,
+    Map<String, Object>? parameters,
+  }) async {
+    await _analytics.logEvent(name: name, parameters: parameters);
   }
 }

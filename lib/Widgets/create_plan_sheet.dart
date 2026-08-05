@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:connect/Config/app_theme.dart';
 import 'package:connect/Providers/plans_provider.dart';
 import 'package:connect/Providers/connection_provider.dart';
+import 'package:connect/services/analytics_service.dart';
 
 class CreatePlanSheet extends StatefulWidget {
   final Map<String, dynamic>? existingPlan;
@@ -303,6 +304,16 @@ class _CreatePlanSheetState extends State<CreatePlanSheet> {
             ? _meetingLinkController.text.trim()
             : null,
         inviteeIds: _selectedInvitees.toList(),
+      );
+
+      AnalyticsService.logEvent(
+        name: 'plan_created',
+        parameters: {
+          'category': categoryToSend,
+          'plan_type': _selectedPlanType,
+          'is_online': _isOnline,
+          'invitees_count': _selectedInvitees.length,
+        },
       );
     }
 
