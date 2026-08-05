@@ -21,6 +21,11 @@ class FeedProvider with ChangeNotifier {
   RealtimeChannel? _realtimeChannel;
   Timer? _newPostPollTimer;
 
+  final _postUpdateStreamController =
+      StreamController<Map<String, dynamic>>.broadcast();
+  Stream<Map<String, dynamic>> get postUpdateStream =>
+      _postUpdateStreamController.stream;
+
   // --- Snapshot of the feed's top post ID when we last loaded ---
   // Used to detect whether new content exists without fetching full posts.
   String? _latestKnownPostId;
@@ -697,6 +702,9 @@ class FeedProvider with ChangeNotifier {
 
     debugPrint("[FeedProvider] Realtime event ($table): $eventType");
 
+    // Broadcast all posts table events to stream listeners (thread widgets)
+    _postUpdateStreamController.add(payload);
+
     if (table == 'post_reactions') {
       _handleReactionRealtimeEvent(
         eventType: eventType,
@@ -805,19 +813,32 @@ class FeedProvider with ChangeNotifier {
     final String event = eventType.toLowerCase();
 
     if (userId == viewerId) {
-      // Self reaction triggered on another device or confirmed by server
-      if (event == 'insert') {
-        userReaction = newRecord['reaction_type']?.toString();
-      } else if (event == 'update') {
+      // Viewer's own reaction — counts are already correct from the
+      // optimistic update + server response in toggleReaction().
+      // Only sync the userReaction flag here.
+      if (event == 'insert' || event == 'update') {
         userReaction = newRecord['reaction_type']?.toString();
       } else if (event == 'delete') {
         userReaction = null;
       }
     } else {
-      // Reaction triggered by another user -> update aggregate reactionCounts map
+      // Another user's reaction — we need to adjust counts.
       if (event == 'insert') {
-        final String reactionType = newRecord['reaction_type']?.toString() ?? 'like';
+        final String reactionType =
+            newRecord['reaction_type']?.toString() ?? 'like';
         counts[reactionType] = (counts[reactionType] ?? 0) + 1;
+      } else if (event == 'delete') {
+        final String reactionType = oldRecord['reaction_type']?.toString() ??
+            newRecord['reaction_type']?.toString() ??
+            'like';
+        if (counts.containsKey(reactionType)) {
+          final c = counts[reactionType]!;
+          if (c <= 1) {
+            counts.remove(reactionType);
+          } else {
+            counts[reactionType] = c - 1;
+          }
+        }
       } else if (event == 'update') {
         final String oldType = oldRecord['reaction_type']?.toString() ?? '';
         final String newType = newRecord['reaction_type']?.toString() ?? '';
@@ -831,18 +852,6 @@ class FeedProvider with ChangeNotifier {
         }
         if (newType.isNotEmpty) {
           counts[newType] = (counts[newType] ?? 0) + 1;
-        }
-      } else if (event == 'delete') {
-        final String reactionType = oldRecord['reaction_type']?.toString() ??
-            newRecord['reaction_type']?.toString() ??
-            '';
-        if (reactionType.isNotEmpty && counts.containsKey(reactionType)) {
-          final c = counts[reactionType]!;
-          if (c <= 1) {
-            counts.remove(reactionType);
-          } else {
-            counts[reactionType] = c - 1;
-          }
         }
       }
     }
@@ -911,6 +920,7 @@ class FeedProvider with ChangeNotifier {
     _stopNewPostPollTimer();
     flushSeenBuffer();
     _seenFlushTimer?.cancel();
+    _postUpdateStreamController.close();
     super.dispose();
   }
 }

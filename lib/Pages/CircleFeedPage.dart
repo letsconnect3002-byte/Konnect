@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -854,12 +855,186 @@ class _FeedPostThreadItemState extends State<_FeedPostThreadItem> {
   CommentNode? _treeNode;
   bool _isLoadingThread = false;
   String? _lastFetchedPostId;
+  StreamSubscription<Map<String, dynamic>>? _postUpdateSub;
 
   @override
   void initState() {
     super.initState();
     if (widget.post.activeReplyCount > 0) {
       _loadThreadPreview();
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_postUpdateSub == null) {
+      final feedProvider = Provider.of<FeedProvider>(context, listen: false);
+      _postUpdateSub =
+          feedProvider.postUpdateStream.listen(_onRealtimePostUpdate);
+    }
+  }
+
+  @override
+  void dispose() {
+    _postUpdateSub?.cancel();
+    super.dispose();
+  }
+
+  bool _isPostIdInTree(CommentNode node, String targetId) {
+    if (node.id == targetId) return true;
+    for (final child in node.replies) {
+      if (_isPostIdInTree(child, targetId)) return true;
+    }
+    return false;
+  }
+
+  void _onRealtimePostUpdate(Map<String, dynamic> payload) {
+    if (!mounted || _treeNode == null) return;
+
+    final String table = payload['table']?.toString() ?? 'posts';
+    final String eventType = payload['eventType']?.toString() ?? '';
+    final Map<String, dynamic> newRecord =
+        Map<String, dynamic>.from(payload['new'] ?? {});
+    final Map<String, dynamic> oldRecord =
+        Map<String, dynamic>.from(payload['old'] ?? {});
+
+    if (table == 'post_reactions') {
+      final String targetPostId = newRecord['post_id']?.toString() ??
+          oldRecord['post_id']?.toString() ??
+          '';
+      if (targetPostId.isEmpty) return;
+
+      if (!_isPostIdInTree(_treeNode!, targetPostId)) return;
+
+      final int? eventUserId = newRecord['user_id'] is int
+          ? newRecord['user_id'] as int
+          : int.tryParse(newRecord['user_id']?.toString() ??
+              oldRecord['user_id']?.toString() ??
+              '');
+
+      final String reactionType =
+          newRecord['reaction_type']?.toString() ?? 'like';
+      final String event = eventType.toLowerCase();
+
+      final feedProvider = Provider.of<FeedProvider>(context, listen: false);
+      final currentViewerId = feedProvider.viewerId;
+
+      CommentNode applyReactionUpdate(CommentNode node) {
+        if (node.id == targetPostId && node.post != null) {
+          final currentPost = node.post!;
+          final Map<String, int> counts =
+              Map<String, int>.from(currentPost.reactionCounts);
+          String? userReaction = currentPost.userReaction;
+
+          final bool isSelf = eventUserId != null &&
+              currentViewerId != null &&
+              eventUserId == currentViewerId;
+
+          if (isSelf) {
+            // Viewer's own reaction — counts are already correct from
+            // _handleReactionToggle optimistic update + server response.
+            // Only sync the userReaction flag here.
+            if (event == 'insert' || event == 'update') {
+              userReaction = reactionType;
+            } else if (event == 'delete') {
+              userReaction = null;
+            }
+          } else {
+            // Another user's reaction — adjust counts.
+            if (event == 'insert') {
+              counts[reactionType] = (counts[reactionType] ?? 0) + 1;
+            } else if (event == 'delete') {
+              final String delType =
+                  oldRecord['reaction_type']?.toString() ??
+                      newRecord['reaction_type']?.toString() ??
+                      reactionType;
+              if (counts.containsKey(delType)) {
+                final current = counts[delType]!;
+                if (current <= 1) {
+                  counts.remove(delType);
+                } else {
+                  counts[delType] = current - 1;
+                }
+              }
+            } else if (event == 'update') {
+              final String? oldReactionType =
+                  oldRecord['reaction_type']?.toString();
+              if (oldReactionType != null &&
+                  counts.containsKey(oldReactionType)) {
+                final prev = counts[oldReactionType]!;
+                if (prev <= 1) {
+                  counts.remove(oldReactionType);
+                } else {
+                  counts[oldReactionType] = prev - 1;
+                }
+              }
+              counts[reactionType] = (counts[reactionType] ?? 0) + 1;
+            }
+          }
+
+          final updatedPost = currentPost.copyWith(
+            userReaction: userReaction,
+            nullifyUserReaction: userReaction == null,
+            reactionCounts: counts,
+          );
+          return node.copyWith(
+            post: updatedPost,
+            replies: node.replies.map(applyReactionUpdate).toList(),
+          );
+        }
+        return node.copyWith(
+          replies: node.replies.map(applyReactionUpdate).toList(),
+        );
+      }
+
+      setState(() {
+        _treeNode = applyReactionUpdate(_treeNode!);
+      });
+    } else if (table == 'posts') {
+      final String targetPostId = newRecord['id']?.toString() ?? '';
+      final String? rootPostId = newRecord['root_post_id']?.toString();
+      final String? replyToPostId = newRecord['reply_to_post_id']?.toString();
+
+      if (eventType.toLowerCase() == 'insert' &&
+          replyToPostId != null &&
+          (rootPostId == widget.post.id ||
+              replyToPostId == widget.post.id ||
+              _isPostIdInTree(_treeNode!, replyToPostId))) {
+        _loadThreadPreview(forceReload: true);
+        return;
+      }
+
+      if (targetPostId.isNotEmpty &&
+          _isPostIdInTree(_treeNode!, targetPostId)) {
+        if (newRecord['reaction_counts'] is Map &&
+            (newRecord['reaction_counts'] as Map).isNotEmpty) {
+          final Map<String, int> serverCounts = {};
+          (newRecord['reaction_counts'] as Map).forEach((k, v) {
+            final c = v is int ? v : (int.tryParse(v?.toString() ?? '') ?? 0);
+            if (c > 0) serverCounts[k.toString()] = c;
+          });
+
+          CommentNode applyCountsUpdate(CommentNode node) {
+            if (node.id == targetPostId && node.post != null) {
+              final updatedPost = node.post!.copyWith(
+                reactionCounts: serverCounts,
+              );
+              return node.copyWith(
+                post: updatedPost,
+                replies: node.replies.map(applyCountsUpdate).toList(),
+              );
+            }
+            return node.copyWith(
+              replies: node.replies.map(applyCountsUpdate).toList(),
+            );
+          }
+
+          setState(() {
+            _treeNode = applyCountsUpdate(_treeNode!);
+          });
+        }
+      }
     }
   }
 
@@ -880,6 +1055,7 @@ class _FeedPostThreadItemState extends State<_FeedPostThreadItem> {
     // Same post — sync the root node's post data (reactions, counts)
     // without re-fetching the entire thread.
     if (_treeNode != null) {
+      final existingPost = _treeNode!.post ?? widget.post;
       setState(() {
         _treeNode = CommentNode(
           id: _treeNode!.id,
@@ -892,8 +1068,9 @@ class _FeedPostThreadItemState extends State<_FeedPostThreadItem> {
           replyCount: widget.post.activeReplyCount,
           isDeleted: _treeNode!.isDeleted,
           replyToName: _treeNode!.replyToName,
-          post: widget.post.copyWith(
+          post: existingPost.copyWith(
             replyCount: widget.post.activeReplyCount,
+            activeReplyCount: widget.post.activeReplyCount,
           ),
           replies: _treeNode!.replies,
         );
@@ -915,9 +1092,9 @@ class _FeedPostThreadItemState extends State<_FeedPostThreadItem> {
     }
   }
 
-  Future<void> _loadThreadPreview() async {
+  Future<void> _loadThreadPreview({bool forceReload = false}) async {
     // Guard: don't re-fetch if we already fetched for this post
-    if (_isLoadingThread || _lastFetchedPostId == widget.post.id) return;
+    if (_isLoadingThread || (!forceReload && _lastFetchedPostId == widget.post.id)) return;
     _isLoadingThread = true;
 
     try {
@@ -1014,6 +1191,98 @@ class _FeedPostThreadItemState extends State<_FeedPostThreadItem> {
     return "${dateTime.day}/${dateTime.month}/${dateTime.year}";
   }
 
+  void _handleReactionToggle(String targetPostId, String selectedKey) {
+    if (_treeNode == null) return;
+
+    CommentNode updateNode(CommentNode node) {
+      if (node.id == targetPostId && node.post != null) {
+        final currentPost = node.post!;
+        final String? oldUserReaction = currentPost.userReaction;
+        final Map<String, int> newCounts =
+            Map<String, int>.from(currentPost.reactionCounts);
+
+        String? newUserReaction;
+        if (oldUserReaction == selectedKey) {
+          newUserReaction = null;
+          if (newCounts.containsKey(selectedKey)) {
+            final c = newCounts[selectedKey]!;
+            if (c <= 1) {
+              newCounts.remove(selectedKey);
+            } else {
+              newCounts[selectedKey] = c - 1;
+            }
+          }
+        } else {
+          if (oldUserReaction != null && newCounts.containsKey(oldUserReaction)) {
+            final prevCount = newCounts[oldUserReaction]!;
+            if (prevCount <= 1) {
+              newCounts.remove(oldUserReaction);
+            } else {
+              newCounts[oldUserReaction] = prevCount - 1;
+            }
+          }
+          newUserReaction = selectedKey;
+          newCounts[selectedKey] = (newCounts[selectedKey] ?? 0) + 1;
+        }
+
+        final updatedPost = currentPost.copyWith(
+          userReaction: newUserReaction,
+          nullifyUserReaction: newUserReaction == null,
+          reactionCounts: newCounts,
+        );
+
+        return node.copyWith(
+          post: updatedPost,
+          replies: node.replies.map(updateNode).toList(),
+        );
+      }
+
+      return node.copyWith(
+        replies: node.replies.map(updateNode).toList(),
+      );
+    }
+
+    setState(() {
+      _treeNode = updateNode(_treeNode!);
+    });
+
+    final feedProvider = Provider.of<FeedProvider>(context, listen: false);
+    feedProvider.toggleReaction(targetPostId, reactionType: selectedKey).then((res) {
+      if (res != null && mounted && _treeNode != null) {
+        final serverReaction = res['user_reaction']?.toString();
+        final Map<String, int> serverCounts = {};
+        if (res['reaction_counts'] is Map) {
+          (res['reaction_counts'] as Map).forEach((k, v) {
+            final c = v is int ? v : (int.tryParse(v?.toString() ?? '') ?? 0);
+            if (c > 0) serverCounts[k.toString()] = c;
+          });
+        }
+
+        CommentNode applyServerUpdate(CommentNode node) {
+          if (node.id == targetPostId && node.post != null) {
+            final currentPost = node.post!;
+            final updatedPost = currentPost.copyWith(
+              userReaction: serverReaction,
+              nullifyUserReaction: serverReaction == null,
+              reactionCounts: serverCounts,
+            );
+            return node.copyWith(
+              post: updatedPost,
+              replies: node.replies.map(applyServerUpdate).toList(),
+            );
+          }
+          return node.copyWith(
+            replies: node.replies.map(applyServerUpdate).toList(),
+          );
+        }
+
+        setState(() {
+          _treeNode = applyServerUpdate(_treeNode!);
+        });
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     // Use activeReplyCount from the provider-owned post directly
@@ -1032,12 +1301,15 @@ class _FeedPostThreadItemState extends State<_FeedPostThreadItem> {
         strokeWidth: 1.8,
         curveRadius: 12.0,
         allowNestedExpansion: false,
+        onReactionToggle: _handleReactionToggle,
         onReplyTap: (node) {
           Navigator.push(
             context,
             MaterialPageRoute(
               builder: (context) => ThreadDetailPage(
                 rootPostId: widget.post.id,
+                highlightPostId: node.id,
+                focusReplyToPostId: node.id,
               ),
             ),
           );
@@ -1048,6 +1320,8 @@ class _FeedPostThreadItemState extends State<_FeedPostThreadItem> {
             MaterialPageRoute(
               builder: (context) => ThreadDetailPage(
                 rootPostId: widget.post.id,
+                highlightPostId: node.id,
+                focusReplyToPostId: node.id,
               ),
             ),
           );

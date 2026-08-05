@@ -36,6 +36,36 @@ class CommentNode {
     this.post,
     this.replies = const [],
   });
+
+  CommentNode copyWith({
+    String? id,
+    int? authorId,
+    String? authorName,
+    String? authorAvatarUrl,
+    String? content,
+    String? timestamp,
+    int? degree,
+    int? replyCount,
+    bool? isDeleted,
+    String? replyToName,
+    FeedPost? post,
+    List<CommentNode>? replies,
+  }) {
+    return CommentNode(
+      id: id ?? this.id,
+      authorId: authorId ?? this.authorId,
+      authorName: authorName ?? this.authorName,
+      authorAvatarUrl: authorAvatarUrl ?? this.authorAvatarUrl,
+      content: content ?? this.content,
+      timestamp: timestamp ?? this.timestamp,
+      degree: degree ?? this.degree,
+      replyCount: replyCount ?? this.replyCount,
+      isDeleted: isDeleted ?? this.isDeleted,
+      replyToName: replyToName ?? this.replyToName,
+      post: post ?? this.post,
+      replies: replies ?? this.replies,
+    );
+  }
 }
 
 /// CustomPainter that renders continuous vertical thread lines with smooth 90-degree

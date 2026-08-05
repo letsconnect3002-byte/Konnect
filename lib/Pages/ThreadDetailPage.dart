@@ -14,11 +14,15 @@ import 'package:connect/Widgets/threaded_comment_tree.dart';
 class ThreadDetailPage extends StatefulWidget {
   final String rootPostId;
   final String? highlightPostId;
+  /// If provided, the reply input will initially target this post ID
+  /// instead of the root post.
+  final String? focusReplyToPostId;
 
   const ThreadDetailPage({
     super.key,
     required this.rootPostId,
     this.highlightPostId,
+    this.focusReplyToPostId,
   });
 
   @override
@@ -30,6 +34,7 @@ class _ThreadDetailPageState extends State<ThreadDetailPage> {
   bool _isLoading = true;
   List<FeedPost> _threadPosts = [];
   FeedPost? _replyingToTarget;
+  bool _hasSetInitialReplyTarget = false;
   bool _isSubmitting = false;
   RealtimeChannel? _threadChannel;
 
@@ -112,8 +117,17 @@ class _ThreadDetailPageState extends State<ThreadDetailPage> {
         setState(() {
           _threadPosts = posts;
           _isLoading = false;
-          if (_threadPosts.isNotEmpty) {
-            _replyingToTarget = _threadPosts.first; // Default reply to root post
+          if (!_hasSetInitialReplyTarget && _threadPosts.isNotEmpty) {
+            _hasSetInitialReplyTarget = true;
+            // If a specific reply target was requested, find it in the thread
+            if (widget.focusReplyToPostId != null) {
+              final targetPost = _threadPosts
+                  .where((p) => p.id == widget.focusReplyToPostId)
+                  .firstOrNull;
+              _replyingToTarget = targetPost ?? _threadPosts.first;
+            } else {
+              _replyingToTarget = _threadPosts.first; // Default reply to root post
+            }
           }
         });
 
@@ -229,6 +243,18 @@ class _ThreadDetailPageState extends State<ThreadDetailPage> {
     if (diff.inHours < 24) return "${diff.inHours}h ago";
     if (diff.inDays < 7) return "${diff.inDays}d ago";
     return "${dateTime.day}/${dateTime.month}/${dateTime.year}";
+  }
+
+  String _truncateContent(String content, int maxLen) {
+    final trimmed = content.replaceAll(RegExp(r'\s+'), ' ').trim();
+    if (trimmed.isEmpty) return '...';
+    if (trimmed.length <= maxLen) return trimmed;
+    // Try to break at last space within maxLen
+    final lastSpace = trimmed.lastIndexOf(' ', maxLen);
+    if (lastSpace > 0) {
+      return '${trimmed.substring(0, lastSpace)}...';
+    }
+    return '${trimmed.substring(0, maxLen)}...';
   }
 
   Future<void> _submitReply() async {
@@ -472,7 +498,11 @@ class _ThreadDetailPageState extends State<ThreadDetailPage> {
                                       Navigator.push(
                                         context,
                                         MaterialPageRoute(
-                                          builder: (context) => ThreadDetailPage(rootPostId: node.id),
+                                          builder: (context) => ThreadDetailPage(
+                                            rootPostId: node.id,
+                                            highlightPostId: node.id,
+                                            focusReplyToPostId: node.id,
+                                          ),
                                         ),
                                       );
                                     } else {
@@ -541,11 +571,15 @@ class _ThreadDetailPageState extends State<ThreadDetailPage> {
                           padding: const EdgeInsets.only(bottom: 6),
                           child: Row(
                             children: [
-                              Text(
-                                "Replying to @${_replyingToTarget!.authorName}",
-                                style: TextStyle(color: context.accentSecondary, fontSize: 12, fontWeight: FontWeight.w600),
+                              Flexible(
+                                child: Text(
+                                  "Replying to @${_replyingToTarget!.authorName} for \"${_truncateContent(_replyingToTarget!.content, 30)}\"",
+                                  style: TextStyle(color: context.accentSecondary, fontSize: 12, fontWeight: FontWeight.w600),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
                               ),
-                              const Spacer(),
+                              const SizedBox(width: 8),
                               GestureDetector(
                                 onTap: () {
                                   setState(() {

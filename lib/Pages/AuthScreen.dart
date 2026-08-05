@@ -53,7 +53,8 @@ class _AuthScreenState extends State<AuthScreen> {
     if (!_acceptPrivacyPolicy) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text("You must agree to the Terms of Service & EULA to proceed"),
+          content:
+              Text("You must agree to the Terms of Service & EULA to proceed"),
           backgroundColor: Colors.orangeAccent,
           behavior: SnackBarBehavior.floating,
         ),
@@ -205,8 +206,9 @@ class _AuthScreenState extends State<AuthScreen> {
       final targetClientId = Platform.isIOS
           ? '698580767225-lbmollstcmlhu2qdndma602hae616m6f.apps.googleusercontent.com'
           : null;
-      final targetServerClientId = '698580767225-9ib3bsce1hd9a9c266ck4ilrdkj1sa4n.apps.googleusercontent.com';
-      
+      final targetServerClientId =
+          '698580767225-9ib3bsce1hd9a9c266ck4ilrdkj1sa4n.apps.googleusercontent.com';
+
       debugPrint(
           '[Google Sign-In] Initializing GoogleSignIn.instance with clientId: $targetClientId and serverClientId: $targetServerClientId');
       await GoogleSignIn.instance.initialize(
@@ -219,8 +221,8 @@ class _AuthScreenState extends State<AuthScreen> {
       // Await the native authenticate() method
       debugPrint(
           '[Google Sign-In] Requesting native authentication via GoogleSignIn.instance.authenticate()...');
-      final GoogleSignInAccount googleUser = await GoogleSignIn.instance
-          .authenticate();
+      final GoogleSignInAccount googleUser =
+          await GoogleSignIn.instance.authenticate();
       debugPrint('[Google Sign-In] authenticate() returned: $googleUser');
 
       // Retrieve the corresponding GoogleSignInAuthentication object
@@ -260,16 +262,11 @@ class _AuthScreenState extends State<AuthScreen> {
           '[Google Sign-In] Supabase AuthException caught: ${e.message} (status: ${e.statusCode}). Activating web OAuth fallback.');
       useFallback = true;
     } on GoogleSignInException catch (e) {
-      debugPrint(
-          '[Google Sign-In] GoogleSignInException caught!');
-      debugPrint(
-          '[Google Sign-In]   - Exception type: ${e.runtimeType}');
-      debugPrint(
-          '[Google Sign-In]   - Error code: ${e.code}');
-      debugPrint(
-          '[Google Sign-In]   - Error description: ${e.description}');
-      debugPrint(
-          '[Google Sign-In]   - Full toString(): ${e.toString()}');
+      debugPrint('[Google Sign-In] GoogleSignInException caught!');
+      debugPrint('[Google Sign-In]   - Exception type: ${e.runtimeType}');
+      debugPrint('[Google Sign-In]   - Error code: ${e.code}');
+      debugPrint('[Google Sign-In]   - Error description: ${e.description}');
+      debugPrint('[Google Sign-In]   - Full toString(): ${e.toString()}');
       if (e.code == GoogleSignInExceptionCode.canceled) {
         debugPrint(
             '[Google Sign-In] User cancelled Google Sign-In (Code 16 or cancellation). Not falling back.');
@@ -330,7 +327,8 @@ class _AuthScreenState extends State<AuthScreen> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Google sign-in could not be completed. Please try again.'),
+              content: Text(
+                  'Google sign-in could not be completed. Please try again.'),
               backgroundColor: Colors.redAccent,
               behavior: SnackBarBehavior.floating,
             ),
@@ -397,7 +395,8 @@ class _AuthScreenState extends State<AuthScreen> {
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Apple sign-in could not be completed. Please try again.'),
+              content: Text(
+                  'Apple sign-in could not be completed. Please try again.'),
               backgroundColor: Colors.redAccent,
               behavior: SnackBarBehavior.floating,
             ),
@@ -1184,7 +1183,8 @@ class _AuthScreenState extends State<AuthScreen> {
           style: ElevatedButton.styleFrom(
             backgroundColor: context.accentPrimary,
             foregroundColor: Colors.white,
-            disabledBackgroundColor: context.accentPrimary.withValues(alpha: 0.5),
+            disabledBackgroundColor:
+                context.accentPrimary.withValues(alpha: 0.5),
             disabledForegroundColor: Colors.white.withValues(alpha: 0.5),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(AppDimensions.radiusPill),
@@ -1467,7 +1467,8 @@ class _AuthScreenState extends State<AuthScreen> {
                         decorationColor: context.accentPrimary,
                       ),
                       recognizer: TapGestureRecognizer()
-                        ..onTap = () => _launchUrl('https://www.joinmandala.in/legal'),
+                        ..onTap = () =>
+                            _launchUrl('https://www.joinmandala.in/legal'),
                     ),
                     const TextSpan(text: ", "),
                     TextSpan(
@@ -1479,7 +1480,8 @@ class _AuthScreenState extends State<AuthScreen> {
                         decorationColor: context.accentPrimary,
                       ),
                       recognizer: TapGestureRecognizer()
-                        ..onTap = () => _launchUrl('https://www.joinmandala.in/legal'),
+                        ..onTap = () =>
+                            _launchUrl('https://www.joinmandala.in/legal'),
                     ),
                     const TextSpan(text: " and "),
                     TextSpan(
@@ -1491,7 +1493,8 @@ class _AuthScreenState extends State<AuthScreen> {
                         decorationColor: context.accentPrimary,
                       ),
                       recognizer: TapGestureRecognizer()
-                        ..onTap = () => _launchUrl('https://www.joinmandala.in/eula'),
+                        ..onTap =
+                            () => _launchUrl('https://www.joinmandala.in/eula'),
                     ),
                     const TextSpan(text: "."),
                   ],
