@@ -219,46 +219,49 @@ class _PulseUserPickerState extends State<PulseUserPicker> {
                       final avatar = conn['avatarUrl'] ?? '';
                       final isSelected = _selectedIds.contains(id);
 
-                      return ListTile(
-                        leading: CircleAvatar(
-                          backgroundImage: avatar.isNotEmpty ? NetworkImage(avatar) : null,
-                          backgroundColor: context.surfaceSecondary,
-                          child: avatar.isEmpty
+                      return Material(
+                        color: Colors.transparent,
+                        child: ListTile(
+                          leading: CircleAvatar(
+                            backgroundImage: avatar.isNotEmpty ? NetworkImage(avatar) : null,
+                            backgroundColor: context.surfaceSecondary,
+                            child: avatar.isEmpty
+                                ? Text(
+                                    name.isNotEmpty ? name[0].toUpperCase() : '',
+                                    style: TextStyle(color: context.textPrimary, fontSize: 14),
+                                  )
+                                : null,
+                          ),
+                          title: Text(
+                            name,
+                            style: TextStyle(
+                              color: context.textPrimary,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14.5,
+                            ),
+                          ),
+                          subtitle: profession.isNotEmpty
                               ? Text(
-                                  name.isNotEmpty ? name[0].toUpperCase() : '',
-                                  style: TextStyle(color: context.textPrimary, fontSize: 14),
+                                  profession,
+                                  style: TextStyle(color: context.textSecondary, fontSize: 12),
                                 )
                               : null,
-                        ),
-                        title: Text(
-                          name,
-                          style: TextStyle(
-                            color: context.textPrimary,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 14.5,
+                          trailing: Icon(
+                            isSelected ? Icons.check_circle_rounded : Icons.radio_button_off_rounded,
+                            color: isSelected ? context.accentSecondary : context.textMuted,
+                            size: 22,
                           ),
+                          onTap: () {
+                            HapticFeedback.lightImpact();
+                            setState(() {
+                              if (isSelected) {
+                                _selectedIds.remove(id);
+                              } else {
+                                _selectedIds.add(id);
+                              }
+                            });
+                          },
                         ),
-                        subtitle: profession.isNotEmpty
-                            ? Text(
-                                profession,
-                                style: TextStyle(color: context.textSecondary, fontSize: 12),
-                              )
-                            : null,
-                        trailing: Icon(
-                          isSelected ? Icons.check_circle_rounded : Icons.radio_button_off_rounded,
-                          color: isSelected ? context.accentSecondary : context.textMuted,
-                          size: 22,
-                        ),
-                        onTap: () {
-                          HapticFeedback.lightImpact();
-                          setState(() {
-                            if (isSelected) {
-                              _selectedIds.remove(id);
-                            } else {
-                              _selectedIds.add(id);
-                            }
-                          });
-                        },
                       );
                     },
                   ),

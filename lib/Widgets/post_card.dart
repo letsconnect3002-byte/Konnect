@@ -80,53 +80,62 @@ class PostCard extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             if (isMe)
-              ListTile(
-                leading: const Icon(Icons.delete_outline_rounded,
-                    color: Colors.redAccent),
-                title: const Text("Delete Post",
-                    style: TextStyle(
-                        color: Colors.redAccent, fontWeight: FontWeight.bold)),
-                onTap: () async {
-                  Navigator.pop(ctx);
-                  try {
-                    await feedProvider.deletePost(post.id);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text("Post deleted")),
-                    );
-                  } catch (e) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                          content: Text("Error deleting post"),
-                          backgroundColor: Colors.redAccent),
-                    );
-                  }
-                },
+              Material(
+                color: Colors.transparent,
+                child: ListTile(
+                  leading: const Icon(Icons.delete_outline_rounded,
+                      color: Colors.redAccent),
+                  title: const Text("Delete Post",
+                      style: TextStyle(
+                          color: Colors.redAccent, fontWeight: FontWeight.bold)),
+                  onTap: () async {
+                    Navigator.pop(ctx);
+                    try {
+                      await feedProvider.deletePost(post.id);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text("Post deleted")),
+                      );
+                    } catch (e) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                            content: Text("Error deleting post"),
+                            backgroundColor: Colors.redAccent),
+                      );
+                    }
+                  },
+                ),
               )
             else ...[
-              ListTile(
-                leading:
-                    const Icon(Icons.flag_outlined, color: Colors.amberAccent),
-                title: Text("Report Content",
-                    style: TextStyle(
-                        color: context.textPrimary,
-                        fontWeight: FontWeight.w600)),
-                onTap: () {
-                  Navigator.pop(ctx);
-                  _showReportDialog(context, feedProvider);
-                },
+              Material(
+                color: Colors.transparent,
+                child: ListTile(
+                  leading:
+                      const Icon(Icons.flag_outlined, color: Colors.amberAccent),
+                  title: Text("Report Content",
+                      style: TextStyle(
+                          color: context.textPrimary,
+                          fontWeight: FontWeight.w600)),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _showReportDialog(context, feedProvider);
+                  },
+                ),
               ),
-              ListTile(
-                leading: const Icon(Icons.block_rounded,
-                    color: Colors.redAccent),
-                title: Text("Block ${post.authorName}",
-                    style: const TextStyle(
-                        color: Colors.redAccent,
-                        fontWeight: FontWeight.w600)),
-                onTap: () {
-                  Navigator.pop(ctx);
-                  _showBlockUserDialog(
-                      context, feedProvider, connectionProvider);
-                },
+              Material(
+                color: Colors.transparent,
+                child: ListTile(
+                  leading: const Icon(Icons.block_rounded,
+                      color: Colors.redAccent),
+                  title: Text("Block ${post.authorName}",
+                      style: const TextStyle(
+                          color: Colors.redAccent,
+                          fontWeight: FontWeight.w600)),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _showBlockUserDialog(
+                        context, feedProvider, connectionProvider);
+                  },
+                ),
               ),
             ],
           ],

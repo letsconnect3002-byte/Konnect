@@ -212,27 +212,30 @@ class _ReferralIntroSheetState extends State<ReferralIntroSheet> {
                   final String avatar = item['mutual_avatar_url']?.toString() ?? '';
                   final bool isSelected = (_selectedMutualId == id);
 
-                  return ListTile(
-                    dense: true,
-                    onTap: () {
-                      HapticFeedback.lightImpact();
-                      setState(() {
-                        _selectedMutualId = id;
-                      });
-                    },
-                    leading: CircleAvatar(
-                      radius: 14,
-                      backgroundColor: context.surfaceSecondary,
-                      backgroundImage: avatar.isNotEmpty ? NetworkImage(avatar) : null,
-                      child: avatar.isEmpty
-                          ? Text(name.substring(0, 1).toUpperCase(),
-                              style: TextStyle(color: context.textPrimary, fontSize: 11))
+                  return Material(
+                    color: Colors.transparent,
+                    child: ListTile(
+                      dense: true,
+                      onTap: () {
+                        HapticFeedback.lightImpact();
+                        setState(() {
+                          _selectedMutualId = id;
+                        });
+                      },
+                      leading: CircleAvatar(
+                        radius: 14,
+                        backgroundColor: context.surfaceSecondary,
+                        backgroundImage: avatar.isNotEmpty ? NetworkImage(avatar) : null,
+                        child: avatar.isEmpty
+                            ? Text(name.substring(0, 1).toUpperCase(),
+                                style: TextStyle(color: context.textPrimary, fontSize: 11))
+                            : null,
+                      ),
+                      title: Text(name, style: TextStyle(color: context.textPrimary, fontSize: 14)),
+                      trailing: isSelected
+                          ? Icon(Icons.check_circle_rounded, color: context.accentPrimary, size: 20)
                           : null,
                     ),
-                    title: Text(name, style: TextStyle(color: context.textPrimary, fontSize: 14)),
-                    trailing: isSelected
-                        ? Icon(Icons.check_circle_rounded, color: context.accentPrimary, size: 20)
-                        : null,
                   );
                 },
               ),
