@@ -10,6 +10,7 @@ import 'package:connect/Providers/connection_provider.dart';
 import 'package:connect/Pages/QrCodeScanner.dart';
 import 'package:connect/Config/app_theme.dart';
 import 'package:connect/services/analytics_service.dart';
+import 'package:connect/services/linkrunner_service.dart';
 import 'package:connect/main.dart';
 
 class ConnectHubBottomSheet extends StatefulWidget {
@@ -214,9 +215,17 @@ class _ConnectHubBottomSheetState extends State<ConnectHubBottomSheet>
   }
 
   void _shareInviteLink() async {
-    if (_generatedInviteCode == null) return;
-    final shareMessage =
-        "Hey! Connect with me on Jana using my connection code: $_generatedInviteCode. Let's start messaging privately.";
+    final profileProvider = Provider.of<ProfileProvider>(context, listen: false);
+    final userId = profileProvider.userId;
+    final inviteLink = LinkrunnerService.generateInviteLink(
+      senderUserId: userId ?? '',
+      inviteCode: _generatedInviteCode,
+    );
+    
+    final String shareMessage = (_generatedInviteCode != null)
+        ? "Hey! Connect with me on Jana! Click here to download & connect: $inviteLink or use my Private Key: $_generatedInviteCode"
+        : "Hey! Connect with me on Jana! Click here to download & connect: $inviteLink";
+        
     await SharePlus.instance.share(ShareParams(text: shareMessage));
   }
 

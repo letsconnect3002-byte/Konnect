@@ -1,15 +1,28 @@
 PODS:
   - Flutter (1.0.0)
+  - linkrunner (4.1.1):
+    - Flutter
+    - LinkrunnerKit (= 4.1.0)
+  - LinkrunnerKit (4.1.0)
 
 DEPENDENCIES:
   - Flutter (from `Flutter`)
+  - linkrunner (from `.symlinks/plugins/linkrunner/ios`)
+
+SPEC REPOS:
+  trunk:
+    - LinkrunnerKit
 
 EXTERNAL SOURCES:
   Flutter:
     :path: Flutter
+  linkrunner:
+    :path: ".symlinks/plugins/linkrunner/ios"
 
 SPEC CHECKSUMS:
   Flutter: cabc95a1d2626b1b06e7179b784ebcf0c0cde467
+  linkrunner: bbecdfa496fa01a45cca6caee0447322b3da839a
+  LinkrunnerKit: d0aab8660717ba685fa3b67f2b57ec030d22424a
 
 PODFILE CHECKSUM: ad7443efd70e358da1249ee16ba26d503c6e30d0
 

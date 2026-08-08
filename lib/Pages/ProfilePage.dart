@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:share_plus/share_plus.dart';
+import 'package:connect/services/linkrunner_service.dart';
 import 'package:connect/Providers/profile_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -155,8 +156,12 @@ class _ProfilePageState extends State<ProfilePage> {
         Navigator.pop(context); // Dismiss loading dialog
       }
 
+      final inviteLink = LinkrunnerService.generateInviteLink(
+        senderUserId: profileProvider.userId ?? '',
+        inviteCode: code,
+      );
       final shareMessage =
-          "Hey, I'm inviting you to my private circle on Jana. Download the app here: joinmandala.in and use my single-use Private code to connect: *$code*.";
+          "Hey, I'm inviting you to my private circle on Jana. Click here to download & connect: $inviteLink or use my single-use Private Key: *$code*.";
 
       await SharePlus.instance.share(ShareParams(text: shareMessage));
     } catch (e) {

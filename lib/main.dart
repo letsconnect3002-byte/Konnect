@@ -38,6 +38,8 @@ import 'package:connect/Repositories/pulse_repository.dart';
 import 'package:connect/Providers/pulse_provider.dart';
 import 'package:connect/Pages/CircleFeedPage.dart';
 import 'package:connect/Providers/feed_provider.dart';
+import 'package:connect/services/linkrunner_service.dart';
+import 'package:connect/Widgets/referral_connection_modal.dart';
 import 'package:connect/Repositories/feed_repository.dart';
 import 'package:connect/services/share_receiver_service.dart';
 import 'package:timezone/data/latest.dart' as tz_latest;
@@ -1975,6 +1977,9 @@ void main() async {
     // authCallbackUrlScheme: 'connectapp',
   );
 
+  // Initialize Linkrunner SDK for deferred deep linking & referrals
+  await LinkrunnerService.initialize();
+
   // Initialize flutter_local_notifications
   const AndroidInitializationSettings initializationSettingsAndroid =
       AndroidInitializationSettings('@mipmap/ic_launcher');
@@ -2208,21 +2213,26 @@ class MyApp extends StatelessWidget {
           );
         },
         onGenerateRoute: (settings) {
-          if (settings.name != null &&
-              (settings.name!.startsWith('/?code=') ||
-                  settings.name!.startsWith('/login-callback') ||
-                  settings.name!.contains('code='))) {
-            return MaterialPageRoute(
-              builder: (context) => Scaffold(
-                backgroundColor: context.canvasBackground,
-                body: Center(
-                  child: CircularProgressIndicator(
-                    valueColor:
-                        AlwaysStoppedAnimation<Color>(context.accentPrimary),
+          if (settings.name != null) {
+            final name = settings.name!;
+            final isAuthCallback = (name.startsWith('/login-callback') || name.contains('code=')) &&
+                !name.contains('referrer=') &&
+                !name.contains('MNDL-') &&
+                !name.contains('invite_code=');
+
+            if (isAuthCallback) {
+              return MaterialPageRoute(
+                builder: (context) => Scaffold(
+                  backgroundColor: context.canvasBackground,
+                  body: Center(
+                    child: CircularProgressIndicator(
+                      valueColor:
+                          AlwaysStoppedAnimation<Color>(context.accentPrimary),
+                    ),
                   ),
                 ),
-              ),
-            );
+              );
+            }
           }
           return null;
         },
@@ -2326,6 +2336,11 @@ class _AppShellGateState extends State<AppShellGate> {
       // ── Show the UI immediately after profile data is ready ──
       // Chat rooms, push tokens, and unread counts load in the background.
       if (mounted) setState(() => _initialized = true);
+
+      // Check if user has a pending referral invite link from Linkrunner
+      if (mounted) {
+        ReferralConnectionModal.checkAndShowPrompt(context);
+      }
 
       if (targetOpenNotificationsPage) {
         targetOpenNotificationsPage = false;

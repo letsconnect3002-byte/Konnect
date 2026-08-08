@@ -936,9 +936,11 @@ class _AuthScreenState extends State<AuthScreen> {
                         ),
                         const SizedBox(height: 24),
 
-                        // Apple Sign In Button (swapped for greater prominence)
-                        _buildAppleButton(context),
-                        const SizedBox(height: 12),
+                        // Apple Sign In Button (only shown on iOS devices)
+                        if (Platform.isIOS) ...[
+                          _buildAppleButton(context),
+                          const SizedBox(height: 12),
+                        ],
                         // Google Sign In Button
                         _buildGoogleButton(context),
                       ],
@@ -1242,6 +1244,7 @@ class _AuthScreenState extends State<AuthScreen> {
   }
 
   Widget _buildAppleButton(BuildContext context) {
+    if (!Platform.isIOS) return const SizedBox.shrink();
     final isEnabled = _acceptPrivacyPolicy;
     return Opacity(
       opacity: isEnabled ? 1.0 : 0.4,
