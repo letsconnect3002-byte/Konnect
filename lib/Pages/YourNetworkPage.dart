@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:connect/Config/app_theme.dart';
+import 'package:connect/Config/feature_config.dart';
 import 'package:provider/provider.dart';
 import 'package:connect/Providers/connection_provider.dart';
 import 'package:connect/Providers/notification_provider.dart';
 import 'package:connect/Providers/network_provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:connect/Widgets/network_map.dart';
+import 'package:connect/Widgets/horizontal_connection_map.dart';
 import 'package:connect/Utils/social_launcher.dart';
 import 'dart:ui';
 
@@ -147,8 +149,10 @@ class _YourNetworkPageState extends State<YourNetworkPage> {
     final String profession = item["profession"] ?? '';
     final String company = item["company"] ?? '';
     final String avatarUrl = item["avatar_url"] ?? item["avatarUrl"] ?? '';
-    final int degreeInt = item["degree"] is int ? item["degree"] : 2;
-    final String degree = degreeInt == 2 ? "2nd" : "3rd";
+    final int degreeInt = item["degree"] is int
+        ? item["degree"] as int
+        : (int.tryParse(item["degree"]?.toString() ?? '') ?? 2);
+    final String degree = degreeInt == 1 ? "1st" : (degreeInt == 2 ? "2nd" : "3rd");
 
     showModalBottomSheet(
       context: context,
@@ -817,8 +821,10 @@ class _YourNetworkPageState extends State<YourNetworkPage> {
     final String name = item["name"] ?? '';
     final String profession = item["profession"] ?? '';
     final String company = item["company"] ?? '';
-    final int degreeInt = item["degree"] is int ? item["degree"] : 2;
-    final String degree = degreeInt == 2 ? "2nd" : "3rd";
+    final int degreeInt = item["degree"] is int
+        ? item["degree"] as int
+        : (int.tryParse(item["degree"]?.toString() ?? '') ?? 2);
+    final String degree = degreeInt == 1 ? "1st" : (degreeInt == 2 ? "2nd" : "3rd");
     final int mutualCount = item["mutual_count"] ?? 0;
     final String mutualNames = item["mutual_names"] ?? '';
     final String mutualAvatarsStr = item["mutual_avatars"] ?? '';
@@ -1235,7 +1241,20 @@ class _ReferBottomSheetState extends State<_ReferBottomSheet> {
               ),
               textAlign: TextAlign.center,
             ),
-            const SizedBox(height: 20),
+            HorizontalConnectionMap(
+              selectedMutual: selectedConnectionIds.isNotEmpty
+                  ? widget.eligibleConnections.firstWhere(
+                      (c) => c['id'] == selectedConnectionIds.first,
+                      orElse: () => widget.eligibleConnections.first,
+                    )
+                  : null,
+              targetName: widget.targetProfile['name'] ?? 'Connection',
+              targetAvatarUrl: widget.targetProfile['avatar_url'] ?? widget.targetProfile['avatarUrl'],
+              degree: widget.targetProfile['degree'] is int
+                  ? widget.targetProfile['degree'] as int
+                  : 2,
+            ),
+            const SizedBox(height: 12),
             Text(
               "SELECT MUTUAL CONNECTIONS",
               style: context.captionText.copyWith(
@@ -1493,122 +1512,136 @@ class _ReferBottomSheetState extends State<_ReferBottomSheet> {
                 ),
               )
             else
-              ElevatedButton(
-                onPressed: selectedConnectionIds.isEmpty
-                    ? null
-                    : () async {
-                        HapticFeedback.mediumImpact();
-                        setState(() {
-                          isSending = true;
-                        });
+              Builder(
+                builder: (context) {
+                  final int targetDegree = widget.targetProfile['degree'] is int
+                      ? widget.targetProfile['degree'] as int
+                      : 2;
+                  final bool is3rdDegreeDisabled = targetDegree == 3 &&
+                      !FeatureConfig.enable3rdDegreeInteraction;
+                  final bool isButtonEnabled =
+                      selectedConnectionIds.isNotEmpty && !is3rdDegreeDisabled;
 
-                        final navigator = Navigator.of(context);
-                        final messenger = ScaffoldMessenger.of(context);
-                        final textPrimaryColor = context.textPrimary;
-
-                        try {
-                          final notifProvider =
-                              Provider.of<NotificationProvider>(context,
-                                  listen: false);
-                          final noteText = noteController.text.trim().isEmpty
-                              ? null
-                              : noteController.text.trim();
-
-                          // Send referral requests to all selected recipients in parallel
-                          await Future.wait(
-                            selectedConnectionIds.map(
-                                (toId) => notifProvider.sendReferralRequest(
-                                      toUserId: toId,
-                                      referredUserId: targetId,
-                                      note: noteText,
-                                    )),
-                          );
-
-                          if (mounted) {
-                            navigator.pop();
-                            messenger.showSnackBar(
-                              SnackBar(
-                                content: Row(
-                                  children: [
-                                    const Icon(Icons.check_circle_rounded,
-                                        color: Colors.white),
-                                    const SizedBox(width: 8),
-                                    Text("Introduction requests sent!",
-                                        style: TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            color: textPrimaryColor)),
-                                  ],
-                                ),
-                                backgroundColor: const Color(0xFF7C3AED),
-                                behavior: SnackBarBehavior.floating,
-                              ),
-                            );
-                          }
-                        } catch (e) {
-                          if (mounted) {
+                  return ElevatedButton(
+                    onPressed: isButtonEnabled
+                        ? () async {
+                            HapticFeedback.mediumImpact();
                             setState(() {
-                              isSending = false;
+                              isSending = true;
                             });
 
-                            String friendlyMessage =
-                                "Failed to send referral. Please try again.";
-                            final errStr = e.toString();
-                            if (errStr.contains("check constraint") ||
-                                errStr.contains("23514")) {
-                              friendlyMessage =
-                                  "Failed to send: unsupported database constraint. Please contact support.";
-                            } else if (errStr.contains("network") ||
-                                errStr.contains("SocketException")) {
-                              friendlyMessage =
-                                  "Network error. Please check your internet connection.";
-                            }
+                            final navigator = Navigator.of(context);
+                            final messenger = ScaffoldMessenger.of(context);
+                            final textPrimaryColor = context.textPrimary;
 
-                            messenger.showSnackBar(
-                              SnackBar(
-                                content: Row(
-                                  children: [
-                                    const Icon(Icons.error_outline_rounded,
-                                        color: Colors.white),
-                                    const SizedBox(width: 8),
-                                    Expanded(
-                                      child: Text(
-                                        friendlyMessage,
-                                        style: TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            color: textPrimaryColor),
-                                      ),
+                            try {
+                              final notifProvider =
+                                  Provider.of<NotificationProvider>(context,
+                                      listen: false);
+                              final noteText =
+                                  noteController.text.trim().isEmpty
+                                      ? null
+                                      : noteController.text.trim();
+
+                              // Send referral requests to all selected recipients in parallel
+                              await Future.wait(
+                                selectedConnectionIds.map(
+                                    (toId) => notifProvider.sendReferralRequest(
+                                          toUserId: toId,
+                                          referredUserId: targetId,
+                                          note: noteText,
+                                        )),
+                              );
+
+                              if (mounted) {
+                                navigator.pop();
+                                messenger.showSnackBar(
+                                  SnackBar(
+                                    content: Row(
+                                      children: [
+                                        const Icon(Icons.check_circle_rounded,
+                                            color: Colors.white),
+                                        const SizedBox(width: 8),
+                                        Text("Introduction requests sent!",
+                                            style: TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                color: textPrimaryColor)),
+                                      ],
                                     ),
-                                  ],
-                                ),
-                                backgroundColor: Colors.redAccent,
-                                behavior: SnackBarBehavior.floating,
-                              ),
-                            );
+                                    backgroundColor: const Color(0xFF7C3AED),
+                                    behavior: SnackBarBehavior.floating,
+                                  ),
+                                );
+                              }
+                            } catch (e) {
+                              if (mounted) {
+                                setState(() {
+                                  isSending = false;
+                                });
+
+                                String friendlyMessage =
+                                    "Failed to send referral. Please try again.";
+                                final errStr = e.toString();
+                                if (errStr.contains("check constraint") ||
+                                    errStr.contains("23514")) {
+                                  friendlyMessage =
+                                      "Failed to send: unsupported database constraint. Please contact support.";
+                                } else if (errStr.contains("network") ||
+                                    errStr.contains("SocketException")) {
+                                  friendlyMessage =
+                                      "Network error. Please check your internet connection.";
+                                }
+
+                                messenger.showSnackBar(
+                                  SnackBar(
+                                    content: Row(
+                                      children: [
+                                        const Icon(Icons.error_outline_rounded,
+                                            color: Colors.white),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: Text(
+                                            friendlyMessage,
+                                            style: TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                color: textPrimaryColor),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    backgroundColor: Colors.redAccent,
+                                    behavior: SnackBarBehavior.floating,
+                                  ),
+                                );
+                              }
+                            }
                           }
-                        }
-                      },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: context.accentSecondary,
-                  foregroundColor: Colors.white,
-                  disabledBackgroundColor:
-                      context.surfaceSecondary.withValues(alpha: 0.5),
-                  disabledForegroundColor: context.textMuted,
-                  shape: RoundedRectangleBorder(
-                    borderRadius:
-                        BorderRadius.circular(AppDimensions.radiusComponent),
-                  ),
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  elevation: 0,
-                ),
-                child: Text(
-                  "Request Introduction",
-                  style: context.bodyText.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: selectedConnectionIds.isEmpty
-                        ? context.textMuted
-                        : Colors.white,
-                  ),
-                ),
+                        : null,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: context.accentSecondary,
+                      foregroundColor: Colors.white,
+                      disabledBackgroundColor:
+                          context.surfaceSecondary.withValues(alpha: 0.5),
+                      disabledForegroundColor: context.textMuted,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(
+                            AppDimensions.radiusComponent),
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      elevation: 0,
+                    ),
+                    child: Text(
+                      is3rdDegreeDisabled
+                          ? "3rd Degree Introductions — Coming Soon"
+                          : "Request Introduction",
+                      style: context.bodyText.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color:
+                            !isButtonEnabled ? context.textMuted : Colors.white,
+                      ),
+                    ),
+                  );
+                },
               ),
           ],
         ),

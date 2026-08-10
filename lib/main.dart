@@ -2215,7 +2215,8 @@ class MyApp extends StatelessWidget {
         onGenerateRoute: (settings) {
           if (settings.name != null) {
             final name = settings.name!;
-            final isAuthCallback = (name.startsWith('/login-callback') || name.contains('code=')) &&
+            final isAuthCallback = (name.startsWith('/login-callback') ||
+                    name.contains('code=')) &&
                 !name.contains('referrer=') &&
                 !name.contains('MNDL-') &&
                 !name.contains('invite_code=');
@@ -2231,6 +2232,29 @@ class MyApp extends StatelessWidget {
                     ),
                   ),
                 ),
+              );
+            }
+
+            // Absorb referral / invite deep link routes silently.
+            // The link params are already handled by LinkrunnerService & ShareReceiverService.
+            if (name.contains('referrer=') ||
+                name.contains('MNDL-') ||
+                name.contains('invite_code=')) {
+              if (appShellKey.currentContext != null) {
+                // App is already running (warm start). Absorb extra route push and pop it immediately
+                // to prevent Duplicate GlobalKey error for AppShellGate.
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  navigatorKey.currentState?.maybePop();
+                });
+                return MaterialPageRoute(
+                  builder: (_) => const SizedBox.shrink(),
+                  settings: settings,
+                );
+              }
+              // Cold start: AuthGate becomes the root route.
+              return MaterialPageRoute(
+                builder: (_) => const AuthGate(),
+                settings: const RouteSettings(name: '/'),
               );
             }
           }
@@ -2262,7 +2286,8 @@ class AuthGate extends StatelessWidget {
           );
         }
 
-        final session = snapshot.data?.session;
+        final currentSession = Supabase.instance.client.auth.currentSession;
+        final session = snapshot.data?.session ?? currentSession;
         final event = snapshot.data?.event;
 
         if (session != null) {
@@ -2337,9 +2362,18 @@ class _AppShellGateState extends State<AppShellGate> {
       // Chat rooms, push tokens, and unread counts load in the background.
       if (mounted) setState(() => _initialized = true);
 
-      // Check if user has a pending referral invite link from Linkrunner
+      // App has fully booted and UI is rendered! Now run referral invite check safely.
       if (mounted) {
-        ReferralConnectionModal.checkAndShowPrompt(context);
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            final bool isExplicitLaunch =
+                LinkrunnerService.consumeWasColdStartDeepLink();
+            ReferralConnectionModal.checkAndShowPrompt(
+              context,
+              isExplicitLinkClick: isExplicitLaunch,
+            );
+          }
+        });
       }
 
       if (targetOpenNotificationsPage) {
@@ -3044,15 +3078,54 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
     _shareSubscription =
         ShareReceiverService.instance.onSharedContent.listen((content) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
+        final String rawText = content.fullText;
+        String? url = content.extractedUrl;
+
+        final bool isInvite = rawText.contains('referrer=') ||
+            rawText.contains('referrer_id=') ||
+            rawText.contains('invite_code=') ||
+            rawText.contains('MNDL-') ||
+            (url != null &&
+                (url.contains('referrer=') ||
+                    url.contains('invite_code=') ||
+                    url.contains('MNDL-')));
+
+        final navContext = navigatorKey.currentContext;
+
+        if (isInvite) {
+          final String linkStr = url ?? rawText;
+          final uri = Uri.tryParse(linkStr);
+          if (uri != null) {
+            final String? referrer = uri.queryParameters['referrer'] ??
+                uri.queryParameters['referrer_id'] ??
+                uri.queryParameters['sender_id'];
+            final String? code = uri.queryParameters['invite_code'] ??
+                uri.queryParameters['code'] ??
+                uri.queryParameters['key'] ??
+                uri.queryParameters['private_key'];
+            if (referrer != null && referrer.isNotEmpty) {
+              LinkrunnerService.savePendingReferrerId(referrer);
+            }
+            if (code != null && code.isNotEmpty) {
+              LinkrunnerService.savePendingInviteCode(code);
+            }
+          }
+
+          if (navContext != null && appShellKey.currentState != null) {
+            ReferralConnectionModal.checkAndShowPrompt(
+              navContext,
+              isExplicitLinkClick: true,
+            );
+          }
+          return;
+        }
+
         setSelectedIndex(0);
         navigatorKey.currentState?.popUntil((route) => route.isFirst);
-        final navContext = navigatorKey.currentContext;
         if (navContext != null) {
           // Extract URL and strip it from the text so the compose sheet
           // never receives the raw URL inside initialText.
           final urlRegex = RegExp(r'https?://\S+', caseSensitive: false);
-          final String rawText = content.fullText;
-          String? url = content.extractedUrl;
           if (url == null || url.trim().isEmpty) {
             url = urlRegex.firstMatch(rawText)?.group(0);
           }

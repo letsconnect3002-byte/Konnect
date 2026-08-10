@@ -190,23 +190,43 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
               child: const Text("Delete Connection",
                   style: TextStyle(
                       color: Colors.redAccent, fontWeight: FontWeight.normal)),
-              onPressed: () async {
+              onPressed: () {
+                final messenger = ScaffoldMessenger.of(context);
                 Navigator.pop(dialogContext);
-                try {
-                  await provider.deleteProfile(connection['id'],
-                      onRoomCleanup: (profileId, roomId) async {
-                    await chatProvider.handleRoomCleanup(profileId, roomId);
-                  });
-                  scaffoldMessenger.showSnackBar(
-                    const SnackBar(
-                      content: Text("Connection removed",
-                          style: TextStyle(color: Colors.white)),
-                      backgroundColor: Colors.redAccent,
+                messenger.showSnackBar(
+                  SnackBar(
+                    behavior: SnackBarBehavior.floating,
+                    backgroundColor: context.surfaceSecondary,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      side: BorderSide(
+                        color: context.borderMuted.withValues(alpha: 0.3),
+                        width: 1,
+                      ),
                     ),
-                  );
-                } catch (e) {
-                  print("Error deleting connection: $e");
-                }
+                    content: const Row(
+                      children: [
+                        Icon(Icons.check_circle_rounded, color: Colors.redAccent, size: 20),
+                        SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            "Connection removed",
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              fontFamily: 'Inter',
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+                provider.deleteProfile(connection['id'],
+                    onRoomCleanup: (profileId, roomId) async {
+                  await chatProvider.handleRoomCleanup(profileId, roomId);
+                });
               },
             ),
           ],
@@ -365,24 +385,42 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
                                       : detailsController.text.trim(),
                             );
 
-                            // 2. Delete Connection
-                            await provider.deleteProfile(intId,
+                            final messenger = ScaffoldMessenger.of(context);
+                            Navigator.of(dialogContext).pop();
+                            messenger.showSnackBar(
+                              SnackBar(
+                                behavior: SnackBarBehavior.floating,
+                                backgroundColor: context.surfaceSecondary,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  side: BorderSide(
+                                    color: context.borderMuted.withValues(alpha: 0.3),
+                                    width: 1,
+                                  ),
+                                ),
+                                content: const Row(
+                                  children: [
+                                    Icon(Icons.check_circle_rounded, color: Colors.greenAccent, size: 20),
+                                    SizedBox(width: 10),
+                                    Expanded(
+                                      child: Text(
+                                        "Connection deleted and contact reported.",
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                            provider.deleteProfile(intId,
                                 onRoomCleanup: (profileId, roomId) async {
                               await chatProvider.handleRoomCleanup(
                                   profileId, roomId);
                             });
-
-                            if (mounted) {
-                              Navigator.of(dialogContext).pop();
-                              scaffoldMessenger.showSnackBar(
-                                const SnackBar(
-                                  content: Text(
-                                      "Connection deleted and contact reported."),
-                                  backgroundColor: Colors.green,
-                                  behavior: SnackBarBehavior.floating,
-                                ),
-                              );
-                            }
                           } catch (e) {
                             if (mounted) {
                               setStateBuilder(() {
@@ -517,75 +555,75 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
           'Messages',
           style: context.screenHeading,
         ),
-        actions: [
-          Consumer<NotificationProvider>(
-            builder: (context, notifProvider, child) {
-              final unread = notifProvider.unreadCount;
-              return Padding(
-                padding: const EdgeInsets.only(right: 16.0),
-                child: Center(
-                  child: GestureDetector(
-                    onTap: () {
-                      HapticFeedback.lightImpact();
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const NotificationPage(),
-                        ),
-                      );
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: context.surfacePrimary,
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                            color: Colors.white.withValues(alpha: 0.04)),
-                      ),
-                      child: Stack(
-                        clipBehavior: Clip.none,
-                        children: [
-                          const Icon(
-                            Icons.notifications_rounded,
-                            color: Colors.white70,
-                            size: 20,
-                          ),
-                          if (unread > 0)
-                            Positioned(
-                              right: -1,
-                              top: -1,
-                              child: Container(
-                                padding: const EdgeInsets.all(2),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFEF4444), // Vibrant Red
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                      color: context.surfacePrimary,
-                                      width: 1.5),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: const Color(0xFFEF4444)
-                                          .withValues(alpha: 0.4),
-                                      blurRadius: 4,
-                                      spreadRadius: 1,
-                                    ),
-                                  ],
-                                ),
-                                constraints: const BoxConstraints(
-                                  minWidth: 8,
-                                  minHeight: 8,
-                                ),
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              );
-            },
-          ),
-        ],
+        // actions: [
+        //   Consumer<NotificationProvider>(
+        //     builder: (context, notifProvider, child) {
+        //       final unread = notifProvider.unreadCount;
+        //       return Padding(
+        //         padding: const EdgeInsets.only(right: 16.0),
+        //         child: Center(
+        //           child: GestureDetector(
+        //             onTap: () {
+        //               HapticFeedback.lightImpact();
+        //               Navigator.push(
+        //                 context,
+        //                 MaterialPageRoute(
+        //                   builder: (context) => const NotificationPage(),
+        //                 ),
+        //               );
+        //             },
+        //             child: Container(
+        //               padding: const EdgeInsets.all(8),
+        //               decoration: BoxDecoration(
+        //                 color: context.surfacePrimary,
+        //                 shape: BoxShape.circle,
+        //                 border: Border.all(
+        //                     color: Colors.white.withValues(alpha: 0.04)),
+        //               ),
+        //               child: Stack(
+        //                 clipBehavior: Clip.none,
+        //                 children: [
+        //                   const Icon(
+        //                     Icons.notifications_rounded,
+        //                     color: Colors.white70,
+        //                     size: 20,
+        //                   ),
+        //                   if (unread > 0)
+        //                     Positioned(
+        //                       right: -1,
+        //                       top: -1,
+        //                       child: Container(
+        //                         padding: const EdgeInsets.all(2),
+        //                         decoration: BoxDecoration(
+        //                           color: const Color(0xFFEF4444), // Vibrant Red
+        //                           shape: BoxShape.circle,
+        //                           border: Border.all(
+        //                               color: context.surfacePrimary,
+        //                               width: 1.5),
+        //                           boxShadow: [
+        //                             BoxShadow(
+        //                               color: const Color(0xFFEF4444)
+        //                                   .withValues(alpha: 0.4),
+        //                               blurRadius: 4,
+        //                               spreadRadius: 1,
+        //                             ),
+        //                           ],
+        //                         ),
+        //                         constraints: const BoxConstraints(
+        //                           minWidth: 8,
+        //                           minHeight: 8,
+        //                         ),
+        //                       ),
+        //                     ),
+        //                 ],
+        //               ),
+        //             ),
+        //           ),
+        //         ),
+        //       );
+        //     },
+        //   ),
+        // ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(60),
           child: Padding(

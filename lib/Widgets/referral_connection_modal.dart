@@ -5,6 +5,7 @@ import 'package:connect/Config/app_theme.dart';
 import 'package:connect/Providers/connection_provider.dart';
 import 'package:connect/Providers/profile_provider.dart';
 import 'package:connect/services/linkrunner_service.dart';
+import 'package:connect/Config/supabase_config.dart';
 
 class ReferralConnectionModal extends StatefulWidget {
   final Map<String, dynamic> referrerProfile;
@@ -18,35 +19,156 @@ class ReferralConnectionModal extends StatefulWidget {
     this.inviteCode,
   });
 
-  static Future<void> checkAndShowPrompt(BuildContext context) async {
+  static void _showFeedbackSnackBar(BuildContext context, String message, {bool isSuccess = false}) {
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: context.surfaceSecondary,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: BorderSide(
+            color: context.borderMuted.withValues(alpha: 0.3),
+            width: 1,
+          ),
+        ),
+        content: Row(
+          children: [
+            if (isSuccess) ...[
+              const Icon(Icons.check_circle_rounded, color: Colors.greenAccent, size: 20),
+              const SizedBox(width: 10),
+            ],
+            Expanded(
+              child: Text(
+                message,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  static bool _isCheckingPrompt = false;
+
+  static Future<void> checkAndShowPrompt(BuildContext context, {bool isExplicitLinkClick = false}) async {
+    if (_isCheckingPrompt) return;
+    _isCheckingPrompt = true;
     try {
-      final pendingReferrerIdStr = await LinkrunnerService.getPendingReferrerId();
+      String? pendingReferrerIdStr = await LinkrunnerService.getPendingReferrerId();
       final pendingInviteCode = await LinkrunnerService.getPendingInviteCode();
 
-      if (pendingReferrerIdStr == null || pendingReferrerIdStr.isEmpty) return;
+      if ((pendingReferrerIdStr == null || pendingReferrerIdStr.isEmpty) &&
+          (pendingInviteCode == null || pendingInviteCode.isEmpty)) {
+        return;
+      }
 
       final profileProvider = Provider.of<ProfileProvider>(context, listen: false);
       final connectionProvider = Provider.of<ConnectionProvider>(context, listen: false);
-
       final myUserId = profileProvider.userId;
       if (myUserId == null) return;
 
-      final int? referrerId = int.tryParse(pendingReferrerIdStr);
-      if (referrerId == null || referrerId == myUserId) {
+      int? referrerId = pendingReferrerIdStr != null ? int.tryParse(pendingReferrerIdStr) : null;
+
+      // 1. Check invite_codes table status in Supabase
+      if (pendingInviteCode != null && pendingInviteCode.isNotEmpty) {
+        try {
+          // Extract exact MNDL-XXXXXX code string (ignoring surrounding asterisks/punctuation/spaces)
+          final RegExp codeRegex = RegExp(r'MNDL-[A-Za-z0-9]+', caseSensitive: false);
+          final Match? match = codeRegex.firstMatch(pendingInviteCode);
+          final String cleanCode = match != null
+              ? match.group(0)!.toUpperCase()
+              : pendingInviteCode.replaceAll(RegExp(r'[^A-Za-z0-9\-]'), '').toUpperCase().trim();
+
+          final adminClient =
+              SupabaseClient(SupabaseConfig.url, SupabaseConfig.serviceRoleKey);
+          final codeRow = await adminClient
+              .from('invite_codes')
+              .select()
+              .ilike('code', cleanCode)
+              .maybeSingle();
+
+          if (codeRow != null) {
+            final bool isUsed = codeRow['is_used'] == true;
+            if (isUsed) {
+              // Code has already been used -> Expired link
+              await LinkrunnerService.clearPendingReferralData();
+              if (isExplicitLinkClick && context.mounted) {
+                _showFeedbackSnackBar(context, "This invite link has already been used or has expired.");
+              }
+              return;
+            }
+
+            final bool isSkipped = codeRow['is_skipped'] == true;
+            if (isSkipped && !isExplicitLinkClick) {
+              // User previously clicked Skip, and this is a routine app reopen.
+              // Do NOT show prompt.
+              await LinkrunnerService.clearPendingReferralData();
+              return;
+            }
+            if (isSkipped && isExplicitLinkClick) {
+              // User re-clicked the URL link. Reset is_skipped and show modal.
+              try {
+                await adminClient
+                    .from('invite_codes')
+                    .update({'is_skipped': false})
+                    .eq('id', codeRow['id']);
+              } catch (e) {
+                debugPrint('[ReferralConnectionModal] Error resetting is_skipped: $e');
+              }
+            }
+
+            final dynamic senderId = codeRow['sender_id'];
+            if (senderId != null) {
+              referrerId = int.tryParse(senderId.toString());
+            }
+          } else {
+            // Code row was not found in invite_codes table.
+            if (referrerId == null) {
+              await LinkrunnerService.clearPendingReferralData();
+              return;
+            }
+            // On routine reopens, block if referrer was already processed
+            if (!isExplicitLinkClick) {
+              final bool alreadyProcessed = await LinkrunnerService.isReferrerProcessed(referrerId.toString());
+              if (alreadyProcessed) {
+                await LinkrunnerService.clearPendingReferralData();
+                return;
+              }
+            }
+          }
+        } catch (e) {
+          debugPrint('[ReferralConnectionModal] Error querying invite code: $e');
+        }
+      } else if (referrerId != null) {
+        // Plain referrer link without invite_code (e.g. referrer=24)
+        // On routine reopens, block if already processed
+        if (!isExplicitLinkClick && await LinkrunnerService.isReferrerProcessed(referrerId.toString())) {
+          await LinkrunnerService.clearPendingReferralData();
+          return;
+        }
+      }
+
+      // 3. Self-referral check
+      if (referrerId == myUserId) {
+        await LinkrunnerService.clearPendingReferralData();
+        if (isExplicitLinkClick && context.mounted) {
+          _showFeedbackSnackBar(context, "This is your own invite link!");
+        }
+        return;
+      }
+
+      if (referrerId == null) {
         await LinkrunnerService.clearPendingReferralData();
         return;
       }
 
-      // Check if already connected
-      final alreadyConnected = connectionProvider.connections.any(
-        (c) => (c['id'] == referrerId || c['connection_profile_id'] == referrerId),
-      );
-      if (alreadyConnected) {
-        await LinkrunnerService.clearPendingReferralData();
-        return;
-      }
-
-      // Fetch referrer profile details
+      // 4. Fetch referrer profile details
       final response = await Supabase.instance.client
           .from('profiles')
           .select()
@@ -55,10 +177,32 @@ class ReferralConnectionModal extends StatefulWidget {
 
       if (response == null) {
         await LinkrunnerService.clearPendingReferralData();
+        if (isExplicitLinkClick && context.mounted) {
+          _showFeedbackSnackBar(context, "Inviter profile was not found.");
+        }
         return;
       }
 
       final Map<String, dynamic> referrerProfile = Map<String, dynamic>.from(response);
+      final String referrerName = referrerProfile['full_name'] ?? referrerProfile['name'] ?? 'User';
+
+      // 5. Check if already connected
+      final alreadyConnected = connectionProvider.connections.any(
+        (c) => (c['id'] == referrerId || c['connection_profile_id'] == referrerId),
+      );
+      if (alreadyConnected) {
+        await LinkrunnerService.markReferrerAsProcessed(
+          referrerId.toString(),
+          inviteCode: pendingInviteCode,
+        );
+        if (isExplicitLinkClick && context.mounted) {
+          _showFeedbackSnackBar(context, "You are already connected with $referrerName!");
+        }
+        return;
+      }
+
+      // Consume pending referral data so routine app reloads will not re-trigger this modal
+      await LinkrunnerService.clearPendingReferralData();
 
       if (context.mounted) {
         await showDialog(
@@ -66,13 +210,15 @@ class ReferralConnectionModal extends StatefulWidget {
           barrierDismissible: false,
           builder: (dialogContext) => ReferralConnectionModal(
             referrerProfile: referrerProfile,
-            referrerId: referrerId,
+            referrerId: referrerId!,
             inviteCode: pendingInviteCode,
           ),
         );
       }
     } catch (e) {
       debugPrint('[ReferralConnectionModal] Error checking pending referral: $e');
+    } finally {
+      _isCheckingPrompt = false;
     }
   }
 
@@ -101,48 +247,60 @@ class _ReferralConnectionModalState extends State<ReferralConnectionModal> {
         ),
       ),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 28.0),
+        padding: const EdgeInsets.all(24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // User Avatar with fallback first letter in center
-            CircleAvatar(
-              radius: 38,
-              backgroundColor: context.accentPrimary.withValues(alpha: 0.18),
-              backgroundImage: hasAvatar ? NetworkImage(avatarUrl) : null,
-              child: hasAvatar
-                  ? null
-                  : Text(
-                      initial,
-                      style: TextStyle(
-                        color: context.accentPrimary,
-                        fontSize: 28,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-            ),
-            const SizedBox(height: 18),
-
-            // Title
-            Text(
-              "Connection Invite",
-              style: TextStyle(
-                color: context.textPrimary,
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
+            // User Avatar
+            Container(
+              width: 72,
+              height: 72,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: context.surfaceSecondary,
+                border: Border.all(
+                  color: context.accentPrimary,
+                  width: 2,
+                ),
               ),
-              textAlign: TextAlign.center,
+              child: ClipOval(
+                child: hasAvatar
+                    ? Image.network(
+                        avatarUrl,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => Center(
+                          child: Text(
+                            initial,
+                            style: TextStyle(
+                              color: context.textPrimary,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 28,
+                            ),
+                          ),
+                        ),
+                      )
+                    : Center(
+                        child: Text(
+                          initial,
+                          style: TextStyle(
+                            color: context.textPrimary,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 28,
+                          ),
+                        ),
+                      ),
+              ),
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 16),
 
-            // Clean Description without (Professional) tag
+            // Connection Request Title
             RichText(
               textAlign: TextAlign.center,
               text: TextSpan(
                 style: TextStyle(
                   color: context.textSecondary,
-                  fontSize: 14,
-                  height: 1.45,
+                  fontSize: 16,
+                  height: 1.4,
                 ),
                 children: [
                   TextSpan(
@@ -156,9 +314,9 @@ class _ReferralConnectionModalState extends State<ReferralConnectionModal> {
                 ],
               ),
             ),
-            const SizedBox(height: 26),
+            const SizedBox(height: 24),
 
-            // Action Buttons
+            // Buttons Row
             Row(
               children: [
                 // Skip Button
@@ -167,7 +325,36 @@ class _ReferralConnectionModalState extends State<ReferralConnectionModal> {
                     onPressed: _isConnecting
                         ? null
                         : () async {
-                            await LinkrunnerService.clearPendingReferralData();
+                            final codeToSkip = widget.inviteCode ??
+                                await LinkrunnerService.getPendingInviteCode();
+                            if (codeToSkip != null && codeToSkip.isNotEmpty) {
+                              try {
+                                final RegExp codeRegex =
+                                    RegExp(r'MNDL-[A-Za-z0-9]+', caseSensitive: false);
+                                final Match? match = codeRegex.firstMatch(codeToSkip);
+                                final String cleanCode = match != null
+                                    ? match.group(0)!.toUpperCase()
+                                    : codeToSkip
+                                        .replaceAll(RegExp(r'[^A-Za-z0-9\-]'), '')
+                                        .toUpperCase()
+                                        .trim();
+
+                                final adminClient = SupabaseClient(
+                                    SupabaseConfig.url, SupabaseConfig.serviceRoleKey);
+                                await adminClient
+                                    .from('invite_codes')
+                                    .update({'is_skipped': true})
+                                    .ilike('code', cleanCode);
+                              } catch (e) {
+                                debugPrint(
+                                    '[ReferralConnectionModal] Error updating is_skipped: $e');
+                              }
+                            }
+
+                            await LinkrunnerService.markReferrerAsProcessed(
+                              widget.referrerId.toString(),
+                              inviteCode: widget.inviteCode,
+                            );
                             if (context.mounted) Navigator.pop(context);
                           },
                     style: TextButton.styleFrom(
@@ -222,6 +409,7 @@ class _ReferralConnectionModalState extends State<ReferralConnectionModal> {
                                       widget.referrerId,
                                       connectionType: 'vip_pass_key',
                                     );
+                                    await connectionProvider.markInviteCodeAsUsedByCode(codeToRedeem);
                                     await connectionProvider.fetchConnections();
                                   }
                                 }
@@ -234,16 +422,17 @@ class _ReferralConnectionModalState extends State<ReferralConnectionModal> {
                                 await connectionProvider.fetchConnections();
                               }
 
-                              await LinkrunnerService.clearPendingReferralData();
+                              await LinkrunnerService.markReferrerAsProcessed(
+                                widget.referrerId.toString(),
+                                inviteCode: widget.inviteCode,
+                              );
 
                               if (context.mounted) {
                                 Navigator.pop(context);
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text("Connected with $name!"),
-                                    backgroundColor: context.surfacePrimary,
-                                    behavior: SnackBarBehavior.floating,
-                                  ),
+                                ReferralConnectionModal._showFeedbackSnackBar(
+                                  context,
+                                  "Connected with $name!",
+                                  isSuccess: true,
                                 );
                               }
                             } catch (e) {

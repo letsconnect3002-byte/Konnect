@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -15,7 +16,15 @@ import 'package:connect/main.dart';
 
 class ConnectHubBottomSheet extends StatefulWidget {
   final String initialShareType;
-  const ConnectHubBottomSheet({super.key, this.initialShareType = 'casual'});
+  final int initialTabIndex;
+  final bool showOnboardingSteps;
+
+  const ConnectHubBottomSheet({
+    super.key,
+    this.initialShareType = 'casual',
+    this.initialTabIndex = 0,
+    this.showOnboardingSteps = false,
+  });
 
   @override
   State<ConnectHubBottomSheet> createState() => _ConnectHubBottomSheetState();
@@ -33,18 +42,41 @@ class _ConnectHubBottomSheetState extends State<ConnectHubBottomSheet>
   bool _qrGenerationError = false;
   String _selectedShareType = 'casual';
   bool _qrGenerated = false;
+  bool _dismissSteps = false;
+
+  Timer? _stepTimer;
+  int _activeStepIndex = 0;
 
   @override
   void initState() {
     super.initState();
     _selectedShareType = widget.initialShareType;
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(
+      length: 2,
+      vsync: this,
+      initialIndex: widget.initialTabIndex.clamp(0, 1),
+    );
     _tabController.addListener(_onTabChanged);
+    if (widget.showOnboardingSteps) {
+      _startStepTimer();
+    }
     AnalyticsService.logEvent(name: 'connect_hub_opened');
+  }
+
+  void _startStepTimer() {
+    _stepTimer?.cancel();
+    _stepTimer = Timer.periodic(const Duration(seconds: 3), (timer) {
+      if (mounted && !_dismissSteps) {
+        setState(() {
+          _activeStepIndex = (_activeStepIndex + 1) % 3;
+        });
+      }
+    });
   }
 
   @override
   void dispose() {
+    _stepTimer?.cancel();
     _tabController.removeListener(_onTabChanged);
     _tabController.dispose();
     _codeController.dispose();
@@ -876,6 +908,120 @@ class _ConnectHubBottomSheetState extends State<ConnectHubBottomSheet>
     );
   }
 
+  Widget _buildAnimatedConnectionSteps(int stepIdx) {
+    if (!widget.showOnboardingSteps || _dismissSteps || (_activeStepIndex % 3) != stepIdx) {
+      return const SizedBox.shrink();
+    }
+
+    final List<Map<String, String>> steps = [
+      {
+        "title": "Step 1 of 3: Generate QR",
+        "desc": "Tap 'Generate QR' below to create an in-person code for scanning.",
+      },
+      {
+        "title": "Step 2 of 3: Private Key",
+        "desc": "Generate a one-time key or private code for remote connections.",
+      },
+      {
+        "title": "Step 3 of 3: Share Invite",
+        "desc": "Tap 'Share Invite' below to send your link directly to contacts.",
+      },
+    ];
+
+    final currentStep = steps[stepIdx];
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // Minimalistic Tooltip Banner (Clean Dark Surface, No Icons/Emojis)
+        AnimatedContainer(
+          duration: const Duration(milliseconds: 300),
+          margin: const EdgeInsets.only(bottom: 2),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          decoration: BoxDecoration(
+            color: context.surfaceSecondary,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: context.accentPrimary.withValues(alpha: 0.5),
+              width: 1.2,
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      currentStep["title"]!,
+                      style: context.bodyText.copyWith(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.bold,
+                        color: context.textPrimary,
+                      ),
+                    ),
+                  ),
+                  // Step Indicator Dots
+                  Row(
+                    children: List.generate(3, (idx) {
+                      final bool isCurrent = idx == stepIdx;
+                      return AnimatedContainer(
+                        duration: const Duration(milliseconds: 250),
+                        margin: const EdgeInsets.symmetric(horizontal: 2.5),
+                        width: isCurrent ? 14 : 6,
+                        height: 6,
+                        decoration: BoxDecoration(
+                          color: isCurrent
+                              ? context.accentPrimary
+                              : context.textMuted.withValues(alpha: 0.3),
+                          borderRadius: BorderRadius.circular(3),
+                        ),
+                      );
+                    }),
+                  ),
+                  const SizedBox(width: 12),
+                  // Dismiss Option
+                  GestureDetector(
+                    onTap: () {
+                      HapticFeedback.lightImpact();
+                      _stepTimer?.cancel();
+                      setState(() {
+                        _dismissSteps = true;
+                      });
+                    },
+                    child: Text(
+                      "Dismiss",
+                      style: context.captionText.copyWith(
+                        color: context.textMuted,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Text(
+                currentStep["desc"]!,
+                style: context.captionText.copyWith(
+                  color: context.textSecondary,
+                  fontSize: 11,
+                  height: 1.3,
+                ),
+              ),
+            ],
+          ),
+        ),
+        // Downward Pointer Arrow
+        CustomPaint(
+          size: const Size(14, 7),
+          painter: _TooltipArrowPainter(color: context.accentPrimary),
+        ),
+        const SizedBox(height: 6),
+      ],
+    );
+  }
+
   Widget _buildMyCodeTab() {
     final profileProvider = Provider.of<ProfileProvider>(context);
     final userId = profileProvider.userId;
@@ -922,6 +1068,7 @@ class _ConnectHubBottomSheetState extends State<ConnectHubBottomSheet>
       child: Column(
         children: [
           const SizedBox(height: 10),
+          _buildAnimatedConnectionSteps(0),
 
           // Centered QR container card with corner brackets (Exactly like ProfilePage.dart)
           Center(
@@ -995,7 +1142,8 @@ class _ConnectHubBottomSheetState extends State<ConnectHubBottomSheet>
               ),
             ),
           ],
-          const SizedBox(height: 20),
+          const SizedBox(height: 16),
+          _buildAnimatedConnectionSteps(1),
 
           // Invite Code text and share action buttons
           Container(
@@ -1089,6 +1237,7 @@ class _ConnectHubBottomSheetState extends State<ConnectHubBottomSheet>
                     ],
                   ),
                 const SizedBox(height: 14),
+                _buildAnimatedConnectionSteps(2),
                 Row(
                   children: [
                     Expanded(
@@ -1245,4 +1394,28 @@ class _ConnectHubBottomSheetState extends State<ConnectHubBottomSheet>
       ),
     );
   }
+}
+
+class _TooltipArrowPainter extends CustomPainter {
+  final Color color;
+
+  _TooltipArrowPainter({required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.fill;
+
+    final path = Path()
+      ..moveTo(0, 0)
+      ..lineTo(size.width / 2, size.height)
+      ..lineTo(size.width, 0)
+      ..close();
+
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

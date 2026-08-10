@@ -9,6 +9,7 @@ abstract class ConnectionRepository {
   Future<void> disconnectUsers(int id1, int id2);
   Future<Map<String, dynamic>?> redeemInviteCode(String code);
   Future<void> markInviteCodeAsUsed(String id);
+  Future<void> markInviteCodeAsUsedByCode(String code);
   Future<void> deleteMyProfile(int id);
   Future<String?> resolveRoomId(int myUserId, int otherUserId);
   RealtimeChannel subscribeToConnections(void Function(dynamic payload) callback);
@@ -154,6 +155,14 @@ class SupabaseConnectionRepository implements ConnectionRepository {
         .from('invite_codes')
         .update({'is_used': true})
         .eq('id', id);
+  }
+
+  @override
+  Future<void> markInviteCodeAsUsedByCode(String code) async {
+    await _client
+        .from('invite_codes')
+        .update({'is_used': true})
+        .eq('code', code.trim().toUpperCase());
   }
 
   @override

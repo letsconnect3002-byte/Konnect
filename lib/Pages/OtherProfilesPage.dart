@@ -195,25 +195,43 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
               child: const Text("Delete Connection",
                   style: TextStyle(
                       color: Colors.redAccent, fontWeight: FontWeight.normal)),
-              onPressed: () async {
-                final navigator = Navigator.of(dialogContext);
-                final scaffoldMessenger = ScaffoldMessenger.of(context);
-                navigator.pop();
-                try {
-                  await _deleteProfileLocally(profileIdStr, provider);
-                  if (!mounted) return;
-                  scaffoldMessenger.showSnackBar(
-                    const SnackBar(
-                      content: Text("Connection and chat history deleted"),
-                      backgroundColor: Colors.redAccent,
-                    ),
-                  );
-                } catch (e) {
-                  if (!mounted) return;
-                  scaffoldMessenger.showSnackBar(
-                    const SnackBar(content: Text("Could not disconnect contact. Please try again.")),
-                  );
+              onPressed: () {
+                final messenger = ScaffoldMessenger.of(context);
+                Navigator.of(dialogContext).pop();
+                if (mounted) {
+                  Navigator.of(context).pop();
                 }
+                messenger.showSnackBar(
+                  SnackBar(
+                    behavior: SnackBarBehavior.floating,
+                    backgroundColor: context.surfaceSecondary,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      side: BorderSide(
+                        color: context.borderMuted.withValues(alpha: 0.3),
+                        width: 1,
+                      ),
+                    ),
+                    content: const Row(
+                      children: [
+                        Icon(Icons.check_circle_rounded, color: Colors.redAccent, size: 20),
+                        SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            "Connection and chat history deleted",
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              fontFamily: 'Inter',
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+                _deleteProfileLocally(profileIdStr, provider);
               },
             ),
           ],
@@ -354,19 +372,41 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
                                   : detailsController.text.trim(),
                             );
                             
-                            // 2. Delete Connection
-                            await _deleteProfileLocally(profileIdStr, provider);
-                            
+                            final messenger = ScaffoldMessenger.of(context);
+                            Navigator.of(dialogContext).pop();
                             if (mounted) {
-                              Navigator.of(dialogContext).pop();
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text("Connection deleted and contact reported."),
-                                  backgroundColor: Colors.green,
-                                  behavior: SnackBarBehavior.floating,
-                                ),
-                              );
+                              Navigator.of(context).pop();
                             }
+                            messenger.showSnackBar(
+                              SnackBar(
+                                behavior: SnackBarBehavior.floating,
+                                backgroundColor: context.surfaceSecondary,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  side: BorderSide(
+                                    color: context.borderMuted.withValues(alpha: 0.3),
+                                    width: 1,
+                                  ),
+                                ),
+                                content: const Row(
+                                  children: [
+                                    Icon(Icons.check_circle_rounded, color: Colors.greenAccent, size: 20),
+                                    SizedBox(width: 10),
+                                    Expanded(
+                                      child: Text(
+                                        "Connection deleted and contact reported.",
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                            _deleteProfileLocally(profileIdStr, provider);
                           } catch (e) {
                             if (mounted) {
                               setStateBuilder(() {

@@ -377,11 +377,33 @@ class ConnectionProvider with ChangeNotifier {
     }
   }
 
+  Future<void> markInviteCodeAsUsedByCode(String code) async {
+    try {
+      await _repository.markInviteCodeAsUsedByCode(code);
+    } catch (e) {
+      print("Error marking invite code as used by code: $e");
+    }
+  }
+
   Future<void> deleteProfile(int id,
       {Future<void> Function(int profileId, String? roomId)?
           onRoomCleanup}) async {
     final myUserId = _userId;
     if (myUserId == null) return;
+
+    // Optimistically remove from local state immediately for instant UI update
+    _lastKnownConnections.removeWhere((c) {
+      final cId = c['id'] ?? c['connection_profile_id'] ?? c['profile_id'];
+      return cId != null && (cId == id || cId.toString() == id.toString());
+    });
+    if (_state is UserConnectionLoaded) {
+      (_state as UserConnectionLoaded).connections.removeWhere((c) {
+        final cId = c['id'] ?? c['connection_profile_id'] ?? c['profile_id'];
+        return cId != null && (cId == id || cId.toString() == id.toString());
+      });
+    }
+    notifyListeners();
+
     if (id == myUserId) {
       try {
         await _repository.deleteMyProfile(id);

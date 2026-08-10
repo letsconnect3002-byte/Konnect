@@ -514,7 +514,7 @@ class PostCard extends StatelessWidget {
                                 onReactionToggle: onReactionToggle,
                               ),
                               const Spacer(),
-                              if (post.degree == 2 && !isMe) ...[
+                              if (post.degree >= 2 && !isMe) ...[
                                 OutlinedButton.icon(
                                   style: OutlinedButton.styleFrom(
                                     padding: const EdgeInsets.symmetric(
@@ -545,6 +545,7 @@ class PostCard extends StatelessWidget {
                                       context: context,
                                       targetUserId: post.authorId,
                                       targetUserName: post.authorName,
+                                      degree: post.degree,
                                     );
                                   },
                                 ),
@@ -689,7 +690,7 @@ class PostCard extends StatelessWidget {
                           onReactionToggle: onReactionToggle,
                         ),
                         const Spacer(),
-                        if (post.degree == 2 && !isMe) ...[
+                        if (post.degree >= 2 && !isMe) ...[
                           OutlinedButton.icon(
                             style: OutlinedButton.styleFrom(
                               padding: const EdgeInsets.symmetric(
@@ -718,6 +719,7 @@ class PostCard extends StatelessWidget {
                                 context: context,
                                 targetUserId: post.authorId,
                                 targetUserName: post.authorName,
+                                degree: post.degree,
                               );
                             },
                           ),

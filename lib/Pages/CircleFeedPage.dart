@@ -8,12 +8,16 @@ import 'package:connect/Providers/profile_provider.dart';
 import 'package:connect/Providers/connection_provider.dart';
 import 'package:connect/Pages/ThreadDetailPage.dart';
 import 'package:connect/Models/feed_post.dart';
+// import 'package:connect/Pages/YourNetworkPage.dart';
+import 'package:connect/Widgets/connect_hub_bottom_sheet.dart';
 import 'package:connect/Widgets/post_card.dart';
 import 'package:connect/Widgets/dwell_detector.dart';
 import 'package:connect/Widgets/threaded_comment_tree.dart';
 import 'package:connect/Widgets/link_preview_card.dart';
 import 'package:connect/Widgets/pulse_row_widget.dart';
 import 'package:connect/Providers/pulse_provider.dart';
+import 'package:connect/Providers/notification_provider.dart';
+import 'package:connect/Pages/NotificationPage.dart';
 import 'package:connect/services/analytics_service.dart';
 
 class CircleFeedPage extends StatefulWidget {
@@ -533,14 +537,75 @@ class _CircleFeedPageState extends State<CircleFeedPage> {
             ],
           ],
         ),
-        // actions: [
-        //   IconButton(
-        //     icon: Icon(Icons.edit_note_rounded,
-        //         color: context.accentPrimary, size: 26),
-        //     onPressed: () => _openComposeSheet(context),
-        //   ),
-        //   const SizedBox(width: 8),
-        // ],
+        actions: [
+          Consumer<NotificationProvider>(
+            builder: (context, notifProvider, child) {
+              final unread = notifProvider.unreadCount;
+              return Padding(
+                padding: const EdgeInsets.only(right: 16.0),
+                child: Center(
+                  child: GestureDetector(
+                    onTap: () {
+                      HapticFeedback.lightImpact();
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const NotificationPage(),
+                        ),
+                      );
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: context.surfacePrimary,
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.04)),
+                      ),
+                      child: Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          const Icon(
+                            Icons.notifications_rounded,
+                            color: Colors.white70,
+                            size: 20,
+                          ),
+                          if (unread > 0)
+                            Positioned(
+                              right: -1,
+                              top: -1,
+                              child: Container(
+                                padding: const EdgeInsets.all(2),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFEF4444), // Vibrant Red
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                      color: context.surfacePrimary,
+                                      width: 1.5),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: const Color(0xFFEF4444)
+                                          .withValues(alpha: 0.4),
+                                      blurRadius: 4,
+                                      spreadRadius: 1,
+                                    ),
+                                  ],
+                                ),
+                                constraints: const BoxConstraints(
+                                  minWidth: 8,
+                                  minHeight: 8,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        ],
       ),
       body: Stack(
         children: [
@@ -577,53 +642,132 @@ class _CircleFeedPageState extends State<CircleFeedPage> {
                       backgroundColor: context.surfacePrimary,
                       color: context.accentPrimary,
                       child: feedProvider.posts.isEmpty
-                          ? SingleChildScrollView(
-                              physics: const AlwaysScrollableScrollPhysics(),
-                              child: Column(
-                                children: [
-                                  const PulseRowWidget(),
-                                  Container(
-                                    height: MediaQuery.of(context).size.height *
-                                        0.6,
-                                    alignment: Alignment.center,
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 32),
-                                    child: Column(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.center,
-                                      children: [
-                                        Text(
-                                          "No post shared by your network yet, be first to do so.",
-                                          textAlign: TextAlign.center,
-                                          style: TextStyle(
-                                            color: context.textSecondary,
-                                            fontSize: 14,
-                                            height: 1.4,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 20),
-                                        ElevatedButton.icon(
-                                          onPressed: () =>
-                                              _openComposeSheet(context),
-                                          icon: const Icon(Icons.add_rounded,
-                                              color: Colors.white, size: 18),
-                                          label: const Text("Share First Post",
+                          ? Builder(
+                              builder: (context) {
+                                final connectionProvider =
+                                    Provider.of<ConnectionProvider>(context);
+                                final bool hasNoConnections =
+                                    connectionProvider.connections.isEmpty;
+
+                                return SingleChildScrollView(
+                                  physics:
+                                      const AlwaysScrollableScrollPhysics(),
+                                  child: Column(
+                                    children: [
+                                      const PulseRowWidget(),
+                                      Container(
+                                        height:
+                                            MediaQuery.of(context).size.height *
+                                                0.55,
+                                        alignment: Alignment.center,
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 32),
+                                        child: Column(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.center,
+                                          children: [
+                                            Container(
+                                              width: 64,
+                                              height: 64,
+                                              decoration: BoxDecoration(
+                                                color: context.accentPrimary
+                                                    .withValues(alpha: 0.12),
+                                                shape: BoxShape.circle,
+                                                border: Border.all(
+                                                  color: context.accentPrimary
+                                                      .withValues(alpha: 0.3),
+                                                  width: 1.5,
+                                                ),
+                                              ),
+                                              child: Icon(
+                                                hasNoConnections
+                                                    ? Icons
+                                                        .people_outline_rounded
+                                                    : Icons
+                                                        .dynamic_feed_rounded,
+                                                size: 32,
+                                                color: context.accentPrimary,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 16),
+                                            Text(
+                                              hasNoConnections
+                                                  ? "Build Your Network"
+                                                  : "No Posts Yet",
+                                              textAlign: TextAlign.center,
                                               style: TextStyle(
+                                                color: context.textPrimary,
+                                                fontSize: 18,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 8),
+                                            Text(
+                                              hasNoConnections
+                                                  ? "Connect with friends and colleagues to start seeing posts and pulses in your feed."
+                                                  : "No post shared by your network yet, be first to do so.",
+                                              textAlign: TextAlign.center,
+                                              style: TextStyle(
+                                                color: context.textSecondary,
+                                                fontSize: 13.5,
+                                                height: 1.4,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 22),
+                                            ElevatedButton.icon(
+                                              onPressed: () {
+                                                if (hasNoConnections) {
+                                                  showModalBottomSheet(
+                                                    context: context,
+                                                    isScrollControlled: true,
+                                                    backgroundColor:
+                                                        Colors.transparent,
+                                                    builder: (context) =>
+                                                        const ConnectHubBottomSheet(
+                                                      initialTabIndex: 1,
+                                                      showOnboardingSteps: true,
+                                                    ),
+                                                  );
+                                                } else {
+                                                  _openComposeSheet(context);
+                                                }
+                                              },
+                                              icon: Icon(
+                                                hasNoConnections
+                                                    ? Icons.person_add_rounded
+                                                    : Icons.add_rounded,
+                                                color: Colors.white,
+                                                size: 18,
+                                              ),
+                                              label: Text(
+                                                hasNoConnections
+                                                    ? "Connect with People"
+                                                    : "Share First Post",
+                                                style: const TextStyle(
                                                   color: Colors.white,
-                                                  fontWeight: FontWeight.bold)),
-                                          style: ElevatedButton.styleFrom(
-                                            backgroundColor:
-                                                context.accentPrimary,
-                                            shape: RoundedRectangleBorder(
-                                                borderRadius:
-                                                    BorderRadius.circular(12)),
-                                          ),
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
+                                              style: ElevatedButton.styleFrom(
+                                                backgroundColor:
+                                                    context.accentPrimary,
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                        horizontal: 24,
+                                                        vertical: 12),
+                                                shape: RoundedRectangleBorder(
+                                                  borderRadius:
+                                                      BorderRadius.circular(12),
+                                                ),
+                                              ),
+                                            ),
+                                          ],
                                         ),
-                                      ],
-                                    ),
+                                      ),
+                                    ],
                                   ),
-                                ],
-                              ),
+                                );
+                              },
                             )
                           : ListView.builder(
                               controller: _scrollController,
@@ -945,10 +1089,9 @@ class _FeedPostThreadItemState extends State<_FeedPostThreadItem> {
             if (event == 'insert') {
               counts[reactionType] = (counts[reactionType] ?? 0) + 1;
             } else if (event == 'delete') {
-              final String delType =
-                  oldRecord['reaction_type']?.toString() ??
-                      newRecord['reaction_type']?.toString() ??
-                      reactionType;
+              final String delType = oldRecord['reaction_type']?.toString() ??
+                  newRecord['reaction_type']?.toString() ??
+                  reactionType;
               if (counts.containsKey(delType)) {
                 final current = counts[delType]!;
                 if (current <= 1) {
@@ -1094,7 +1237,8 @@ class _FeedPostThreadItemState extends State<_FeedPostThreadItem> {
 
   Future<void> _loadThreadPreview({bool forceReload = false}) async {
     // Guard: don't re-fetch if we already fetched for this post
-    if (_isLoadingThread || (!forceReload && _lastFetchedPostId == widget.post.id)) return;
+    if (_isLoadingThread ||
+        (!forceReload && _lastFetchedPostId == widget.post.id)) return;
     _isLoadingThread = true;
 
     try {
@@ -1213,7 +1357,8 @@ class _FeedPostThreadItemState extends State<_FeedPostThreadItem> {
             }
           }
         } else {
-          if (oldUserReaction != null && newCounts.containsKey(oldUserReaction)) {
+          if (oldUserReaction != null &&
+              newCounts.containsKey(oldUserReaction)) {
             final prevCount = newCounts[oldUserReaction]!;
             if (prevCount <= 1) {
               newCounts.remove(oldUserReaction);
@@ -1247,7 +1392,9 @@ class _FeedPostThreadItemState extends State<_FeedPostThreadItem> {
     });
 
     final feedProvider = Provider.of<FeedProvider>(context, listen: false);
-    feedProvider.toggleReaction(targetPostId, reactionType: selectedKey).then((res) {
+    feedProvider
+        .toggleReaction(targetPostId, reactionType: selectedKey)
+        .then((res) {
       if (res != null && mounted && _treeNode != null) {
         final serverReaction = res['user_reaction']?.toString();
         final Map<String, int> serverCounts = {};

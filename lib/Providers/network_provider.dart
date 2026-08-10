@@ -62,9 +62,35 @@ class NetworkProvider with ChangeNotifier {
   }
 
   // Getters
-  int get primaryCount => _primaryCount;
-  int get secondaryCount => _secondaryCount;
-  int get tertiaryCount => _tertiaryCount;
+  int get primaryCount {
+    final listCount = _networkList.where((item) {
+      final deg = item["degree"] is int
+          ? item["degree"] as int
+          : (int.tryParse(item["degree"]?.toString() ?? '') ?? 2);
+      return deg == 1;
+    }).length;
+    return _primaryCount > listCount ? _primaryCount : listCount;
+  }
+
+  int get secondaryCount {
+    final listCount = _networkList.where((item) {
+      final deg = item["degree"] is int
+          ? item["degree"] as int
+          : (int.tryParse(item["degree"]?.toString() ?? '') ?? 2);
+      return deg == 2;
+    }).length;
+    return _secondaryCount > listCount ? _secondaryCount : listCount;
+  }
+
+  int get tertiaryCount {
+    final listCount = _networkList.where((item) {
+      final deg = item["degree"] is int
+          ? item["degree"] as int
+          : (int.tryParse(item["degree"]?.toString() ?? '') ?? 2);
+      return deg == 3;
+    }).length;
+    return _tertiaryCount > listCount ? _tertiaryCount : listCount;
+  }
 
   List<Map<String, dynamic>> get networkList => _networkList;
 
