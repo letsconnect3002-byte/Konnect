@@ -2240,21 +2240,15 @@ class MyApp extends StatelessWidget {
             if (name.contains('referrer=') ||
                 name.contains('MNDL-') ||
                 name.contains('invite_code=')) {
-              if (appShellKey.currentContext != null) {
-                // App is already running (warm start). Absorb extra route push and pop it immediately
-                // to prevent Duplicate GlobalKey error for AppShellGate.
-                WidgetsBinding.instance.addPostFrameCallback((_) {
-                  navigatorKey.currentState?.maybePop();
-                });
-                return MaterialPageRoute(
-                  builder: (_) => const SizedBox.shrink(),
-                  settings: settings,
-                );
-              }
-              // Cold start: AuthGate becomes the root route.
+              // Both warm start and cold start: absorb the deep link route silently.
+              // LinkrunnerService has already extracted and saved the URL params.
+              // The home AuthGate handles auth → AppShellGate → referral modal flow.
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                navigatorKey.currentState?.maybePop();
+              });
               return MaterialPageRoute(
-                builder: (_) => const AuthGate(),
-                settings: const RouteSettings(name: '/'),
+                builder: (_) => const SizedBox.shrink(),
+                settings: settings,
               );
             }
           }
@@ -2266,8 +2260,16 @@ class MyApp extends StatelessWidget {
   }
 }
 
-class AuthGate extends StatelessWidget {
+class AuthGate extends StatefulWidget {
   const AuthGate({super.key});
+
+  @override
+  State<AuthGate> createState() => _AuthGateState();
+}
+
+class _AuthGateState extends State<AuthGate> {
+  /// Stable key so Flutter reuses the same AppShellGate across StreamBuilder rebuilds.
+  final GlobalKey _appShellGateKey = GlobalKey();
 
   @override
   Widget build(BuildContext context) {
@@ -2301,7 +2303,7 @@ class AuthGate extends StatelessWidget {
         }
 
         if (session != null) {
-          return const AppShellGate();
+          return AppShellGate(key: _appShellGateKey);
         }
 
         final profileProvider =
@@ -2366,11 +2368,10 @@ class _AppShellGateState extends State<AppShellGate> {
       if (mounted) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted) {
-            final bool isExplicitLaunch =
-                LinkrunnerService.consumeWasColdStartDeepLink();
+            LinkrunnerService.consumeWasColdStartDeepLink();
             ReferralConnectionModal.checkAndShowPrompt(
               context,
-              isExplicitLinkClick: isExplicitLaunch,
+              isExplicitLinkClick: true,
             );
           }
         });
@@ -3097,7 +3098,7 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
           final uri = Uri.tryParse(linkStr);
           if (uri != null) {
             final String? referrer = uri.queryParameters['referrer'] ??
-                uri.queryParameters['referrer_id'] ??
+              uri.queryParameters['referrer_id'] ??
                 uri.queryParameters['sender_id'];
             final String? code = uri.queryParameters['invite_code'] ??
                 uri.queryParameters['code'] ??
