@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import 'package:connect/Providers/connection_provider.dart';
 import 'package:connect/Providers/notification_provider.dart';
 import 'package:connect/Providers/network_provider.dart';
+import 'package:connect/Providers/feed_provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:connect/Widgets/network_map.dart';
 import 'package:connect/Widgets/horizontal_connection_map.dart';
@@ -152,7 +153,8 @@ class _YourNetworkPageState extends State<YourNetworkPage> {
     final int degreeInt = item["degree"] is int
         ? item["degree"] as int
         : (int.tryParse(item["degree"]?.toString() ?? '') ?? 2);
-    final String degree = degreeInt == 1 ? "1st" : (degreeInt == 2 ? "2nd" : "3rd");
+    final String degree =
+        degreeInt == 1 ? "1st" : (degreeInt == 2 ? "2nd" : "3rd");
 
     showModalBottomSheet(
       context: context,
@@ -321,6 +323,34 @@ class _YourNetworkPageState extends State<YourNetworkPage> {
                                       ),
                                     ),
                                   ),
+                                  if (Provider.of<ConnectionProvider>(context,
+                                          listen: false)
+                                      .isUserBlocked(targetUserId)) ...[
+                                    const SizedBox(width: 6),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 7, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: Colors.redAccent
+                                            .withValues(alpha: 0.12),
+                                        borderRadius: BorderRadius.circular(6),
+                                        border: Border.all(
+                                          color: Colors.redAccent
+                                              .withValues(alpha: 0.3),
+                                          width: 0.8,
+                                        ),
+                                      ),
+                                      child: const Text(
+                                        "Blocked",
+                                        style: TextStyle(
+                                          color: Colors.redAccent,
+                                          fontSize: 9.5,
+                                          fontWeight: FontWeight.bold,
+                                          fontFamily: 'Inter',
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ],
                               ),
                               const SizedBox(height: 4),
@@ -401,6 +431,92 @@ class _YourNetworkPageState extends State<YourNetworkPage> {
                         ],
                       ),
                     const SizedBox(height: 24),
+
+                    if (Provider.of<ConnectionProvider>(context, listen: false)
+                        .isUserBlocked(targetUserId)) ...[
+                      ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor:
+                              Colors.greenAccent.withValues(alpha: 0.12),
+                          foregroundColor: Colors.greenAccent,
+                          surfaceTintColor: Colors.transparent,
+                          shadowColor: Colors.transparent,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            side: BorderSide(
+                              color: Colors.greenAccent.withValues(alpha: 0.3),
+                            ),
+                          ),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                        ),
+                        onPressed: () async {
+                          HapticFeedback.mediumImpact();
+                          final connProv = Provider.of<ConnectionProvider>(
+                              context,
+                              listen: false);
+                          try {
+                            await connProv.unblockUser(targetUserId);
+                            if (context.mounted) {
+                              Provider.of<FeedProvider>(context, listen: false)
+                                  .fetchInitialFeed(silent: true);
+                              Navigator.pop(context);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Row(
+                                    children: [
+                                      const Icon(Icons.check_circle_rounded,
+                                          color: Colors.greenAccent, size: 20),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          "$name unblocked successfully",
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.w600,
+                                            fontFamily: 'Inter',
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  backgroundColor: const Color(0xFF1E202C),
+                                  behavior: SnackBarBehavior.floating,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    side: BorderSide(
+                                      color: Colors.greenAccent
+                                          .withValues(alpha: 0.3),
+                                      width: 1,
+                                    ),
+                                  ),
+                                ),
+                              );
+                            }
+                          } catch (e) {
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                      "Failed to unblock user. Please try again."),
+                                  backgroundColor: Colors.redAccent,
+                                  behavior: SnackBarBehavior.floating,
+                                ),
+                              );
+                            }
+                          }
+                        },
+                        icon: const Icon(Icons.lock_open_rounded, size: 18),
+                        label: const Text(
+                          "Unblock Contact",
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            fontFamily: 'Inter',
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                    ],
 
                     // Close Button
                     ElevatedButton(
@@ -818,13 +934,20 @@ class _YourNetworkPageState extends State<YourNetworkPage> {
   }
 
   Widget _buildConnectionCard(BuildContext context, Map<String, dynamic> item) {
+    final connectionProvider = Provider.of<ConnectionProvider>(context);
+    final int targetUserId = item["id"] is int
+        ? item["id"] as int
+        : (int.tryParse(item["id"]?.toString() ?? '') ?? 0);
+    final bool isBlocked = connectionProvider.isUserBlocked(targetUserId);
+
     final String name = item["name"] ?? '';
     final String profession = item["profession"] ?? '';
     final String company = item["company"] ?? '';
     final int degreeInt = item["degree"] is int
         ? item["degree"] as int
         : (int.tryParse(item["degree"]?.toString() ?? '') ?? 2);
-    final String degree = degreeInt == 1 ? "1st" : (degreeInt == 2 ? "2nd" : "3rd");
+    final String degree =
+        degreeInt == 1 ? "1st" : (degreeInt == 2 ? "2nd" : "3rd");
     final int mutualCount = item["mutual_count"] ?? 0;
     final String mutualNames = item["mutual_names"] ?? '';
     final String mutualAvatarsStr = item["mutual_avatars"] ?? '';
@@ -969,6 +1092,31 @@ class _YourNetworkPageState extends State<YourNetworkPage> {
                               ),
                             ),
                           ),
+                          if (isBlocked) ...[
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 7, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: Colors.redAccent.withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(
+                                  color:
+                                      Colors.redAccent.withValues(alpha: 0.3),
+                                  width: 0.8,
+                                ),
+                              ),
+                              child: const Text(
+                                "Blocked",
+                                style: TextStyle(
+                                  color: Colors.redAccent,
+                                  fontSize: 9.5,
+                                  fontWeight: FontWeight.bold,
+                                  fontFamily: 'Inter',
+                                ),
+                              ),
+                            ),
+                          ],
                         ],
                       ),
                       const SizedBox(height: 3),
@@ -1093,42 +1241,131 @@ class _YourNetworkPageState extends State<YourNetworkPage> {
               ),
               const SizedBox(width: 8),
 
-              // Right: Request Refer button
-              GestureDetector(
-                onTap: () => _showReferBottomSheet(context, item),
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-                  decoration: BoxDecoration(
-                    border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.15),
-                      width: 1.0,
+              // Right: Unblock button if blocked, else Request Refer button
+              if (isBlocked)
+                GestureDetector(
+                  onTap: () async {
+                    HapticFeedback.mediumImpact();
+                    try {
+                      await connectionProvider.unblockUser(targetUserId);
+                      if (context.mounted) {
+                        Provider.of<FeedProvider>(context, listen: false)
+                            .fetchInitialFeed(silent: true);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Row(
+                              children: [
+                                const Icon(Icons.check_circle_rounded,
+                                    color: Colors.greenAccent, size: 20),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    "$name unblocked successfully",
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w600,
+                                      fontFamily: 'Inter',
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            backgroundColor: const Color(0xFF1E202C),
+                            behavior: SnackBarBehavior.floating,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              side: BorderSide(
+                                color:
+                                    Colors.greenAccent.withValues(alpha: 0.3),
+                                width: 1,
+                              ),
+                            ),
+                          ),
+                        );
+                      }
+                    } catch (e) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                                "Failed to unblock user. Please try again."),
+                            backgroundColor: Colors.redAccent,
+                            behavior: SnackBarBehavior.floating,
+                          ),
+                        );
+                      }
+                    }
+                  },
+                  child: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                    decoration: BoxDecoration(
+                      color: Colors.greenAccent.withValues(alpha: 0.12),
+                      border: Border.all(
+                        color: Colors.greenAccent.withValues(alpha: 0.4),
+                        width: 1.0,
+                      ),
+                      borderRadius: BorderRadius.circular(8),
                     ),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons
-                            .ios_share_rounded, // matches standard 'Request Refer' icon from screen
-                        color: context.textPrimary,
-                        size: 13,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        "Request Refer",
-                        style: TextStyle(
-                          color: context.textPrimary,
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.bold,
-                          fontFamily: 'Inter',
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.lock_open_rounded,
+                          color: Colors.greenAccent,
+                          size: 13,
                         ),
+                        SizedBox(width: 4),
+                        Text(
+                          "Unblock",
+                          style: TextStyle(
+                            color: Colors.greenAccent,
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.bold,
+                            fontFamily: 'Inter',
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              else
+                // Right: Request Refer button
+                GestureDetector(
+                  onTap: () => _showReferBottomSheet(context, item),
+                  child: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                    decoration: BoxDecoration(
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.15),
+                        width: 1.0,
                       ),
-                    ],
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons
+                              .ios_share_rounded, // matches standard 'Request Refer' icon from screen
+                          color: context.textPrimary,
+                          size: 13,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          "Request Refer",
+                          style: TextStyle(
+                            color: context.textPrimary,
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.bold,
+                            fontFamily: 'Inter',
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-              ),
             ],
           ),
         ],
@@ -1249,7 +1486,8 @@ class _ReferBottomSheetState extends State<_ReferBottomSheet> {
                     )
                   : null,
               targetName: widget.targetProfile['name'] ?? 'Connection',
-              targetAvatarUrl: widget.targetProfile['avatar_url'] ?? widget.targetProfile['avatarUrl'],
+              targetAvatarUrl: widget.targetProfile['avatar_url'] ??
+                  widget.targetProfile['avatarUrl'],
               degree: widget.targetProfile['degree'] is int
                   ? widget.targetProfile['degree'] as int
                   : 2,

@@ -38,6 +38,8 @@ class ConnectionProvider with ChangeNotifier {
   RealtimeChannel? _connectionsSubscription;
 
   List<Map<String, dynamic>> _lastKnownConnections = [];
+  Set<int> _blockedUserIds = {};
+  Set<int> _blockedByUserIds = {};
 
   UserConnectionState _state = UserConnectionInitial();
   UserConnectionState get state => _state;
@@ -45,6 +47,10 @@ class ConnectionProvider with ChangeNotifier {
   List<Map<String, dynamic>> get connections => _state is UserConnectionLoaded
       ? (_state as UserConnectionLoaded).connections
       : _lastKnownConnections;
+  Set<int> get blockedUserIds => _blockedUserIds;
+  Set<int> get blockedByUserIds => _blockedByUserIds;
+  bool isUserBlocked(int? id) => id != null && _blockedUserIds.contains(id);
+
   AppError? get lastError => _state is UserConnectionError
       ? (_state as UserConnectionError).error
       : null;
@@ -132,6 +138,7 @@ class ConnectionProvider with ChangeNotifier {
           .select('blocked_id')
           .eq('blocker_id', myUserId);
       final Set<int> blockedIds = blocks.map((b) => b['blocked_id'] as int).toSet();
+      _blockedUserIds = blockedIds;
 
       // Fetch list of users who blocked us
       final List<dynamic> blockedBy = await Supabase.instance.client
@@ -139,6 +146,7 @@ class ConnectionProvider with ChangeNotifier {
           .select('blocker_id')
           .eq('blocked_id', myUserId);
       final Set<int> blockedByIds = blockedBy.map((b) => b['blocker_id'] as int).toSet();
+      _blockedByUserIds = blockedByIds;
 
       // Mark connection attributes
       for (final conn in list) {
@@ -434,6 +442,9 @@ class ConnectionProvider with ChangeNotifier {
     if (myUserId == null) throw Exception("User not authenticated");
 
     try {
+      _blockedUserIds.add(id);
+      notifyListeners();
+
       // 1. Log the block in Supabase blocked_users table
       await Supabase.instance.client.from('blocked_users').insert({
         'blocker_id': myUserId,
@@ -444,6 +455,7 @@ class ConnectionProvider with ChangeNotifier {
       // 2. Refresh connections lists to show blocked status instantly
       await fetchConnections(silent: true);
     } catch (e) {
+      _blockedUserIds.remove(id);
       print("Error blocking user: $e");
       _setError(e);
       rethrow;
@@ -456,6 +468,9 @@ class ConnectionProvider with ChangeNotifier {
     if (myUserId == null) throw Exception("User not authenticated");
 
     try {
+      _blockedUserIds.remove(id);
+      notifyListeners();
+
       // Delete block entry from Supabase
       await Supabase.instance.client
           .from('blocked_users')
@@ -466,6 +481,7 @@ class ConnectionProvider with ChangeNotifier {
       // Refresh connections lists
       await fetchConnections(silent: true);
     } catch (e) {
+      _blockedUserIds.add(id);
       print("Error unblocking user: $e");
       _setError(e);
       rethrow;

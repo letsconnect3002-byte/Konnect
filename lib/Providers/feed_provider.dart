@@ -152,7 +152,7 @@ class FeedProvider with ChangeNotifier {
   //  Initial feed load
   // -------------------------------------------------------
 
-  Future<void> fetchInitialFeed() async {
+  Future<void> fetchInitialFeed({bool silent = false}) async {
     final vId = _viewerId;
     if (vId == null) return;
 
@@ -160,39 +160,45 @@ class FeedProvider with ChangeNotifier {
       _subscribeToRealtime();
     }
 
-    _isLoading = true;
-    _error = null;
-    _hasNewPosts = false;
-    notifyListeners();
+    if (!silent) {
+      _isLoading = true;
+      _error = null;
+      _hasNewPosts = false;
+      notifyListeners();
+    }
 
     try {
-      _currentBucket = 'unseen';
-      _hasReachedEnd = false;
-      _hasShownCaughtUpDivider = false;
-
       final fetched = await _repository.getFeed(
         viewerId: vId,
         bucket: 'unseen',
         limit: 20,
       );
 
-      _posts = List.from(fetched);
+      final List<FeedPost> updatedPosts = List.from(fetched);
+      bool newHasReachedEnd = false;
+      bool newHasShownCaughtUpDivider = false;
+      String newBucket = 'unseen';
 
       if (fetched.length < 20) {
-        if (_posts.isNotEmpty) {
-          _hasShownCaughtUpDivider = true;
+        if (updatedPosts.isNotEmpty) {
+          newHasShownCaughtUpDivider = true;
         }
-        _currentBucket = 'seen';
+        newBucket = 'seen';
         final seenFetched = await _repository.getFeed(
           viewerId: vId,
           bucket: 'seen',
           limit: 20,
         );
-        _posts.addAll(seenFetched);
+        updatedPosts.addAll(seenFetched);
         if (seenFetched.length < 20) {
-          _hasReachedEnd = true;
+          newHasReachedEnd = true;
         }
       }
+
+      _currentBucket = newBucket;
+      _hasReachedEnd = newHasReachedEnd;
+      _hasShownCaughtUpDivider = newHasShownCaughtUpDivider;
+      _posts = updatedPosts;
 
       // Snapshot the latest post ID for change detection
       if (_posts.isNotEmpty) {
@@ -213,9 +219,13 @@ class FeedProvider with ChangeNotifier {
       }
     } catch (e) {
       debugPrint("[FeedProvider] Error loading initial feed: $e");
-      _error = AppError.from(e);
+      if (!silent) {
+        _error = AppError.from(e);
+      }
     } finally {
-      _isLoading = false;
+      if (!silent) {
+        _isLoading = false;
+      }
       _unseenCount = 0; // Clear badge immediately in the UI
       notifyListeners();
     }
@@ -715,6 +725,26 @@ class FeedProvider with ChangeNotifier {
       return;
     }
 
+    if (table == 'blocked_users') {
+      _handleBlockedUsersRealtimeEvent(
+        eventType: eventType,
+        newRecord: newRecord,
+        oldRecord: oldRecord,
+        viewerId: vId,
+      );
+      return;
+    }
+
+    if (table == 'user_connections') {
+      _handleUserConnectionsRealtimeEvent(
+        eventType: eventType,
+        newRecord: newRecord,
+        oldRecord: oldRecord,
+        viewerId: vId,
+      );
+      return;
+    }
+
     if (eventType == 'insert') {
       final int? authorId = newRecord['author_id'] is int
           ? newRecord['author_id'] as int
@@ -863,6 +893,64 @@ class FeedProvider with ChangeNotifier {
     );
     notifyListeners();
     debugPrint("[FeedProvider] Realtime reaction updated for post $postId");
+  }
+
+  void _handleBlockedUsersRealtimeEvent({
+    required String eventType,
+    required Map<String, dynamic> newRecord,
+    required Map<String, dynamic> oldRecord,
+    required int viewerId,
+  }) {
+    final event = eventType.toLowerCase();
+    debugPrint("[FeedProvider] Realtime blocked_users event: $event, new: $newRecord, old: $oldRecord");
+
+    if (event == 'insert') {
+      final blockerId = newRecord['blocker_id'] is int
+          ? newRecord['blocker_id'] as int
+          : int.tryParse(newRecord['blocker_id']?.toString() ?? '');
+      final blockedId = newRecord['blocked_id'] is int
+          ? newRecord['blocked_id'] as int
+          : int.tryParse(newRecord['blocked_id']?.toString() ?? '');
+
+      if (blockerId == viewerId && blockedId != null) {
+        removePostsByAuthor(blockedId);
+      } else if (blockedId == viewerId && blockerId != null) {
+        removePostsByAuthor(blockerId);
+      }
+    } else if (event == 'delete') {
+      final blockerId = oldRecord['blocker_id'] is int
+          ? oldRecord['blocker_id'] as int
+          : int.tryParse(oldRecord['blocker_id']?.toString() ?? '');
+      final blockedId = oldRecord['blocked_id'] is int
+          ? oldRecord['blocked_id'] as int
+          : int.tryParse(oldRecord['blocked_id']?.toString() ?? '');
+
+      if (blockerId == null || blockerId == viewerId || blockedId == viewerId) {
+        debugPrint("[FeedProvider] User unblocked in realtime. Silently refreshing feed...");
+        fetchInitialFeed(silent: true);
+      }
+    }
+  }
+
+  void _handleUserConnectionsRealtimeEvent({
+    required String eventType,
+    required Map<String, dynamic> newRecord,
+    required Map<String, dynamic> oldRecord,
+    required int viewerId,
+  }) {
+    final event = eventType.toLowerCase();
+    debugPrint("[FeedProvider] Realtime user_connections event: $event, new: $newRecord, old: $oldRecord");
+
+    final int? u1 = (newRecord['user_id_1'] ?? oldRecord['user_id_1']) is int
+        ? (newRecord['user_id_1'] ?? oldRecord['user_id_1']) as int
+        : int.tryParse((newRecord['user_id_1'] ?? oldRecord['user_id_1'])?.toString() ?? '');
+    final int? u2 = (newRecord['user_id_2'] ?? oldRecord['user_id_2']) is int
+        ? (newRecord['user_id_2'] ?? oldRecord['user_id_2']) as int
+        : int.tryParse((newRecord['user_id_2'] ?? oldRecord['user_id_2'])?.toString() ?? '');
+
+    // If connection involves the current user or their extended network, silently refresh the feed
+    debugPrint("[FeedProvider] Connection changed ($event: u1=$u1, u2=$u2, viewer=$viewerId). Refreshing feed...");
+    fetchInitialFeed(silent: true);
   }
 
   // -------------------------------------------------------

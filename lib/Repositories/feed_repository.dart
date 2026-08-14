@@ -340,6 +340,32 @@ class SupabaseFeedRepository implements FeedRepository {
           });
         },
       )
+      .onPostgresChanges(
+        event: PostgresChangeEvent.all,
+        schema: 'public',
+        table: 'blocked_users',
+        callback: (payload) {
+          onChange({
+            'table': 'blocked_users',
+            'eventType': payload.eventType.name,
+            'new': payload.newRecord,
+            'old': payload.oldRecord,
+          });
+        },
+      )
+      .onPostgresChanges(
+        event: PostgresChangeEvent.all,
+        schema: 'public',
+        table: 'user_connections',
+        callback: (payload) {
+          onChange({
+            'table': 'user_connections',
+            'eventType': payload.eventType.name,
+            'new': payload.newRecord,
+            'old': payload.oldRecord,
+          });
+        },
+      )
       .subscribe();
     return channel;
   }
