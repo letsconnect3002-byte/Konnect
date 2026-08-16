@@ -1269,7 +1269,10 @@ class _FeedPostThreadItemState extends State<_FeedPostThreadItem> {
           CommentNode buildNode(FeedPost p) {
             final children = childrenMap[p.id] ?? [];
             final activeChildren = children.where((c) => !c.isDeleted).length;
-            final updatedChildPost = p.copyWith(replyCount: activeChildren);
+            final updatedChildPost = p.copyWith(
+              replyCount: activeChildren,
+              activeReplyCount: activeChildren,
+            );
             return CommentNode(
               id: p.id,
               authorId: p.authorId,
@@ -1287,7 +1290,10 @@ class _FeedPostThreadItemState extends State<_FeedPostThreadItem> {
 
           // Use activeReplyCount from the widget's post (server-authoritative)
           final activeCount = widget.post.activeReplyCount;
-          final updatedRootPost = rootPost.copyWith(replyCount: activeCount);
+          final updatedRootPost = rootPost.copyWith(
+            replyCount: activeCount,
+            activeReplyCount: activeCount,
+          );
           final rootNode = CommentNode(
             id: rootPost.id,
             authorId: rootPost.authorId,

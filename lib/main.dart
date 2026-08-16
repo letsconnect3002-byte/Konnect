@@ -3098,7 +3098,7 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
           final uri = Uri.tryParse(linkStr);
           if (uri != null) {
             final String? referrer = uri.queryParameters['referrer'] ??
-              uri.queryParameters['referrer_id'] ??
+                uri.queryParameters['referrer_id'] ??
                 uri.queryParameters['sender_id'];
             final String? code = uri.queryParameters['invite_code'] ??
                 uri.queryParameters['code'] ??

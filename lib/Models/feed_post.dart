@@ -125,7 +125,9 @@ class FeedPost {
       replyCount: json['reply_count'] is int
           ? json['reply_count'] as int
           : (int.tryParse(json['reply_count']?.toString() ?? '') ?? 0),
-      activeReplyCount: null,
+      activeReplyCount: json['active_reply_count'] is int
+          ? json['active_reply_count'] as int
+          : int.tryParse(json['active_reply_count']?.toString() ?? ''),
       degree: degree,
       isDeleted: json['is_deleted'] == true,
       replyToPostId: json['reply_to_post_id']?.toString(),
@@ -150,6 +152,9 @@ class FeedPost {
     bool nullifyUserReaction = false,
     Map<String, int>? reactionCounts,
   }) {
+    final int newReplyCount = replyCount ?? this.replyCount;
+    final int newActiveReplyCount = activeReplyCount ??
+        (replyCount != null ? newReplyCount : this.activeReplyCount);
     return FeedPost(
       id: id ?? this.id,
       authorId: authorId ?? this.authorId,
@@ -157,8 +162,8 @@ class FeedPost {
       authorAvatarUrl: authorAvatarUrl ?? this.authorAvatarUrl,
       content: content ?? this.content,
       createdAt: createdAt ?? this.createdAt,
-      replyCount: replyCount ?? this.replyCount,
-      activeReplyCount: activeReplyCount ?? this.activeReplyCount,
+      replyCount: newReplyCount,
+      activeReplyCount: newActiveReplyCount,
       degree: degree ?? this.degree,
       isDeleted: isDeleted ?? this.isDeleted,
       replyToPostId: replyToPostId ?? this.replyToPostId,

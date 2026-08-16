@@ -425,21 +425,29 @@ class PostCard extends StatelessWidget {
                               Icon(Icons.reply_rounded,
                                   size: 12, color: context.accentSecondary),
                               const SizedBox(width: 4),
-                              Text(
-                                "Replying to ",
-                                style: TextStyle(
-                                    color: context.textMuted, fontSize: 11),
-                              ),
-                              Text(
-                                (myName.isNotEmpty &&
-                                        replyToName!.trim().toLowerCase() ==
-                                            myName.toLowerCase())
-                                    ? "@Me"
-                                    : "@$replyToName",
-                                style: TextStyle(
-                                  color: context.accentSecondary,
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.bold,
+                              Expanded(
+                                child: Text.rich(
+                                  TextSpan(
+                                    text: "Replying to ",
+                                    style: TextStyle(
+                                        color: context.textMuted, fontSize: 11),
+                                    children: [
+                                      TextSpan(
+                                        text: (myName.isNotEmpty &&
+                                                replyToName!.trim().toLowerCase() ==
+                                                    myName.toLowerCase())
+                                            ? "@Me"
+                                            : "@$replyToName",
+                                        style: TextStyle(
+                                          color: context.accentSecondary,
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                               ),
                             ],
@@ -603,21 +611,29 @@ class PostCard extends StatelessWidget {
                         Icon(Icons.reply_rounded,
                             size: 12, color: context.accentSecondary),
                         const SizedBox(width: 4),
-                        Text(
-                          "Replying to ",
-                          style:
-                              TextStyle(color: context.textMuted, fontSize: 11),
-                        ),
-                        Text(
-                          (myName.isNotEmpty &&
-                                  replyToName!.trim().toLowerCase() ==
-                                      myName.toLowerCase())
-                              ? "@Me"
-                              : "@$replyToName",
-                          style: TextStyle(
-                            color: context.accentSecondary,
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
+                        Expanded(
+                          child: Text.rich(
+                            TextSpan(
+                              text: "Replying to ",
+                              style: TextStyle(
+                                  color: context.textMuted, fontSize: 11),
+                              children: [
+                                TextSpan(
+                                  text: (myName.isNotEmpty &&
+                                          replyToName!.trim().toLowerCase() ==
+                                              myName.toLowerCase())
+                                      ? "@Me"
+                                      : "@$replyToName",
+                                  style: TextStyle(
+                                    color: context.accentSecondary,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
                       ],

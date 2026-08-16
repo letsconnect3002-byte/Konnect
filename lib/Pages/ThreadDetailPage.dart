@@ -344,7 +344,10 @@ class _ThreadDetailPageState extends State<ThreadDetailPage> {
     final children = childrenMap[post.id] ?? [];
     final activeChildCount = children.where((c) => !c.isDeleted).length;
     final effectiveReplyCount = activeChildCount;
-    final updatedPost = post.copyWith(replyCount: effectiveReplyCount);
+    final updatedPost = post.copyWith(
+      replyCount: effectiveReplyCount,
+      activeReplyCount: effectiveReplyCount,
+    );
 
     final String? replyToName = post.replyToPostId != null
         ? _resolveParentAuthorName(post.replyToPostId)
@@ -492,6 +495,7 @@ class _ThreadDetailPageState extends State<ThreadDetailPage> {
                                   curveRadius: 12.0,
                                   initialExpandPostId: _highlightedPostId,
                                   itemKeys: _itemKeys,
+                                  allowNestedExpansion: false,
                                   onReactionToggle: _handleReactionToggle,
                                   onReplyTap: (node) {
                                     if (node.replyCount > 0 || node.replies.isNotEmpty) {
@@ -525,22 +529,35 @@ class _ThreadDetailPageState extends State<ThreadDetailPage> {
                                     }
                                   },
                                   onCommentTap: (node) {
-                                    final targetPost = node.post ?? _threadPosts.firstWhere(
-                                      (p) => p.id == node.id,
-                                      orElse: () => FeedPost(
-                                        id: node.id,
-                                        authorId: node.authorId,
-                                        authorName: node.authorName,
-                                        authorAvatarUrl: node.authorAvatarUrl,
-                                        content: node.content,
-                                        createdAt: DateTime.now(),
-                                        replyCount: node.replyCount,
-                                        degree: node.degree,
-                                      ),
-                                    );
-                                    setState(() {
-                                      _replyingToTarget = targetPost;
-                                    });
+                                    if (node.replyCount > 0 || node.replies.isNotEmpty) {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) => ThreadDetailPage(
+                                            rootPostId: node.id,
+                                            highlightPostId: node.id,
+                                            focusReplyToPostId: node.id,
+                                          ),
+                                        ),
+                                      );
+                                    } else {
+                                      final targetPost = node.post ?? _threadPosts.firstWhere(
+                                        (p) => p.id == node.id,
+                                        orElse: () => FeedPost(
+                                          id: node.id,
+                                          authorId: node.authorId,
+                                          authorName: node.authorName,
+                                          authorAvatarUrl: node.authorAvatarUrl,
+                                          content: node.content,
+                                          createdAt: DateTime.now(),
+                                          replyCount: node.replyCount,
+                                          degree: node.degree,
+                                        ),
+                                      );
+                                      setState(() {
+                                        _replyingToTarget = targetPost;
+                                      });
+                                    }
                                   },
                                 ),
                               );

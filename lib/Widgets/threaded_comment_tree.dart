@@ -756,31 +756,39 @@ class _ThreadNodeWidgetState extends State<_ThreadNodeWidget>
                           size: 12,
                           color: Theme.of(context).colorScheme.primary),
                       const SizedBox(width: 4),
-                      Text(
-                        "Replying to ",
-                        style: TextStyle(
-                          color: Theme.of(context)
-                              .colorScheme
-                              .onSurface
-                              .withValues(alpha: 0.5),
-                          fontSize: 11,
-                        ),
+                      Expanded(
+                        child: Builder(builder: (context) {
+                          final profileProvider = Provider.of<ProfileProvider>(context);
+                          final myName = profileProvider.name.trim();
+                          final bool isReplyingToMe = (myName.isNotEmpty &&
+                              node.replyToName != null &&
+                              node.replyToName!.trim().toLowerCase() == myName.toLowerCase());
+                          return Text.rich(
+                            TextSpan(
+                              text: "Replying to ",
+                              style: TextStyle(
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .onSurface
+                                    .withValues(alpha: 0.5),
+                                fontSize: 11,
+                              ),
+                              children: [
+                                TextSpan(
+                                  text: isReplyingToMe ? "@Me" : "@${node.replyToName}",
+                                  style: TextStyle(
+                                    color: Theme.of(context).colorScheme.primary,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          );
+                        }),
                       ),
-                      Builder(builder: (context) {
-                        final profileProvider = Provider.of<ProfileProvider>(context);
-                        final myName = profileProvider.name.trim();
-                        final bool isReplyingToMe = (myName.isNotEmpty &&
-                            node.replyToName != null &&
-                            node.replyToName!.trim().toLowerCase() == myName.toLowerCase());
-                        return Text(
-                          isReplyingToMe ? "@Me" : "@${node.replyToName}",
-                          style: TextStyle(
-                            color: Theme.of(context).colorScheme.primary,
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        );
-                      }),
                     ],
                   ),
                   const SizedBox(height: 4),

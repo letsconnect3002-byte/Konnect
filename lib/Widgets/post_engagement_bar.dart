@@ -209,7 +209,7 @@ class _ReplyButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final int count = post.activeReplyCount;
+    final int count = post.activeReplyCount > 0 ? post.activeReplyCount : post.replyCount;
 
     return InkWell(
       onTap: onTap,
@@ -224,15 +224,17 @@ class _ReplyButton extends StatelessWidget {
               size: 15,
               color: context.textSecondary,
             ),
-            const SizedBox(width: 5),
-            Text(
-              "$count",
-              style: TextStyle(
-                color: context.textSecondary,
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
+            if (count > 0) ...[
+              const SizedBox(width: 5),
+              Text(
+                "$count",
+                style: TextStyle(
+                  color: context.textSecondary,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
-            ),
+            ],
           ],
         ),
       ),
