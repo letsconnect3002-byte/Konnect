@@ -146,7 +146,7 @@ class SupabaseFeedRepository implements FeedRepository {
                     ? DateTime.parse(row['created_at'].toString()).toLocal()
                     : DateTime.now(),
                 replyCount: row['reply_count'] is int ? row['reply_count'] as int : (int.tryParse(row['reply_count']?.toString() ?? '') ?? 0),
-                degree: 0,
+                degree: (viewerId != null && authorId == viewerId) ? 0 : 3,
                 isDeleted: row['is_deleted'] == true,
                 replyToPostId: row['reply_to_post_id']?.toString(),
               ));
@@ -393,8 +393,8 @@ class SupabaseFeedRepository implements FeedRepository {
           ? response['author_id'] as int
           : (int.tryParse(response['author_id']?.toString() ?? '') ?? 0);
 
-      int degree = 0;
-      if (authorId != viewerId) {
+      int degree = (authorId == viewerId) ? 0 : 1;
+      if (authorId != viewerId && viewerId != 0) {
         try {
           final reachRes = await _client.rpc('get_network_reach', params: {'p_user_id': viewerId});
           if (reachRes is List) {

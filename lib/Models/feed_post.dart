@@ -89,7 +89,7 @@ class FeedPost {
           : int.tryParse(json['active_reply_count']?.toString() ?? ''),
       degree: json['degree'] is int
           ? json['degree'] as int
-          : (int.tryParse(json['degree']?.toString() ?? '') ?? 0),
+          : (int.tryParse(json['degree']?.toString() ?? '') ?? 1),
       isDeleted: json['is_deleted'] == true,
       replyToPostId: json['reply_to_post_id']?.toString(),
       userReaction: json['user_reaction']?.toString(),
@@ -97,7 +97,7 @@ class FeedPost {
     );
   }
 
-  factory FeedPost.fromThreadRpcJson(Map<String, dynamic> json, {int degree = 1}) {
+  factory FeedPost.fromThreadRpcJson(Map<String, dynamic> json, {int degree = 3}) {
     Map<String, int> parsedReactionCounts = {};
     if (json['reaction_counts'] != null && json['reaction_counts'] is Map) {
       final map = json['reaction_counts'] as Map;
@@ -128,7 +128,9 @@ class FeedPost {
       activeReplyCount: json['active_reply_count'] is int
           ? json['active_reply_count'] as int
           : int.tryParse(json['active_reply_count']?.toString() ?? ''),
-      degree: degree,
+      degree: json['degree'] is int
+          ? json['degree'] as int
+          : (int.tryParse(json['degree']?.toString() ?? '') ?? degree),
       isDeleted: json['is_deleted'] == true,
       replyToPostId: json['reply_to_post_id']?.toString(),
       userReaction: json['user_reaction']?.toString(),

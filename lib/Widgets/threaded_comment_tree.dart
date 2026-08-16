@@ -813,11 +813,16 @@ class _ThreadNodeWidgetState extends State<_ThreadNodeWidget>
                       final nodeName = node.authorName.trim().toLowerCase();
                       final isMe = (myUserId != 0 && node.authorId == myUserId) ||
                           (myName.isNotEmpty && nodeName.isNotEmpty && myName == nodeName);
-                      final String badgeText = isMe
+                      final isAuthorMe = isMe || node.degree == 0;
+                      final String badgeText = isAuthorMe
                           ? "You"
                           : (node.degree == 1
                               ? "1°"
-                              : (node.degree == 2 ? "2°" : "3°"));
+                              : (node.degree == 2
+                                  ? "2°"
+                                  : (node.degree >= 3 ? "3°" : "")));
+
+                      if (badgeText.isEmpty) return const SizedBox.shrink();
 
                       return Padding(
                         padding: const EdgeInsets.only(right: 6.0),

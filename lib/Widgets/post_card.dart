@@ -291,9 +291,11 @@ class PostCard extends StatelessWidget {
       text = "1°";
     } else if (post.degree == 2) {
       text = "2°";
-    } else {
+    } else if (post.degree >= 3) {
       text = "3°";
     }
+
+    if (text.isEmpty) return const SizedBox.shrink();
 
     return Text(
       text,
@@ -323,13 +325,8 @@ class PostCard extends StatelessWidget {
     final myName = profileProvider.name.trim().toLowerCase();
     final postName = post.authorName.trim().toLowerCase();
 
-    final isMe = post.degree == 0 ||
-        (myUserId != 0 && post.authorId == myUserId) ||
-        (myName.isNotEmpty &&
-            postName.isNotEmpty &&
-            (myName == postName ||
-                myName.contains(postName) ||
-                postName.contains(myName)));
+    final isMe = (myUserId != 0 && post.authorId == myUserId) ||
+        (myName.isNotEmpty && postName.isNotEmpty && myName == postName);
 
     final rawAvatar = CircleAvatar(
       radius: 18,

@@ -299,6 +299,7 @@ returns table (
   content text,
   created_at timestamptz,
   reply_count int,
+  degree int,
   is_deleted boolean,
   reply_to_post_id uuid,
   user_reaction text,
@@ -307,6 +308,13 @@ returns table (
 language sql
 stable
 as $$
+  with visible_authors as (
+    select p_viewer_id as user_id, 0 as deg
+    union all
+    select r.reachable_user_id, r.degree as deg
+    from public.get_network_reach(p_viewer_id) r
+    where p_viewer_id is not null
+  )
   select
     p.id,
     p.author_id,
@@ -315,6 +323,7 @@ as $$
     p.content,
     p.created_at,
     p.reply_count,
+    coalesce(va.deg, case when p_viewer_id is not null and p.author_id = p_viewer_id then 0 else 3 end) as degree,
     p.is_deleted,
     p.reply_to_post_id,
     (
@@ -337,6 +346,7 @@ as $$
     ) as reaction_counts
   from public.posts p
   join public.profiles pr on pr.id = p.author_id
+  left join visible_authors va on va.user_id = p.author_id
   where p.root_post_id = p_root_post_id
   order by p.created_at asc;
 $$;

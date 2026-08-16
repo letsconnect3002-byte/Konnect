@@ -1288,11 +1288,14 @@ class _FeedPostThreadItemState extends State<_FeedPostThreadItem> {
             );
           }
 
-          // Use activeReplyCount from the widget's post (server-authoritative)
           final activeCount = widget.post.activeReplyCount;
+          final int effectiveDegree = (rootPost.degree != 0 || rootPost.authorId == feedProvider.viewerId)
+              ? rootPost.degree
+              : widget.post.degree;
           final updatedRootPost = rootPost.copyWith(
             replyCount: activeCount,
             activeReplyCount: activeCount,
+            degree: effectiveDegree,
           );
           final rootNode = CommentNode(
             id: rootPost.id,
@@ -1301,7 +1304,7 @@ class _FeedPostThreadItemState extends State<_FeedPostThreadItem> {
             authorAvatarUrl: rootPost.authorAvatarUrl,
             content: rootPost.content,
             timestamp: _formatTimeAgo(rootPost.createdAt),
-            degree: rootPost.degree,
+            degree: effectiveDegree,
             replyCount: activeCount,
             isDeleted: rootPost.isDeleted,
             post: updatedRootPost,
