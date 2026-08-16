@@ -23,6 +23,7 @@ class NotificationPage extends StatefulWidget {
 
 class _NotificationPageState extends State<NotificationPage> {
   late NotificationProvider _notificationProvider;
+  final Set<String> _processingActionNotificationIds = {};
 
   @override
   void initState() {
@@ -440,6 +441,7 @@ class _NotificationPageState extends State<NotificationPage> {
     if (type == 'tribe_invite' ||
         type == 'tribe_request' ||
         type == 'tribe_approved' ||
+        type == 'tribe_invite_accepted' ||
         type == 'tribe_request_approved' ||
         type == 'tribe_request_declined' ||
         type == 'tribe_invite_declined' ||
@@ -1079,9 +1081,11 @@ class _NotificationPageState extends State<NotificationPage> {
 
     String actionText;
     IconData actionIcon;
-    if (type == 'tribe_invite') {
+    if (type == 'tribe_invite' || type == 'tribe_invite_accepted') {
       actionText = " invited you to join ";
-      actionIcon = Icons.mail_rounded;
+      actionIcon = type == 'tribe_invite_accepted'
+          ? Icons.check_circle_rounded
+          : Icons.mail_rounded;
     } else if (type == 'tribe_request') {
       actionText = " requested to join ";
       actionIcon = Icons.person_add_rounded;
@@ -1106,6 +1110,7 @@ class _NotificationPageState extends State<NotificationPage> {
     final bool isActioned = type == 'tribe_request_approved' ||
         type == 'tribe_request_declined' ||
         type == 'tribe_invite_declined' ||
+        type == 'tribe_invite_accepted' ||
         type == 'tribe_approved' ||
         type == 'tribe_removed';
 
@@ -1228,132 +1233,178 @@ class _NotificationPageState extends State<NotificationPage> {
                       ),
                       if ((type == 'tribe_invite' || type == 'tribe_request') && tribeId != null && !isActioned) ...[
                         const SizedBox(height: 8),
-                        Row(
-                          children: [
-                            SizedBox(
-                              width: 76,
-                              height: 30,
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  gradient: const LinearGradient(
-                                    colors: [
-                                      Color(0xFF8B5CF6),
-                                      Color(0xFF6D28D9)
-                                    ],
+                        () {
+                          final notifId = notification['id']?.toString() ?? '';
+                          final isProcessing = _processingActionNotificationIds.contains(notifId);
+
+                          return Row(
+                            children: [
+                              SizedBox(
+                                width: 76,
+                                height: 30,
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      colors: isProcessing
+                                          ? [
+                                              const Color(0xFF8B5CF6).withValues(alpha: 0.5),
+                                              const Color(0xFF6D28D9).withValues(alpha: 0.5)
+                                            ]
+                                          : [
+                                              const Color(0xFF8B5CF6),
+                                              const Color(0xFF6D28D9)
+                                            ],
+                                    ),
+                                    borderRadius: BorderRadius.circular(10),
                                   ),
-                                  borderRadius: BorderRadius.circular(10),
+                                  child: ElevatedButton(
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.transparent,
+                                      foregroundColor: Colors.white,
+                                      shadowColor: Colors.transparent,
+                                      padding: EdgeInsets.zero,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                    ),
+                                    onPressed: isProcessing
+                                        ? null
+                                        : () async {
+                                            HapticFeedback.lightImpact();
+                                            if (notifId.isNotEmpty) {
+                                              setState(() {
+                                                _processingActionNotificationIds.add(notifId);
+                                              });
+                                            }
+                                            final tribeProvider =
+                                                Provider.of<TribeProvider>(context,
+                                                    listen: false);
+                                            try {
+                                              if (type == 'tribe_invite') {
+                                                await tribeProvider
+                                                    .joinTribeDirectly(tribeId!);
+                                              } else {
+                                                final requesterId = (otherUser['id'] as num?)?.toInt();
+                                                if (requesterId == null) throw Exception("Invalid requester.");
+                                                await tribeProvider
+                                                    .approveRequest(tribeId!, requesterId);
+                                              }
+                                              await provider.fetchNotifications();
+                                            } catch (e) {
+                                              if (mounted) {
+                                                ScaffoldMessenger.of(context)
+                                                    .showSnackBar(
+                                                  const SnackBar(
+                                                      content: Text(
+                                                          "Could not approve request. Please try again.")),
+                                                );
+                                              }
+                                            } finally {
+                                              if (mounted && notifId.isNotEmpty) {
+                                                setState(() {
+                                                  _processingActionNotificationIds.remove(notifId);
+                                                });
+                                              }
+                                            }
+                                          },
+                                    child: isProcessing
+                                        ? const SizedBox(
+                                            width: 14,
+                                            height: 14,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2,
+                                              valueColor:
+                                                  AlwaysStoppedAnimation<Color>(Colors.white),
+                                            ),
+                                          )
+                                        : const Text(
+                                            "Accept",
+                                            style: TextStyle(
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.bold,
+                                              fontFamily: 'Inter',
+                                            ),
+                                          ),
+                                  ),
                                 ),
+                              ),
+                              const SizedBox(width: 8),
+                              SizedBox(
+                                width: 76,
+                                height: 30,
                                 child: ElevatedButton(
                                   style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.transparent,
-                                    foregroundColor: Colors.white,
+                                    backgroundColor: const Color(0xFF1F2030),
+                                    foregroundColor: const Color(0xFF8B8C9E),
                                     shadowColor: Colors.transparent,
                                     padding: EdgeInsets.zero,
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(10),
+                                      side: BorderSide(
+                                        color: Colors.white
+                                            .withValues(alpha: 0.03),
+                                        width: 1,
+                                      ),
                                     ),
                                   ),
-                                  onPressed: () async {
-                                    HapticFeedback.lightImpact();
-                                    final tribeProvider =
-                                        Provider.of<TribeProvider>(context,
-                                            listen: false);
-                                    try {
-                                      if (type == 'tribe_invite') {
-                                        await tribeProvider
-                                            .joinTribeDirectly(tribeId!);
-                                      } else {
-                                        final requesterId = (otherUser['id'] as num?)?.toInt();
-                                        if (requesterId == null) throw Exception("Invalid requester.");
-                                        await tribeProvider
-                                            .approveRequest(tribeId!, requesterId);
-                                      }
-                                      await provider.fetchNotifications();
-                                    } catch (e) {
-                                      if (mounted) {
-                                        ScaffoldMessenger.of(context)
-                                            .showSnackBar(
-                                          const SnackBar(
-                                              content: Text(
-                                                  "Could not approve request. Please try again.")),
-                                        );
-                                      }
-                                    }
-                                  },
+                                  onPressed: isProcessing
+                                      ? null
+                                      : () async {
+                                          HapticFeedback.lightImpact();
+                                          if (notifId.isNotEmpty) {
+                                            setState(() {
+                                              _processingActionNotificationIds.add(notifId);
+                                            });
+                                          }
+                                          final tribeProvider =
+                                              Provider.of<TribeProvider>(context,
+                                                  listen: false);
+                                          try {
+                                            final targetId = type == 'tribe_invite'
+                                                ? provider.userId!
+                                                : (otherUser['id'] as num?)?.toInt();
+                                            if (targetId == null) throw Exception("Invalid target user.");
+                                            await tribeProvider
+                                                .declineRequestOrInvite(
+                                                    tribeId!, targetId);
+                                            await provider.fetchNotifications();
+                                          } catch (e) {
+                                            if (mounted) {
+                                              ScaffoldMessenger.of(context)
+                                                  .showSnackBar(
+                                                const SnackBar(
+                                                    content: Text(
+                                                        "Could not decline request. Please try again.")),
+                                              );
+                                            }
+                                          } finally {
+                                            if (mounted && notifId.isNotEmpty) {
+                                              setState(() {
+                                                _processingActionNotificationIds.remove(notifId);
+                                              });
+                                            }
+                                          }
+                                        },
                                   child: const Text(
-                                    "Accept",
+                                    "Decline",
                                     style: TextStyle(
                                       fontSize: 11,
-                                      fontWeight: FontWeight.bold,
+                                      fontWeight: FontWeight.w600,
                                       fontFamily: 'Inter',
                                     ),
                                   ),
                                 ),
                               ),
-                            ),
-                            const SizedBox(width: 8),
-                            SizedBox(
-                              width: 76,
-                              height: 30,
-                              child: ElevatedButton(
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFF1F2030),
-                                  foregroundColor: const Color(0xFF8B8C9E),
-                                  shadowColor: Colors.transparent,
-                                  padding: EdgeInsets.zero,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(10),
-                                    side: BorderSide(
-                                      color: Colors.white
-                                          .withValues(alpha: 0.03),
-                                      width: 1,
-                                    ),
-                                  ),
-                                ),
-                                onPressed: () async {
-                                  HapticFeedback.lightImpact();
-                                  final tribeProvider =
-                                      Provider.of<TribeProvider>(context,
-                                          listen: false);
-                                  try {
-                                    final targetId = type == 'tribe_invite'
-                                        ? provider.userId!
-                                        : (otherUser['id'] as num?)?.toInt();
-                                    if (targetId == null) throw Exception("Invalid target user.");
-                                    await tribeProvider
-                                        .declineRequestOrInvite(
-                                            tribeId!, targetId);
-                                    await provider.fetchNotifications();
-                                  } catch (e) {
-                                    if (mounted) {
-                                      ScaffoldMessenger.of(context)
-                                          .showSnackBar(
-                                        const SnackBar(
-                                            content: Text(
-                                                "Could not decline request. Please try again.")),
-                                      );
-                                    }
-                                  }
-                                },
-                                child: const Text(
-                                  "Decline",
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w600,
-                                    fontFamily: 'Inter',
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
+                            ],
+                          );
+                        }(),
                       ],
                       if (isActioned) ...[
                         const SizedBox(height: 6),
                         Text(
                           type == 'tribe_request_approved'
                               ? "Approved"
-                              : type == 'tribe_approved'
+                              : (type == 'tribe_approved' || type == 'tribe_invite_accepted')
                                   ? "Joined"
                                   : type == 'tribe_removed'
                                       ? "Removed"
@@ -1362,7 +1413,9 @@ class _NotificationPageState extends State<NotificationPage> {
                             fontSize: 11,
                             fontWeight: FontWeight.w600,
                             fontFamily: 'Inter',
-                            color: (type == 'tribe_request_approved' || type == 'tribe_approved')
+                            color: (type == 'tribe_request_approved' ||
+                                    type == 'tribe_approved' ||
+                                    type == 'tribe_invite_accepted')
                                 ? Colors.green.withValues(alpha: 0.7)
                                 : Colors.redAccent.withValues(alpha: 0.7),
                           ),

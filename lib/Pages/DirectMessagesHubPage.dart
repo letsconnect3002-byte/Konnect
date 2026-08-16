@@ -810,6 +810,18 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
                                 fontFamily: 'Inter',
                               ),
                             ),
+                            const SizedBox(width: 4),
+                            Text(
+                              "(beta)",
+                              style: TextStyle(
+                                color: _selectedTab == 'tribes'
+                                    ? Colors.white.withValues(alpha: 0.8)
+                                    : context.textMuted,
+                                fontWeight: FontWeight.w500,
+                                fontSize: 10,
+                                fontFamily: 'Inter',
+                              ),
+                            ),
                           ],
                         ),
                       ),

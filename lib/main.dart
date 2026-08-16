@@ -465,11 +465,21 @@ Future<void> showConnectionLocalNotification({
 String? pendingNotificationPayload;
 int? targetChatSenderId;
 bool targetOpenNotificationsPage = false;
+String? targetTribeChatId;
+String? targetTribeName;
 
 void handleLocalNotificationClickPayload(String payload) {
   try {
     final data = jsonDecode(payload);
     final action = data['action'] as String?;
+    if (action == 'complete_profile') {
+      appShellKey.currentState?.setSelectedIndex(5);
+      return;
+    }
+    if (action == 'new_pulse') {
+      appShellKey.currentState?.setSelectedIndex(0);
+      return;
+    }
     if (action == 'feed_notification') {
       final rootPostId =
           data['root_post_id']?.toString() ?? data['post_id']?.toString() ?? '';
@@ -911,71 +921,89 @@ Future<void> onNotificationActionReceived(NotificationResponse response) async {
               final requesterId =
                   requesterIdStr != null ? int.tryParse(requesterIdStr) : null;
               if (requesterId != null) {
-                final rolesRes = await client
-                    .from('tribe_roles')
-                    .select('id')
+                final existingReq = await client
+                    .from('tribe_members')
+                    .select('status')
                     .eq('tribe_id', tribeId)
-                    .eq('is_default', true)
+                    .eq('user_id', requesterId)
                     .maybeSingle();
-                final defaultRoleId =
-                    rolesRes != null ? rolesRes['id'] as String? : null;
-                if (defaultRoleId != null) {
-                  await client
-                      .from('tribe_members')
-                      .update({
-                        'status': 'active',
-                        'role_id': defaultRoleId,
-                        'joined_at': nowStr,
-                        'updated_at': nowStr,
-                      })
+
+                if (existingReq == null || existingReq['status'] != 'active') {
+                  final rolesRes = await client
+                      .from('tribe_roles')
+                      .select('id')
                       .eq('tribe_id', tribeId)
-                      .eq('user_id', requesterId);
-
-                  await client.from('tribe_activity_log').insert({
-                    'tribe_id': tribeId,
-                    'actor_id': requesterId,
-                    'action_type': 'joined',
-                    'created_at': nowStr,
-                  });
-
-                  final tribeRes = await client
-                      .from('tribes')
-                      .select('name')
-                      .eq('id', tribeId)
+                      .eq('is_default', true)
                       .maybeSingle();
-                  final tribeName = tribeRes != null
-                      ? tribeRes['name']?.toString() ?? 'Tribe'
-                      : 'Tribe';
-                  await client.from('connection_notifications').insert({
-                    'user_id': requesterId,
-                    'other_user_id': myUserId,
-                    'type': 'referral',
-                    'note': jsonEncode({
+                  final defaultRoleId =
+                      rolesRes != null ? rolesRes['id'] as String? : null;
+                  if (defaultRoleId != null) {
+                    await client
+                        .from('tribe_members')
+                        .update({
+                          'status': 'active',
+                          'role_id': defaultRoleId,
+                          'joined_at': nowStr,
+                          'updated_at': nowStr,
+                        })
+                        .eq('tribe_id', tribeId)
+                        .eq('user_id', requesterId);
+
+                    await client.from('tribe_activity_log').insert({
                       'tribe_id': tribeId,
-                      'tribe_name': tribeName,
-                      'real_type': 'tribe_approved'
-                    }),
-                    'is_seen': false,
-                  });
+                      'actor_id': requesterId,
+                      'action_type': 'joined',
+                      'created_at': nowStr,
+                    });
+
+                    final tribeRes = await client
+                        .from('tribes')
+                        .select('name')
+                        .eq('id', tribeId)
+                        .maybeSingle();
+                    final tribeName = tribeRes != null
+                        ? tribeRes['name']?.toString() ?? 'Tribe'
+                        : 'Tribe';
+                    await client.from('connection_notifications').insert({
+                      'user_id': requesterId,
+                      'other_user_id': myUserId,
+                      'type': 'referral',
+                      'note': jsonEncode({
+                        'tribe_id': tribeId,
+                        'tribe_name': tribeName,
+                        'real_type': 'tribe_approved'
+                      }),
+                      'is_seen': false,
+                    });
+                  }
                 }
               }
             } else {
-              await client
+              final existingMem = await client
                   .from('tribe_members')
-                  .update({
-                    'status': 'active',
-                    'joined_at': nowStr,
-                    'updated_at': nowStr,
-                  })
+                  .select('status')
                   .eq('tribe_id', tribeId)
-                  .eq('user_id', myUserId);
+                  .eq('user_id', myUserId)
+                  .maybeSingle();
 
-              await client.from('tribe_activity_log').insert({
-                'tribe_id': tribeId,
-                'actor_id': myUserId,
-                'action_type': 'joined',
-                'created_at': nowStr,
-              });
+              if (existingMem == null || existingMem['status'] != 'active') {
+                await client
+                    .from('tribe_members')
+                    .update({
+                      'status': 'active',
+                      'joined_at': nowStr,
+                      'updated_at': nowStr,
+                    })
+                    .eq('tribe_id', tribeId)
+                    .eq('user_id', myUserId);
+
+                await client.from('tribe_activity_log').insert({
+                  'tribe_id': tribeId,
+                  'actor_id': myUserId,
+                  'action_type': 'joined',
+                  'created_at': nowStr,
+                });
+              }
             }
 
             await client.from('connection_notifications').update({
@@ -2010,9 +2038,17 @@ void main() async {
           pendingNotificationPayload = payload;
           try {
             final data = jsonDecode(payload);
-            final senderIdStr = data['sender_id'] as String?;
-            if (senderIdStr != null) {
-              targetChatSenderId = int.tryParse(senderIdStr);
+            final action = data['action'] as String?;
+            if (action == 'tribe_message') {
+              targetTribeChatId = data['tribe_id']?.toString();
+              targetTribeName = data['tribe_name']?.toString() ?? 'Mafia';
+            } else if (action == 'connection_notification') {
+              targetOpenNotificationsPage = true;
+            } else {
+              final senderIdStr = data['sender_id'] as String?;
+              if (senderIdStr != null) {
+                targetChatSenderId = int.tryParse(senderIdStr);
+              }
             }
           } catch (e) {
             print("Error parsing local notification payload on startup: $e");
@@ -2043,11 +2079,16 @@ void main() async {
         try {
           final data = jsonDecode(localPayload);
           final action = data['action'] as String?;
-          final senderIdStr = data['sender_id'] as String?;
-          if (action == 'connection_notification') {
+          if (action == 'tribe_message') {
+            targetTribeChatId = data['tribe_id']?.toString();
+            targetTribeName = data['tribe_name']?.toString() ?? 'Mafia';
+          } else if (action == 'connection_notification') {
             targetOpenNotificationsPage = true;
-          } else if (senderIdStr != null) {
-            targetChatSenderId = int.tryParse(senderIdStr);
+          } else {
+            final senderIdStr = data['sender_id'] as String?;
+            if (senderIdStr != null) {
+              targetChatSenderId = int.tryParse(senderIdStr);
+            }
           }
         } catch (e) {
           print("Error parsing local notification payload on startup: $e");
@@ -2059,11 +2100,16 @@ void main() async {
     if (fcmMessage != null) {
       final data = fcmMessage.data;
       final action = data['action'] as String?;
-      final senderIdStr = data['sender_id'] as String?;
-      if (action == 'connection_notification') {
+      if (action == 'tribe_message') {
+        targetTribeChatId = data['tribe_id']?.toString();
+        targetTribeName = data['tribe_name']?.toString() ?? 'Mafia';
+      } else if (action == 'connection_notification') {
         targetOpenNotificationsPage = true;
-      } else if (senderIdStr != null) {
-        targetChatSenderId = int.tryParse(senderIdStr);
+      } else {
+        final senderIdStr = data['sender_id'] as String?;
+        if (senderIdStr != null) {
+          targetChatSenderId = int.tryParse(senderIdStr);
+        }
       }
     }
   } catch (e) {
@@ -2384,6 +2430,21 @@ class _AppShellGateState extends State<AppShellGate> {
         navigatorKey.currentState?.push(
           PageRouteBuilder(
             pageBuilder: (context, anim, secAnim) => const NotificationPage(),
+            transitionDuration: Duration.zero,
+            reverseTransitionDuration: Duration.zero,
+          ),
+        );
+      } else if (targetTribeChatId != null) {
+        final tribeId = targetTribeChatId!;
+        final tribeName = targetTribeName ?? 'Mafia';
+        targetTribeChatId = null;
+        targetTribeName = null;
+        pendingNotificationPayload = null;
+
+        navigatorKey.currentState?.push(
+          PageRouteBuilder(
+            pageBuilder: (context, anim, secAnim) =>
+                TribeChatPage(tribeId: tribeId, tribeName: tribeName),
             transitionDuration: Duration.zero,
             reverseTransitionDuration: Duration.zero,
           ),
@@ -2996,32 +3057,7 @@ class _AppShellGateState extends State<AppShellGate> {
       FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
         print(
             "PushNotifications: Notification tapped in background state: ${message.messageId}");
-        final data = message.data;
-        final action = data['action'] as String?;
-        if (action == 'feed_notification') {
-          final rootPostId = data['root_post_id']?.toString() ??
-              data['post_id']?.toString() ??
-              '';
-          final postId = data['post_id']?.toString() ?? '';
-          if (rootPostId.isNotEmpty) {
-            appShellKey.currentState?.setSelectedIndex(0);
-            navigatorKey.currentState?.popUntil((route) => route.isFirst);
-            navigatorKey.currentState?.push(
-              MaterialPageRoute(
-                builder: (routeContext) => ThreadDetailPage(
-                  rootPostId: rootPostId,
-                  highlightPostId: postId.isNotEmpty ? postId : rootPostId,
-                ),
-              ),
-            );
-          }
-        } else if (action == 'connection_notification') {
-          navigatorKey.currentState?.push(
-            MaterialPageRoute(
-              builder: (routeContext) => const NotificationPage(),
-            ),
-          );
-        }
+        handleLocalNotificationClickPayload(jsonEncode(message.data));
       });
     } catch (e) {
       print("PushNotifications: Error setting up push notifications: $e");
@@ -3196,38 +3232,7 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
   }
 
   void _handleNotificationClick(RemoteMessage message) {
-    final data = message.data;
-    final action = data['action'] as String?;
-
-    if (action == 'complete_profile') {
-      if (mounted) {
-        setSelectedIndex(5);
-      }
-      return;
-    }
-
-    if (action == 'new_pulse') {
-      if (mounted) {
-        setSelectedIndex(0);
-      }
-      return;
-    }
-
-    final senderIdStr = (data['sender_id'] ?? data['publisher_id']) as String?;
-
-    if (senderIdStr != null) {
-      final senderId = int.tryParse(senderIdStr);
-      if (senderId != null) {
-        if (mounted) {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => IndividualChatPage(otherUserId: senderId),
-            ),
-          );
-        }
-      }
-    }
+    handleLocalNotificationClickPayload(jsonEncode(message.data));
   }
 
   void setSelectedIndex(int index) {

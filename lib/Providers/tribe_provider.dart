@@ -438,6 +438,12 @@ class TribeProvider with ChangeNotifier {
     if (myUserId == null) return;
 
     try {
+      final existing = await _repository.getTribeMember(tribeId, myUserId);
+      if (existing != null && existing['status'] == 'active') {
+        print("User $myUserId is already active in tribe $tribeId. Skipping duplicate join.");
+        return;
+      }
+
       final tribe = await _repository.getTribeById(tribeId);
       if (tribe == null) throw Exception("Tribe not found.");
 
@@ -456,8 +462,11 @@ class TribeProvider with ChangeNotifier {
           roles.firstWhereOrNull((r) => r['is_default'] == true);
       if (defaultRole == null) throw Exception("No default role found.");
 
+      final assignedRoleId = (existing != null && existing['role_id'] != null)
+          ? existing['role_id'] as String
+          : defaultRole['id'] as String;
+
       final nowStr = DateTime.now().toUtc().toIso8601String();
-      final existing = await _repository.getTribeMember(tribeId, myUserId);
 
       final activityLog = {
         'tribe_id': tribeId,
@@ -470,17 +479,26 @@ class TribeProvider with ChangeNotifier {
         // Update existing row
         final updates = {
           'status': 'active',
-          'role_id': defaultRole['id'],
+          'role_id': assignedRoleId,
           'joined_at': nowStr,
         };
         await _repository.updateTribeMemberStatus(
             tribeId, myUserId, updates, activityLog);
+
+        if (existing['invited_by'] != null) {
+          await _notificationRepository.markTribeNotificationActioned(
+            recipientUserId: myUserId,
+            otherUserId: existing['invited_by'] as int,
+            tribeId: tribeId,
+            newRealType: 'tribe_invite_accepted',
+          );
+        }
       } else {
         // Insert new row
         final memberData = {
           'tribe_id': tribeId,
           'user_id': myUserId,
-          'role_id': defaultRole['id'],
+          'role_id': assignedRoleId,
           'status': 'active',
           'joined_at': nowStr,
           'created_at': nowStr,
@@ -503,8 +521,15 @@ class TribeProvider with ChangeNotifier {
     if (myUserId == null) return;
 
     try {
-      final nowStr = DateTime.now().toUtc().toIso8601String();
       final existing = await _repository.getTribeMember(tribeId, myUserId);
+      if (existing != null &&
+          (existing['status'] == 'active' ||
+              existing['status'] == 'requested')) {
+        print("User $myUserId has already requested or joined tribe $tribeId. Skipping duplicate request.");
+        return;
+      }
+
+      final nowStr = DateTime.now().toUtc().toIso8601String();
 
       final activityLog = {
         'tribe_id': tribeId,
@@ -584,6 +609,14 @@ class TribeProvider with ChangeNotifier {
     }
 
     try {
+      final existing = await _repository.getTribeMember(tribeId, inviteeId);
+      if (existing != null &&
+          (existing['status'] == 'active' ||
+              existing['status'] == 'invited')) {
+        print("User $inviteeId is already active or invited in tribe $tribeId. Skipping duplicate invite.");
+        return;
+      }
+
       final tribe = await _repository.getTribeById(tribeId);
       if (tribe == null) throw Exception("Tribe not found.");
 
@@ -597,7 +630,6 @@ class TribeProvider with ChangeNotifier {
       }
 
       final nowStr = DateTime.now().toUtc().toIso8601String();
-      final existing = await _repository.getTribeMember(tribeId, inviteeId);
 
       // Resolve the invitee's display name for the activity log
       String inviteeName = 'a user';
@@ -672,6 +704,12 @@ class TribeProvider with ChangeNotifier {
     }
 
     try {
+      final member = await _repository.getTribeMember(tribeId, requesterId);
+      if (member != null && member['status'] == 'active') {
+        print("Requester $requesterId is already active in tribe $tribeId. Skipping duplicate approve.");
+        return;
+      }
+
       // Enforce max members
       final tribe = await _repository.getTribeById(tribeId);
       if (tribe == null) throw Exception("Tribe not found.");
@@ -738,6 +776,15 @@ class TribeProvider with ChangeNotifier {
     if (myUserId == null) return;
 
     try {
+      final existing = await _repository.getTribeMember(tribeId, targetUserId);
+      if (existing != null &&
+          (existing['status'] == 'declined' ||
+              existing['status'] == 'removed' ||
+              existing['status'] == 'left')) {
+        print("User $targetUserId is already declined or removed from tribe $tribeId.");
+        return;
+      }
+
       final nowStr = DateTime.now().toUtc().toIso8601String();
       final isSelf = myUserId == targetUserId;
 

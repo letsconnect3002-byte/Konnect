@@ -195,9 +195,12 @@ class _TribeChatPageState extends State<TribeChatPage> {
     final logs = provider.getActivityLog(widget.tribeId);
     final canViewLog = provider.hasPermission(widget.tribeId, 'view_activity_log');
 
-    // Merge and sort reverse
+    // Merge and sort reverse with deduplication
+    final Set<String> seenIds = {};
     final List<Map<String, dynamic>> mergedList = [];
     for (final m in messages) {
+      final id = m['id']?.toString();
+      if (id != null && !seenIds.add('msg_$id')) continue;
       mergedList.add({
         ...m,
         '_is_message': true,
@@ -207,6 +210,8 @@ class _TribeChatPageState extends State<TribeChatPage> {
     }
     if (canViewLog) {
       for (final l in logs) {
+        final id = l['id']?.toString();
+        if (id != null && !seenIds.add('log_$id')) continue;
         mergedList.add({
           ...l,
           '_is_message': false,

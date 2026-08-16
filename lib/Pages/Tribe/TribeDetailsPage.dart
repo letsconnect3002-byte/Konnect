@@ -116,111 +116,186 @@ class _TribeDetailsPageState extends State<TribeDetailsPage> {
     }
   }
 
-  void _showInviteRoleSelectionDialog(
-      BuildContext context, Map<String, dynamic> connection) {
+  Future<bool> _showInviteRoleSelectionDialog(
+      BuildContext context, Map<String, dynamic> connection) async {
     final tribeProvider = Provider.of<TribeProvider>(context, listen: false);
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
     final roles = tribeProvider.getRoles(widget.tribeId);
     final name = connection['name'] ?? 'this member';
 
-    showDialog(
+    final result = await showDialog<bool>(
       context: context,
-      builder: (context) {
-        return Dialog(
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          child: GlassmorphicContainer(
-            borderRadius: BorderRadius.circular(24),
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text("Select Invitation Role for $name",
-                    style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16)),
-                const SizedBox(height: 8),
-                Text(
-                    "Choose which role this user will be assigned when they join.",
-                    style:
-                        TextStyle(color: context.textSecondary, fontSize: 12)),
-                const SizedBox(height: 16),
-                SizedBox(
-                  width: double.maxFinite,
-                  child: ListView.builder(
-                    shrinkWrap: true,
-                    itemCount: roles.length,
-                    itemBuilder: (context, index) {
-                      final role = roles[index];
-                      final roleColorStr = role['color']?.toString() ?? '#FFFFFF';
-                      final roleColor = Color(int.parse(roleColorStr.replaceAll('#', '0xFF')));
-                      final slug = role['slug']?.toString() ?? '';
-                      final roleDetails = MafiaRoleDetails.getForSlug(slug);
-                      final displayTitle = role['name']?.toString() ?? roleDetails.title;
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        bool isInviting = false;
+        String selectedRoleTitle = '';
 
-                      return Material(
-                        color: Colors.transparent,
-                        child: ListTile(
-                          contentPadding:
-                              const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          leading: Text(roleDetails.icon, style: const TextStyle(fontSize: 20)),
-                          title: Text(displayTitle,
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return PopScope(
+              canPop: !isInviting,
+              child: Dialog(
+                backgroundColor: Colors.transparent,
+                elevation: 0,
+                child: GlassmorphicContainer(
+                  borderRadius: BorderRadius.circular(24),
+                  padding: const EdgeInsets.all(24),
+                  child: isInviting
+                      ? Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const SizedBox(height: 12),
+                            const SizedBox(
+                              width: 44,
+                              height: 44,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 3.5,
+                                valueColor:
+                                    AlwaysStoppedAnimation<Color>(Colors.white),
+                              ),
+                            ),
+                            const SizedBox(height: 24),
+                            const Text(
+                              "Sending Invitation...",
                               style: TextStyle(
-                                  color: roleColor,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 14)),
-                          subtitle: roleDetails.uxProfile.isNotEmpty
-                              ? Text(roleDetails.uxProfile,
-                                  style: TextStyle(
-                                      color: context.textSecondary,
-                                      fontSize: 11))
-                              : null,
-                          onTap: () async {
-                            final navigator = Navigator.of(context);
-                            try {
-                              await tribeProvider.inviteUser(
-                                  widget.tribeId,
-                                  connection['id'] as int,
-                                  role['id'] as String);
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              "Assigning $name the $selectedRoleTitle role...",
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: context.textSecondary,
+                                fontSize: 13,
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                          ],
+                        )
+                      : Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text("Select Invitation Role for $name",
+                                style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 16)),
+                            const SizedBox(height: 8),
+                            Text(
+                                "Choose which role this user will be assigned when they join.",
+                                style: TextStyle(
+                                    color: context.textSecondary, fontSize: 12)),
+                            const SizedBox(height: 16),
+                            Flexible(
+                              child: ConstrainedBox(
+                                constraints: BoxConstraints(
+                                  maxHeight:
+                                      MediaQuery.of(context).size.height * 0.5,
+                                ),
+                                child: ListView.builder(
+                                  shrinkWrap: true,
+                                  itemCount: roles.length,
+                                  itemBuilder: (context, index) {
+                                    final role = roles[index];
+                                    final roleColorStr =
+                                        role['color']?.toString() ?? '#FFFFFF';
+                                    final roleColor = Color(int.parse(
+                                        roleColorStr.replaceAll('#', '0xFF')));
+                                    final slug = role['slug']?.toString() ?? '';
+                                    final roleDetails =
+                                        MafiaRoleDetails.getForSlug(slug);
+                                    final displayTitle = role['name']?.toString() ??
+                                        roleDetails.title;
 
-                              navigator.pop(); // Pop dialog
-                              navigator.pop(); // Pop sheet
+                                    return Material(
+                                      color: Colors.transparent,
+                                      child: ListTile(
+                                        contentPadding:
+                                            const EdgeInsets.symmetric(
+                                                horizontal: 8, vertical: 4),
+                                        leading: Text(roleDetails.icon,
+                                            style:
+                                                const TextStyle(fontSize: 20)),
+                                        title: Text(displayTitle,
+                                            style: TextStyle(
+                                                color: roleColor,
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 14)),
+                                        subtitle: roleDetails.uxProfile.isNotEmpty
+                                            ? Text(roleDetails.uxProfile,
+                                                style: TextStyle(
+                                                    color:
+                                                        context.textSecondary,
+                                                    fontSize: 11))
+                                            : null,
+                                        onTap: isInviting
+                                            ? null
+                                            : () async {
+                                                setDialogState(() {
+                                                  isInviting = true;
+                                                  selectedRoleTitle =
+                                                      displayTitle;
+                                                });
+                                                try {
+                                                  await tribeProvider.inviteUser(
+                                                      widget.tribeId,
+                                                      connection['id'] as int,
+                                                      role['id'] as String);
 
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                    content:
-                                        Text("Invitation sent successfully!"),
-                                    backgroundColor: Colors.green),
-                              );
-                            } catch (e) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                    content: Text("Could not send invitation. Please verify the username and try again."),
-                                    backgroundColor: Colors.redAccent),
-                              );
-                            }
-                          },
+                                                  if (dialogContext.mounted) {
+                                                    Navigator.of(dialogContext).pop(true);
+                                                  }
+                                                } catch (e) {
+                                                  print("Error inviting user: $e");
+                                                  if (dialogContext.mounted) {
+                                                    setDialogState(() {
+                                                      isInviting = false;
+                                                    });
+                                                  }
+                                                  scaffoldMessenger.showSnackBar(
+                                                    SnackBar(
+                                                        content: Text(e
+                                                            .toString()
+                                                            .replaceAll(
+                                                                "Exception: ",
+                                                                "")),
+                                                        backgroundColor:
+                                                            Colors.redAccent),
+                                                  );
+                                                }
+                                              },
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: TextButton(
+                                child: const Text("Cancel",
+                                    style: TextStyle(color: Colors.white70)),
+                                onPressed: isInviting
+                                    ? null
+                                    : () => Navigator.pop(dialogContext, false),
+                              ),
+                            )
+                          ],
                         ),
-                      );
-                    },
-                  ),
                 ),
-                const SizedBox(height: 8),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: TextButton(
-                    child: const Text("Cancel",
-                        style: TextStyle(color: Colors.white70)),
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                )
-              ],
-            ),
-          ),
+              ),
+            );
+          },
         );
       },
     );
+
+    return result ?? false;
   }
 
   void _showInviteUserSheet(BuildContext context) {
@@ -229,9 +304,13 @@ class _TribeDetailsPageState extends State<TribeDetailsPage> {
     final tribeProvider = Provider.of<TribeProvider>(context, listen: false);
     final myConnections = connectionProvider.connections;
 
-    // Filter connections not already in member cache list
+    // Filter connections: only exclude members who are currently active, invited, or requested
     final existingMemberIds = tribeProvider
         .getMembers(widget.tribeId)
+        .where((m) =>
+            m['status'] == 'active' ||
+            m['status'] == 'invited' ||
+            m['status'] == 'requested')
         .map((m) => m['user_id'] as int)
         .toSet();
 
@@ -242,7 +321,7 @@ class _TribeDetailsPageState extends State<TribeDetailsPage> {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
-      builder: (context) {
+      builder: (sheetContext) {
         return GlassmorphicContainer(
           borderRadius: const BorderRadius.only(
               topLeft: Radius.circular(24), topRight: Radius.circular(24)),
@@ -291,8 +370,22 @@ class _TribeDetailsPageState extends State<TribeDetailsPage> {
                                 child: const Text("Invite",
                                     style:
                                         TextStyle(fontWeight: FontWeight.bold)),
-                                onPressed: () {
-                                  _showInviteRoleSelectionDialog(context, conn);
+                                onPressed: () async {
+                                  final success =
+                                      await _showInviteRoleSelectionDialog(
+                                          sheetContext, conn);
+                                  if (success && sheetContext.mounted) {
+                                    Navigator.of(sheetContext).pop();
+                                    if (context.mounted) {
+                                      ScaffoldMessenger.of(context)
+                                          .showSnackBar(
+                                        const SnackBar(
+                                            content: Text(
+                                                "Invitation sent successfully!"),
+                                            backgroundColor: Colors.green),
+                                      );
+                                    }
+                                  }
                                 },
                               ),
                             ),
