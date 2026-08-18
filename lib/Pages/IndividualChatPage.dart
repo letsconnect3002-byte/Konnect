@@ -653,26 +653,8 @@ class _IndividualChatPageState extends State<IndividualChatPage>
           }
         },
         behavior: HitTestBehavior.opaque,
-        child: Stack(
+        child: Column(
           children: [
-          Positioned.fill(
-            child: Image.asset(
-              'assets/background/message background.png',
-              fit: BoxFit.cover,
-            ),
-          ),
-          Positioned.fill(
-            child: Opacity(
-              opacity: 0.85,
-              child: Container(
-                decoration: BoxDecoration(
-                  gradient: context.felineBackgroundGradient,
-                ),
-              ),
-            ),
-          ),
-          Column(
-            children: [
               Expanded(
                 child: (_isRoomLoading || _isProfileLoading)
                     ? Center(
@@ -856,11 +838,9 @@ class _IndividualChatPageState extends State<IndividualChatPage>
               _buildInputBar(),
             ],
           ),
-        ],
-      ),
-     ),
-    );
-  }
+        ),
+      );
+    }
 
   Widget _buildMessageBubble({
     required String text,

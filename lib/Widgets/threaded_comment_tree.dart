@@ -197,8 +197,7 @@ class ThreadedCommentTree extends StatelessWidget {
     this.childAvatarRadius = 14.0,
     this.indentationWidth = 48.0,
     this.parentLeftPadding = 16.0,
-    this.lineColor = const Color(
-        0x61FFFFFF), // Colors.white38 default for dark background visibility
+    this.lineColor = const Color(0xFF3E414D), // Solid 100% opaque slate-gray
     this.strokeWidth = 1.8,
     this.curveRadius = 12.0,
     this.allowNestedExpansion = true,
@@ -432,13 +431,11 @@ class _ThreadNodeWidgetState extends State<_ThreadNodeWidget>
       if (avatarUrls.length >= 3) break;
     }
 
-    final double stackWidth = avatarUrls.isEmpty
-        ? 22.0
-        : (22.0 + (avatarUrls.length - 1) * 12.0);
+    final double stackWidth =
+        avatarUrls.isEmpty ? 22.0 : (22.0 + (avatarUrls.length - 1) * 12.0);
 
-    final double leftPadding = widget.isRootNode
-        ? widget.parentLeftPadding + 14.0
-        : 14.0;
+    final double leftPadding =
+        widget.isRootNode ? widget.parentLeftPadding + 14.0 : 14.0;
 
     return Padding(
       padding: EdgeInsets.only(left: leftPadding, top: 4.0, bottom: 8.0),
@@ -543,7 +540,8 @@ class _ThreadNodeWidgetState extends State<_ThreadNodeWidget>
         ? widget.parentAvatarRadius
         : widget.childAvatarRadius;
 
-    final itemKey = widget.itemKeys?.putIfAbsent(widget.comment.id, () => GlobalKey());
+    final itemKey =
+        widget.itemKeys?.putIfAbsent(widget.comment.id, () => GlobalKey());
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -583,7 +581,8 @@ class _ThreadNodeWidgetState extends State<_ThreadNodeWidget>
                             lineColor: widget.lineColor,
                             strokeWidth: widget.strokeWidth,
                             curveRadius: widget.curveRadius,
-                            childAvatarCenterYOffsets: _childAvatarCenterYOffsets,
+                            childAvatarCenterYOffsets:
+                                _childAvatarCenterYOffsets,
                             childAvatarLeftXs: _childAvatarLeftXs,
                             isLastChildChain: widget.isLastChildChain,
                             isRootNode: widget.isRootNode,
@@ -591,12 +590,15 @@ class _ThreadNodeWidgetState extends State<_ThreadNodeWidget>
                             parentAvatarBottomY: _parentAvatarBottomY,
                           ),
                           child: Padding(
-                            padding: EdgeInsets.only(left: widget.indentationWidth),
+                            padding:
+                                EdgeInsets.only(left: widget.indentationWidth),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
-                              children: List.generate(widget.comment.replies.length, (index) {
+                              children: List.generate(
+                                  widget.comment.replies.length, (index) {
                                 final childNode = widget.comment.replies[index];
-                                final isLast = (index == widget.comment.replies.length - 1);
+                                final isLast = (index ==
+                                    widget.comment.replies.length - 1);
 
                                 return _ThreadNodeWidget(
                                   key: ValueKey(childNode.id),
@@ -609,8 +611,10 @@ class _ThreadNodeWidgetState extends State<_ThreadNodeWidget>
                                   lineColor: widget.lineColor,
                                   strokeWidth: widget.strokeWidth,
                                   curveRadius: widget.curveRadius,
-                                  allowNestedExpansion: widget.allowNestedExpansion,
-                                  initialExpandPostId: widget.initialExpandPostId,
+                                  allowNestedExpansion:
+                                      widget.allowNestedExpansion,
+                                  initialExpandPostId:
+                                      widget.initialExpandPostId,
                                   itemKeys: widget.itemKeys,
                                   onReplyTap: widget.onReplyTap,
                                   onCommentTap: widget.onCommentTap,
@@ -642,20 +646,23 @@ class _ThreadNodeWidgetState extends State<_ThreadNodeWidget>
                             },
                             borderRadius: BorderRadius.circular(12.0),
                             child: Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8.0, vertical: 4.0),
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   Icon(
                                     Icons.keyboard_arrow_up_rounded,
                                     size: 14.0,
-                                    color: Theme.of(context).colorScheme.primary,
+                                    color:
+                                        Theme.of(context).colorScheme.primary,
                                   ),
                                   const SizedBox(width: 4.0),
                                   Text(
                                     "Hide replies",
                                     style: TextStyle(
-                                      color: Theme.of(context).colorScheme.primary,
+                                      color:
+                                          Theme.of(context).colorScheme.primary,
                                       fontSize: 12.0,
                                       fontWeight: FontWeight.w600,
                                     ),
@@ -758,11 +765,13 @@ class _ThreadNodeWidgetState extends State<_ThreadNodeWidget>
                       const SizedBox(width: 4),
                       Expanded(
                         child: Builder(builder: (context) {
-                          final profileProvider = Provider.of<ProfileProvider>(context);
+                          final profileProvider =
+                              Provider.of<ProfileProvider>(context);
                           final myName = profileProvider.name.trim();
                           final bool isReplyingToMe = (myName.isNotEmpty &&
                               node.replyToName != null &&
-                              node.replyToName!.trim().toLowerCase() == myName.toLowerCase());
+                              node.replyToName!.trim().toLowerCase() ==
+                                  myName.toLowerCase());
                           return Text.rich(
                             TextSpan(
                               text: "Replying to ",
@@ -775,9 +784,12 @@ class _ThreadNodeWidgetState extends State<_ThreadNodeWidget>
                               ),
                               children: [
                                 TextSpan(
-                                  text: isReplyingToMe ? "@Me" : "@${node.replyToName}",
+                                  text: isReplyingToMe
+                                      ? "@Me"
+                                      : "@${node.replyToName}",
                                   style: TextStyle(
-                                    color: Theme.of(context).colorScheme.primary,
+                                    color:
+                                        Theme.of(context).colorScheme.primary,
                                     fontSize: 11,
                                     fontWeight: FontWeight.bold,
                                   ),
@@ -806,13 +818,19 @@ class _ThreadNodeWidgetState extends State<_ThreadNodeWidget>
                     ),
                     const SizedBox(width: 6.0),
                     Builder(builder: (context) {
-                      final profileProvider = Provider.of<ProfileProvider>(context);
-                      final feedProvider = Provider.of<FeedProvider>(context, listen: false);
-                      final myUserId = profileProvider.userId ?? feedProvider.viewerId ?? 0;
+                      final profileProvider =
+                          Provider.of<ProfileProvider>(context);
+                      final feedProvider =
+                          Provider.of<FeedProvider>(context, listen: false);
+                      final myUserId =
+                          profileProvider.userId ?? feedProvider.viewerId ?? 0;
                       final myName = profileProvider.name.trim().toLowerCase();
                       final nodeName = node.authorName.trim().toLowerCase();
-                      final isMe = (myUserId != 0 && node.authorId == myUserId) ||
-                          (myName.isNotEmpty && nodeName.isNotEmpty && myName == nodeName);
+                      final isMe =
+                          (myUserId != 0 && node.authorId == myUserId) ||
+                              (myName.isNotEmpty &&
+                                  nodeName.isNotEmpty &&
+                                  myName == nodeName);
                       final isAuthorMe = isMe || node.degree == 0;
                       final String badgeText = isAuthorMe
                           ? "You"
@@ -829,7 +847,10 @@ class _ThreadNodeWidgetState extends State<_ThreadNodeWidget>
                         child: Text(
                           badgeText,
                           style: TextStyle(
-                            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+                            color: Theme.of(context)
+                                .colorScheme
+                                .onSurface
+                                .withValues(alpha: 0.5),
                             fontSize: 11.0,
                             fontWeight: FontWeight.w500,
                           ),
@@ -875,7 +896,8 @@ class _ThreadNodeWidgetState extends State<_ThreadNodeWidget>
 
                 // Reply Action
                 GestureDetector(
-                  onTap: () => (widget.onCommentTap ?? widget.onReplyTap)?.call(node),
+                  onTap: () =>
+                      (widget.onCommentTap ?? widget.onReplyTap)?.call(node),
                   child: Text(
                     "Reply",
                     style: TextStyle(

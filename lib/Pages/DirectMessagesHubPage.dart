@@ -206,7 +206,8 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
                     ),
                     content: const Row(
                       children: [
-                        Icon(Icons.check_circle_rounded, color: Colors.redAccent, size: 20),
+                        Icon(Icons.check_circle_rounded,
+                            color: Colors.redAccent, size: 20),
                         SizedBox(width: 10),
                         Expanded(
                           child: Text(
@@ -394,13 +395,15 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(12),
                                   side: BorderSide(
-                                    color: context.borderMuted.withValues(alpha: 0.3),
+                                    color: context.borderMuted
+                                        .withValues(alpha: 0.3),
                                     width: 1,
                                   ),
                                 ),
                                 content: const Row(
                                   children: [
-                                    Icon(Icons.check_circle_rounded, color: Colors.greenAccent, size: 20),
+                                    Icon(Icons.check_circle_rounded,
+                                        color: Colors.greenAccent, size: 20),
                                     SizedBox(width: 10),
                                     Expanded(
                                       child: Text(

@@ -1,53 +1,74 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:connect/Providers/profile_provider.dart';
 
 /// AppColors contains the color palette tokens defined for the Connect App's
-/// true dark-canvas aesthetic.
+/// true dark-canvas luxury tier aesthetic.
 class AppColors {
   AppColors._();
 
-  static const Color canvasBackground =
-      Color(0xFF000000); // Pure deep black canvas background
-  static const Color surfacePrimary =
-      Color(0xFF121316); // Matte obsidian dark grey for primary cards
-  static const Color surfaceSecondary =
-      Color(0xFF1C1D22); // Slightly lighter gray for fields, nested containers
-  static const Color borderMuted =
-      Color(0xFF23252B); // Thin, low-contrast border frame for containers
-  static const Color textPrimary =
-      Color(0xFFFFFFFF); // Pure white for major titles
-  static const Color textSecondary =
-      Color(0xFF8E919A); // Neutral grey for secondary labels and metadata
-  static const Color textMuted =
-      Color(0xFF4E515A); // Dark grey for placeholders and structural indicators
+  // Dark Canvas Elevation Hierarchy
+  static const Color canvasBackground = Color(0xFF000000); // Pitch black backdrop
+  static const Color surfacePrimary = Color(0xFF0F1013); // Matte obsidian card surface
+  static const Color surfaceSecondary = Color(0xFF17181D); // Elevated container / input fill
+  static const Color surfaceHighlight = Color(0xFF22242B); // Active press / selection state
 
-  static const Color accentPrimary =
-      Color(0xFF0064E0); // Experimental Blue Accent
-  static const Color accentSecondary =
-      Color(0xFF0064E0); // Experimental Blue Accent
+  // Borders & Glass Lines
+  static const Color borderSubtle = Color(0x14FFFFFF); // 8% white
+  static const Color borderMuted = Color(0x24FFFFFF); // 14% white
+
+  // Typography
+  static const Color textPrimary = Color(0xFFF4F4F6); // Soft off-white
+  static const Color textSecondary = Color(0xFFA1A4B0); // Cool gray
+  static const Color textMuted = Color(0xFF5E626E); // Slate gray
+
+  // Unified Accent System (Electric Sapphire)
+  static const Color accentPrimary = Color(0xFF2563EB); // Electric Sapphire
+  static const Color accentSecondary = Color(0xFF3B82F6); // Vibrant Sapphire
+  static const Color accentGlow = Color(0x402563EB); // 25% glow backing
 
   static const Color felineColor10 = Color(0xFF000000);
-  static const Color felineColor20 = Color(0xFF0A0A0C);
-  static const Color felineColor30 =
-      Color(0xFF00183D); // Experimental deep midnight blue background
+  static const Color felineColor20 = Color(0xFF07090F);
+  static const Color felineColor30 = Color(0xFF0B1224); // Deep ambient sapphire tone
 }
 
-/// AppGradients contains high-fidelity accent gradients instead of flat primary colors.
+/// AppGradients contains high-fidelity ambient gradients and specular edge highlights.
 class AppGradients {
   AppGradients._();
 
-  // static const LinearGradient felineBackgroundGradient = LinearGradient(
-  //   colors: [
-  //     AppColors.felineColor10,
-  //     AppColors.felineColor20,
-  //     AppColors.felineColor30,
-  //   ],
-  //   begin: Alignment.bottomLeft,
-  //   end: Alignment.topRight,
-  // );
+  /// Lightweight single-pass ambient radial backdrop to replace heavy blur overlays
+  static const RadialGradient ambientCanvasGradient = RadialGradient(
+    center: Alignment(0.65, -0.35),
+    radius: 1.25,
+    colors: [
+      Color(0xFF0B142B),
+      Color(0xFF000000),
+    ],
+    stops: [0.0, 0.75],
+  );
+
+  /// Specular gradient border reflecting ambient top-light
+  static const LinearGradient specularBorderGradient = LinearGradient(
+    begin: Alignment.topCenter,
+    end: Alignment.bottomCenter,
+    colors: [
+      Color(0x29FFFFFF), // 16% top specular reflection
+      Color(0x05FFFFFF), // 2% bottom edge
+    ],
+  );
+
+  /// Electric Sapphire hero accent gradient
+  static const LinearGradient sapphireAccentGradient = LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [
+      Color(0xFF3B82F6),
+      Color(0xFF1D4ED8),
+    ],
+  );
 
   static const LinearGradient felineBackgroundGradient = LinearGradient(
     colors: [
@@ -60,13 +81,13 @@ class AppGradients {
   );
 
   static const LinearGradient voltScanGradient = LinearGradient(
-    colors: [Color(0xFFCEF143), Color(0xFF76EC68)],
+    colors: [Color(0xFF3B82F6), Color(0xFF2563EB)],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
 
   static const LinearGradient ticketGradient = LinearGradient(
-    colors: [Color(0xFF3B82F6), Color(0xFFEC4899), Color(0xFFF59E0B)],
+    colors: [Color(0xFF3B82F6), Color(0xFF6366F1), Color(0xFF2563EB)],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
@@ -79,34 +100,34 @@ class AppTypography {
   static TextStyle get displayHeader => GoogleFonts.inter(
         fontSize: 26.0,
         fontWeight: FontWeight.bold,
-        letterSpacing: -0.3,
+        letterSpacing: -0.4,
         color: AppColors.textPrimary,
       );
 
   static TextStyle get screenHeading => GoogleFonts.inter(
         fontSize: 20.0,
         fontWeight: FontWeight.bold,
-        letterSpacing: 0.0,
+        letterSpacing: -0.2,
         color: AppColors.textPrimary,
       );
 
   static TextStyle get cardTitle => GoogleFonts.inter(
         fontSize: 16.0,
         fontWeight: FontWeight.w600,
-        letterSpacing: 0.1,
+        letterSpacing: -0.1,
         color: AppColors.textPrimary,
       );
 
   static TextStyle get bodyText => GoogleFonts.inter(
         fontSize: 14.0,
         fontWeight: FontWeight.w400,
-        letterSpacing: 0.2,
+        letterSpacing: 0.1,
         color: AppColors.textPrimary,
       );
 
   static TextStyle get captionText => GoogleFonts.inter(
         fontSize: 11.0,
-        fontWeight: FontWeight.bold,
+        fontWeight: FontWeight.w600,
         letterSpacing: 0.2,
         color: AppColors.textSecondary,
       );
@@ -133,7 +154,7 @@ class AppTheme {
       scaffoldBackgroundColor: Colors.transparent,
       canvasColor: AppColors.canvasBackground,
       cardColor: AppColors.surfacePrimary,
-      primaryColor: AppColors.textPrimary,
+      primaryColor: AppColors.accentPrimary,
       dialogTheme: const DialogThemeData(
         backgroundColor: AppColors.surfacePrimary,
       ),
@@ -141,7 +162,7 @@ class AppTheme {
         checkmarkColor: Colors.white,
       ),
       colorScheme: const ColorScheme.dark(
-        primary: AppColors.textPrimary,
+        primary: AppColors.accentPrimary,
         secondary: AppColors.accentSecondary,
         surface: AppColors.surfacePrimary,
         onSurface: AppColors.textPrimary,
@@ -165,6 +186,7 @@ class AppTheme {
     );
   }
 }
+
 
 class SubtlePageTransitionsBuilder extends PageTransitionsBuilder {
   const SubtlePageTransitionsBuilder();
@@ -233,13 +255,22 @@ extension AppThemeExtension on ThemeData {
   Color get canvasBackground => Colors.transparent;
   Color get surfacePrimary => AppColors.surfacePrimary;
   Color get surfaceSecondary => AppColors.surfaceSecondary;
+  Color get surfaceHighlight => AppColors.surfaceHighlight;
+  Color get borderSubtle => AppColors.borderSubtle;
   Color get borderMuted => AppColors.borderMuted;
   Color get accentPrimary => AppColors.accentPrimary;
   Color get accentSecondary => AppColors.accentSecondary;
+  Color get accentGlow => AppColors.accentGlow;
   Color get textPrimary => AppColors.textPrimary;
   Color get textSecondary => AppColors.textSecondary;
   Color get textMuted => AppColors.textMuted;
 
+  RadialGradient get ambientCanvasGradient =>
+      AppGradients.ambientCanvasGradient;
+  LinearGradient get specularBorderGradient =>
+      AppGradients.specularBorderGradient;
+  LinearGradient get sapphireAccentGradient =>
+      AppGradients.sapphireAccentGradient;
   LinearGradient get felineBackgroundGradient =>
       AppGradients.felineBackgroundGradient;
   LinearGradient get voltScanGradient => AppGradients.voltScanGradient;
@@ -260,13 +291,19 @@ extension AppBuildContextExtension on BuildContext {
   Color get canvasBackground => Colors.transparent;
   Color get surfacePrimary => theme.surfacePrimary;
   Color get surfaceSecondary => theme.surfaceSecondary;
+  Color get surfaceHighlight => theme.surfaceHighlight;
+  Color get borderSubtle => theme.borderSubtle;
   Color get borderMuted => theme.borderMuted;
   Color get accentPrimary => theme.accentPrimary;
   Color get accentSecondary => theme.accentSecondary;
+  Color get accentGlow => theme.accentGlow;
   Color get textPrimary => theme.textPrimary;
   Color get textSecondary => theme.textSecondary;
   Color get textMuted => theme.textMuted;
 
+  RadialGradient get ambientCanvasGradient => theme.ambientCanvasGradient;
+  LinearGradient get specularBorderGradient => theme.specularBorderGradient;
+  LinearGradient get sapphireAccentGradient => theme.sapphireAccentGradient;
   LinearGradient get felineBackgroundGradient => theme.felineBackgroundGradient;
   LinearGradient get voltScanGradient => theme.voltScanGradient;
   LinearGradient get ticketGradient => theme.ticketGradient;
@@ -305,7 +342,104 @@ bool shouldDisableTransparency(BuildContext context) {
   }
 }
 
-/// A highly polished, HIG-compliant Glassmorphic container.
+/// An elastic spring compression widget that provides micro-haptic tactile feedback
+/// on press down (selectionClick) and release (lightImpact) with smooth cubic scaling.
+class BounceTap extends StatefulWidget {
+  final Widget child;
+  final VoidCallback? onTap;
+  final VoidCallback? onLongPress;
+  final double scaleDown;
+  final Duration duration;
+  final HitTestBehavior behavior;
+
+  const BounceTap({
+    super.key,
+    required this.child,
+    this.onTap,
+    this.onLongPress,
+    this.scaleDown = 0.965,
+    this.duration = const Duration(milliseconds: 110),
+    this.behavior = HitTestBehavior.opaque,
+  });
+
+  @override
+  State<BounceTap> createState() => _BounceTapState();
+}
+
+class _BounceTapState extends State<BounceTap>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _scaleAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: widget.duration,
+      reverseDuration: widget.duration,
+    );
+    _scaleAnimation = Tween<double>(begin: 1.0, end: widget.scaleDown).animate(
+      CurvedAnimation(
+        parent: _controller,
+        curve: Curves.easeInOutCubic,
+        reverseCurve: Curves.easeOutCubic,
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _onTapDown(TapDownDetails details) {
+    if (widget.onTap == null && widget.onLongPress == null) return;
+    HapticFeedback.selectionClick();
+    _controller.forward();
+  }
+
+  void _onTapUp(TapUpDetails details) {
+    if (widget.onTap == null && widget.onLongPress == null) return;
+    _controller.reverse();
+  }
+
+  void _onTapCancel() {
+    if (widget.onTap == null && widget.onLongPress == null) return;
+    _controller.reverse();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (widget.onTap == null && widget.onLongPress == null) {
+      return widget.child;
+    }
+
+    return GestureDetector(
+      behavior: widget.behavior,
+      onTapDown: _onTapDown,
+      onTapUp: _onTapUp,
+      onTapCancel: _onTapCancel,
+      onTap: () {
+        HapticFeedback.lightImpact();
+        widget.onTap?.call();
+      },
+      onLongPress: widget.onLongPress != null
+          ? () {
+              HapticFeedback.mediumImpact();
+              widget.onLongPress?.call();
+            }
+          : null,
+      child: ScaleTransition(
+        scale: _scaleAnimation,
+        child: widget.child,
+      ),
+    );
+  }
+}
+
+/// A highly polished, HIG-compliant Glassmorphic container with specular edge lighting.
 /// Automatically falls back to a solid background if transparency is disabled.
 class GlassmorphicContainer extends StatelessWidget {
   final Widget child;
@@ -330,7 +464,7 @@ class GlassmorphicContainer extends StatelessWidget {
     this.border,
     this.glassColor,
     this.fallbackColor,
-    this.blurSigma = 15.0,
+    this.blurSigma = 14.0,
     this.padding,
     this.margin,
     this.boxShadow,
@@ -363,10 +497,10 @@ class GlassmorphicContainer extends StatelessWidget {
     }
 
     final effectiveGlassColor =
-        glassColor ?? Colors.black.withValues(alpha: 0.4);
+        glassColor ?? const Color(0xFF0F1013).withValues(alpha: 0.65);
     final effectiveBorder = border ??
         Border.all(
-          color: Colors.white.withValues(alpha: 0.08),
+          color: Colors.white.withValues(alpha: 0.10),
           width: 1.0,
         );
 

@@ -391,7 +391,7 @@ class PostCard extends StatelessWidget {
                         width: 2,
                         height: 8,
                         color: showTopConnector
-                            ? Colors.white.withValues(alpha: 0.25)
+                            ? const Color(0xFF3E414D)
                             : Colors.transparent,
                       ),
                       avatarWidget,
@@ -399,7 +399,7 @@ class PostCard extends StatelessWidget {
                         child: Container(
                           width: 2,
                           color: showBottomConnector
-                              ? Colors.white.withValues(alpha: 0.25)
+                              ? const Color(0xFF3E414D)
                               : Colors.transparent,
                         ),
                       ),
@@ -520,40 +520,73 @@ class PostCard extends StatelessWidget {
                               ),
                               const Spacer(),
                               if (post.degree >= 2 && !isMe) ...[
-                                OutlinedButton.icon(
-                                  style: OutlinedButton.styleFrom(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 10, vertical: 4),
-                                    minimumSize: Size.zero,
-                                    tapTargetSize:
-                                        MaterialTapTargetSize.shrinkWrap,
-                                    side: BorderSide(
+                                if (isThreadView)
+                                  BounceTap(
+                                    onTap: () {
+                                      ReferralIntroSheet.show(
+                                        context: context,
+                                        targetUserId: post.authorId,
+                                        targetUserName: post.authorName,
+                                        degree: post.degree,
+                                      );
+                                    },
+                                    child: Container(
+                                      padding: const EdgeInsets.all(5),
+                                      decoration: BoxDecoration(
                                         color: context.accentPrimary
-                                            .withValues(alpha: 0.6)),
-                                    shape: RoundedRectangleBorder(
-                                        borderRadius:
-                                            BorderRadius.circular(99)),
-                                  ),
-                                  icon: Icon(Icons.person_add_outlined,
-                                      size: 14, color: context.accentPrimary),
-                                  label: Text(
-                                    "Connect",
-                                    style: TextStyle(
-                                      color: context.accentPrimary,
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.bold,
+                                            .withValues(alpha: 0.12),
+                                        shape: BoxShape.circle,
+                                        border: Border.all(
+                                          color: context.accentPrimary
+                                              .withValues(alpha: 0.4),
+                                          width: 0.8,
+                                        ),
+                                      ),
+                                      child: Icon(Icons.person_add_rounded,
+                                          size: 13,
+                                          color: context.accentSecondary),
+                                    ),
+                                  )
+                                else
+                                  BounceTap(
+                                    onTap: () {
+                                      ReferralIntroSheet.show(
+                                        context: context,
+                                        targetUserId: post.authorId,
+                                        targetUserName: post.authorName,
+                                        degree: post.degree,
+                                      );
+                                    },
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 10, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        borderRadius: BorderRadius.circular(99),
+                                        border: Border.all(
+                                          color: context.accentPrimary
+                                              .withValues(alpha: 0.6),
+                                          width: 0.8,
+                                        ),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(Icons.person_add_outlined,
+                                              size: 14,
+                                              color: context.accentPrimary),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            "Connect",
+                                            style: TextStyle(
+                                              color: context.accentPrimary,
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
                                     ),
                                   ),
-                                  onPressed: () {
-                                    HapticFeedback.lightImpact();
-                                    ReferralIntroSheet.show(
-                                      context: context,
-                                      targetUserId: post.authorId,
-                                      targetUserName: post.authorName,
-                                      degree: post.degree,
-                                    );
-                                  },
-                                ),
                               ],
                             ],
                           ),
@@ -704,38 +737,73 @@ class PostCard extends StatelessWidget {
                         ),
                         const Spacer(),
                         if (post.degree >= 2 && !isMe) ...[
-                          OutlinedButton.icon(
-                            style: OutlinedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 10, vertical: 4),
-                              minimumSize: Size.zero,
-                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                              side: BorderSide(
+                          if (isThreadView)
+                            BounceTap(
+                              onTap: () {
+                                ReferralIntroSheet.show(
+                                  context: context,
+                                  targetUserId: post.authorId,
+                                  targetUserName: post.authorName,
+                                  degree: post.degree,
+                                );
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.all(5),
+                                decoration: BoxDecoration(
                                   color: context.accentPrimary
-                                      .withValues(alpha: 0.6)),
-                              shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(99)),
-                            ),
-                            icon: Icon(Icons.person_add_outlined,
-                                size: 14, color: context.accentPrimary),
-                            label: Text(
-                              "Connect",
-                              style: TextStyle(
-                                color: context.accentPrimary,
-                                fontSize: 11,
-                                fontWeight: FontWeight.bold,
+                                      .withValues(alpha: 0.12),
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: context.accentPrimary
+                                        .withValues(alpha: 0.4),
+                                    width: 0.8,
+                                  ),
+                                ),
+                                child: Icon(Icons.person_add_rounded,
+                                    size: 13,
+                                    color: context.accentSecondary),
+                              ),
+                            )
+                          else
+                            BounceTap(
+                              onTap: () {
+                                ReferralIntroSheet.show(
+                                  context: context,
+                                  targetUserId: post.authorId,
+                                  targetUserName: post.authorName,
+                                  degree: post.degree,
+                                );
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 10, vertical: 4),
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(99),
+                                  border: Border.all(
+                                    color: context.accentPrimary
+                                        .withValues(alpha: 0.6),
+                                    width: 0.8,
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.person_add_outlined,
+                                        size: 14,
+                                        color: context.accentPrimary),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      "Connect",
+                                      style: TextStyle(
+                                        color: context.accentPrimary,
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
-                            onPressed: () {
-                              HapticFeedback.lightImpact();
-                              ReferralIntroSheet.show(
-                                context: context,
-                                targetUserId: post.authorId,
-                                targetUserName: post.authorName,
-                                degree: post.degree,
-                              );
-                            },
-                          ),
                         ],
                       ],
                     ),

@@ -297,8 +297,9 @@ Future<void> showConnectionLocalNotification({
       type == 'plan_reminder_start';
   final bool isTribeInvite = type == 'tribe_invite';
   final bool isTribeRequest = type == 'tribe_request';
-  final bool isInformational =
-      type == 'tribe_removed' || type == 'tribe_approved' || type == 'tribe_added';
+  final bool isInformational = type == 'tribe_removed' ||
+      type == 'tribe_approved' ||
+      type == 'tribe_added';
 
   if (isTribeInvite) {
     androidActions = [
@@ -2249,29 +2250,15 @@ class MyApp extends StatelessWidget {
         darkTheme: AppTheme.darkTheme,
         themeMode: ThemeMode.dark,
         builder: (context, child) {
-          final profileProvider = Provider.of<ProfileProvider>(context);
-          final blurEnabled = profileProvider.blurBackground;
-
-          Widget backgroundGradient = Container(
-            decoration: BoxDecoration(
-              gradient: context.felineBackgroundGradient,
-            ),
-          );
-
-          if (blurEnabled) {
-            backgroundGradient = ImageFiltered(
-              imageFilter: ImageFilter.blur(sigmaX: 50.0, sigmaY: 50.0),
-              child: Container(
-                decoration: BoxDecoration(
-                  gradient: context.felineBackgroundGradient,
-                ),
-              ),
-            );
-          }
-
           return Stack(
             children: [
-              Positioned.fill(child: backgroundGradient),
+              Positioned.fill(
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: context.ambientCanvasGradient,
+                  ),
+                ),
+              ),
               if (child != null) Positioned.fill(child: child),
             ],
           );
@@ -3273,18 +3260,31 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
             index: _currentIndex,
             children: _screens,
           ),
-          if (!_dismissedProfileNudge)
-            Positioned(
-              top: topPadding + 6,
-              left: 0,
-              right: 0,
-              child: ProfileNudgeBanner(
-                onOpenProfile: () {
-                  setSelectedIndex(5);
-                },
-                onDismiss: _handleDismissProfileNudge,
+          Positioned(
+            top: topPadding + 6,
+            left: 0,
+            right: 0,
+            child: AnimatedSlide(
+              offset:
+                  _dismissedProfileNudge ? const Offset(0, -1.2) : Offset.zero,
+              duration: const Duration(milliseconds: 320),
+              curve: Curves.easeInOutCubic,
+              child: AnimatedOpacity(
+                opacity: _dismissedProfileNudge ? 0.0 : 1.0,
+                duration: const Duration(milliseconds: 240),
+                curve: Curves.easeOut,
+                child: IgnorePointer(
+                  ignoring: _dismissedProfileNudge,
+                  child: ProfileNudgeBanner(
+                    onOpenProfile: () {
+                      setSelectedIndex(5);
+                    },
+                    onDismiss: _handleDismissProfileNudge,
+                  ),
+                ),
               ),
             ),
+          ),
           Positioned(
             left: 0,
             right: 0,
@@ -3404,28 +3404,41 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
       );
     }
 
-    return GestureDetector(
+    return BounceTap(
       onTap: () {
-        HapticFeedback.lightImpact();
         setState(() => _currentIndex = index);
       },
-      behavior: HitTestBehavior.opaque,
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          iconWidget,
-          const SizedBox(height: 4),
-          // Active state indicator dot
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            width: 4,
-            height: 4,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: isActive ? const Color(0xFFCEF143) : Colors.transparent,
+      scaleDown: 0.94,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        color: Colors.transparent,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            iconWidget,
+            const SizedBox(height: 4),
+            // Active state indicator dot
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              curve: Curves.easeOutCubic,
+              width: 4,
+              height: 4,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: isActive ? context.accentSecondary : Colors.transparent,
+                boxShadow: isActive
+                    ? [
+                        BoxShadow(
+                          color: context.accentPrimary.withValues(alpha: 0.8),
+                          blurRadius: 4,
+                          spreadRadius: 1,
+                        ),
+                      ]
+                    : null,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

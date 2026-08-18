@@ -215,7 +215,7 @@ class _ReferralIntroSheetState extends State<ReferralIntroSheet> {
                 ),
               ],
             ),
-            backgroundColor: const Color(0xFF7C3AED),
+            backgroundColor: context.accentPrimary,
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -334,12 +334,12 @@ class _ReferralIntroSheetState extends State<ReferralIntroSheet> {
               ),
               const SizedBox(height: 10),
               if (_isLoading)
-                const Center(
+                Center(
                   child: Padding(
-                    padding: EdgeInsets.symmetric(vertical: 20),
+                    padding: const EdgeInsets.symmetric(vertical: 20),
                     child: CircularProgressIndicator(
                       valueColor:
-                          AlwaysStoppedAnimation<Color>(Color(0xFF7C3AED)),
+                          AlwaysStoppedAnimation<Color>(context.accentPrimary),
                     ),
                   ),
                 )

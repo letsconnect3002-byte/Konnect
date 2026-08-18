@@ -607,28 +607,10 @@ class _CircleFeedPageState extends State<CircleFeedPage> {
           ),
         ],
       ),
-      body: Stack(
-        children: [
-          Positioned.fill(
-            child: Image.asset(
-              'assets/background/message background.png',
-              fit: BoxFit.cover,
-            ),
-          ),
-          Positioned.fill(
-            child: Opacity(
-              opacity: 0.85,
-              child: Container(
-                decoration: BoxDecoration(
-                  gradient: context.felineBackgroundGradient,
-                ),
-              ),
-            ),
-          ),
-          feedProvider.isLoading && feedProvider.posts.isEmpty
-              ? const Center(child: CircularProgressIndicator())
-              : Stack(
-                  children: [
+      body: feedProvider.isLoading && feedProvider.posts.isEmpty
+          ? const Center(child: CircularProgressIndicator())
+          : Stack(
+              children: [
                     RefreshIndicator(
                       onRefresh: () async {
                         final pulseProvider =
@@ -896,8 +878,6 @@ class _CircleFeedPageState extends State<CircleFeedPage> {
                       ),
                   ],
                 ),
-        ],
-      ),
       floatingActionButton: Padding(
         padding: const EdgeInsets.only(bottom: 70.0),
         child: FloatingActionButton(
@@ -1453,7 +1433,7 @@ class _FeedPostThreadItemState extends State<_FeedPostThreadItem> {
         childAvatarRadius: 14.0,
         indentationWidth: 48.0,
         parentLeftPadding: 16.0,
-        lineColor: Colors.white.withValues(alpha: 0.25),
+        lineColor: const Color(0xFF3E414D),
         strokeWidth: 1.8,
         curveRadius: 12.0,
         allowNestedExpansion: false,

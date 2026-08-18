@@ -490,7 +490,7 @@ class _ThreadDetailPageState extends State<ThreadDetailPage> {
                                   childAvatarRadius: 14.0,
                                   indentationWidth: 48.0,
                                   parentLeftPadding: 16.0,
-                                  lineColor: Colors.grey[600]!,
+                                  lineColor: const Color(0xFF3E414D),
                                   strokeWidth: 1.8,
                                   curveRadius: 12.0,
                                   initialExpandPostId: _highlightedPostId,

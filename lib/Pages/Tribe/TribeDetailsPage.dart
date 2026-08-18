@@ -211,27 +211,9 @@ class _TribeDetailsPageState extends State<TribeDetailsPage> {
                                     final displayTitle = role['name']?.toString() ??
                                         roleDetails.title;
 
-                                    return Material(
-                                      color: Colors.transparent,
-                                      child: ListTile(
-                                        contentPadding:
-                                            const EdgeInsets.symmetric(
-                                                horizontal: 8, vertical: 4),
-                                        leading: Text(roleDetails.icon,
-                                            style:
-                                                const TextStyle(fontSize: 20)),
-                                        title: Text(displayTitle,
-                                            style: TextStyle(
-                                                color: roleColor,
-                                                fontWeight: FontWeight.bold,
-                                                fontSize: 14)),
-                                        subtitle: roleDetails.uxProfile.isNotEmpty
-                                            ? Text(roleDetails.uxProfile,
-                                                style: TextStyle(
-                                                    color:
-                                                        context.textSecondary,
-                                                    fontSize: 11))
-                                            : null,
+                                    return Padding(
+                                      padding: const EdgeInsets.only(bottom: 8.0),
+                                      child: BounceTap(
                                         onTap: isAdding
                                             ? null
                                             : () async {
@@ -268,6 +250,54 @@ class _TribeDetailsPageState extends State<TribeDetailsPage> {
                                                   );
                                                 }
                                               },
+                                        child: Container(
+                                          padding: const EdgeInsets.all(12),
+                                          decoration: BoxDecoration(
+                                            color: context.surfaceSecondary,
+                                            borderRadius: BorderRadius.circular(14),
+                                            border: Border.all(
+                                              color: roleColor.withValues(alpha: 0.25),
+                                              width: 1.0,
+                                            ),
+                                          ),
+                                          child: Row(
+                                            children: [
+                                              Container(
+                                                width: 38,
+                                                height: 38,
+                                                decoration: BoxDecoration(
+                                                  color: roleColor.withValues(alpha: 0.12),
+                                                  shape: BoxShape.circle,
+                                                ),
+                                                alignment: Alignment.center,
+                                                child: Text(roleDetails.icon,
+                                                    style: const TextStyle(fontSize: 18)),
+                                              ),
+                                              const SizedBox(width: 12),
+                                              Expanded(
+                                                child: Column(
+                                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                                  children: [
+                                                    Text(displayTitle,
+                                                        style: TextStyle(
+                                                            color: roleColor,
+                                                            fontWeight: FontWeight.bold,
+                                                            fontSize: 14)),
+                                                    if (roleDetails.uxProfile.isNotEmpty) ...[
+                                                      const SizedBox(height: 2),
+                                                      Text(roleDetails.uxProfile,
+                                                          style: TextStyle(
+                                                              color: context.textSecondary,
+                                                              fontSize: 11)),
+                                                    ],
+                                                  ],
+                                                ),
+                                              ),
+                                              Icon(Icons.chevron_right_rounded,
+                                                  color: context.textMuted, size: 20),
+                                            ],
+                                          ),
+                                        ),
                                       ),
                                     );
                                   },
