@@ -127,20 +127,20 @@ class _TribeDetailsPageState extends State<TribeDetailsPage> {
       context: context,
       barrierDismissible: false,
       builder: (dialogContext) {
-        bool isInviting = false;
+        bool isAdding = false;
         String selectedRoleTitle = '';
 
         return StatefulBuilder(
           builder: (context, setDialogState) {
             return PopScope(
-              canPop: !isInviting,
+              canPop: !isAdding,
               child: Dialog(
                 backgroundColor: Colors.transparent,
                 elevation: 0,
                 child: GlassmorphicContainer(
                   borderRadius: BorderRadius.circular(24),
                   padding: const EdgeInsets.all(24),
-                  child: isInviting
+                  child: isAdding
                       ? Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
@@ -156,7 +156,7 @@ class _TribeDetailsPageState extends State<TribeDetailsPage> {
                             ),
                             const SizedBox(height: 24),
                             const Text(
-                              "Sending Invitation...",
+                              "Adding to Mafia...",
                               style: TextStyle(
                                 color: Colors.white,
                                 fontWeight: FontWeight.bold,
@@ -179,14 +179,14 @@ class _TribeDetailsPageState extends State<TribeDetailsPage> {
                           mainAxisSize: MainAxisSize.min,
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text("Select Invitation Role for $name",
+                            Text("Select Role for $name",
                                 style: const TextStyle(
                                     color: Colors.white,
                                     fontWeight: FontWeight.bold,
                                     fontSize: 16)),
                             const SizedBox(height: 8),
                             Text(
-                                "Choose which role this user will be assigned when they join.",
+                                "Choose which role this user will be assigned.",
                                 style: TextStyle(
                                     color: context.textSecondary, fontSize: 12)),
                             const SizedBox(height: 16),
@@ -232,16 +232,16 @@ class _TribeDetailsPageState extends State<TribeDetailsPage> {
                                                         context.textSecondary,
                                                     fontSize: 11))
                                             : null,
-                                        onTap: isInviting
+                                        onTap: isAdding
                                             ? null
                                             : () async {
                                                 setDialogState(() {
-                                                  isInviting = true;
+                                                  isAdding = true;
                                                   selectedRoleTitle =
                                                       displayTitle;
                                                 });
                                                 try {
-                                                  await tribeProvider.inviteUser(
+                                                  await tribeProvider.addMember(
                                                       widget.tribeId,
                                                       connection['id'] as int,
                                                       role['id'] as String);
@@ -250,10 +250,10 @@ class _TribeDetailsPageState extends State<TribeDetailsPage> {
                                                     Navigator.of(dialogContext).pop(true);
                                                   }
                                                 } catch (e) {
-                                                  print("Error inviting user: $e");
+                                                  print("Error adding member: $e");
                                                   if (dialogContext.mounted) {
                                                     setDialogState(() {
-                                                      isInviting = false;
+                                                      isAdding = false;
                                                     });
                                                   }
                                                   scaffoldMessenger.showSnackBar(
@@ -280,7 +280,7 @@ class _TribeDetailsPageState extends State<TribeDetailsPage> {
                               child: TextButton(
                                 child: const Text("Cancel",
                                     style: TextStyle(color: Colors.white70)),
-                                onPressed: isInviting
+                                onPressed: isAdding
                                     ? null
                                     : () => Navigator.pop(dialogContext, false),
                               ),
@@ -304,13 +304,10 @@ class _TribeDetailsPageState extends State<TribeDetailsPage> {
     final tribeProvider = Provider.of<TribeProvider>(context, listen: false);
     final myConnections = connectionProvider.connections;
 
-    // Filter connections: only exclude members who are currently active, invited, or requested
+    // Filter connections: only exclude members who are currently active
     final existingMemberIds = tribeProvider
         .getMembers(widget.tribeId)
-        .where((m) =>
-            m['status'] == 'active' ||
-            m['status'] == 'invited' ||
-            m['status'] == 'requested')
+        .where((m) => m['status'] == 'active')
         .map((m) => m['user_id'] as int)
         .toSet();
 
@@ -329,14 +326,14 @@ class _TribeDetailsPageState extends State<TribeDetailsPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text("Invite Connection",
+              Text("Add Connection",
                   style: context.screenHeading
                       .copyWith(fontWeight: FontWeight.bold)),
               const SizedBox(height: 16),
               Expanded(
                 child: inviteable.isEmpty
                     ? Center(
-                        child: Text("No connection to invite",
+                        child: Text("No connections to add",
                             style: TextStyle(color: context.textMuted)))
                     : ListView.builder(
                         itemCount: inviteable.length,
@@ -367,7 +364,7 @@ class _TribeDetailsPageState extends State<TribeDetailsPage> {
                               subtitle: Text(conn['profession'] ?? '',
                                   style: TextStyle(color: context.textMuted)),
                               trailing: TextButton(
-                                child: const Text("Invite",
+                                child: const Text("Add",
                                     style:
                                         TextStyle(fontWeight: FontWeight.bold)),
                                 onPressed: () async {
@@ -379,9 +376,9 @@ class _TribeDetailsPageState extends State<TribeDetailsPage> {
                                     if (context.mounted) {
                                       ScaffoldMessenger.of(context)
                                           .showSnackBar(
-                                        const SnackBar(
+                                        SnackBar(
                                             content: Text(
-                                                "Invitation sent successfully!"),
+                                                "$name added to Mafia successfully!"),
                                             backgroundColor: Colors.green),
                                       );
                                     }
@@ -1356,7 +1353,7 @@ class _TribeDetailsPageState extends State<TribeDetailsPage> {
                                 Expanded(
                                   child: _buildActionButton(
                                     icon: Icons.person_add_alt_1_rounded,
-                                    label: "Invite User",
+                                    label: "Add Member",
                                     onTap: () => _showInviteUserSheet(context),
                                   ),
                                 ),

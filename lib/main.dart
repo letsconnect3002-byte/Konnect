@@ -298,7 +298,7 @@ Future<void> showConnectionLocalNotification({
   final bool isTribeInvite = type == 'tribe_invite';
   final bool isTribeRequest = type == 'tribe_request';
   final bool isInformational =
-      type == 'tribe_removed' || type == 'tribe_approved';
+      type == 'tribe_removed' || type == 'tribe_approved' || type == 'tribe_added';
 
   if (isTribeInvite) {
     androidActions = [
@@ -498,15 +498,9 @@ void handleLocalNotificationClickPayload(String payload) {
       }
       return;
     }
-    if (action == 'connection_notification') {
-      navigatorKey.currentState?.push(
-        MaterialPageRoute(
-          builder: (routeContext) => const NotificationPage(),
-        ),
-      );
-      return;
-    }
-    if (action == 'tribe_message') {
+    if (action == 'tribe_message' ||
+        action == 'tribe_added' ||
+        data['real_type'] == 'tribe_added') {
       final tribeId = data['tribe_id'] as String?;
       final tribeName = data['tribe_name'] as String? ?? 'Mafia';
       if (tribeId != null) {
@@ -517,6 +511,14 @@ void handleLocalNotificationClickPayload(String payload) {
           ),
         );
       }
+      return;
+    }
+    if (action == 'connection_notification') {
+      navigatorKey.currentState?.push(
+        MaterialPageRoute(
+          builder: (routeContext) => const NotificationPage(),
+        ),
+      );
       return;
     }
     final senderIdStr = data['sender_id'] as String?;
@@ -1873,6 +1875,16 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
             } else if (type == "plan_reminder_start") {
               title = "Plan Starting Now";
               body = "\"$planTitle\" is starting now!";
+            } else if (type == "tribe_added") {
+              String tribeName = "a Mafia";
+              if (note != null && note.startsWith('{')) {
+                try {
+                  final parsed = jsonDecode(note);
+                  tribeName = parsed['tribe_name']?.toString() ?? "a Mafia";
+                } catch (_) {}
+              }
+              title = "Added to $tribeName";
+              body = "$actorName added you to \"$tribeName\"";
             } else if (type == "tribe_invite") {
               String tribeName = "a Mafia";
               if (note != null && note.startsWith('{')) {
@@ -2039,7 +2051,9 @@ void main() async {
           try {
             final data = jsonDecode(payload);
             final action = data['action'] as String?;
-            if (action == 'tribe_message') {
+            if (action == 'tribe_message' ||
+                action == 'tribe_added' ||
+                data['real_type'] == 'tribe_added') {
               targetTribeChatId = data['tribe_id']?.toString();
               targetTribeName = data['tribe_name']?.toString() ?? 'Mafia';
             } else if (action == 'connection_notification') {
@@ -2079,7 +2093,9 @@ void main() async {
         try {
           final data = jsonDecode(localPayload);
           final action = data['action'] as String?;
-          if (action == 'tribe_message') {
+          if (action == 'tribe_message' ||
+              action == 'tribe_added' ||
+              data['real_type'] == 'tribe_added') {
             targetTribeChatId = data['tribe_id']?.toString();
             targetTribeName = data['tribe_name']?.toString() ?? 'Mafia';
           } else if (action == 'connection_notification') {
@@ -2100,7 +2116,9 @@ void main() async {
     if (fcmMessage != null) {
       final data = fcmMessage.data;
       final action = data['action'] as String?;
-      if (action == 'tribe_message') {
+      if (action == 'tribe_message' ||
+          action == 'tribe_added' ||
+          data['real_type'] == 'tribe_added') {
         targetTribeChatId = data['tribe_id']?.toString();
         targetTribeName = data['tribe_name']?.toString() ?? 'Mafia';
       } else if (action == 'connection_notification') {

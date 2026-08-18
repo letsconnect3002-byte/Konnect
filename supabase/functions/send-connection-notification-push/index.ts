@@ -83,7 +83,7 @@ serve(async (req) => {
     let realType = type
     let tribeName = "a Mafia"
     let tribeMessage = ""
-
+    let roleName = ""
     if (note && note.startsWith("{")) {
       try {
         const parsed = JSON.parse(note)
@@ -96,12 +96,18 @@ serve(async (req) => {
         if (parsed.message) {
           tribeMessage = parsed.message
         }
+        if (parsed.role_name) {
+          roleName = parsed.role_name
+        }
       } catch (e) {
         console.error("Error parsing JSON note:", e)
       }
     }
 
-    if (realType === "tribe_invite") {
+    if (realType === "tribe_added") {
+      title = `Added to ${tribeName}`
+      bodyText = `${actorName} added you to "${tribeName}"`
+    } else if (realType === "tribe_invite") {
       title = "Mafia Invitation"
       bodyText = `${actorName} invited you to join "${tribeName}"`
     } else if (realType === "tribe_request") {
@@ -110,6 +116,9 @@ serve(async (req) => {
     } else if (realType === "tribe_approved") {
       title = "Mafia Approved"
       bodyText = `Your request to join "${tribeName}" was approved`
+    } else if (realType === "tribe_removed") {
+      title = `Removed from ${tribeName}`
+      bodyText = `You were removed from "${tribeName}"`
     } else if (realType === "tribe_message") {
       title = `New Message in ${tribeName}`
       bodyText = `${actorName}: ${tribeMessage}`

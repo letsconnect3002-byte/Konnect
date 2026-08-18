@@ -4,6 +4,7 @@ import 'package:connect/Pages/ConnectionProfilePage.dart';
 import 'package:connect/Pages/IndividualChatPage.dart';
 import 'package:connect/Pages/PlanDetailPage.dart';
 import 'package:connect/Pages/ThreadDetailPage.dart';
+import 'package:connect/Pages/Tribe/TribeChatPage.dart';
 import 'package:connect/Providers/connection_provider.dart';
 import 'package:connect/Providers/notification_provider.dart';
 import 'package:connect/Providers/plans_provider.dart';
@@ -441,6 +442,7 @@ class _NotificationPageState extends State<NotificationPage> {
     if (type == 'tribe_invite' ||
         type == 'tribe_request' ||
         type == 'tribe_approved' ||
+        type == 'tribe_added' ||
         type == 'tribe_invite_accepted' ||
         type == 'tribe_request_approved' ||
         type == 'tribe_request_declined' ||
@@ -1081,7 +1083,10 @@ class _NotificationPageState extends State<NotificationPage> {
 
     String actionText;
     IconData actionIcon;
-    if (type == 'tribe_invite' || type == 'tribe_invite_accepted') {
+    if (type == 'tribe_added') {
+      actionText = " added you to ";
+      actionIcon = Icons.group_add_rounded;
+    } else if (type == 'tribe_invite' || type == 'tribe_invite_accepted') {
       actionText = " invited you to join ";
       actionIcon = type == 'tribe_invite_accepted'
           ? Icons.check_circle_rounded
@@ -1140,6 +1145,15 @@ class _NotificationPageState extends State<NotificationPage> {
           onTap: () {
             HapticFeedback.lightImpact();
             provider.markAsSeen(notification['id']);
+            if (tribeId != null) {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) =>
+                      TribeChatPage(tribeId: tribeId!, tribeName: tribeName),
+                ),
+              );
+            }
           },
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),

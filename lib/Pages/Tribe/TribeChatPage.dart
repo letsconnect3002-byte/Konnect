@@ -151,8 +151,18 @@ class _TribeChatPageState extends State<TribeChatPage> {
     // Extract target name from metadata (for actions that affect another user)
     final metadata = log['metadata'] as Map<String, dynamic>? ?? {};
     final String targetName = metadata['target_name']?.toString() ?? 'a member';
+    final String roleName = metadata['role_name']?.toString() ?? '';
 
     switch (actionType) {
+      case 'added_member':
+        final roleSuffix = roleName.isNotEmpty ? " as $roleName" : "";
+        final isTargetMe = metadata['target_user_id'] == myUserId;
+        if (isTargetMe) {
+          return "$actorName added you to the Mafia$roleSuffix";
+        }
+        return isMe
+            ? "You added $targetName$roleSuffix"
+            : "$actorName added $targetName$roleSuffix";
       case 'joined':
         return isMe ? "You joined the Mafia" : "$actorName joined the Mafia";
       case 'left':
@@ -164,8 +174,8 @@ class _TribeChatPageState extends State<TribeChatPage> {
             : "$actorName removed $targetName from the Mafia";
       case 'invited':
         return isMe
-            ? "You invited $targetName"
-            : "$actorName invited $targetName";
+            ? "You added $targetName"
+            : "$actorName added $targetName";
       case 'requested_to_join':
         return isMe
             ? "You requested to join the Mafia"

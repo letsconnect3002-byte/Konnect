@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:connect/Models/app_error.dart';
+import 'package:connect/Models/mafia_role_details.dart';
 import 'package:connect/Repositories/tribe_repository.dart';
 import 'package:connect/Repositories/notification_repository.dart';
 import 'package:collection/collection.dart';
@@ -599,28 +600,30 @@ class TribeProvider with ChangeNotifier {
     }
   }
 
-  // ── Invite Flows ──
+  // ── Add Member Flows ──
   Future<void> inviteUser(String tribeId, int inviteeId, String roleId) async {
+    await addMember(tribeId, inviteeId, roleId);
+  }
+
+  Future<void> addMember(String tribeId, int inviteeId, String roleId) async {
     final myUserId = _userId;
     if (myUserId == null) return;
 
     if (!hasPermission(tribeId, 'manage_members')) {
-      throw Exception("You do not have permission to invite members.");
+      throw Exception("You do not have permission to add members.");
     }
 
     try {
       final existing = await _repository.getTribeMember(tribeId, inviteeId);
-      if (existing != null &&
-          (existing['status'] == 'active' ||
-              existing['status'] == 'invited')) {
-        print("User $inviteeId is already active or invited in tribe $tribeId. Skipping duplicate invite.");
+      if (existing != null && existing['status'] == 'active') {
+        print("User $inviteeId is already active in tribe $tribeId. Skipping duplicate add.");
         return;
       }
 
       final tribe = await _repository.getTribeById(tribeId);
       if (tribe == null) throw Exception("Tribe not found.");
 
-      // Check capacity validation before invitation is sent
+      // Check capacity validation before addition
       final max = tribe['max_members'] as int?;
       if (max != null) {
         final activeCount = await _repository.getActiveMembersCount(tribeId);
@@ -631,7 +634,7 @@ class TribeProvider with ChangeNotifier {
 
       final nowStr = DateTime.now().toUtc().toIso8601String();
 
-      // Resolve the invitee's display name for the activity log
+      // Resolve the member's display name for the activity log
       String inviteeName = 'a user';
       final allMembers =
           _tribeMembers[tribeId] ?? await _repository.getTribeMembers(tribeId);
@@ -642,22 +645,33 @@ class TribeProvider with ChangeNotifier {
         inviteeName = profile?['name']?.toString() ?? 'a user';
       }
 
+      // Resolve role name
+      final roles =
+          _tribeRoles[tribeId] ?? await _repository.getTribeRoles(tribeId);
+      final selectedRole = roles.firstWhereOrNull((r) => r['id'] == roleId);
+      final roleSlug = selectedRole?['slug']?.toString() ?? '';
+      final roleDetails = MafiaRoleDetails.getForSlug(roleSlug);
+      final roleTitle = selectedRole?['name']?.toString() ?? roleDetails.title;
+
       final activityLog = {
         'tribe_id': tribeId,
         'actor_id': myUserId,
-        'action_type': 'invited',
+        'action_type': 'added_member',
         'metadata': {
           'target_user_id': inviteeId,
           'target_name': inviteeName,
+          'role_name': roleTitle,
         },
         'created_at': nowStr,
       };
 
       if (existing != null) {
         final updates = {
-          'status': 'invited',
+          'status': 'active',
           'invited_by': myUserId,
           'role_id': roleId,
+          'joined_at': nowStr,
+          'updated_at': nowStr,
         };
         await _repository.updateTribeMemberStatus(
             tribeId, inviteeId, updates, activityLog);
@@ -666,8 +680,9 @@ class TribeProvider with ChangeNotifier {
           'tribe_id': tribeId,
           'user_id': inviteeId,
           'role_id': roleId,
-          'status': 'invited',
+          'status': 'active',
           'invited_by': myUserId,
+          'joined_at': nowStr,
           'created_at': nowStr,
           'updated_at': nowStr,
         };
@@ -675,7 +690,7 @@ class TribeProvider with ChangeNotifier {
         await _repository.insertTribeActivityLog(activityLog);
       }
 
-      // Notify Invitee
+      // Notify the added member
       await _notificationRepository.insertNotification(
         userId: inviteeId,
         otherUserId: myUserId,
@@ -683,13 +698,13 @@ class TribeProvider with ChangeNotifier {
         note: jsonEncode({
           'tribe_id': tribeId,
           'tribe_name': tribe['name'],
-          'real_type': 'tribe_invite'
+          'real_type': 'tribe_added',
         }),
       );
 
       await fetchTribeDetails(tribeId);
     } catch (e) {
-      print("Error inviting user: $e");
+      print("Error adding member: $e");
       rethrow;
     }
   }
