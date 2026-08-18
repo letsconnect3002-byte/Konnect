@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:connect/Config/app_theme.dart';
@@ -42,6 +41,8 @@ class _ThreadDetailPageState extends State<ThreadDetailPage> {
   Timer? _highlightTimer;
   final Map<String, GlobalKey> _itemKeys = {};
 
+  int _loadRequestId = 0;
+
   @override
   void initState() {
     super.initState();
@@ -52,51 +53,70 @@ class _ThreadDetailPageState extends State<ThreadDetailPage> {
 
   void _subscribeToThreadRealtime() {
     final client = Supabase.instance.client;
-    _threadChannel = client.channel('thread:${widget.rootPostId}:${DateTime.now().millisecondsSinceEpoch}');
+    _threadChannel = client.channel(
+        'thread:${widget.rootPostId}:${DateTime.now().millisecondsSinceEpoch}');
     _threadChannel!
-      .onPostgresChanges(
-        event: PostgresChangeEvent.all,
-        schema: 'public',
-        table: 'posts',
-        filter: PostgresChangeFilter(
-          type: PostgresChangeFilterType.eq,
-          column: 'id',
-          value: widget.rootPostId,
-        ),
-        callback: (payload) {
-          if (mounted) _loadThread();
-        },
-      )
-      .onPostgresChanges(
-        event: PostgresChangeEvent.all,
-        schema: 'public',
-        table: 'posts',
-        filter: PostgresChangeFilter(
-          type: PostgresChangeFilterType.eq,
-          column: 'root_post_id',
-          value: widget.rootPostId,
-        ),
-        callback: (payload) {
-          if (mounted) _loadThread();
-        },
-      )
-      .onPostgresChanges(
-        event: PostgresChangeEvent.all,
-        schema: 'public',
-        table: 'post_reactions',
-        callback: (payload) {
-          if (mounted) _loadThread();
-        },
-      )
-      .onPostgresChanges(
-        event: PostgresChangeEvent.all,
-        schema: 'public',
-        table: 'feed_reactions',
-        callback: (payload) {
-          if (mounted) _loadThread();
-        },
-      )
-      .subscribe();
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'posts',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'id',
+            value: widget.rootPostId,
+          ),
+          callback: (payload) {
+            if (mounted) _loadThread();
+          },
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'posts',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'root_post_id',
+            value: widget.rootPostId,
+          ),
+          callback: (payload) {
+            if (mounted) _loadThread();
+          },
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'post_reactions',
+          callback: (payload) {
+            if (!mounted) return;
+            final Map<String, dynamic> newRecord =
+                Map<String, dynamic>.from(payload.newRecord);
+            final Map<String, dynamic> oldRecord =
+                Map<String, dynamic>.from(payload.oldRecord);
+            final String targetPostId = newRecord['post_id']?.toString() ??
+                oldRecord['post_id']?.toString() ??
+                '';
+
+            if (targetPostId.isEmpty) return;
+
+            final index =
+                _threadPosts.indexWhere((p) => p.id == targetPostId);
+            if (index != -1) {
+              final feedProvider =
+                  Provider.of<FeedProvider>(context, listen: false);
+              final vId = feedProvider.viewerId ?? 0;
+              setState(() {
+                _threadPosts[index] = applyReactionDelta(
+                  _threadPosts[index],
+                  eventType: payload.eventType.name,
+                  newRecord: newRecord,
+                  oldRecord: oldRecord,
+                  viewerId: vId,
+                );
+              });
+            }
+          },
+        )
+        .subscribe();
   }
 
   @override
@@ -110,10 +130,11 @@ class _ThreadDetailPageState extends State<ThreadDetailPage> {
   }
 
   Future<void> _loadThread() async {
+    final currentRequestId = ++_loadRequestId;
     final feedProvider = Provider.of<FeedProvider>(context, listen: false);
     try {
       final posts = await feedProvider.fetchThread(widget.rootPostId);
-      if (mounted) {
+      if (mounted && currentRequestId == _loadRequestId) {
         setState(() {
           _threadPosts = posts;
           _isLoading = false;

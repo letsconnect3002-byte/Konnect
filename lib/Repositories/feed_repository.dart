@@ -58,12 +58,18 @@ abstract class FeedRepository {
 
   RealtimeChannel subscribeToPosts({
     required void Function(Map<String, dynamic> payload) onChange,
+    void Function(RealtimeSubscribeStatus status, Object? error)? onStatusChange,
   });
 
   void unsubscribeChannel(RealtimeChannel channel);
 
   Future<FeedPost?> getPostById({
     required String postId,
+    required int viewerId,
+  });
+
+  Future<Map<String, dynamic>> getPostsReactionSummaries({
+    required List<String> postIds,
     required int viewerId,
   });
 }
@@ -311,6 +317,7 @@ class SupabaseFeedRepository implements FeedRepository {
   @override
   RealtimeChannel subscribeToPosts({
     required void Function(Map<String, dynamic> payload) onChange,
+    void Function(RealtimeSubscribeStatus status, Object? error)? onStatusChange,
   }) {
     final channel = _client.channel('public:feed:${DateTime.now().millisecondsSinceEpoch}');
     channel
@@ -366,13 +373,36 @@ class SupabaseFeedRepository implements FeedRepository {
           });
         },
       )
-      .subscribe();
+      .subscribe((status, error) {
+        onStatusChange?.call(status, error);
+      });
     return channel;
   }
 
   @override
   void unsubscribeChannel(RealtimeChannel channel) {
     _client.removeChannel(channel);
+  }
+
+  @override
+  Future<Map<String, dynamic>> getPostsReactionSummaries({
+    required List<String> postIds,
+    required int viewerId,
+  }) async {
+    if (postIds.isEmpty) return {};
+    try {
+      final response = await _client.rpc('get_posts_reaction_summaries', params: {
+        'p_post_ids': postIds,
+        'p_viewer_id': viewerId,
+      });
+      if (response is Map) {
+        return Map<String, dynamic>.from(response);
+      }
+      return {};
+    } catch (e) {
+      debugPrint("[FeedRepository] Error fetching reaction summaries: $e");
+      return {};
+    }
   }
 
   @override
@@ -418,6 +448,14 @@ class SupabaseFeedRepository implements FeedRepository {
 
       final profile = response['profiles'] as Map<String, dynamic>?;
 
+      Map<String, int> reactionCounts = {};
+      if (response['reaction_counts'] is Map) {
+        (response['reaction_counts'] as Map).forEach((k, v) {
+          final c = v is int ? v : (int.tryParse(v?.toString() ?? '') ?? 0);
+          if (c > 0) reactionCounts[k.toString()] = c;
+        });
+      }
+
       return FeedPost(
         id: response['id'].toString(),
         authorId: authorId,
@@ -433,6 +471,7 @@ class SupabaseFeedRepository implements FeedRepository {
         degree: degree,
         isDeleted: response['is_deleted'] == true,
         replyToPostId: response['reply_to_post_id']?.toString(),
+        reactionCounts: reactionCounts,
       );
     } catch (e) {
       return null;

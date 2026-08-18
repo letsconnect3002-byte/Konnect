@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:connect/Models/feed_post.dart';
 import 'package:connect/Models/app_error.dart';
@@ -195,10 +195,40 @@ class FeedProvider with ChangeNotifier {
         }
       }
 
+      // Merge fetched posts with current _posts by id, preserving in-flight realtime reaction updates
+      final Map<String, FeedPost> existingPostsMap = {
+        for (final p in _posts) p.id: p
+      };
+
+      final List<FeedPost> mergedPosts = [];
+      for (final fetchedPost in updatedPosts) {
+        final existing = existingPostsMap[fetchedPost.id];
+        if (existing != null) {
+          // If existing post received realtime or optimistic reaction updates, merge them safely
+          mergedPosts.add(fetchedPost.copyWith(
+            reactionCounts: existing.reactionCounts.isNotEmpty
+                ? existing.reactionCounts
+                : fetchedPost.reactionCounts,
+            userReaction: existing.userReaction ?? fetchedPost.userReaction,
+            replyCount: existing.replyCount,
+            activeReplyCount: existing.activeReplyCount,
+          ));
+        } else {
+          mergedPosts.add(fetchedPost);
+        }
+      }
+
+      // Also preserve any optimistic temp posts currently being posted
+      for (final p in _posts) {
+        if (p.id.startsWith('temp_') && !mergedPosts.any((m) => m.id == p.id)) {
+          mergedPosts.insert(0, p);
+        }
+      }
+
       _currentBucket = newBucket;
       _hasReachedEnd = newHasReachedEnd;
       _hasShownCaughtUpDivider = newHasShownCaughtUpDivider;
-      _posts = updatedPosts;
+      _posts = mergedPosts;
 
       // Snapshot the latest post ID for change detection
       if (_posts.isNotEmpty) {
@@ -690,8 +720,70 @@ class FeedProvider with ChangeNotifier {
 
     _realtimeChannel = _repository.subscribeToPosts(
       onChange: (payload) => _handleRealtimeEvent(payload),
+      onStatusChange: (status, error) {
+        debugPrint("[FeedProvider] Realtime channel status: $status, error: $error");
+        if (status == RealtimeSubscribeStatus.subscribed) {
+          _reconcileReactions();
+        }
+      },
     );
     debugPrint("[FeedProvider] Realtime channel subscribed");
+  }
+
+  Future<void> _reconcileReactions() async {
+    final vId = _viewerId;
+    if (vId == null || _posts.isEmpty) return;
+
+    final List<String> targetPostIds = _posts
+        .where((p) => !p.id.startsWith('temp_'))
+        .map((p) => p.id)
+        .toList();
+
+    if (targetPostIds.isEmpty) return;
+
+    try {
+      final summaries = await _repository.getPostsReactionSummaries(
+        postIds: targetPostIds,
+        viewerId: vId,
+      );
+
+      if (summaries.isEmpty) return;
+
+      bool hasChanges = false;
+      for (int i = 0; i < _posts.length; i++) {
+        final post = _posts[i];
+        if (summaries.containsKey(post.id)) {
+          final summary = summaries[post.id];
+          if (summary is Map) {
+            final Map<String, int> reactionCounts = {};
+            if (summary['reaction_counts'] is Map) {
+              (summary['reaction_counts'] as Map).forEach((k, v) {
+                final c = v is int ? v : (int.tryParse(v?.toString() ?? '') ?? 0);
+                if (c > 0) reactionCounts[k.toString()] = c;
+              });
+            }
+            final String? userReaction = summary['user_reaction']?.toString();
+
+            if (!mapEquals(post.reactionCounts, reactionCounts) ||
+                post.userReaction != userReaction) {
+              _posts[i] = post.copyWith(
+                reactionCounts: reactionCounts,
+                userReaction: userReaction,
+                nullifyUserReaction: userReaction == null,
+              );
+              hasChanges = true;
+            }
+          }
+        }
+      }
+
+      if (hasChanges) {
+        notifyListeners();
+        debugPrint("[FeedProvider] Reconciled reactions for ${_posts.length} posts");
+      }
+    } catch (e) {
+      debugPrint("[FeedProvider] Error reconciling reactions: $e");
+    }
   }
 
   void _unsubscribeRealtime() {
@@ -826,70 +918,22 @@ class FeedProvider with ChangeNotifier {
   }) {
     final String postId =
         newRecord['post_id']?.toString() ?? oldRecord['post_id']?.toString() ?? '';
-    final int? userId = newRecord['user_id'] is int
-        ? newRecord['user_id'] as int
-        : int.tryParse(
-            newRecord['user_id']?.toString() ?? oldRecord['user_id']?.toString() ?? '');
 
     if (postId.isEmpty) return;
 
     final index = _posts.indexWhere((p) => p.id == postId);
-    if (index == -1) return;
-
-    final post = _posts[index];
-    final Map<String, int> counts = Map<String, int>.from(post.reactionCounts);
-    String? userReaction = post.userReaction;
-
-    final String event = eventType.toLowerCase();
-
-    if (userId == viewerId) {
-      // Viewer's own reaction — counts are already correct from the
-      // optimistic update + server response in toggleReaction().
-      // Only sync the userReaction flag here.
-      if (event == 'insert' || event == 'update') {
-        userReaction = newRecord['reaction_type']?.toString();
-      } else if (event == 'delete') {
-        userReaction = null;
-      }
-    } else {
-      // Another user's reaction — we need to adjust counts.
-      if (event == 'insert') {
-        final String reactionType =
-            newRecord['reaction_type']?.toString() ?? 'like';
-        counts[reactionType] = (counts[reactionType] ?? 0) + 1;
-      } else if (event == 'delete') {
-        final String reactionType = oldRecord['reaction_type']?.toString() ??
-            newRecord['reaction_type']?.toString() ??
-            'like';
-        if (counts.containsKey(reactionType)) {
-          final c = counts[reactionType]!;
-          if (c <= 1) {
-            counts.remove(reactionType);
-          } else {
-            counts[reactionType] = c - 1;
-          }
-        }
-      } else if (event == 'update') {
-        final String oldType = oldRecord['reaction_type']?.toString() ?? '';
-        final String newType = newRecord['reaction_type']?.toString() ?? '';
-        if (oldType.isNotEmpty && counts.containsKey(oldType)) {
-          final c = counts[oldType]!;
-          if (c <= 1) {
-            counts.remove(oldType);
-          } else {
-            counts[oldType] = c - 1;
-          }
-        }
-        if (newType.isNotEmpty) {
-          counts[newType] = (counts[newType] ?? 0) + 1;
-        }
-      }
+    if (index == -1) {
+      debugPrint(
+          "[FeedProvider] Realtime reaction for post $postId not found in local feed list");
+      return;
     }
 
-    _posts[index] = post.copyWith(
-      reactionCounts: counts,
-      userReaction: userReaction,
-      nullifyUserReaction: userReaction == null,
+    _posts[index] = applyReactionDelta(
+      _posts[index],
+      eventType: eventType,
+      newRecord: newRecord,
+      oldRecord: oldRecord,
+      viewerId: viewerId,
     );
     notifyListeners();
     debugPrint("[FeedProvider] Realtime reaction updated for post $postId");

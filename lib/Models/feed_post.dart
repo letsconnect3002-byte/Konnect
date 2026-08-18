@@ -174,3 +174,75 @@ class FeedPost {
     );
   }
 }
+
+/// Pure delta function to apply realtime insert/update/delete events on post_reactions
+/// consistently across all feed and thread components.
+FeedPost applyReactionDelta(
+  FeedPost post, {
+  required String eventType,
+  required Map<String, dynamic> newRecord,
+  required Map<String, dynamic> oldRecord,
+  required int viewerId,
+}) {
+  final event = eventType.toLowerCase();
+  final int? eventUserId = newRecord['user_id'] is int
+      ? newRecord['user_id'] as int
+      : int.tryParse(newRecord['user_id']?.toString() ??
+          oldRecord['user_id']?.toString() ??
+          '');
+
+  final Map<String, int> counts = Map<String, int>.from(post.reactionCounts);
+  String? userReaction = post.userReaction;
+
+  final bool isSelf = eventUserId != null && eventUserId == viewerId;
+
+  if (isSelf) {
+    // Viewer's own reaction: counts are handled optimistically by toggleReaction()
+    // and self-correct via server response. Only sync the userReaction indicator.
+    if (event == 'insert' || event == 'update') {
+      userReaction = newRecord['reaction_type']?.toString();
+    } else if (event == 'delete') {
+      userReaction = null;
+    }
+  } else {
+    // Another user's reaction: adjust the reaction counts accordingly.
+    if (event == 'insert') {
+      final String reactionType =
+          newRecord['reaction_type']?.toString() ?? 'like';
+      counts[reactionType] = (counts[reactionType] ?? 0) + 1;
+    } else if (event == 'delete') {
+      final String reactionType = oldRecord['reaction_type']?.toString() ??
+          newRecord['reaction_type']?.toString() ??
+          'like';
+      if (counts.containsKey(reactionType)) {
+        final current = counts[reactionType]!;
+        if (current <= 1) {
+          counts.remove(reactionType);
+        } else {
+          counts[reactionType] = current - 1;
+        }
+      }
+    } else if (event == 'update') {
+      final String? oldReactionType = oldRecord['reaction_type']?.toString();
+      final String newReactionType =
+          newRecord['reaction_type']?.toString() ?? 'like';
+
+      if (oldReactionType != null && counts.containsKey(oldReactionType)) {
+        final prev = counts[oldReactionType]!;
+        if (prev <= 1) {
+          counts.remove(oldReactionType);
+        } else {
+          counts[oldReactionType] = prev - 1;
+        }
+      }
+      counts[newReactionType] = (counts[newReactionType] ?? 0) + 1;
+    }
+  }
+
+  return post.copyWith(
+    reactionCounts: counts,
+    userReaction: userReaction,
+    nullifyUserReaction: userReaction == null,
+  );
+}
+

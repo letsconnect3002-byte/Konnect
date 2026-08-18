@@ -1031,75 +1031,17 @@ class _FeedPostThreadItemState extends State<_FeedPostThreadItem> {
 
       if (!_isPostIdInTree(_treeNode!, targetPostId)) return;
 
-      final int? eventUserId = newRecord['user_id'] is int
-          ? newRecord['user_id'] as int
-          : int.tryParse(newRecord['user_id']?.toString() ??
-              oldRecord['user_id']?.toString() ??
-              '');
-
-      final String reactionType =
-          newRecord['reaction_type']?.toString() ?? 'like';
-      final String event = eventType.toLowerCase();
-
       final feedProvider = Provider.of<FeedProvider>(context, listen: false);
       final currentViewerId = feedProvider.viewerId;
 
       CommentNode applyReactionUpdate(CommentNode node) {
         if (node.id == targetPostId && node.post != null) {
-          final currentPost = node.post!;
-          final Map<String, int> counts =
-              Map<String, int>.from(currentPost.reactionCounts);
-          String? userReaction = currentPost.userReaction;
-
-          final bool isSelf = eventUserId != null &&
-              currentViewerId != null &&
-              eventUserId == currentViewerId;
-
-          if (isSelf) {
-            // Viewer's own reaction — counts are already correct from
-            // _handleReactionToggle optimistic update + server response.
-            // Only sync the userReaction flag here.
-            if (event == 'insert' || event == 'update') {
-              userReaction = reactionType;
-            } else if (event == 'delete') {
-              userReaction = null;
-            }
-          } else {
-            // Another user's reaction — adjust counts.
-            if (event == 'insert') {
-              counts[reactionType] = (counts[reactionType] ?? 0) + 1;
-            } else if (event == 'delete') {
-              final String delType = oldRecord['reaction_type']?.toString() ??
-                  newRecord['reaction_type']?.toString() ??
-                  reactionType;
-              if (counts.containsKey(delType)) {
-                final current = counts[delType]!;
-                if (current <= 1) {
-                  counts.remove(delType);
-                } else {
-                  counts[delType] = current - 1;
-                }
-              }
-            } else if (event == 'update') {
-              final String? oldReactionType =
-                  oldRecord['reaction_type']?.toString();
-              if (oldReactionType != null &&
-                  counts.containsKey(oldReactionType)) {
-                final prev = counts[oldReactionType]!;
-                if (prev <= 1) {
-                  counts.remove(oldReactionType);
-                } else {
-                  counts[oldReactionType] = prev - 1;
-                }
-              }
-              counts[reactionType] = (counts[reactionType] ?? 0) + 1;
-            }
-          }
-
-          final updatedPost = currentPost.copyWith(
-            userReaction: userReaction,
-            nullifyUserReaction: userReaction == null,
-            reactionCounts: counts,
+          final updatedPost = applyReactionDelta(
+            node.post!,
+            eventType: eventType,
+            newRecord: newRecord,
+            oldRecord: oldRecord,
+            viewerId: currentViewerId ?? 0,
           );
           return node.copyWith(
             post: updatedPost,

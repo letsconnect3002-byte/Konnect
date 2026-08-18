@@ -32,6 +32,7 @@ create table if not exists public.posts (
   reply_to_post_id uuid references public.posts(id),
   root_post_id uuid not null references public.posts(id),
   reply_count integer not null default 0,
+  reaction_counts jsonb not null default '{}'::jsonb,
   is_deleted boolean not null default false,
   created_at timestamp with time zone not null default timezone('utc'::text, now()),
   updated_at timestamp with time zone not null default timezone('utc'::text, now()),
@@ -108,6 +109,43 @@ create trigger trg_posts_after_insert
   after insert on public.posts
   for each row
   execute function public.posts_after_insert();
+
+create or replace function public.post_reactions_after_change()
+returns trigger
+language plpgsql
+security definer
+as $$
+declare
+  target_post_id uuid;
+  counts_json jsonb;
+begin
+  target_post_id := coalesce(NEW.post_id, OLD.post_id);
+  if target_post_id is not null then
+    select coalesce(
+      jsonb_object_agg(sub.reaction_type, sub.cnt),
+      '{}'::jsonb
+    ) into counts_json
+    from (
+      select pr.reaction_type, count(*)::int as cnt
+      from public.post_reactions pr
+      where pr.post_id = target_post_id
+      group by pr.reaction_type
+    ) sub;
+
+    update public.posts
+    set reaction_counts = counts_json,
+        updated_at = timezone('utc'::text, now())
+    where id = target_post_id;
+  end if;
+  return coalesce(NEW, OLD);
+end;
+$$;
+
+drop trigger if exists trg_post_reactions_after_change on public.post_reactions;
+create trigger trg_post_reactions_after_change
+  after insert or update or delete on public.post_reactions
+  for each row
+  execute function public.post_reactions_after_change();
 
 -- ---------------------------------------------------------------------
 -- 3. SEEN TRACKING
@@ -421,18 +459,85 @@ as $$
 $$;
 
 -- ---------------------------------------------------------------------
--- 12. FEED NOTIFICATION PUSH TRIGGER
+-- 13. REACTION SUMMARY RPCS (FOR RECONNECT RECONCILIATION)
 -- ---------------------------------------------------------------------
-create or replace trigger send_feed_notification_push_trigger
-after insert on public.connection_notifications
-for each row
-when (NEW.type in ('feed_reply', 'feed_mention', 'feed_reply_mention'))
-execute function supabase_functions.http_request(
-  'https://gvzblxozqftheowpazvx.supabase.co/functions/v1/send-feed-notification-push',
-  'POST',
-  '{"Content-Type":"application/json","Authorization":"Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd2emJseG96cWZ0aGVvd3BhenZ4Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3OTMzMTA0NCwiZXhwIjoyMDk0OTA3MDQ0fQ.1nBIvX9ZEIChCu9pKW7mq2kW4-ZCCZYyQQHxxCiBUcs"}',
-  '{}',
-  '10000'
-);
+
+create or replace function public.get_posts_reaction_summaries(
+  p_post_ids uuid[],
+  p_viewer_id bigint default null
+)
+returns jsonb
+language plpgsql
+stable
+security definer
+as $$
+begin
+  return coalesce(
+    (
+      select jsonb_object_agg(
+        p.id,
+        jsonb_build_object(
+          'post_id', p.id,
+          'reaction_counts', p.reaction_counts,
+          'user_reaction', (
+            select pr.reaction_type
+            from public.post_reactions pr
+            where pr.post_id = p.id and pr.user_id = p_viewer_id
+            limit 1
+          )
+        )
+      )
+      from public.posts p
+      where p.id = any(p_post_ids)
+    ),
+    '{}'::jsonb
+  );
+end;
+$$;
+
+create or replace function public.get_post_reaction_summary(
+  p_post_id uuid,
+  p_viewer_id bigint default null
+)
+returns jsonb
+language plpgsql
+stable
+security definer
+as $$
+declare
+  v_user_reaction text := null;
+  v_reaction_counts jsonb := '{}'::jsonb;
+begin
+  if p_viewer_id is not null then
+    select reaction_type into v_user_reaction
+    from public.post_reactions
+    where post_id = p_post_id and user_id = p_viewer_id
+    limit 1;
+  end if;
+
+  select reaction_counts into v_reaction_counts
+  from public.posts
+  where id = p_post_id;
+
+  if v_reaction_counts is null then
+    select coalesce(
+      jsonb_object_agg(sub.reaction_type, sub.cnt),
+      '{}'::jsonb
+    ) into v_reaction_counts
+    from (
+      select pr.reaction_type, count(*)::int as cnt
+      from public.post_reactions pr
+      where pr.post_id = p_post_id
+      group by pr.reaction_type
+    ) sub;
+  end if;
+
+  return jsonb_build_object(
+    'post_id', p_post_id,
+    'user_reaction', v_user_reaction,
+    'reaction_counts', coalesce(v_reaction_counts, '{}'::jsonb)
+  );
+end;
+$$;
 
 commit;
