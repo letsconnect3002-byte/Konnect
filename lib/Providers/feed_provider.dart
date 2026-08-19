@@ -66,6 +66,7 @@ class FeedProvider with ChangeNotifier {
   AppError? get error => _error;
 
   final Set<String> _bufferedSeenPostIds = {};
+  final Set<String> _pendingReactionPostIds = {};
   Timer? _seenFlushTimer;
 
   // -------------------------------------------------------
@@ -195,7 +196,7 @@ class FeedProvider with ChangeNotifier {
         }
       }
 
-      // Merge fetched posts with current _posts by id, preserving in-flight realtime reaction updates
+      // Merge fetched posts with current _posts by id, preserving only active in-flight optimistic reactions
       final Map<String, FeedPost> existingPostsMap = {
         for (final p in _posts) p.id: p
       };
@@ -203,17 +204,15 @@ class FeedProvider with ChangeNotifier {
       final List<FeedPost> mergedPosts = [];
       for (final fetchedPost in updatedPosts) {
         final existing = existingPostsMap[fetchedPost.id];
-        if (existing != null) {
-          // If existing post received realtime or optimistic reaction updates, merge them safely
+        if (existing != null && _pendingReactionPostIds.contains(fetchedPost.id)) {
+          // ONLY preserve local reaction state if the viewer is actively mid-flight toggling a reaction on this post
           mergedPosts.add(fetchedPost.copyWith(
-            reactionCounts: existing.reactionCounts.isNotEmpty
-                ? existing.reactionCounts
-                : fetchedPost.reactionCounts,
-            userReaction: existing.userReaction ?? fetchedPost.userReaction,
-            replyCount: existing.replyCount,
-            activeReplyCount: existing.activeReplyCount,
+            reactionCounts: existing.reactionCounts,
+            userReaction: existing.userReaction,
+            nullifyUserReaction: existing.userReaction == null,
           ));
         } else {
+          // Freshly fetched server data is authoritative for reactionCounts, userReaction, replyCount, activeReplyCount
           mergedPosts.add(fetchedPost);
         }
       }
@@ -612,6 +611,8 @@ class FeedProvider with ChangeNotifier {
     final vId = _viewerId;
     if (vId == null) return null;
 
+    _pendingReactionPostIds.add(postId);
+
     final index = _posts.indexWhere((p) => p.id == postId);
     FeedPost? oldPost;
     if (index != -1) {
@@ -692,6 +693,8 @@ class FeedProvider with ChangeNotifier {
         }
       }
       return null;
+    } finally {
+      _pendingReactionPostIds.remove(postId);
     }
   }
 
@@ -752,7 +755,8 @@ class FeedProvider with ChangeNotifier {
       bool hasChanges = false;
       for (int i = 0; i < _posts.length; i++) {
         final post = _posts[i];
-        if (summaries.containsKey(post.id)) {
+        if (summaries.containsKey(post.id) &&
+            !_pendingReactionPostIds.contains(post.id)) {
           final summary = summaries[post.id];
           if (summary is Map) {
             final Map<String, int> reactionCounts = {};
