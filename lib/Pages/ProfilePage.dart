@@ -125,7 +125,8 @@ class _ProfilePageState extends State<ProfilePage> {
           backgroundColor: Colors.transparent,
           elevation: 0,
           child: GlassmorphicContainer(
-            borderRadius: BorderRadius.circular(AppDimensions.radiusPremiumCard),
+            borderRadius:
+                BorderRadius.circular(AppDimensions.radiusPremiumCard),
             child: Padding(
               padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
               child: Column(
@@ -186,8 +187,8 @@ class _ProfilePageState extends State<ProfilePage> {
         (profileProvider.phoneNumber.trim().isNotEmpty ||
             profileProvider.professionalPhoneNumber.trim().isNotEmpty);
 
-    debugPrint(
-        "ProfilePage Build: userId=${profileProvider.userId}, hasBasicDetails=$hasBasicDetails, name='${profileProvider.name}', profession='${profileProvider.profession}', phoneNumber='${profileProvider.phoneNumber}'");
+    // debugPrint(
+    //     "ProfilePage Build: userId=${profileProvider.userId}, hasBasicDetails=$hasBasicDetails, name='${profileProvider.name}', profession='${profileProvider.profession}', phoneNumber='${profileProvider.phoneNumber}'");
 
     // Get QR image if profile data is present, basic details are filled, and QR is generated
     QrImage? qrImage;
@@ -732,7 +733,6 @@ class _ProfilePageState extends State<ProfilePage> {
                           });
                         },
                       ),
-
                       const SizedBox(height: 24),
                       ElevatedButton(
                         onPressed: () {
@@ -852,7 +852,6 @@ class _ProfilePageState extends State<ProfilePage> {
                           });
                         },
                       ),
-
                       const SizedBox(height: 24),
                       ElevatedButton(
                         onPressed: () {
@@ -1174,8 +1173,6 @@ class _ProfilePageState extends State<ProfilePage> {
           ),
         );
 
-
-
     final scanCard = compactCard(
       icon: Icons.person_add_rounded,
       label: 'Connect Hub',
@@ -1204,8 +1201,6 @@ class _ProfilePageState extends State<ProfilePage> {
       disabled: !hasProfile,
       onTap: () => _showShareOptionsBottomSheet(context, profileProvider),
     );
-
-
 
     // ── Assemble Column ──────────────────────────────────────────────────
     return Column(

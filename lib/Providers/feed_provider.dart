@@ -43,11 +43,25 @@ class FeedProvider with ChangeNotifier {
   bool _isLoading = false;
   bool get isLoading => _isLoading;
 
+  // Global Post Registry (caches all posts, thread previews, and replies)
+  final Map<String, FeedPost> _postRegistry = {};
+
   FeedPost? getPostById(String postId) {
+    if (_postRegistry.containsKey(postId)) return _postRegistry[postId];
     for (final p in _posts) {
       if (p.id == postId) return p;
     }
     return null;
+  }
+
+  void registerPost(FeedPost post) {
+    _postRegistry[post.id] = post;
+  }
+
+  void registerPosts(Iterable<FeedPost> posts) {
+    for (final post in posts) {
+      _postRegistry[post.id] = post;
+    }
   }
 
   bool _isLoadingMore = false;
@@ -90,6 +104,12 @@ class FeedProvider with ChangeNotifier {
         _latestKnownPostId = null;
         notifyListeners();
       }
+    }
+  }
+
+  void ensureRealtimeSubscribed() {
+    if (_viewerId != null && _realtimeChannel == null) {
+      _subscribeToRealtime();
     }
   }
 
@@ -228,6 +248,7 @@ class FeedProvider with ChangeNotifier {
       _hasReachedEnd = newHasReachedEnd;
       _hasShownCaughtUpDivider = newHasShownCaughtUpDivider;
       _posts = mergedPosts;
+      registerPosts(mergedPosts);
 
       // Snapshot the latest post ID for change detection
       if (_posts.isNotEmpty) {
@@ -291,6 +312,7 @@ class FeedProvider with ChangeNotifier {
         );
 
         _posts.addAll(fetched);
+        registerPosts(fetched);
 
         if (fetched.length < 20) {
           _hasShownCaughtUpDivider = true;
@@ -301,6 +323,7 @@ class FeedProvider with ChangeNotifier {
             limit: 20,
           );
           _posts.addAll(seenFetched);
+          registerPosts(seenFetched);
           if (seenFetched.length < 20) {
             _hasReachedEnd = true;
           }
@@ -315,6 +338,7 @@ class FeedProvider with ChangeNotifier {
         );
 
         _posts.addAll(fetched);
+        registerPosts(fetched);
 
         if (fetched.length < 20) {
           _hasReachedEnd = true;
@@ -614,9 +638,8 @@ class FeedProvider with ChangeNotifier {
     _pendingReactionPostIds.add(postId);
 
     final index = _posts.indexWhere((p) => p.id == postId);
-    FeedPost? oldPost;
-    if (index != -1) {
-      oldPost = _posts[index];
+    FeedPost? oldPost = _postRegistry[postId] ?? (index != -1 ? _posts[index] : null);
+    if (oldPost != null) {
       final String? oldUserReaction = oldPost.userReaction;
       final Map<String, int> newCounts = Map<String, int>.from(oldPost.reactionCounts);
 
@@ -646,11 +669,15 @@ class FeedProvider with ChangeNotifier {
         newCounts[reactionType] = (newCounts[reactionType] ?? 0) + 1;
       }
 
-      _posts[index] = oldPost.copyWith(
+      final optimisticPost = oldPost.copyWith(
         userReaction: newUserReaction,
         nullifyUserReaction: newUserReaction == null,
         reactionCounts: newCounts,
       );
+      _postRegistry[postId] = optimisticPost;
+      if (index != -1) {
+        _posts[index] = optimisticPost;
+      }
       notifyListeners();
     }
 
@@ -670,13 +697,17 @@ class FeedProvider with ChangeNotifier {
         });
       }
 
-      final currIdx = _posts.indexWhere((p) => p.id == postId);
-      if (currIdx != -1) {
-        _posts[currIdx] = _posts[currIdx].copyWith(
+      final existing = _postRegistry[postId] ?? (index != -1 ? _posts[index] : null);
+      if (existing != null) {
+        final serverUpdated = existing.copyWith(
           userReaction: serverUserReaction,
           nullifyUserReaction: serverUserReaction == null,
           reactionCounts: serverCounts,
         );
+        _postRegistry[postId] = serverUpdated;
+        if (index != -1) {
+          _posts[index] = serverUpdated;
+        }
         notifyListeners();
       }
       return {
@@ -686,11 +717,12 @@ class FeedProvider with ChangeNotifier {
     } catch (e) {
       debugPrint("[FeedProvider] Error toggling reaction: $e");
       if (oldPost != null) {
+        _postRegistry[postId] = oldPost;
         final rollbackIdx = _posts.indexWhere((p) => p.id == postId);
         if (rollbackIdx != -1) {
           _posts[rollbackIdx] = oldPost;
-          notifyListeners();
         }
+        notifyListeners();
       }
       return null;
     } finally {
@@ -703,7 +735,9 @@ class FeedProvider with ChangeNotifier {
   // -------------------------------------------------------
 
   Future<List<FeedPost>> fetchThread(String rootPostId) async {
-    return await _repository.getThread(rootPostId: rootPostId, viewerId: _viewerId);
+    final threadPosts = await _repository.getThread(rootPostId: rootPostId, viewerId: _viewerId);
+    registerPosts(threadPosts);
+    return threadPosts;
   }
 
   Future<List<Map<String, dynamic>>> fetchMutualConnections(int targetId) async {
@@ -798,18 +832,20 @@ class FeedProvider with ChangeNotifier {
   }
 
   Future<void> _handleRealtimeEvent(Map<String, dynamic> payload) async {
-    final vId = _viewerId;
-    if (vId == null) return;
-
     final String table = payload['table']?.toString() ?? 'posts';
     final String eventType = payload['eventType']?.toString() ?? '';
-    final Map<String, dynamic> newRecord = Map<String, dynamic>.from(payload['new'] ?? {});
-    final Map<String, dynamic> oldRecord = Map<String, dynamic>.from(payload['old'] ?? {});
+    final vId = _viewerId;
 
-    debugPrint("[FeedProvider] Realtime event ($table): $eventType");
+    debugPrint(
+        '[FeedProvider] Realtime event received: table=$table, eventType=$eventType, viewerId=$vId');
 
     // Broadcast all posts table events to stream listeners (thread widgets)
     _postUpdateStreamController.add(payload);
+
+    final Map<String, dynamic> newRecord =
+        Map<String, dynamic>.from(payload['new'] ?? {});
+    final Map<String, dynamic> oldRecord =
+        Map<String, dynamic>.from(payload['old'] ?? {});
 
     if (table == 'post_reactions') {
       _handleReactionRealtimeEvent(
@@ -818,6 +854,18 @@ class FeedProvider with ChangeNotifier {
         oldRecord: oldRecord,
         viewerId: vId,
       );
+      return;
+    }
+
+    if (table == 'posts' && eventType.toLowerCase() == 'update') {
+      _handlePostRealtimeUpdate(payload);
+      return;
+    }
+
+    // For other tables requiring viewerId:
+    if (vId == null) {
+      debugPrint(
+          '[FeedProvider] DROPPED non-reaction event because viewerId is null (table: $table)');
       return;
     }
 
@@ -841,7 +889,7 @@ class FeedProvider with ChangeNotifier {
       return;
     }
 
-    if (eventType == 'insert') {
+    if (eventType.toLowerCase() == 'insert') {
       final int? authorId = newRecord['author_id'] is int
           ? newRecord['author_id'] as int
           : int.tryParse(newRecord['author_id']?.toString() ?? '');
@@ -868,36 +916,31 @@ class FeedProvider with ChangeNotifier {
           notifyListeners();
         }
       }
-    } else if (eventType == 'update') {
-      final String postId = newRecord['id']?.toString() ?? '';
-      final bool isDeleted = newRecord['is_deleted'] == true;
+    }
+  }
 
+  void _handlePostRealtimeUpdate(Map<String, dynamic> payload) {
+    final newRecord = payload['new'] as Map<String, dynamic>?;
+    if (newRecord == null) return;
+
+    final postId = newRecord['id']?.toString() ?? '';
+    if (postId.isEmpty) return;
+
+    final bool isDeleted = newRecord['is_deleted'] == true;
+
+    // Skip updating local state if this device is mid-flight with an optimistic tap
+    if (_pendingReactionPostIds.contains(postId)) {
+      debugPrint('[FeedProvider] Skipping realtime update for pending post $postId');
+      return;
+    }
+
+    if (isDeleted) {
+      _postRegistry.remove(postId);
       final index = _posts.indexWhere((p) => p.id == postId);
       if (index != -1) {
-        // A top-level feed post was deleted
-        if (isDeleted) {
-          _posts.removeAt(index);
-        } else {
-          final int replyCount = newRecord['reply_count'] is int
-              ? newRecord['reply_count'] as int
-              : (int.tryParse(newRecord['reply_count']?.toString() ?? '') ?? _posts[index].replyCount);
-
-          Map<String, int> reactionCounts = _posts[index].reactionCounts;
-          if (newRecord['reaction_counts'] is Map) {
-            reactionCounts = {};
-            (newRecord['reaction_counts'] as Map).forEach((k, v) {
-              final c = v is int ? v : (int.tryParse(v?.toString() ?? '') ?? 0);
-              if (c > 0) reactionCounts[k.toString()] = c;
-            });
-          }
-
-          _posts[index] = _posts[index].copyWith(
-            replyCount: replyCount,
-            reactionCounts: reactionCounts,
-          );
-        }
+        _posts.removeAt(index);
         notifyListeners();
-      } else if (isDeleted) {
+      } else {
         // A reply was soft-deleted → decrement root post's activeReplyCount
         final String? rootPostId = newRecord['root_post_id']?.toString();
         if (rootPostId != null && rootPostId != postId) {
@@ -911,6 +954,47 @@ class FeedProvider with ChangeNotifier {
           }
         }
       }
+      return;
+    }
+
+    final rawCounts = newRecord['reaction_counts'];
+    final Map<String, int> updatedCounts = {};
+    if (rawCounts is Map) {
+      rawCounts.forEach((key, val) {
+        final c = (val is num) ? val.toInt() : (int.tryParse(val?.toString() ?? '') ?? 0);
+        if (c > 0) updatedCounts[key.toString()] = c;
+      });
+    }
+
+    final int? replyCount = newRecord['reply_count'] is int
+        ? newRecord['reply_count'] as int
+        : int.tryParse(newRecord['reply_count']?.toString() ?? '');
+
+    bool changed = false;
+
+    // 1. Update in-memory registry (handles root posts and nested replies)
+    if (_postRegistry.containsKey(postId)) {
+      final old = _postRegistry[postId]!;
+      _postRegistry[postId] = old.copyWith(
+        reactionCounts: updatedCounts,
+        replyCount: replyCount ?? old.replyCount,
+      );
+      changed = true;
+    }
+
+    // 2. Update _posts list
+    final index = _posts.indexWhere((p) => p.id == postId);
+    if (index != -1) {
+      _posts[index] = _posts[index].copyWith(
+        reactionCounts: updatedCounts,
+        replyCount: replyCount ?? _posts[index].replyCount,
+      );
+      changed = true;
+    }
+
+    if (changed) {
+      notifyListeners();
+      debugPrint('[FeedProvider] Successfully applied posts UPDATE to post $postId (counts: $updatedCounts)');
     }
   }
 
@@ -918,29 +1002,58 @@ class FeedProvider with ChangeNotifier {
     required String eventType,
     required Map<String, dynamic> newRecord,
     required Map<String, dynamic> oldRecord,
-    required int viewerId,
+    int? viewerId,
   }) {
     final String postId =
         newRecord['post_id']?.toString() ?? oldRecord['post_id']?.toString() ?? '';
+    final int? eventUserId = newRecord['user_id'] is int
+        ? newRecord['user_id'] as int
+        : int.tryParse(newRecord['user_id']?.toString() ??
+            oldRecord['user_id']?.toString() ??
+            '');
+    final String? reactionType =
+        newRecord['reaction_type']?.toString() ?? oldRecord['reaction_type']?.toString();
 
-    if (postId.isEmpty) return;
+    debugPrint(
+        '[FeedProvider] Processing reaction: postId=$postId, eventUserId=$eventUserId, type=$reactionType, event=$eventType');
 
-    final index = _posts.indexWhere((p) => p.id == postId);
-    if (index == -1) {
-      debugPrint(
-          "[FeedProvider] Realtime reaction for post $postId not found in local feed list");
+    if (postId.isEmpty) {
+      debugPrint('[FeedProvider] Reaction event dropped: postId is empty');
       return;
     }
 
-    _posts[index] = applyReactionDelta(
-      _posts[index],
-      eventType: eventType,
-      newRecord: newRecord,
-      oldRecord: oldRecord,
-      viewerId: viewerId,
-    );
-    notifyListeners();
-    debugPrint("[FeedProvider] Realtime reaction updated for post $postId");
+    // Check if post is currently locked in local optimistic flight
+    if (_pendingReactionPostIds.contains(postId)) {
+      debugPrint(
+          '[FeedProvider] Skipping realtime reaction for pending post $postId');
+      return;
+    }
+
+    // 1. Update Registry (handles root posts + nested replies)
+    final existingPost = _postRegistry[postId] ?? _posts.where((p) => p.id == postId).firstOrNull;
+    if (existingPost != null) {
+      final updatedPost = applyReactionDelta(
+        existingPost,
+        eventType: eventType,
+        newRecord: newRecord,
+        oldRecord: oldRecord,
+        viewerId: viewerId,
+      );
+      _postRegistry[postId] = updatedPost;
+
+      // 2. Update _posts list if it's a top-level post
+      final postIndex = _posts.indexWhere((p) => p.id == postId);
+      if (postIndex != -1) {
+        _posts[postIndex] = updatedPost;
+      }
+
+      notifyListeners();
+      debugPrint(
+          '[FeedProvider] Realtime reaction updated for post $postId in registry & feed. Total: ${updatedPost.totalReactions}');
+    } else {
+      debugPrint(
+          '[FeedProvider] Post $postId not found in registry (${_postRegistry.length} items) or feed list (${_posts.length} items)');
+    }
   }
 
   void _handleBlockedUsersRealtimeEvent({

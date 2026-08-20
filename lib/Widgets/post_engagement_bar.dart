@@ -23,9 +23,9 @@ class PostEngagementBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Selector<FeedProvider, FeedPost?>(
-      selector: (_, provider) => provider.getPostById(post.id),
-      builder: (context, livePost, child) {
+    return Consumer<FeedProvider>(
+      builder: (context, provider, child) {
+        final livePost = provider.getPostById(post.id);
         final currentPost = livePost ?? post;
 
         return Row(

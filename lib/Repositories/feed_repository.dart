@@ -314,44 +314,118 @@ class SupabaseFeedRepository implements FeedRepository {
     });
   }
 
+  RealtimeChannel? _feedChannel;
+
   @override
   RealtimeChannel subscribeToPosts({
     required void Function(Map<String, dynamic> payload) onChange,
     void Function(RealtimeSubscribeStatus status, Object? error)? onStatusChange,
   }) {
-    final channel = _client.channel('public:feed:${DateTime.now().millisecondsSinceEpoch}');
+    // 1. Clean up existing channel if active
+    if (_feedChannel != null) {
+      _client.removeChannel(_feedChannel!);
+      _feedChannel = null;
+    }
+
+    // 2. Create fixed-topic stable channel
+    final channel = _client.channel('public:feed_channel');
+    _feedChannel = channel;
+
+    // 3. Explicit post_reactions listeners (INSERT, UPDATE, DELETE)
     channel
       .onPostgresChanges(
-        event: PostgresChangeEvent.all,
-        schema: 'public',
-        table: 'posts',
-        callback: (payload) {
-          onChange({
-            'table': 'posts',
-            'eventType': payload.eventType.name,
-            'new': payload.newRecord,
-            'old': payload.oldRecord,
-          });
-        },
-      )
-      .onPostgresChanges(
-        event: PostgresChangeEvent.all,
+        event: PostgresChangeEvent.insert,
         schema: 'public',
         table: 'post_reactions',
         callback: (payload) {
+          debugPrint('[RAW REALTIME] post_reactions INSERT: ${payload.newRecord}');
           onChange({
             'table': 'post_reactions',
-            'eventType': payload.eventType.name,
+            'eventType': 'INSERT',
             'new': payload.newRecord,
             'old': payload.oldRecord,
           });
         },
       )
+      .onPostgresChanges(
+        event: PostgresChangeEvent.update,
+        schema: 'public',
+        table: 'post_reactions',
+        callback: (payload) {
+          debugPrint('[RAW REALTIME] post_reactions UPDATE: ${payload.newRecord}');
+          onChange({
+            'table': 'post_reactions',
+            'eventType': 'UPDATE',
+            'new': payload.newRecord,
+            'old': payload.oldRecord,
+          });
+        },
+      )
+      .onPostgresChanges(
+        event: PostgresChangeEvent.delete,
+        schema: 'public',
+        table: 'post_reactions',
+        callback: (payload) {
+          debugPrint('[RAW REALTIME] post_reactions DELETE: ${payload.oldRecord}');
+          onChange({
+            'table': 'post_reactions',
+            'eventType': 'DELETE',
+            'new': payload.newRecord,
+            'old': payload.oldRecord,
+          });
+        },
+      )
+      // 4. Explicit posts listeners (INSERT, UPDATE, DELETE)
+      .onPostgresChanges(
+        event: PostgresChangeEvent.insert,
+        schema: 'public',
+        table: 'posts',
+        callback: (payload) {
+          debugPrint('[RAW REALTIME] posts INSERT: ${payload.newRecord}');
+          onChange({
+            'table': 'posts',
+            'eventType': 'INSERT',
+            'new': payload.newRecord,
+            'old': payload.oldRecord,
+          });
+        },
+      )
+      .onPostgresChanges(
+        event: PostgresChangeEvent.update,
+        schema: 'public',
+        table: 'posts',
+        callback: (payload) {
+          debugPrint('[RAW REALTIME] posts UPDATE received for id: ${payload.newRecord['id']}');
+          debugPrint('[RAW REALTIME] Updated reaction_counts: ${payload.newRecord['reaction_counts']}');
+          onChange({
+            'table': 'posts',
+            'eventType': 'UPDATE',
+            'new': payload.newRecord,
+            'old': payload.oldRecord,
+          });
+        },
+      )
+      .onPostgresChanges(
+        event: PostgresChangeEvent.delete,
+        schema: 'public',
+        table: 'posts',
+        callback: (payload) {
+          debugPrint('[RAW REALTIME] posts DELETE: ${payload.oldRecord}');
+          onChange({
+            'table': 'posts',
+            'eventType': 'DELETE',
+            'new': payload.newRecord,
+            'old': payload.oldRecord,
+          });
+        },
+      )
+      // 5. Blocked users
       .onPostgresChanges(
         event: PostgresChangeEvent.all,
         schema: 'public',
         table: 'blocked_users',
         callback: (payload) {
+          debugPrint('[RAW REALTIME] blocked_users event: ${payload.eventType.name}');
           onChange({
             'table': 'blocked_users',
             'eventType': payload.eventType.name,
@@ -360,11 +434,13 @@ class SupabaseFeedRepository implements FeedRepository {
           });
         },
       )
+      // 6. User connections
       .onPostgresChanges(
         event: PostgresChangeEvent.all,
         schema: 'public',
         table: 'user_connections',
         callback: (payload) {
+          debugPrint('[RAW REALTIME] user_connections event: ${payload.eventType.name}');
           onChange({
             'table': 'user_connections',
             'eventType': payload.eventType.name,
@@ -374,14 +450,19 @@ class SupabaseFeedRepository implements FeedRepository {
         },
       )
       .subscribe((status, error) {
+        debugPrint('[RAW REALTIME] Channel status changed: $status, error: $error');
         onStatusChange?.call(status, error);
       });
+
     return channel;
   }
 
   @override
   void unsubscribeChannel(RealtimeChannel channel) {
     _client.removeChannel(channel);
+    if (_feedChannel == channel) {
+      _feedChannel = null;
+    }
   }
 
   @override

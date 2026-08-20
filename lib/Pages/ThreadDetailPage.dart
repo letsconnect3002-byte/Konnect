@@ -53,8 +53,40 @@ class _ThreadDetailPageState extends State<ThreadDetailPage> {
 
   void _subscribeToThreadRealtime() {
     final client = Supabase.instance.client;
-    _threadChannel = client.channel(
-        'thread:${widget.rootPostId}:${DateTime.now().millisecondsSinceEpoch}');
+    if (_threadChannel != null) {
+      client.removeChannel(_threadChannel!);
+      _threadChannel = null;
+    }
+
+    _threadChannel = client.channel('thread:${widget.rootPostId}');
+
+    void handleReactionChange(String eventType, Map<String, dynamic> newRecord,
+        Map<String, dynamic> oldRecord) {
+      if (!mounted) return;
+      final String targetPostId = newRecord['post_id']?.toString() ??
+          oldRecord['post_id']?.toString() ??
+          '';
+
+      if (targetPostId.isEmpty) return;
+
+      final index = _threadPosts.indexWhere((p) => p.id == targetPostId);
+      if (index != -1) {
+        final feedProvider = Provider.of<FeedProvider>(context, listen: false);
+        final vId = feedProvider.viewerId;
+        final updatedPost = applyReactionDelta(
+          _threadPosts[index],
+          eventType: eventType,
+          newRecord: newRecord,
+          oldRecord: oldRecord,
+          viewerId: vId,
+        );
+        feedProvider.registerPost(updatedPost);
+        setState(() {
+          _threadPosts[index] = updatedPost;
+        });
+      }
+    }
+
     _threadChannel!
         .onPostgresChanges(
           event: PostgresChangeEvent.all,
@@ -83,37 +115,39 @@ class _ThreadDetailPageState extends State<ThreadDetailPage> {
           },
         )
         .onPostgresChanges(
-          event: PostgresChangeEvent.all,
+          event: PostgresChangeEvent.insert,
           schema: 'public',
           table: 'post_reactions',
           callback: (payload) {
-            if (!mounted) return;
-            final Map<String, dynamic> newRecord =
-                Map<String, dynamic>.from(payload.newRecord);
-            final Map<String, dynamic> oldRecord =
-                Map<String, dynamic>.from(payload.oldRecord);
-            final String targetPostId = newRecord['post_id']?.toString() ??
-                oldRecord['post_id']?.toString() ??
-                '';
-
-            if (targetPostId.isEmpty) return;
-
-            final index =
-                _threadPosts.indexWhere((p) => p.id == targetPostId);
-            if (index != -1) {
-              final feedProvider =
-                  Provider.of<FeedProvider>(context, listen: false);
-              final vId = feedProvider.viewerId ?? 0;
-              setState(() {
-                _threadPosts[index] = applyReactionDelta(
-                  _threadPosts[index],
-                  eventType: payload.eventType.name,
-                  newRecord: newRecord,
-                  oldRecord: oldRecord,
-                  viewerId: vId,
-                );
-              });
-            }
+            handleReactionChange(
+              'INSERT',
+              Map<String, dynamic>.from(payload.newRecord),
+              Map<String, dynamic>.from(payload.oldRecord),
+            );
+          },
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.update,
+          schema: 'public',
+          table: 'post_reactions',
+          callback: (payload) {
+            handleReactionChange(
+              'UPDATE',
+              Map<String, dynamic>.from(payload.newRecord),
+              Map<String, dynamic>.from(payload.oldRecord),
+            );
+          },
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.delete,
+          schema: 'public',
+          table: 'post_reactions',
+          callback: (payload) {
+            handleReactionChange(
+              'DELETE',
+              Map<String, dynamic>.from(payload.newRecord),
+              Map<String, dynamic>.from(payload.oldRecord),
+            );
           },
         )
         .subscribe();

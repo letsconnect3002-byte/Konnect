@@ -695,8 +695,10 @@ class _ThreadNodeWidgetState extends State<_ThreadNodeWidget>
     // 1. Full PostCard UI if original FeedPost reference is attached
     if (node.post != null) {
       final bool isHighlighted = (widget.initialExpandPostId == node.id);
+      final feedProvider = Provider.of<FeedProvider>(context);
+      final livePost = feedProvider.getPostById(node.id) ?? node.post!;
       return PostCard(
-        post: node.post!,
+        post: livePost,
         isThreadView: false,
         isHighlighted: isHighlighted,
         avatarKey: activeKey,

@@ -133,7 +133,8 @@ class ChatProvider with ChangeNotifier {
     });
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('chat_draft_${myUserId}_$otherUserId', draft.trim());
+      await prefs.setString(
+          'chat_draft_${myUserId}_$otherUserId', draft.trim());
     } catch (e) {
       print("Error saving draft: $e");
     }
@@ -197,7 +198,7 @@ class ChatProvider with ChangeNotifier {
   Future<void> _updateLastMessageForRoomSilent(String roomId) async {
     final lastMsg = await _repository.getLastMessageForRoom(roomId);
     _lastMessagesByRoom[roomId] = lastMsg;
-    debugPrint("[ChatProvider] _updateLastMessageForRoomSilent: Room $roomId updated last message: ${lastMsg != null ? lastMsg['payload'] : 'null'}");
+    // debugPrint("[ChatProvider] _updateLastMessageForRoomSilent: Room $roomId updated last message: ${lastMsg != null ? lastMsg['payload'] : 'null'}");
   }
 
   Future<void> updateLastMessageForRoom(String roomId) async {
@@ -248,7 +249,8 @@ class ChatProvider with ChangeNotifier {
         loadChatRooms();
       }
     } else if (connectionsChanged && userId != null) {
-      debugPrint("[ChatProvider] Connections list changed. Reloading chat rooms and updating subscriptions...");
+      debugPrint(
+          "[ChatProvider] Connections list changed. Reloading chat rooms and updating subscriptions...");
       loadChatRooms(silent: true);
     }
   }
@@ -535,7 +537,8 @@ class ChatProvider with ChangeNotifier {
   void subscribeToRoom(String roomId) {
     if (_roomSubscriptions.containsKey(roomId)) return;
 
-    debugPrint("[ChatProvider] Establishing Realtime subscription for room: $roomId");
+    // debugPrint(
+    //     "[ChatProvider] Establishing Realtime subscription for room: $roomId");
 
     final channel = _repository.subscribeToRoom(
       roomId,
@@ -547,7 +550,8 @@ class ChatProvider with ChangeNotifier {
         final senderId = msg['sender_id'] as int;
         final payloadText = msg['payload'] as String;
 
-        debugPrint("[ChatProvider] Realtime Postgres INSERT event received. Room: $rId, MessageId: $msgId, SenderId: $senderId, Payload: $payloadText");
+        debugPrint(
+            "[ChatProvider] Realtime Postgres INSERT event received. Room: $rId, MessageId: $msgId, SenderId: $senderId, Payload: $payloadText");
 
         if (senderId == _userId) return;
 
@@ -573,11 +577,13 @@ class ChatProvider with ChangeNotifier {
         await _updateLastMessageForRoomSilent(rId);
 
         if (isInChat) {
-          debugPrint("[ChatProvider] Receiver is currently inside the active chat. Refreshing active messages...");
+          debugPrint(
+              "[ChatProvider] Receiver is currently inside the active chat. Refreshing active messages...");
           _playReceiveSound();
           await refreshActiveRoomMessages();
         } else {
-          debugPrint("[ChatProvider] Receiver is on another page. Triggering in-app notification banner...");
+          debugPrint(
+              "[ChatProvider] Receiver is on another page. Triggering in-app notification banner...");
           _playReceiveSound();
           notifyListeners();
 
@@ -609,7 +615,8 @@ class ChatProvider with ChangeNotifier {
         final messageId = newRecord['id'] as String;
         final rId = newRecord['room_id'] as String;
 
-        debugPrint("[ChatProvider] Realtime Postgres UPDATE event received. Room: $rId, MessageId: $messageId, Status: $newStatus");
+        debugPrint(
+            "[ChatProvider] Realtime Postgres UPDATE event received. Room: $rId, MessageId: $messageId, Status: $newStatus");
 
         await _repository.updateMessageStatusLocally(messageId, newStatus);
         await _updateLastMessageForRoomSilent(rId);
@@ -627,7 +634,8 @@ class ChatProvider with ChangeNotifier {
         final messageId = oldRecord['id'] as String?;
         final rId = oldRecord['room_id'] as String?;
 
-        debugPrint("[ChatProvider] Realtime Postgres DELETE event received. Room: $rId, MessageId: $messageId");
+        debugPrint(
+            "[ChatProvider] Realtime Postgres DELETE event received. Room: $rId, MessageId: $messageId");
 
         if (messageId != null) {
           final localMsg = await _repository.getMessageByIdLocally(messageId);
@@ -657,7 +665,8 @@ class ChatProvider with ChangeNotifier {
         }
       },
       onSubscribeStatus: (status) async {
-        debugPrint("[ChatProvider] Realtime subscription status changed for room $roomId: $status");
+        // debugPrint(
+        //     "[ChatProvider] Realtime subscription status changed for room $roomId: $status");
         if (status == RealtimeSubscribeStatus.subscribed) {
           await syncOutgoingMessageStatuses();
           await updateUnreadCount();
@@ -941,8 +950,11 @@ class ChatProvider with ChangeNotifier {
           }
         } else {
           final localStatus = localMsg['status'] as String? ?? 'sent';
-          final targetStatus = _statusRank(serverStatus) > _statusRank(localStatus) ? serverStatus : localStatus;
-          
+          final targetStatus =
+              _statusRank(serverStatus) > _statusRank(localStatus)
+                  ? serverStatus
+                  : localStatus;
+
           await _repository.insertMessageLocally(
             msgId,
             roomId,
@@ -972,13 +984,13 @@ class ChatProvider with ChangeNotifier {
   Future<void> refreshActiveRoomMessages() async {
     final roomId = activeRoomId;
     if (roomId == null) return;
-    
+
     final messages = await _repository.getMessagesForRoomLocally(roomId);
     if (activeRoomId != roomId) return;
-    
+
     _activeRoomMessages = List<Map<String, dynamic>>.from(messages);
     await _updateLastMessageForRoomSilent(roomId);
-    
+
     if (activeRoomId != roomId) return;
     notifyListeners();
   }

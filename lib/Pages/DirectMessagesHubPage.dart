@@ -532,8 +532,8 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
       final bMsg =
           bRoomId != null ? chatProvider.lastMessagesByRoom[bRoomId] : null;
 
-      debugPrint(
-          "[DMHub] Sorting connection ${a['name']} (Room: $aRoomId, lastMsg: ${aMsg != null ? aMsg['payload'] : 'null'}) vs ${b['name']} (Room: $bRoomId, lastMsg: ${bMsg != null ? bMsg['payload'] : 'null'})");
+      // debugPrint(
+      //     "[DMHub] Sorting connection ${a['name']} (Room: $aRoomId, lastMsg: ${aMsg != null ? aMsg['payload'] : 'null'}) vs ${b['name']} (Room: $bRoomId, lastMsg: ${bMsg != null ? bMsg['payload'] : 'null'})");
 
       if (aMsg == null && bMsg == null) return 0;
       if (aMsg == null) return 1;

@@ -443,7 +443,11 @@ class _CircleFeedPageState extends State<CircleFeedPage> {
       final profileProvider =
           Provider.of<ProfileProvider>(context, listen: false);
       final feedProvider = Provider.of<FeedProvider>(context, listen: false);
-      feedProvider.updateViewerId(profileProvider.userId);
+      if (feedProvider.viewerId != profileProvider.userId) {
+        feedProvider.updateViewerId(profileProvider.userId);
+      } else {
+        feedProvider.ensureRealtimeSubscribed();
+      }
     });
   }
 
@@ -1014,7 +1018,7 @@ class _FeedPostThreadItemState extends State<_FeedPostThreadItem> {
   }
 
   void _onRealtimePostUpdate(Map<String, dynamic> payload) {
-    if (!mounted || _treeNode == null) return;
+    if (!mounted) return;
 
     final String table = payload['table']?.toString() ?? 'posts';
     final String eventType = payload['eventType']?.toString() ?? '';
@@ -1029,33 +1033,35 @@ class _FeedPostThreadItemState extends State<_FeedPostThreadItem> {
           '';
       if (targetPostId.isEmpty) return;
 
-      if (!_isPostIdInTree(_treeNode!, targetPostId)) return;
+      if (_treeNode != null && _isPostIdInTree(_treeNode!, targetPostId)) {
+        final feedProvider = Provider.of<FeedProvider>(context, listen: false);
+        final currentViewerId = feedProvider.viewerId;
 
-      final feedProvider = Provider.of<FeedProvider>(context, listen: false);
-      final currentViewerId = feedProvider.viewerId;
-
-      CommentNode applyReactionUpdate(CommentNode node) {
-        if (node.id == targetPostId && node.post != null) {
-          final updatedPost = applyReactionDelta(
-            node.post!,
-            eventType: eventType,
-            newRecord: newRecord,
-            oldRecord: oldRecord,
-            viewerId: currentViewerId ?? 0,
-          );
+        CommentNode applyReactionUpdate(CommentNode node) {
+          if (node.id == targetPostId && node.post != null) {
+            final updatedPost = applyReactionDelta(
+              node.post!,
+              eventType: eventType,
+              newRecord: newRecord,
+              oldRecord: oldRecord,
+              viewerId: currentViewerId,
+            );
+            return node.copyWith(
+              post: updatedPost,
+              replies: node.replies.map(applyReactionUpdate).toList(),
+            );
+          }
           return node.copyWith(
-            post: updatedPost,
             replies: node.replies.map(applyReactionUpdate).toList(),
           );
         }
-        return node.copyWith(
-          replies: node.replies.map(applyReactionUpdate).toList(),
-        );
-      }
 
-      setState(() {
-        _treeNode = applyReactionUpdate(_treeNode!);
-      });
+        setState(() {
+          _treeNode = applyReactionUpdate(_treeNode!);
+        });
+      } else if (targetPostId == widget.post.id) {
+        setState(() {});
+      }
     } else if (table == 'posts') {
       final String targetPostId = newRecord['id']?.toString() ?? '';
       final String? rootPostId = newRecord['root_post_id']?.toString();
@@ -1065,12 +1071,13 @@ class _FeedPostThreadItemState extends State<_FeedPostThreadItem> {
           replyToPostId != null &&
           (rootPostId == widget.post.id ||
               replyToPostId == widget.post.id ||
-              _isPostIdInTree(_treeNode!, replyToPostId))) {
+              (_treeNode != null && _isPostIdInTree(_treeNode!, replyToPostId)))) {
         _loadThreadPreview(forceReload: true);
         return;
       }
 
       if (targetPostId.isNotEmpty &&
+          _treeNode != null &&
           _isPostIdInTree(_treeNode!, targetPostId)) {
         if (newRecord['reaction_counts'] is Map &&
             (newRecord['reaction_counts'] as Map).isNotEmpty) {
@@ -1117,30 +1124,27 @@ class _FeedPostThreadItemState extends State<_FeedPostThreadItem> {
       return;
     }
 
-    // Same post — sync the root node's post data (reactions, counts)
-    // without re-fetching the entire thread.
-    if (_treeNode != null) {
-      final existingPost = _treeNode!.post ?? widget.post;
-      setState(() {
-        _treeNode = CommentNode(
-          id: _treeNode!.id,
-          authorId: _treeNode!.authorId,
-          authorName: _treeNode!.authorName,
-          authorAvatarUrl: _treeNode!.authorAvatarUrl,
-          content: _treeNode!.content,
-          timestamp: _treeNode!.timestamp,
-          degree: _treeNode!.degree,
-          replyCount: widget.post.activeReplyCount,
-          isDeleted: _treeNode!.isDeleted,
-          replyToName: _treeNode!.replyToName,
-          post: existingPost.copyWith(
-            replyCount: widget.post.activeReplyCount,
-            activeReplyCount: widget.post.activeReplyCount,
-          ),
-          replies: _treeNode!.replies,
-        );
-      });
-    }
+    // Same post — sync root node and all child nodes in the tree with live registry posts
+    setState(() {
+      if (_treeNode != null) {
+        final feedProvider = Provider.of<FeedProvider>(context, listen: false);
+
+        CommentNode syncNodeWithLivePost(CommentNode node) {
+          final livePost = feedProvider.getPostById(node.id) ?? node.post;
+          final updatedPost = livePost?.copyWith(
+            replyCount: node.replyCount,
+            activeReplyCount: node.replyCount,
+          );
+          return node.copyWith(
+            post: updatedPost,
+            replyCount: node.replyCount,
+            replies: node.replies.map(syncNodeWithLivePost).toList(),
+          );
+        }
+
+        _treeNode = syncNodeWithLivePost(_treeNode!);
+      }
+    });
 
     // If activeReplyCount went from 0 → >0 and we haven't fetched yet
     if (widget.post.activeReplyCount > 0 &&
@@ -1267,60 +1271,60 @@ class _FeedPostThreadItemState extends State<_FeedPostThreadItem> {
   }
 
   void _handleReactionToggle(String targetPostId, String selectedKey) {
-    if (_treeNode == null) return;
+    if (_treeNode != null) {
+      CommentNode updateNode(CommentNode node) {
+        if (node.id == targetPostId && node.post != null) {
+          final currentPost = node.post!;
+          final String? oldUserReaction = currentPost.userReaction;
+          final Map<String, int> newCounts =
+              Map<String, int>.from(currentPost.reactionCounts);
 
-    CommentNode updateNode(CommentNode node) {
-      if (node.id == targetPostId && node.post != null) {
-        final currentPost = node.post!;
-        final String? oldUserReaction = currentPost.userReaction;
-        final Map<String, int> newCounts =
-            Map<String, int>.from(currentPost.reactionCounts);
+          String? newUserReaction;
+          if (oldUserReaction == selectedKey) {
+            newUserReaction = null;
+            if (newCounts.containsKey(selectedKey)) {
+              final c = newCounts[selectedKey]!;
+              if (c <= 1) {
+                newCounts.remove(selectedKey);
+              } else {
+                newCounts[selectedKey] = c - 1;
+              }
+            }
+          } else {
+            if (oldUserReaction != null &&
+                newCounts.containsKey(oldUserReaction)) {
+              final prevCount = newCounts[oldUserReaction]!;
+              if (prevCount <= 1) {
+                newCounts.remove(oldUserReaction);
+              } else {
+                newCounts[oldUserReaction] = prevCount - 1;
+              }
+            }
+            newUserReaction = selectedKey;
+            newCounts[selectedKey] = (newCounts[selectedKey] ?? 0) + 1;
+          }
 
-        String? newUserReaction;
-        if (oldUserReaction == selectedKey) {
-          newUserReaction = null;
-          if (newCounts.containsKey(selectedKey)) {
-            final c = newCounts[selectedKey]!;
-            if (c <= 1) {
-              newCounts.remove(selectedKey);
-            } else {
-              newCounts[selectedKey] = c - 1;
-            }
-          }
-        } else {
-          if (oldUserReaction != null &&
-              newCounts.containsKey(oldUserReaction)) {
-            final prevCount = newCounts[oldUserReaction]!;
-            if (prevCount <= 1) {
-              newCounts.remove(oldUserReaction);
-            } else {
-              newCounts[oldUserReaction] = prevCount - 1;
-            }
-          }
-          newUserReaction = selectedKey;
-          newCounts[selectedKey] = (newCounts[selectedKey] ?? 0) + 1;
+          final updatedPost = currentPost.copyWith(
+            userReaction: newUserReaction,
+            nullifyUserReaction: newUserReaction == null,
+            reactionCounts: newCounts,
+          );
+
+          return node.copyWith(
+            post: updatedPost,
+            replies: node.replies.map(updateNode).toList(),
+          );
         }
 
-        final updatedPost = currentPost.copyWith(
-          userReaction: newUserReaction,
-          nullifyUserReaction: newUserReaction == null,
-          reactionCounts: newCounts,
-        );
-
         return node.copyWith(
-          post: updatedPost,
           replies: node.replies.map(updateNode).toList(),
         );
       }
 
-      return node.copyWith(
-        replies: node.replies.map(updateNode).toList(),
-      );
+      setState(() {
+        _treeNode = updateNode(_treeNode!);
+      });
     }
-
-    setState(() {
-      _treeNode = updateNode(_treeNode!);
-    });
 
     final feedProvider = Provider.of<FeedProvider>(context, listen: false);
     feedProvider
@@ -1363,14 +1367,21 @@ class _FeedPostThreadItemState extends State<_FeedPostThreadItem> {
 
   @override
   Widget build(BuildContext context) {
-    // Use activeReplyCount from the provider-owned post directly
-    final effectivePost = widget.post.copyWith(
-      replyCount: widget.post.activeReplyCount,
+    // Always resolve the latest post instance dynamically from FeedProvider
+    final feedProvider = context.watch<FeedProvider>();
+    final livePost = feedProvider.getPostById(widget.post.id) ?? widget.post;
+    final effectivePost = livePost.copyWith(
+      replyCount: livePost.activeReplyCount,
     );
 
     if (_treeNode != null && _treeNode!.replies.isNotEmpty) {
+      final updatedTree = (_treeNode!.post?.reactionCounts != effectivePost.reactionCounts ||
+              _treeNode!.post?.userReaction != effectivePost.userReaction)
+          ? _treeNode!.copyWith(post: effectivePost)
+          : _treeNode!;
+
       return ThreadedCommentTree(
-        comment: _treeNode!,
+        comment: updatedTree,
         parentAvatarRadius: 18.0,
         childAvatarRadius: 14.0,
         indentationWidth: 48.0,
@@ -1410,6 +1421,7 @@ class _FeedPostThreadItemState extends State<_FeedPostThreadItem> {
     return PostCard(
       post: effectivePost,
       onTap: widget.onTap,
+      onReactionToggle: _handleReactionToggle,
     );
   }
 }

@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+
 class FeedPost {
   final String id;
   final int authorId;
@@ -173,6 +175,35 @@ class FeedPost {
       reactionCounts: reactionCounts ?? this.reactionCounts,
     );
   }
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    return other is FeedPost &&
+        other.id == id &&
+        other.authorId == authorId &&
+        other.authorName == authorName &&
+        other.authorAvatarUrl == authorAvatarUrl &&
+        other.content == content &&
+        other.createdAt == createdAt &&
+        other.replyCount == replyCount &&
+        other.activeReplyCount == activeReplyCount &&
+        other.degree == degree &&
+        other.isDeleted == isDeleted &&
+        other.replyToPostId == replyToPostId &&
+        other.userReaction == userReaction &&
+        mapEquals(other.reactionCounts, reactionCounts);
+  }
+
+  @override
+  int get hashCode => Object.hash(
+        id,
+        authorId,
+        userReaction,
+        replyCount,
+        activeReplyCount,
+        Object.hashAll(reactionCounts.entries.map((e) => Object.hash(e.key, e.value))),
+      );
 }
 
 /// Pure delta function to apply realtime insert/update/delete events on post_reactions
@@ -182,7 +213,7 @@ FeedPost applyReactionDelta(
   required String eventType,
   required Map<String, dynamic> newRecord,
   required Map<String, dynamic> oldRecord,
-  required int viewerId,
+  int? viewerId,
 }) {
   final event = eventType.toLowerCase();
   final int? eventUserId = newRecord['user_id'] is int
@@ -194,7 +225,7 @@ FeedPost applyReactionDelta(
   final Map<String, int> counts = Map<String, int>.from(post.reactionCounts);
   String? userReaction = post.userReaction;
 
-  final bool isSelf = eventUserId != null && eventUserId == viewerId;
+  final bool isSelf = eventUserId != null && viewerId != null && eventUserId == viewerId;
 
   if (isSelf) {
     // Viewer's own reaction: counts are handled optimistically by toggleReaction()
