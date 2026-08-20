@@ -338,7 +338,9 @@ class SupabaseFeedRepository implements FeedRepository {
         schema: 'public',
         table: 'post_reactions',
         callback: (payload) {
-          debugPrint('[RAW REALTIME] post_reactions INSERT: ${payload.newRecord}');
+          final newRec = payload.newRecord;
+          debugPrint(
+              '[REALTIME_SIGNAL: REPO] post_reactions INSERT | postId: ${newRec['post_id']}, userId: ${newRec['user_id']}, reaction: ${newRec['reaction_type']}');
           onChange({
             'table': 'post_reactions',
             'eventType': 'INSERT',
@@ -352,7 +354,9 @@ class SupabaseFeedRepository implements FeedRepository {
         schema: 'public',
         table: 'post_reactions',
         callback: (payload) {
-          debugPrint('[RAW REALTIME] post_reactions UPDATE: ${payload.newRecord}');
+          final newRec = payload.newRecord;
+          debugPrint(
+              '[REALTIME_SIGNAL: REPO] post_reactions UPDATE | postId: ${newRec['post_id']}, userId: ${newRec['user_id']}, reaction: ${newRec['reaction_type']}');
           onChange({
             'table': 'post_reactions',
             'eventType': 'UPDATE',
@@ -366,7 +370,9 @@ class SupabaseFeedRepository implements FeedRepository {
         schema: 'public',
         table: 'post_reactions',
         callback: (payload) {
-          debugPrint('[RAW REALTIME] post_reactions DELETE: ${payload.oldRecord}');
+          final oldRec = payload.oldRecord;
+          debugPrint(
+              '[REALTIME_SIGNAL: REPO] post_reactions DELETE | postId: ${oldRec['post_id']}, userId: ${oldRec['user_id']}, reaction: ${oldRec['reaction_type']}');
           onChange({
             'table': 'post_reactions',
             'eventType': 'DELETE',
@@ -381,7 +387,8 @@ class SupabaseFeedRepository implements FeedRepository {
         schema: 'public',
         table: 'posts',
         callback: (payload) {
-          debugPrint('[RAW REALTIME] posts INSERT: ${payload.newRecord}');
+          debugPrint(
+              '[REALTIME_SIGNAL: REPO] posts INSERT | id: ${payload.newRecord['id']}, authorId: ${payload.newRecord['author_id']}');
           onChange({
             'table': 'posts',
             'eventType': 'INSERT',
@@ -395,8 +402,8 @@ class SupabaseFeedRepository implements FeedRepository {
         schema: 'public',
         table: 'posts',
         callback: (payload) {
-          debugPrint('[RAW REALTIME] posts UPDATE received for id: ${payload.newRecord['id']}');
-          debugPrint('[RAW REALTIME] Updated reaction_counts: ${payload.newRecord['reaction_counts']}');
+          debugPrint(
+              '[REALTIME_SIGNAL: REPO] posts UPDATE | id: ${payload.newRecord['id']}, reaction_counts: ${payload.newRecord['reaction_counts']}, reply_count: ${payload.newRecord['reply_count']}');
           onChange({
             'table': 'posts',
             'eventType': 'UPDATE',

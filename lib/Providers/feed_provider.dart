@@ -751,20 +751,26 @@ class FeedProvider with ChangeNotifier {
   // -------------------------------------------------------
 
   void _subscribeToRealtime() {
-    _unsubscribeRealtime();
+    if (_realtimeChannel != null) {
+      debugPrint("[REALTIME_SIGNAL: PROVIDER] Channel already exists, skipping duplicate subscription");
+      return;
+    }
     final vId = _viewerId;
     if (vId == null) return;
 
     _realtimeChannel = _repository.subscribeToPosts(
       onChange: (payload) => _handleRealtimeEvent(payload),
       onStatusChange: (status, error) {
-        debugPrint("[FeedProvider] Realtime channel status: $status, error: $error");
+        debugPrint("[REALTIME_SIGNAL: PROVIDER] Channel status: $status, error: $error");
         if (status == RealtimeSubscribeStatus.subscribed) {
           _reconcileReactions();
+        } else if (status == RealtimeSubscribeStatus.closed ||
+            status == RealtimeSubscribeStatus.channelError) {
+          _realtimeChannel = null;
         }
       },
     );
-    debugPrint("[FeedProvider] Realtime channel subscribed");
+    debugPrint("[REALTIME_SIGNAL: PROVIDER] Realtime channel subscribe requested");
   }
 
   Future<void> _reconcileReactions() async {
@@ -837,7 +843,7 @@ class FeedProvider with ChangeNotifier {
     final vId = _viewerId;
 
     debugPrint(
-        '[FeedProvider] Realtime event received: table=$table, eventType=$eventType, viewerId=$vId');
+        '[REALTIME_SIGNAL: PROVIDER] Incoming Event: table=$table, eventType=$eventType, viewerId=$vId');
 
     // Broadcast all posts table events to stream listeners (thread widgets)
     _postUpdateStreamController.add(payload);
@@ -919,6 +925,23 @@ class FeedProvider with ChangeNotifier {
     }
   }
 
+  void handleReactionRealtimePayload({
+    required String eventType,
+    required Map<String, dynamic> newRecord,
+    required Map<String, dynamic> oldRecord,
+  }) {
+    _handleReactionRealtimeEvent(
+      eventType: eventType,
+      newRecord: newRecord,
+      oldRecord: oldRecord,
+      viewerId: _viewerId,
+    );
+  }
+
+  void handlePostRealtimePayload(Map<String, dynamic> newRecord) {
+    _handlePostRealtimeUpdate({'new': newRecord});
+  }
+
   void _handlePostRealtimeUpdate(Map<String, dynamic> payload) {
     final newRecord = payload['new'] as Map<String, dynamic>?;
     if (newRecord == null) return;
@@ -930,7 +953,7 @@ class FeedProvider with ChangeNotifier {
 
     // Skip updating local state if this device is mid-flight with an optimistic tap
     if (_pendingReactionPostIds.contains(postId)) {
-      debugPrint('[FeedProvider] Skipping realtime update for pending post $postId');
+      debugPrint('[REALTIME_SIGNAL: PROVIDER] Skipping realtime update for in-flight pending post $postId');
       return;
     }
 
@@ -980,6 +1003,7 @@ class FeedProvider with ChangeNotifier {
         replyCount: replyCount ?? old.replyCount,
       );
       changed = true;
+      debugPrint('[REALTIME_SIGNAL: PROVIDER] Updated _postRegistry[$postId] with reactionCounts: $updatedCounts');
     }
 
     // 2. Update _posts list
@@ -990,11 +1014,14 @@ class FeedProvider with ChangeNotifier {
         replyCount: replyCount ?? _posts[index].replyCount,
       );
       changed = true;
+      debugPrint('[REALTIME_SIGNAL: PROVIDER] Updated _posts[$index] for post $postId with reactionCounts: $updatedCounts');
     }
 
     if (changed) {
       notifyListeners();
-      debugPrint('[FeedProvider] Successfully applied posts UPDATE to post $postId (counts: $updatedCounts)');
+      debugPrint('[REALTIME_SIGNAL: PROVIDER] ✅ Successfully applied posts UPDATE to post $postId (counts: $updatedCounts) -> notifyListeners() called');
+    } else {
+      debugPrint('[REALTIME_SIGNAL: PROVIDER] ⚠️ Received posts UPDATE for $postId, but post was not in registry or feed list');
     }
   }
 
@@ -1015,17 +1042,17 @@ class FeedProvider with ChangeNotifier {
         newRecord['reaction_type']?.toString() ?? oldRecord['reaction_type']?.toString();
 
     debugPrint(
-        '[FeedProvider] Processing reaction: postId=$postId, eventUserId=$eventUserId, type=$reactionType, event=$eventType');
+        '[REALTIME_SIGNAL: PROVIDER] Processing post_reactions delta: postId=$postId, eventUserId=$eventUserId, type=$reactionType, event=$eventType');
 
     if (postId.isEmpty) {
-      debugPrint('[FeedProvider] Reaction event dropped: postId is empty');
+      debugPrint('[REALTIME_SIGNAL: PROVIDER] ⚠️ Reaction event dropped: postId is empty');
       return;
     }
 
     // Check if post is currently locked in local optimistic flight
     if (_pendingReactionPostIds.contains(postId)) {
       debugPrint(
-          '[FeedProvider] Skipping realtime reaction for pending post $postId');
+          '[REALTIME_SIGNAL: PROVIDER] Skipping realtime reaction for pending in-flight post $postId');
       return;
     }
 
@@ -1049,10 +1076,10 @@ class FeedProvider with ChangeNotifier {
 
       notifyListeners();
       debugPrint(
-          '[FeedProvider] Realtime reaction updated for post $postId in registry & feed. Total: ${updatedPost.totalReactions}');
+          '[REALTIME_SIGNAL: PROVIDER] ✅ Realtime post_reactions updated for post $postId in registry & feed. Total: ${updatedPost.totalReactions} -> notifyListeners() called');
     } else {
       debugPrint(
-          '[FeedProvider] Post $postId not found in registry (${_postRegistry.length} items) or feed list (${_posts.length} items)');
+          '[REALTIME_SIGNAL: PROVIDER] ⚠️ Post $postId not found in registry (${_postRegistry.length} items) or feed list (${_posts.length} items)');
     }
   }
 

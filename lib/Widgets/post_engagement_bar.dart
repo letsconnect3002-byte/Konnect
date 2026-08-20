@@ -67,6 +67,8 @@ class _ReactionButton extends StatelessWidget {
       targetRect: targetRect,
       activeReaction: post.userReaction,
       onSelectReaction: (selectedKey) {
+        debugPrint(
+            '[REALTIME_SIGNAL: UI] User tapped reaction "$selectedKey" on post ${post.id}');
         AnalyticsService.logEvent(
           name: 'post_reaction_selected',
           parameters: {
@@ -89,6 +91,9 @@ class _ReactionButton extends StatelessWidget {
 
     final bool hasUserReaction = post.userReaction != null;
     final int totalCount = post.totalReactions;
+
+    debugPrint(
+        '[REALTIME_SIGNAL: UI] _ReactionButton BUILD for post: ${post.id} | totalCount: $totalCount, userReaction: ${post.userReaction}, counts: ${post.reactionCounts}');
 
     Widget iconWidget;
     if (hasUserReaction) {

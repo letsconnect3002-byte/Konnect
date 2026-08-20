@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:connect/Config/app_theme.dart';
 import 'package:connect/Providers/feed_provider.dart';
 import 'package:connect/Providers/profile_provider.dart';
@@ -434,6 +435,7 @@ class CircleFeedPage extends StatefulWidget {
 
 class _CircleFeedPageState extends State<CircleFeedPage> {
   final ScrollController _scrollController = ScrollController();
+  RealtimeChannel? _feedChannel;
 
   @override
   void initState() {
@@ -445,10 +447,103 @@ class _CircleFeedPageState extends State<CircleFeedPage> {
       final feedProvider = Provider.of<FeedProvider>(context, listen: false);
       if (feedProvider.viewerId != profileProvider.userId) {
         feedProvider.updateViewerId(profileProvider.userId);
-      } else {
-        feedProvider.ensureRealtimeSubscribed();
       }
+      _subscribeToFeedRealtime();
     });
+  }
+
+  void _subscribeToFeedRealtime() {
+    final client = Supabase.instance.client;
+    final profileProvider =
+        Provider.of<ProfileProvider>(context, listen: false);
+    final userId = profileProvider.userId ?? 0;
+
+    if (_feedChannel != null) {
+      client.removeChannel(_feedChannel!);
+      _feedChannel = null;
+    }
+
+    _feedChannel = client.channel('feed:viewer_$userId');
+    _feedChannel!
+      .onPostgresChanges(
+        event: PostgresChangeEvent.insert,
+        schema: 'public',
+        table: 'post_reactions',
+        callback: (payload) {
+          debugPrint(
+              '[REALTIME_SIGNAL: CIRCLE_FEED] post_reactions INSERT received: ${payload.newRecord}');
+          final feedProvider =
+              Provider.of<FeedProvider>(context, listen: false);
+          feedProvider.handleReactionRealtimePayload(
+            eventType: 'INSERT',
+            newRecord: Map<String, dynamic>.from(payload.newRecord),
+            oldRecord: Map<String, dynamic>.from(payload.oldRecord),
+          );
+          if (mounted) setState(() {});
+        },
+      )
+      .onPostgresChanges(
+        event: PostgresChangeEvent.update,
+        schema: 'public',
+        table: 'post_reactions',
+        callback: (payload) {
+          debugPrint(
+              '[REALTIME_SIGNAL: CIRCLE_FEED] post_reactions UPDATE received: ${payload.newRecord}');
+          final feedProvider =
+              Provider.of<FeedProvider>(context, listen: false);
+          feedProvider.handleReactionRealtimePayload(
+            eventType: 'UPDATE',
+            newRecord: Map<String, dynamic>.from(payload.newRecord),
+            oldRecord: Map<String, dynamic>.from(payload.oldRecord),
+          );
+          if (mounted) setState(() {});
+        },
+      )
+      .onPostgresChanges(
+        event: PostgresChangeEvent.delete,
+        schema: 'public',
+        table: 'post_reactions',
+        callback: (payload) {
+          debugPrint(
+              '[REALTIME_SIGNAL: CIRCLE_FEED] post_reactions DELETE received: ${payload.oldRecord}');
+          final feedProvider =
+              Provider.of<FeedProvider>(context, listen: false);
+          feedProvider.handleReactionRealtimePayload(
+            eventType: 'DELETE',
+            newRecord: Map<String, dynamic>.from(payload.newRecord),
+            oldRecord: Map<String, dynamic>.from(payload.oldRecord),
+          );
+          if (mounted) setState(() {});
+        },
+      )
+      .onPostgresChanges(
+        event: PostgresChangeEvent.update,
+        schema: 'public',
+        table: 'posts',
+        callback: (payload) {
+          debugPrint(
+              '[REALTIME_SIGNAL: CIRCLE_FEED] posts UPDATE received: ${payload.newRecord['id']} -> ${payload.newRecord['reaction_counts']}');
+          final feedProvider =
+              Provider.of<FeedProvider>(context, listen: false);
+          feedProvider.handlePostRealtimePayload(
+              Map<String, dynamic>.from(payload.newRecord));
+          if (mounted) setState(() {});
+        },
+      )
+      .subscribe((status, error) {
+        debugPrint(
+            '[REALTIME_SIGNAL: CIRCLE_FEED] Channel status: $status, error: $error');
+      });
+  }
+
+  @override
+  void dispose() {
+    _scrollController.removeListener(_onScroll);
+    _scrollController.dispose();
+    if (_feedChannel != null) {
+      Supabase.instance.client.removeChannel(_feedChannel!);
+    }
+    super.dispose();
   }
 
   void _onScroll() {
@@ -492,13 +587,6 @@ class _CircleFeedPageState extends State<CircleFeedPage> {
         ],
       ),
     );
-  }
-
-  @override
-  void dispose() {
-    _scrollController.removeListener(_onScroll);
-    _scrollController.dispose();
-    super.dispose();
   }
 
   @override
@@ -1033,6 +1121,9 @@ class _FeedPostThreadItemState extends State<_FeedPostThreadItem> {
           '';
       if (targetPostId.isEmpty) return;
 
+      debugPrint(
+          '[REALTIME_SIGNAL: UI] _onRealtimePostUpdate post_reactions $eventType for targetPostId: $targetPostId (itemRootId: ${widget.post.id})');
+
       if (_treeNode != null && _isPostIdInTree(_treeNode!, targetPostId)) {
         final feedProvider = Provider.of<FeedProvider>(context, listen: false);
         final currentViewerId = feedProvider.viewerId;
@@ -1046,6 +1137,8 @@ class _FeedPostThreadItemState extends State<_FeedPostThreadItem> {
               oldRecord: oldRecord,
               viewerId: currentViewerId,
             );
+            debugPrint(
+                '[REALTIME_SIGNAL: UI] Updated tree node post $targetPostId reactions to: ${updatedPost.reactionCounts}');
             return node.copyWith(
               post: updatedPost,
               replies: node.replies.map(applyReactionUpdate).toList(),
@@ -1060,6 +1153,7 @@ class _FeedPostThreadItemState extends State<_FeedPostThreadItem> {
           _treeNode = applyReactionUpdate(_treeNode!);
         });
       } else if (targetPostId == widget.post.id) {
+        debugPrint('[REALTIME_SIGNAL: UI] Calling setState on root post card ${widget.post.id}');
         setState(() {});
       }
     } else if (table == 'posts') {
