@@ -115,6 +115,16 @@ class ThreadLinePainter extends CustomPainter {
       ..strokeWidth = strokeWidth
       ..strokeCap = StrokeCap.round;
 
+    final double expectedParentCenterX =
+        parentLeftPadding + parentAvatarRadius;
+    final double trunkX = (parentCenterX > 0 &&
+            (parentCenterX - expectedParentCenterX).abs() < 15.0)
+        ? parentCenterX
+        : expectedParentCenterX;
+
+    final double expectedChildLeftX =
+        indentationWidth + parentLeftPadding;
+
     // 1. Y coordinate where vertical trunk starts: 6px gap below parent avatar bottom
     final double lineStartY = parentAvatarBottomY + 6.0;
 
@@ -126,27 +136,30 @@ class ThreadLinePainter extends CustomPainter {
     // Draw central vertical trunk line from parent avatar bottom down to the last child curve
     if (mainTrunkEndY > lineStartY) {
       final trunkPath = Path()
-        ..moveTo(parentCenterX, lineStartY)
-        ..lineTo(parentCenterX, mainTrunkEndY);
+        ..moveTo(trunkX, lineStartY)
+        ..lineTo(trunkX, mainTrunkEndY);
       canvas.drawPath(trunkPath, paint);
     }
 
     // 3. Draw 90-degree curved elbow branches towards each child reply avatar Y-center
     for (int i = 0; i < yOffsets.length; i++) {
       final double childCenterY = yOffsets[i];
-      final double childLeftX =
-          (i < childAvatarLeftXs.length && childAvatarLeftXs[i] > 0)
-              ? childAvatarLeftXs[i]
-              : indentationWidth;
+      if (childCenterY <= 0) continue;
+
+      final double childLeftX = (i < childAvatarLeftXs.length &&
+              childAvatarLeftXs[i] > 0 &&
+              (childAvatarLeftXs[i] - expectedChildLeftX).abs() < 25.0)
+          ? childAvatarLeftXs[i]
+          : expectedChildLeftX;
       final double targetChildX =
           childLeftX - 6.0; // 6px gap before child profile picture
 
       final branchPath = Path()
-        ..moveTo(parentCenterX, childCenterY - curveRadius)
+        ..moveTo(trunkX, childCenterY - curveRadius)
         ..quadraticBezierTo(
-          parentCenterX,
+          trunkX,
           childCenterY, // Control point at elbow corner
-          parentCenterX + curveRadius,
+          trunkX + curveRadius,
           childCenterY, // End of 90-degree curve
         )
         ..lineTo(targetChildX, childCenterY);
@@ -366,9 +379,9 @@ class _ThreadNodeWidgetState extends State<_ThreadNodeWidget>
       return;
     }
 
-    double parentCenterX = widget.isRootNode
-        ? (widget.parentLeftPadding + widget.parentAvatarRadius)
-        : widget.parentAvatarRadius;
+    final double expectedParentCenterX =
+        widget.parentLeftPadding + widget.parentAvatarRadius;
+    double parentCenterX = expectedParentCenterX;
     double parentAvatarBottomY = -widget.parentAvatarRadius - 4.0;
 
     final GlobalKey activeKey =
@@ -379,10 +392,16 @@ class _ThreadNodeWidgetState extends State<_ThreadNodeWidget>
       final avatarCenterGlobal = parentAvatarBox.localToGlobal(
           Offset(parentAvatarBox.size.width / 2, parentAvatarBox.size.height));
       final localPoint = customPaintBox.globalToLocal(avatarCenterGlobal);
-      parentCenterX = localPoint.dx;
-      parentAvatarBottomY = localPoint.dy;
+      if ((localPoint.dx - expectedParentCenterX).abs() < 15.0) {
+        parentCenterX = localPoint.dx;
+      }
+      if (localPoint.dy <= 0) {
+        parentAvatarBottomY = localPoint.dy;
+      }
     }
 
+    final double expectedChildLeftX =
+        widget.indentationWidth + widget.parentLeftPadding;
     final List<double> newYOffsets = [];
     final List<double> newLeftXs = [];
 
@@ -393,7 +412,9 @@ class _ThreadNodeWidgetState extends State<_ThreadNodeWidget>
         final childLeftTopGlobal = childAvatarBox.localToGlobal(Offset.zero);
         final localLeftTop = customPaintBox.globalToLocal(childLeftTopGlobal);
         final centerY = localLeftTop.dy + (childAvatarBox.size.height / 2);
-        final leftX = localLeftTop.dx;
+        final leftX = (localLeftTop.dx - expectedChildLeftX).abs() < 25.0
+            ? localLeftTop.dx
+            : expectedChildLeftX;
 
         newYOffsets.add(centerY);
         newLeftXs.add(leftX);
@@ -697,8 +718,21 @@ class _ThreadNodeWidgetState extends State<_ThreadNodeWidget>
       final bool isHighlighted = (widget.initialExpandPostId == node.id);
       final feedProvider = Provider.of<FeedProvider>(context);
       final livePost = feedProvider.getPostById(node.id) ?? node.post!;
+      final int effectiveReplyCount = (node.replyCount > 0)
+          ? node.replyCount
+          : (node.replies.isNotEmpty
+              ? node.replies.where((r) => !r.isDeleted).length
+              : (node.post?.activeReplyCount ??
+                  (node.post?.replyCount ??
+                      (livePost.activeReplyCount > 0
+                          ? livePost.activeReplyCount
+                          : livePost.replyCount))));
+      final effectivePost = livePost.copyWith(
+        replyCount: effectiveReplyCount,
+        activeReplyCount: effectiveReplyCount,
+      );
       return PostCard(
-        post: livePost,
+        post: effectivePost,
         isThreadView: false,
         isHighlighted: isHighlighted,
         avatarKey: activeKey,

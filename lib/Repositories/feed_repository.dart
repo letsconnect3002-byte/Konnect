@@ -163,14 +163,32 @@ class SupabaseFeedRepository implements FeedRepository {
         }
       }
 
-      if (viewerId != null) {
-        result = result.map((post) {
-          if (post.authorId == viewerId) {
-            return post.copyWith(degree: 0);
-          }
-          return post;
-        }).toList();
+      // Compute direct child reply counts for each post in the thread
+      final Map<String, int> childCountMap = {};
+      for (final p in result) {
+        if (p.replyToPostId != null &&
+            p.replyToPostId!.isNotEmpty &&
+            !p.isDeleted) {
+          childCountMap[p.replyToPostId!] =
+              (childCountMap[p.replyToPostId!] ?? 0) + 1;
+        }
       }
+
+      result = result.map((post) {
+        final int computedReplyCount = childCountMap[post.id] ??
+            (post.id == rootPostId ? post.replyCount : 0);
+        FeedPost updated = post;
+        if (post.id != rootPostId || computedReplyCount > 0) {
+          updated = updated.copyWith(
+            replyCount: computedReplyCount,
+            activeReplyCount: computedReplyCount,
+          );
+        }
+        if (viewerId != null && updated.authorId == viewerId) {
+          updated = updated.copyWith(degree: 0);
+        }
+        return updated;
+      }).toList();
 
       return result;
     } catch (e) {
