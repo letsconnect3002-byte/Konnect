@@ -436,6 +436,7 @@ class CircleFeedPage extends StatefulWidget {
 class _CircleFeedPageState extends State<CircleFeedPage> {
   final ScrollController _scrollController = ScrollController();
   RealtimeChannel? _feedChannel;
+  bool _onlyFirstDegree = false;
 
   @override
   void initState() {
@@ -589,115 +590,492 @@ class _CircleFeedPageState extends State<CircleFeedPage> {
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final feedProvider = Provider.of<FeedProvider>(context);
-
-    return Scaffold(
-      backgroundColor: context.canvasBackground,
-      appBar: AppBar(
-        backgroundColor: context.canvasBackground,
-        elevation: 0,
-        centerTitle: false,
-        title: Row(
-          children: [
-            Text(
-              "Jana",
-              style: TextStyle(
-                color: context.textPrimary,
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            if (feedProvider.unseenCount > 0) ...[
-              const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: context.accentPrimary,
-                  borderRadius: BorderRadius.circular(99),
+  void _openFeedFilterSheet(BuildContext context) {
+    HapticFeedback.lightImpact();
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (sheetContext) {
+        return StatefulBuilder(
+          builder: (ctx, setSheetState) {
+            return Container(
+              decoration: BoxDecoration(
+                color: context.surfacePrimary,
+                borderRadius:
+                    const BorderRadius.vertical(top: Radius.circular(24)),
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.08),
+                  width: 1,
                 ),
-                child: Text(
-                  "${feedProvider.unseenCount} new",
-                  style: const TextStyle(
-                    color: Colors.black,
-                    fontSize: 11,
-                    fontWeight: FontWeight.bold,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.6),
+                    blurRadius: 24,
+                    offset: const Offset(0, -6),
+                  ),
+                ],
+              ),
+              child: SafeArea(
+                top: false,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 36,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                      const SizedBox(height: 18),
+                      Row(
+                        children: [
+                          Text(
+                            "Feed Selection",
+                            style: TextStyle(
+                              color: context.textPrimary,
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              fontFamily: 'Inter',
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          Text(
+                            "Choose which circle of posts to display",
+                            style: TextStyle(
+                              color: context.textSecondary,
+                              fontSize: 13,
+                              fontFamily: 'Inter',
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 20),
+                      _buildFeedOptionCard(
+                        title: "Full Network",
+                        description:
+                            "Posts from direct connections and extended network",
+                        icon: Icons.public_rounded,
+                        isSelected: !_onlyFirstDegree,
+                        onTap: () {
+                          if (_onlyFirstDegree) {
+                            HapticFeedback.selectionClick();
+                            setState(() => _onlyFirstDegree = false);
+                            setSheetState(() {});
+                          }
+                          Navigator.pop(sheetContext);
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      _buildFeedOptionCard(
+                        title: "Inner Circle",
+                        description:
+                            "Posts exclusively from your direct 1st-degree connections",
+                        icon: Icons.people_alt_rounded,
+                        isSelected: _onlyFirstDegree,
+                        onTap: () {
+                          if (!_onlyFirstDegree) {
+                            HapticFeedback.selectionClick();
+                            setState(() => _onlyFirstDegree = true);
+                            setSheetState(() {});
+                          }
+                          Navigator.pop(sheetContext);
+                        },
+                      ),
+                      const SizedBox(height: 8),
+                    ],
                   ),
                 ),
               ),
-            ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildFeedOptionCard({
+    required String title,
+    required String description,
+    required IconData icon,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return BounceTap(
+      onTap: onTap,
+      scaleDown: 0.98,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOutCubic,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? context.accentPrimary.withValues(alpha: 0.12)
+              : context.surfaceSecondary,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isSelected
+                ? context.accentPrimary.withValues(alpha: 0.5)
+                : Colors.white.withValues(alpha: 0.05),
+            width: 1.2,
+          ),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: context.accentPrimary.withValues(alpha: 0.15),
+                    blurRadius: 10,
+                    offset: const Offset(0, 3),
+                  ),
+                ]
+              : null,
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 42,
+              height: 42,
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? context.accentPrimary.withValues(alpha: 0.2)
+                    : Colors.white.withValues(alpha: 0.05),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                icon,
+                size: 20,
+                color: isSelected
+                    ? context.accentPrimary
+                    : context.textSecondary,
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      color: isSelected ? Colors.white : context.textPrimary,
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      fontFamily: 'Inter',
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    description,
+                    style: TextStyle(
+                      color: context.textSecondary,
+                      fontSize: 12.5,
+                      height: 1.3,
+                      fontFamily: 'Inter',
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 10),
+            Container(
+              width: 22,
+              height: 22,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: isSelected ? context.accentPrimary : Colors.transparent,
+                border: Border.all(
+                  color: isSelected
+                      ? context.accentPrimary
+                      : context.textSecondary.withValues(alpha: 0.4),
+                  width: 2,
+                ),
+              ),
+              child: isSelected
+                  ? const Icon(
+                      Icons.check,
+                      size: 14,
+                      color: Colors.white,
+                    )
+                  : null,
+            ),
           ],
         ),
-        actions: [
-          Consumer<NotificationProvider>(
-            builder: (context, notifProvider, child) {
-              final unread = notifProvider.unreadCount;
-              return Padding(
-                padding: const EdgeInsets.only(right: 16.0),
-                child: Center(
-                  child: GestureDetector(
-                    onTap: () {
-                      HapticFeedback.lightImpact();
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const NotificationPage(),
+      ),
+    );
+  }
+
+  Widget _buildEmpty1DegreeState(BuildContext context) {
+    return SingleChildScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      child: Column(
+        children: [
+          const PulseRowWidget(),
+          Container(
+            height: MediaQuery.of(context).size.height * 0.52,
+            alignment: Alignment.center,
+            padding: const EdgeInsets.symmetric(horizontal: 32),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  width: 64,
+                  height: 64,
+                  decoration: BoxDecoration(
+                    color: context.accentPrimary.withValues(alpha: 0.12),
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: context.accentPrimary.withValues(alpha: 0.3),
+                      width: 1.5,
+                    ),
+                  ),
+                  child: Icon(
+                    Icons.people_outline_rounded,
+                    size: 32,
+                    color: context.accentPrimary,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  "No Inner Circle Posts",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: context.textPrimary,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  "None of your direct 1st-degree connections have posted yet. Switch to Full Network to see posts from your extended network.",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: context.textSecondary,
+                    fontSize: 13.5,
+                    height: 1.4,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                ElevatedButton.icon(
+                  onPressed: () {
+                    HapticFeedback.selectionClick();
+                    setState(() => _onlyFirstDegree = false);
+                  },
+                  icon: const Icon(Icons.public_rounded,
+                      color: Colors.white, size: 18),
+                  label: const Text(
+                    "View Full Network",
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: context.accentPrimary,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 24, vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final feedProvider = Provider.of<FeedProvider>(context);
+    final List<FeedPost> displayedPosts = _onlyFirstDegree
+        ? feedProvider.posts
+            .where((p) => p.degree == 1 || p.degree == 0)
+            .toList()
+        : feedProvider.posts;
+
+    return Scaffold(
+      backgroundColor: context.canvasBackground,
+      appBar: PreferredSize(
+        preferredSize: const Size.fromHeight(56),
+        child: SafeArea(
+          bottom: false,
+          child: Container(
+            height: 56,
+            color: context.canvasBackground,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                // Left: Jana + Unseen Badge
+                Positioned(
+                  left: 20,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        "Jana",
+                        style: TextStyle(
+                          color: context.textPrimary,
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
                         ),
-                      );
-                    },
+                      ),
+                      if (feedProvider.unseenCount > 0) ...[
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: context.accentPrimary,
+                            borderRadius: BorderRadius.circular(99),
+                          ),
+                          child: Text(
+                            "${feedProvider.unseenCount} new",
+                            style: const TextStyle(
+                              color: Colors.black,
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                // Center: Perfectly centered filter button
+                Center(
+                  child: BounceTap(
+                    onTap: () => _openFeedFilterSheet(context),
+                    scaleDown: 0.94,
                     child: Container(
-                      padding: const EdgeInsets.all(8),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 7),
                       decoration: BoxDecoration(
                         color: context.surfacePrimary,
-                        shape: BoxShape.circle,
+                        borderRadius: BorderRadius.circular(99),
                         border: Border.all(
-                            color: Colors.white.withValues(alpha: 0.04)),
-                      ),
-                      child: Stack(
-                        clipBehavior: Clip.none,
-                        children: [
-                          const Icon(
-                            Icons.notifications_rounded,
-                            color: Colors.white70,
-                            size: 20,
+                          color: Colors.white.withValues(alpha: 0.08),
+                          width: 1.0,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.3),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
                           ),
-                          if (unread > 0)
-                            Positioned(
-                              right: -1,
-                              top: -1,
-                              child: Container(
-                                padding: const EdgeInsets.all(2),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFEF4444), // Vibrant Red
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                      color: context.surfacePrimary,
-                                      width: 1.5),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: const Color(0xFFEF4444)
-                                          .withValues(alpha: 0.4),
-                                      blurRadius: 4,
-                                      spreadRadius: 1,
-                                    ),
-                                  ],
-                                ),
-                                constraints: const BoxConstraints(
-                                  minWidth: 8,
-                                  minHeight: 8,
-                                ),
-                              ),
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            _onlyFirstDegree
+                                ? Icons.people_alt_rounded
+                                : Icons.public_rounded,
+                            size: 14,
+                            color: context.accentPrimary,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            _onlyFirstDegree ? "Inner Circle" : "Full Network",
+                            style: TextStyle(
+                              color: context.textPrimary,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              fontFamily: 'Inter',
                             ),
+                          ),
+                          const SizedBox(width: 4),
+                          Icon(
+                            Icons.keyboard_arrow_down_rounded,
+                            size: 17,
+                            color: context.textSecondary,
+                          ),
                         ],
                       ),
                     ),
                   ),
                 ),
-              );
-            },
+                // Right: Notification Icon Button
+                Positioned(
+                  right: 16,
+                  child: Consumer<NotificationProvider>(
+                    builder: (context, notifProvider, child) {
+                      final unread = notifProvider.unreadCount;
+                      return Center(
+                        child: GestureDetector(
+                          onTap: () {
+                            HapticFeedback.lightImpact();
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const NotificationPage(),
+                              ),
+                            );
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: context.surfacePrimary,
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                  color: Colors.white.withValues(alpha: 0.04)),
+                            ),
+                            child: Stack(
+                              clipBehavior: Clip.none,
+                              children: [
+                                const Icon(
+                                  Icons.notifications_rounded,
+                                  color: Colors.white70,
+                                  size: 20,
+                                ),
+                                if (unread > 0)
+                                  Positioned(
+                                    right: -1,
+                                    top: -1,
+                                    child: Container(
+                                      padding: const EdgeInsets.all(2),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFEF4444),
+                                        shape: BoxShape.circle,
+                                        border: Border.all(
+                                            color: context.surfacePrimary,
+                                            width: 1.5),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: const Color(0xFFEF4444)
+                                                .withValues(alpha: 0.4),
+                                            blurRadius: 4,
+                                            spreadRadius: 1,
+                                          ),
+                                        ],
+                                      ),
+                                      constraints: const BoxConstraints(
+                                        minWidth: 8,
+                                        minHeight: 8,
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
           ),
-        ],
+        ),
       ),
       body: feedProvider.isLoading && feedProvider.posts.isEmpty
           ? const Center(child: CircularProgressIndicator())
@@ -843,70 +1221,75 @@ class _CircleFeedPageState extends State<CircleFeedPage> {
                                 );
                               },
                             )
-                          : ListView.builder(
-                              controller: _scrollController,
-                              physics: const AlwaysScrollableScrollPhysics(),
-                              itemCount: feedProvider.posts.length + 2,
-                              itemBuilder: (context, index) {
-                                if (index == 0) {
-                                  return const PulseRowWidget();
-                                }
+                          : displayedPosts.isEmpty
+                              ? _buildEmpty1DegreeState(context)
+                              : ListView.builder(
+                                  controller: _scrollController,
+                                  physics:
+                                      const AlwaysScrollableScrollPhysics(),
+                                  itemCount: displayedPosts.length + 2,
+                                  itemBuilder: (context, index) {
+                                    if (index == 0) {
+                                      return const PulseRowWidget();
+                                    }
 
-                                if (index == feedProvider.posts.length + 1) {
-                                  if (feedProvider.isLoadingMore) {
-                                    return const Padding(
-                                      padding:
-                                          EdgeInsets.symmetric(vertical: 20),
-                                      child: Center(
-                                          child: CircularProgressIndicator()),
-                                    );
-                                  }
-                                  return const SizedBox(height: 80);
-                                }
-
-                                final post = feedProvider.posts[index - 1];
-                                final postIndex = index - 1;
-
-                                final bool showDividerHere = feedProvider
-                                        .hasShownCaughtUpDivider &&
-                                    postIndex > 0 &&
-                                    feedProvider.posts[postIndex - 1].degree ==
-                                        post.degree;
-                                return Column(
-                                  children: [
-                                    if (showDividerHere && postIndex == 5)
-                                      _buildCaughtUpDivider(context),
-                                    DwellDetector(
-                                      onDwell: () {
-                                        feedProvider
-                                            .markPostSeenLocally(post.id);
-                                        AnalyticsService.logEvent(
-                                          name: 'feed_post_dwelled',
-                                          parameters: {
-                                            'post_id': post.id,
-                                            'author_degree': post.degree,
-                                          },
+                                    if (index == displayedPosts.length + 1) {
+                                      if (feedProvider.isLoadingMore) {
+                                        return const Padding(
+                                          padding: EdgeInsets.symmetric(
+                                              vertical: 20),
+                                          child: Center(
+                                              child:
+                                                  CircularProgressIndicator()),
                                         );
-                                      },
-                                      child: _FeedPostThreadItem(
-                                        key: ValueKey("feed_item_${post.id}"),
-                                        post: post,
-                                        onTap: () {
-                                          Navigator.push(
-                                            context,
-                                            MaterialPageRoute(
-                                              builder: (context) =>
-                                                  ThreadDetailPage(
-                                                      rootPostId: post.id),
-                                            ),
-                                          );
-                                        },
-                                      ),
-                                    ),
-                                  ],
-                                );
-                              },
-                            ),
+                                      }
+                                      return const SizedBox(height: 80);
+                                    }
+
+                                    final post = displayedPosts[index - 1];
+                                    final postIndex = index - 1;
+
+                                    final bool showDividerHere = feedProvider
+                                            .hasShownCaughtUpDivider &&
+                                        postIndex > 0 &&
+                                        displayedPosts[postIndex - 1].degree ==
+                                            post.degree;
+                                    return Column(
+                                      children: [
+                                        if (showDividerHere && postIndex == 5)
+                                          _buildCaughtUpDivider(context),
+                                        DwellDetector(
+                                          onDwell: () {
+                                            feedProvider
+                                                .markPostSeenLocally(post.id);
+                                            AnalyticsService.logEvent(
+                                              name: 'feed_post_dwelled',
+                                              parameters: {
+                                                'post_id': post.id,
+                                                'author_degree': post.degree,
+                                              },
+                                            );
+                                          },
+                                          child: _FeedPostThreadItem(
+                                            key: ValueKey(
+                                                "feed_item_${post.id}"),
+                                            post: post,
+                                            onTap: () {
+                                              Navigator.push(
+                                                context,
+                                                MaterialPageRoute(
+                                                  builder: (context) =>
+                                                      ThreadDetailPage(
+                                                          rootPostId: post.id),
+                                                ),
+                                              );
+                                            },
+                                          ),
+                                        ),
+                                      ],
+                                    );
+                                  },
+                                ),
                     ),
                     if (feedProvider.hasNewPosts)
                       Positioned(

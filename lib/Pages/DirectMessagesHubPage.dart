@@ -3,8 +3,6 @@ import 'package:connect/Providers/profile_provider.dart';
 import 'package:connect/Providers/connection_provider.dart';
 import 'package:connect/Providers/chat_provider.dart';
 import 'package:connect/Models/app_error.dart';
-import 'package:connect/Providers/notification_provider.dart';
-import 'package:connect/Pages/NotificationPage.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -14,6 +12,7 @@ import 'package:connect/Config/app_theme.dart';
 import 'package:connect/Providers/tribe_provider.dart';
 import 'package:connect/Pages/Tribe/TribeChatPage.dart';
 import 'package:connect/Pages/Tribe/TribeCreatePage.dart';
+import 'package:connect/Pages/PlansPage.dart';
 
 class DirectMessagesHubPage extends StatefulWidget {
   const DirectMessagesHubPage({super.key});
@@ -558,75 +557,39 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
           'Messages',
           style: context.screenHeading,
         ),
-        // actions: [
-        //   Consumer<NotificationProvider>(
-        //     builder: (context, notifProvider, child) {
-        //       final unread = notifProvider.unreadCount;
-        //       return Padding(
-        //         padding: const EdgeInsets.only(right: 16.0),
-        //         child: Center(
-        //           child: GestureDetector(
-        //             onTap: () {
-        //               HapticFeedback.lightImpact();
-        //               Navigator.push(
-        //                 context,
-        //                 MaterialPageRoute(
-        //                   builder: (context) => const NotificationPage(),
-        //                 ),
-        //               );
-        //             },
-        //             child: Container(
-        //               padding: const EdgeInsets.all(8),
-        //               decoration: BoxDecoration(
-        //                 color: context.surfacePrimary,
-        //                 shape: BoxShape.circle,
-        //                 border: Border.all(
-        //                     color: Colors.white.withValues(alpha: 0.04)),
-        //               ),
-        //               child: Stack(
-        //                 clipBehavior: Clip.none,
-        //                 children: [
-        //                   const Icon(
-        //                     Icons.notifications_rounded,
-        //                     color: Colors.white70,
-        //                     size: 20,
-        //                   ),
-        //                   if (unread > 0)
-        //                     Positioned(
-        //                       right: -1,
-        //                       top: -1,
-        //                       child: Container(
-        //                         padding: const EdgeInsets.all(2),
-        //                         decoration: BoxDecoration(
-        //                           color: const Color(0xFFEF4444), // Vibrant Red
-        //                           shape: BoxShape.circle,
-        //                           border: Border.all(
-        //                               color: context.surfacePrimary,
-        //                               width: 1.5),
-        //                           boxShadow: [
-        //                             BoxShadow(
-        //                               color: const Color(0xFFEF4444)
-        //                                   .withValues(alpha: 0.4),
-        //                               blurRadius: 4,
-        //                               spreadRadius: 1,
-        //                             ),
-        //                           ],
-        //                         ),
-        //                         constraints: const BoxConstraints(
-        //                           minWidth: 8,
-        //                           minHeight: 8,
-        //                         ),
-        //                       ),
-        //                     ),
-        //                 ],
-        //               ),
-        //             ),
-        //           ),
-        //         ),
-        //       );
-        //     },
-        //   ),
-        // ],
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 16.0),
+            child: Center(
+              child: BounceTap(
+                onTap: () {
+                  HapticFeedback.lightImpact();
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const PlansPage(),
+                    ),
+                  );
+                },
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: context.surfacePrimary,
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.04),
+                    ),
+                  ),
+                  child: const Icon(
+                    Icons.event_outlined,
+                    color: Colors.white70,
+                    size: 20,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(60),
           child: Padding(

@@ -13,7 +13,6 @@ import 'package:connect/Pages/OtherProfilesPage.dart';
 import 'package:connect/Pages/yet_to_be_built_profile_page.dart';
 import 'package:connect/Pages/IndividualChatPage.dart';
 import 'package:connect/Pages/Tribe/TribeChatPage.dart';
-import 'package:connect/Pages/PlansPage.dart';
 import 'package:connect/Providers/profile_provider.dart';
 import 'package:connect/Providers/connection_provider.dart';
 import 'package:connect/Providers/chat_provider.dart';
@@ -474,7 +473,7 @@ void handleLocalNotificationClickPayload(String payload) {
     final data = jsonDecode(payload);
     final action = data['action'] as String?;
     if (action == 'complete_profile') {
-      appShellKey.currentState?.setSelectedIndex(5);
+      appShellKey.currentState?.setSelectedIndex(4);
       return;
     }
     if (action == 'new_pulse') {
@@ -3108,8 +3107,7 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
       const DirectMessagesHubPage(), // index 1 — Message (Chats)
       const OtherProfilesPage(), // index 2 — Mandal / Connections
       const YourNetworkPage(), // index 3 — Your Network
-      const PlansPage(), // index 4 — Plans
-      const YetToBeBuiltProfilePage(), // index 5 — My Card
+      const YetToBeBuiltProfilePage(), // index 4 — My Card
     ];
     _setupNotificationTapListeners();
     _initShareReceiver();
@@ -3277,7 +3275,7 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
                   ignoring: _dismissedProfileNudge,
                   child: ProfileNudgeBanner(
                     onOpenProfile: () {
-                      setSelectedIndex(5);
+                      setSelectedIndex(4);
                     },
                     onDismiss: _handleDismissProfileNudge,
                   ),
@@ -3336,8 +3334,7 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
                       index: 1, icon: Icons.chat_bubble_outline_rounded),
                   _buildNavItem(index: 2, icon: Icons.people_outline_rounded),
                   _buildNavItem(index: 3, icon: Icons.search_rounded),
-                  _buildNavItem(index: 4, icon: Icons.event_outlined),
-                  _buildNavItem(index: 5, icon: Icons.person_outline_rounded),
+                  _buildNavItem(index: 4, icon: Icons.person_outline_rounded),
                 ],
               ),
             ),

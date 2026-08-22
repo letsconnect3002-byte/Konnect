@@ -44,7 +44,7 @@ class _PlansPageState extends State<PlansPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.transparent,
+      backgroundColor: context.canvasBackground,
       body: SafeArea(
         bottom: false,
         child: Column(
@@ -75,12 +75,41 @@ class _PlansPageState extends State<PlansPage> {
   }
 
   Widget _buildHeader() {
+    final canPop = Navigator.canPop(context);
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text('Plans', style: AppTypography.displayHeader),
+          Row(
+            children: [
+              if (canPop) ...[
+                GestureDetector(
+                  onTap: () {
+                    HapticFeedback.lightImpact();
+                    Navigator.pop(context);
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.all(8),
+                    margin: const EdgeInsets.only(right: 12),
+                    decoration: BoxDecoration(
+                      color: context.surfacePrimary,
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.04),
+                      ),
+                    ),
+                    child: Icon(
+                      Icons.arrow_back_ios_new_rounded,
+                      color: context.textPrimary,
+                      size: 16,
+                    ),
+                  ),
+                ),
+              ],
+              Text('Plans', style: AppTypography.displayHeader),
+            ],
+          ),
           GestureDetector(
             onTap: _openCreatePlanSheet,
             child: Container(
@@ -90,7 +119,8 @@ class _PlansPageState extends State<PlansPage> {
                 color: AppColors.accentPrimary,
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: const Icon(Icons.add_rounded, color: Colors.white, size: 22),
+              child:
+                  const Icon(Icons.add_rounded, color: Colors.white, size: 22),
             ),
           ),
         ],
@@ -239,8 +269,18 @@ class _PlansPageState extends State<PlansPage> {
 
   String _monthName(int month) {
     const months = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec'
     ];
     return months[month - 1];
   }
@@ -291,7 +331,8 @@ class _PlansPageState extends State<PlansPage> {
             // Title row
             Row(
               children: [
-                Text(categoryEmoji(category), style: const TextStyle(fontSize: 20)),
+                Text(categoryEmoji(category),
+                    style: const TextStyle(fontSize: 20)),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
@@ -432,8 +473,7 @@ class _PlansPageState extends State<PlansPage> {
         value: progress,
         minHeight: 3,
         backgroundColor: Colors.white.withValues(alpha: 0.06),
-        valueColor:
-            const AlwaysStoppedAnimation<Color>(Color(0xFF22C55E)),
+        valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF22C55E)),
       ),
     );
   }
