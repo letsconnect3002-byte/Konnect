@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:connect/services/analytics_service.dart';
 
 class SocialLauncher {
   /// Resolves the social media handle or URL dynamically.
@@ -36,6 +37,10 @@ class SocialLauncher {
   /// Resolves and launches the social link in an external application.
   static Future<void> launchSocialLink(
       BuildContext context, String platform, String input) async {
+    AnalyticsService.logEvent(
+      name: 'profile_social_action_clicked',
+      parameters: {'platform': platform.toLowerCase()},
+    );
     final url = getSocialUrl(platform, input);
     if (url.isEmpty) return;
 

@@ -9,6 +9,7 @@ import 'package:connect/Providers/profile_provider.dart';
 import 'package:connect/Providers/connection_provider.dart';
 import 'package:connect/Widgets/post_card.dart';
 import 'package:connect/Widgets/threaded_comment_tree.dart';
+import 'package:connect/services/analytics_service.dart';
 
 class ThreadDetailPage extends StatefulWidget {
   final String rootPostId;
@@ -49,6 +50,10 @@ class _ThreadDetailPageState extends State<ThreadDetailPage> {
     _highlightedPostId = widget.highlightPostId;
     _loadThread();
     _subscribeToThreadRealtime();
+    AnalyticsService.logEvent(
+      name: 'thread_opened',
+      parameters: {'root_post_id': widget.rootPostId},
+    );
   }
 
   void _subscribeToThreadRealtime() {
@@ -338,6 +343,7 @@ class _ThreadDetailPageState extends State<ThreadDetailPage> {
       replyCount: 0,
       degree: 0,
       replyToPostId: target.id,
+      visibility: target.visibility,
     );
 
     // Optimistic UI addition
@@ -353,6 +359,17 @@ class _ThreadDetailPageState extends State<ThreadDetailPage> {
         authorAvatarUrl: profileProvider.avatarUrl,
         replyToPostId: target.id,
         connections: connectionProvider.connections,
+        visibility: target.visibility,
+      );
+      AnalyticsService.logEvent(
+        name: 'thread_reply_submitted',
+        parameters: {
+          'root_post_id': widget.rootPostId,
+          'reply_to_post_id': target.id,
+          'is_nested': target.id != widget.rootPostId ? 1 : 0,
+          'visibility': target.visibility,
+          'char_count': text.length,
+        },
       );
 
       if (mounted) {

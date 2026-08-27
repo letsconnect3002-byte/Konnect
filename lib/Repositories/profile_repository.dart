@@ -122,8 +122,8 @@ class SupabaseProfileRepository implements ProfileRepository {
   Future<Map<String, dynamic>> fetchConnectionDetails(int myUserId, int idToFetch) async {
     final Map<String, dynamic> result = {
       'profile': null,
-      'sharedCardPermission': 'both',
-      'mySharedCardToThem': 'both',
+      'sharedCardPermission': 'casual',
+      'mySharedCardToThem': 'casual',
     };
 
     final profileResponse = await _client
@@ -142,7 +142,7 @@ class SupabaseProfileRepository implements ProfileRepository {
         .eq('connected_user_id', idToFetch)
         .maybeSingle();
     if (connResponse != null) {
-      result['sharedCardPermission'] = connResponse['shared_card'] ?? 'both';
+      result['sharedCardPermission'] = connResponse['shared_card'] ?? 'casual';
     }
 
     // Fetch mySharedCardToThem from user_connections
@@ -156,9 +156,9 @@ class SupabaseProfileRepository implements ProfileRepository {
         .maybeSingle();
     if (rawConn != null) {
       if (myUserId < idToFetch) {
-        result['mySharedCardToThem'] = rawConn['user_1_shared_card'] ?? 'both';
+        result['mySharedCardToThem'] = rawConn['user_1_shared_card'] ?? 'casual';
       } else {
-        result['mySharedCardToThem'] = rawConn['user_2_shared_card'] ?? 'both';
+        result['mySharedCardToThem'] = rawConn['user_2_shared_card'] ?? 'casual';
       }
     }
 

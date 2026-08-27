@@ -69,6 +69,7 @@ class CircleFeedPage extends StatefulWidget {
 
     bool isSubmitting = false;
     bool isPreviewDetached = false;
+    String postVisibility = 'both'; // 'both', 'casual', 'professional'
 
     showModalBottomSheet(
       context: context,
@@ -132,6 +133,57 @@ class CircleFeedPage extends StatefulWidget {
             setSheetState(() {});
           }
 
+          Widget buildAudienceTab(String value, String title, IconData icon) {
+            final isSelected = postVisibility == value;
+            return Expanded(
+              child: GestureDetector(
+                onTap: () {
+                  HapticFeedback.selectionClick();
+                  setSheetState(() => postVisibility = value);
+                },
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  curve: Curves.easeOutCubic,
+                  padding: const EdgeInsets.symmetric(vertical: 7),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(10),
+                    color: isSelected ? context.accentSecondary : Colors.transparent,
+                    boxShadow: isSelected
+                        ? [
+                            BoxShadow(
+                              color: context.accentSecondary.withValues(alpha: 0.3),
+                              blurRadius: 6,
+                              offset: const Offset(0, 2),
+                            )
+                          ]
+                        : null,
+                  ),
+                  alignment: Alignment.center,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        icon,
+                        size: 13,
+                        color: isSelected ? Colors.white : context.textSecondary,
+                      ),
+                      const SizedBox(width: 5),
+                      Text(
+                        title,
+                        style: TextStyle(
+                          color: isSelected ? Colors.white : context.textSecondary,
+                          fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          }
+
           return SingleChildScrollView(
             child: Container(
               padding: EdgeInsets.only(
@@ -186,11 +238,36 @@ class CircleFeedPage extends StatefulWidget {
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    "Shared with your network.",
+                    postVisibility == 'both'
+                        ? "Visible to all connections across your network."
+                        : postVisibility == 'professional'
+                            ? "Visible only to your professional network."
+                            : "Visible only to your casual / personal network.",
                     style:
                         TextStyle(color: context.textSecondary, fontSize: 12),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 14),
+
+                  // Audience Selector Segment
+                  Container(
+                    decoration: BoxDecoration(
+                      color: context.surfaceSecondary,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.05),
+                      ),
+                    ),
+                    padding: const EdgeInsets.all(3),
+                    child: Row(
+                      children: [
+                        buildAudienceTab('both', 'All Circles', Icons.public_rounded),
+                        buildAudienceTab('casual', 'Casual', Icons.coffee_rounded),
+                        buildAudienceTab('professional', 'Professional', Icons.work_rounded),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+
                   TextField(
                     controller: controller,
                     maxLines: 4,
@@ -395,6 +472,16 @@ class CircleFeedPage extends StatefulWidget {
                                   authorName: profileProvider.name,
                                   authorAvatarUrl: profileProvider.avatarUrl,
                                   connections: connections,
+                                  visibility: postVisibility,
+                                );
+                                AnalyticsService.logEvent(
+                                  name: 'post_created',
+                                  parameters: {
+                                    'visibility': postVisibility,
+                                    'char_count': postContent.length,
+                                    'has_link': (activeUrl != null && activeUrl.isNotEmpty) ? 1 : 0,
+                                    'mentions_count': RegExp(r'@[a-zA-Z0-9_]+').allMatches(postContent).length,
+                                  },
                                 );
                                 if (ctx.mounted) Navigator.pop(ctx);
                               } catch (e) {
@@ -670,6 +757,10 @@ class _CircleFeedPageState extends State<CircleFeedPage> {
                             HapticFeedback.selectionClick();
                             setState(() => _onlyFirstDegree = false);
                             setSheetState(() {});
+                            AnalyticsService.logEvent(
+                              name: 'feed_filter_changed',
+                              parameters: {'filter': 'full_network'},
+                            );
                           }
                           Navigator.pop(sheetContext);
                         },
@@ -686,6 +777,10 @@ class _CircleFeedPageState extends State<CircleFeedPage> {
                             HapticFeedback.selectionClick();
                             setState(() => _onlyFirstDegree = true);
                             setSheetState(() {});
+                            AnalyticsService.logEvent(
+                              name: 'feed_filter_changed',
+                              parameters: {'filter': 'inner_circle'},
+                            );
                           }
                           Navigator.pop(sheetContext);
                         },
@@ -1083,6 +1178,10 @@ class _CircleFeedPageState extends State<CircleFeedPage> {
               children: [
                     RefreshIndicator(
                       onRefresh: () async {
+                        AnalyticsService.logEvent(
+                          name: 'feed_refresh_triggered',
+                          parameters: {'trigger': 'pull_to_refresh'},
+                        );
                         final pulseProvider =
                             Provider.of<PulseProvider>(context, listen: false);
                         await Future.wait([
@@ -1302,6 +1401,10 @@ class _CircleFeedPageState extends State<CircleFeedPage> {
                             child: InkWell(
                               onTap: () {
                                 HapticFeedback.mediumImpact();
+                                AnalyticsService.logEvent(
+                                  name: 'feed_refresh_triggered',
+                                  parameters: {'trigger': 'banner_click'},
+                                );
                                 feedProvider.loadNewPosts();
                                 if (_scrollController.hasClients) {
                                   _scrollController.animateTo(

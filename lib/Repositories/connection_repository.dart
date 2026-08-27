@@ -45,11 +45,11 @@ class SupabaseConnectionRepository implements ConnectionRepository {
       connectedIds.add(otherId);
 
       if (id1 == myUserId) {
-        mySharedCardLookup[otherId] = (row['user_1_shared_card'] ?? 'both').toString();
-        sharedCardLookup[otherId] = (row['user_2_shared_card'] ?? 'both').toString();
+        mySharedCardLookup[otherId] = (row['user_1_shared_card'] ?? 'casual').toString();
+        sharedCardLookup[otherId] = (row['user_2_shared_card'] ?? 'casual').toString();
       } else {
-        mySharedCardLookup[otherId] = (row['user_2_shared_card'] ?? 'both').toString();
-        sharedCardLookup[otherId] = (row['user_1_shared_card'] ?? 'both').toString();
+        mySharedCardLookup[otherId] = (row['user_2_shared_card'] ?? 'casual').toString();
+        sharedCardLookup[otherId] = (row['user_1_shared_card'] ?? 'casual').toString();
       }
     }
 
@@ -88,8 +88,8 @@ class SupabaseConnectionRepository implements ConnectionRepository {
             ? List<String>.from(row['card_types'] as List)
             : <String>[],
         'connection_profile_id': profileId,
-        'shared_card': sharedCardLookup[profileId] ?? 'both',
-        'my_shared_card': mySharedCardLookup[profileId] ?? 'both',
+        'shared_card': sharedCardLookup[profileId] ?? 'casual',
+        'my_shared_card': mySharedCardLookup[profileId] ?? 'casual',
         'field_assignments': row['field_assignments'],
       };
     }).toList();

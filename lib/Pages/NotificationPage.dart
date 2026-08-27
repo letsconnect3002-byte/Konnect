@@ -14,6 +14,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:skeletonizer/skeletonizer.dart';
+import 'package:connect/services/analytics_service.dart';
 
 class NotificationPage extends StatefulWidget {
   const NotificationPage({super.key});
@@ -313,6 +314,10 @@ class _NotificationPageState extends State<NotificationPage> {
       child: InkWell(
         onTap: () {
           HapticFeedback.lightImpact();
+          AnalyticsService.logEvent(
+            name: 'notification_item_tapped',
+            parameters: {'type': realType},
+          );
           if (isUnseen) {
             provider.markAsSeen(notification['id'].toString());
           }

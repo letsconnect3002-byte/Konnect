@@ -41,6 +41,7 @@ class _ConnectHubBottomSheetState extends State<ConnectHubBottomSheet>
   QrImage? _qrImage;
   bool _qrGenerationError = false;
   String _selectedShareType = 'casual';
+  String _selectedKeyShareType = 'casual';
   bool _qrGenerated = false;
   bool _dismissSteps = false;
 
@@ -51,6 +52,7 @@ class _ConnectHubBottomSheetState extends State<ConnectHubBottomSheet>
   void initState() {
     super.initState();
     _selectedShareType = widget.initialShareType;
+    _selectedKeyShareType = widget.initialShareType;
     _tabController = TabController(
       length: 2,
       vsync: this,
@@ -116,8 +118,9 @@ class _ConnectHubBottomSheetState extends State<ConnectHubBottomSheet>
     }
   }
 
-  Future<void> _generateInviteCode() async {
+  Future<void> _generateInviteCode([String? typeOverride]) async {
     if (_isGeneratingCode) return;
+    final shareType = typeOverride ?? _selectedKeyShareType;
     setState(() {
       _isGeneratingCode = true;
     });
@@ -125,10 +128,10 @@ class _ConnectHubBottomSheetState extends State<ConnectHubBottomSheet>
     try {
       final profileProvider =
           Provider.of<ProfileProvider>(context, listen: false);
-      final code = await profileProvider.generateInviteCode(_selectedShareType);
+      final code = await profileProvider.generateInviteCode(shareType);
       AnalyticsService.logEvent(
         name: 'invite_code_generated',
-        parameters: {'share_type': _selectedShareType},
+        parameters: {'share_type': shareType},
       );
       if (mounted) {
         setState(() {
@@ -505,9 +508,121 @@ class _ConnectHubBottomSheetState extends State<ConnectHubBottomSheet>
                             _qrGenerated = true;
                           });
                           _initializeQrCode();
-                          if (_generatedInviteCode != null) {
-                            _generateInviteCode();
-                          }
+                          Navigator.pop(context);
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: context.accentPrimary,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                        ),
+                        child: const Text(
+                          "Apply Selection",
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontFamily: 'Inter',
+                            fontSize: 14,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _showKeyOptionsBottomSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return GlassmorphicContainer(
+              borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(AppDimensions.radiusPremiumCard)),
+              border: Border(
+                top: BorderSide(
+                    color: Colors.white.withValues(alpha: 0.04), width: 1),
+              ),
+              padding: EdgeInsets.only(
+                left: 24,
+                right: 24,
+                top: 24,
+                bottom: 24 + MediaQuery.of(context).viewInsets.bottom,
+              ),
+              child: SafeArea(
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Center(
+                        child: Container(
+                          width: 40,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: context.surfaceSecondary,
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      Text(
+                        "Share Identity Options",
+                        style: TextStyle(
+                          color: context.textPrimary,
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          fontFamily: 'Inter',
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        "Select which digital card you want to share with this Private Key:",
+                        style: TextStyle(
+                          color: context.textSecondary,
+                          fontSize: 13,
+                          fontFamily: 'Inter',
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      _buildOptionTile(
+                        title: "Casual Card Only",
+                        subtitle: "Share bio, socials, name & basic details.",
+                        value: "casual",
+                        groupValue: _selectedKeyShareType,
+                        onChanged: (val) {
+                          setModalState(() {
+                            _selectedKeyShareType = val!;
+                          });
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      _buildOptionTile(
+                        title: "Professional Card Only",
+                        subtitle:
+                            "Share company, email, phone & professional bio.",
+                        value: "professional",
+                        groupValue: _selectedKeyShareType,
+                        onChanged: (val) {
+                          setModalState(() {
+                            _selectedKeyShareType = val!;
+                          });
+                        },
+                      ),
+                      const SizedBox(height: 24),
+                      ElevatedButton(
+                        onPressed: () {
+                          _generateInviteCode(_selectedKeyShareType);
                           Navigator.pop(context);
                         },
                         style: ElevatedButton.styleFrom(
@@ -1184,7 +1299,7 @@ class _ConnectHubBottomSheetState extends State<ConnectHubBottomSheet>
                         ),
                         const SizedBox(height: 12),
                         ElevatedButton(
-                          onPressed: _generateInviteCode,
+                          onPressed: () => _showKeyOptionsBottomSheet(context),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: context.accentPrimary,
                             foregroundColor: Colors.white,
@@ -1204,7 +1319,69 @@ class _ConnectHubBottomSheetState extends State<ConnectHubBottomSheet>
                       ],
                     ),
                   )
-                else
+                else ...[
+                  Center(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 12),
+                      margin: const EdgeInsets.only(bottom: 16),
+                      decoration: BoxDecoration(
+                        color: context.surfaceSecondary,
+                        borderRadius: BorderRadius.circular(
+                            AppDimensions.radiusPremiumCard),
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.04),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            width: 8,
+                            height: 8,
+                            decoration: BoxDecoration(
+                              color: context.accentSecondary,
+                              shape: BoxShape.circle,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: context.accentSecondary
+                                      .withValues(alpha: 0.4),
+                                  blurRadius: 6,
+                                  spreadRadius: 2,
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            "Sharing: ${_selectedKeyShareType.toUpperCase()}",
+                            style: context.bodyText.copyWith(
+                                fontWeight: FontWeight.w600, fontSize: 13),
+                          ),
+                          const SizedBox(width: 12),
+                          Container(
+                            width: 1,
+                            height: 14,
+                            color: Colors.white.withValues(alpha: 0.12),
+                          ),
+                          const SizedBox(width: 12),
+                          GestureDetector(
+                            onTap: () => _showKeyOptionsBottomSheet(context),
+                            child: Text(
+                              "Change",
+                              style: TextStyle(
+                                color: context.accentSecondary,
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                                fontFamily: 'Inter',
+                                decoration: TextDecoration.underline,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
@@ -1236,6 +1413,7 @@ class _ConnectHubBottomSheetState extends State<ConnectHubBottomSheet>
                       ),
                     ],
                   ),
+                ],
                 const SizedBox(height: 14),
                 _buildAnimatedConnectionSteps(2),
                 Row(

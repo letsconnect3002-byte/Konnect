@@ -9,6 +9,7 @@ import 'package:connect/Pages/Tribe/TribeDetailsPage.dart';
 import 'package:collection/collection.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:connect/main.dart';
+import 'package:connect/services/analytics_service.dart';
 
 class TribeChatPage extends StatefulWidget {
   final String tribeId;
@@ -127,6 +128,14 @@ class _TribeChatPageState extends State<TribeChatPage> {
         widget.tribeId,
         text,
         replyToId: replyId,
+      );
+      AnalyticsService.logEvent(
+        name: 'tribe_message_sent',
+        parameters: {
+          'tribe_id': widget.tribeId,
+          'has_reply': replyId != null ? 1 : 0,
+          'char_count': text.length,
+        },
       );
       _scrollToBottom();
     } catch (e) {

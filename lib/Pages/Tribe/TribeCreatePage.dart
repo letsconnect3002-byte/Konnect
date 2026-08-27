@@ -7,6 +7,7 @@ import 'package:connect/Providers/tribe_provider.dart';
 import 'package:connect/Pages/Tribe/TribeChatPage.dart';
 import 'package:connect/services/image_upload_service.dart';
 import 'package:connect/Pages/crop_image_page.dart';
+import 'package:connect/services/analytics_service.dart';
 import 'package:uuid/uuid.dart';
 
 class TribeCreatePage extends StatefulWidget {
@@ -129,6 +130,14 @@ class _TribeCreatePageState extends State<TribeCreatePage> {
       );
 
       if (mounted && result != null) {
+        AnalyticsService.logEvent(
+          name: 'tribe_created',
+          parameters: {
+            'tribe_id': result['id']?.toString() ?? '',
+            'visibility': _visibility,
+            'requires_approval': _requiresApproval ? 1 : 0,
+          },
+        );
         Navigator.pop(context); // Pop creation screen
         Navigator.push(
           context,

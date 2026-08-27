@@ -11,6 +11,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:connect/Widgets/network_map.dart';
 import 'package:connect/Widgets/horizontal_connection_map.dart';
 import 'package:connect/Utils/social_launcher.dart';
+import 'package:connect/services/analytics_service.dart';
 import 'dart:ui';
 
 class YourNetworkPage extends StatefulWidget {
@@ -684,6 +685,14 @@ class _YourNetworkPageState extends State<YourNetworkPage> {
                                         onChanged: (val) {
                                           if (userId != null) {
                                             networkProvider.search(userId, val);
+                                          }
+                                          if (val.trim().length >= 3) {
+                                            AnalyticsService.logEvent(
+                                              name: 'network_search_performed',
+                                              parameters: {
+                                                'query_length': val.trim().length,
+                                              },
+                                            );
                                           }
                                         },
                                         style: TextStyle(

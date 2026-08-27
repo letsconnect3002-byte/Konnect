@@ -5,6 +5,7 @@ import 'package:connect/Config/app_theme.dart';
 import 'package:connect/Providers/plans_provider.dart';
 import 'package:connect/Providers/connection_provider.dart';
 import 'package:connect/Widgets/create_plan_sheet.dart';
+import 'package:connect/services/analytics_service.dart';
 
 class PlanDetailPage extends StatefulWidget {
   final String planId;
@@ -47,6 +48,15 @@ class _PlanDetailPageState extends State<PlanDetailPage> {
         _edits = edits;
         _loading = false;
       });
+      if (plan != null) {
+        AnalyticsService.logEvent(
+          name: 'plan_details_viewed',
+          parameters: {
+            'plan_id': widget.planId,
+            'title': plan['title']?.toString() ?? '',
+          },
+        );
+      }
     }
   }
 
@@ -731,6 +741,14 @@ class _PlanDetailPageState extends State<PlanDetailPage> {
         planId: widget.planId,
         status: status,
         declineReason: reason,
+      );
+      AnalyticsService.logEvent(
+        name: 'plan_rsvp_submitted',
+        parameters: {
+          'plan_id': widget.planId,
+          'status': status,
+          'has_decline_reason': (reason != null && reason.isNotEmpty) ? 1 : 0,
+        },
       );
       if (mounted) {
         setState(() {

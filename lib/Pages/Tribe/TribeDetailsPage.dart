@@ -13,6 +13,7 @@ import 'package:connect/Providers/connection_provider.dart';
 import 'package:connect/Providers/notification_provider.dart';
 import 'package:connect/Pages/Tribe/TribeRoleBuilderPage.dart';
 import 'package:connect/Models/mafia_role_details.dart';
+import 'package:connect/services/analytics_service.dart';
 
 class TribeDetailsPage extends StatefulWidget {
   final String tribeId;
@@ -227,6 +228,14 @@ class _TribeDetailsPageState extends State<TribeDetailsPage> {
                                                       widget.tribeId,
                                                       connection['id'] as int,
                                                       role['id'] as String);
+                                                  AnalyticsService.logEvent(
+                                                    name: 'tribe_invite_sent',
+                                                    parameters: {
+                                                      'tribe_id': widget.tribeId,
+                                                      'invitee_id': connection['id'] as int,
+                                                      'role_slug': slug,
+                                                    },
+                                                  );
 
                                                   if (dialogContext.mounted) {
                                                     Navigator.of(dialogContext).pop(true);

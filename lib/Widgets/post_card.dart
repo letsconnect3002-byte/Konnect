@@ -11,6 +11,7 @@ import 'package:connect/Pages/ConnectionProfilePage.dart';
 import 'package:connect/Widgets/referral_intro_sheet.dart';
 import 'package:connect/Widgets/post_engagement_bar.dart';
 import 'package:connect/Widgets/link_preview_card.dart';
+import 'package:connect/services/analytics_service.dart';
 
 class PostCard extends StatelessWidget {
   final FeedPost post;
@@ -926,6 +927,12 @@ class _FormattedPostContent extends StatelessWidget {
                 }).toList();
 
                 if (matches.isNotEmpty) {
+                  AnalyticsService.logEvent(
+                    name: 'profile_viewed_from_mention',
+                    parameters: {
+                      'target_user_id': matches.first['id'] ?? 0,
+                    },
+                  );
                   Navigator.push(
                     context,
                     MaterialPageRoute(

@@ -932,8 +932,8 @@ class ProfileProvider with ChangeNotifier {
     if (currentUserId == null) {
       return {
         'profile': null,
-        'sharedCardPermission': 'both',
-        'mySharedCardToThem': 'both',
+        'sharedCardPermission': 'casual',
+        'mySharedCardToThem': 'casual',
       };
     }
     try {
@@ -943,8 +943,8 @@ class ProfileProvider with ChangeNotifier {
       _setError(e);
       return {
         'profile': null,
-        'sharedCardPermission': 'both',
-        'mySharedCardToThem': 'both',
+        'sharedCardPermission': 'casual',
+        'mySharedCardToThem': 'casual',
       };
     }
   }

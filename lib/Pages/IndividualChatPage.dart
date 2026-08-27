@@ -8,6 +8,7 @@ import 'package:connect/Providers/chat_provider.dart';
 import 'package:connect/Providers/connection_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:connect/Config/app_theme.dart';
+import 'package:connect/services/analytics_service.dart';
 
 class IndividualChatPage extends StatefulWidget {
   final Map<String, dynamic>? connectionData;
@@ -301,6 +302,14 @@ class _IndividualChatPageState extends State<IndividualChatPage>
     } else {
       await _provider.sendChatMessage(roomId: _roomId!, text: text);
     }
+
+    AnalyticsService.logEvent(
+      name: 'dm_message_sent',
+      parameters: {
+        'has_reply': replyMsg != null ? 1 : 0,
+        'char_count': text.length,
+      },
+    );
 
     WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
   }

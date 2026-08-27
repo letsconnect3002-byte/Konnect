@@ -362,6 +362,7 @@ class FeedProvider with ChangeNotifier {
     String? authorAvatarUrl,
     String? replyToPostId,
     List<Map<String, dynamic>>? connections,
+    String visibility = 'both',
   }) async {
     final vId = _viewerId;
     if (vId == null || content.trim().isEmpty) {
@@ -379,6 +380,7 @@ class FeedProvider with ChangeNotifier {
       replyCount: 0,
       degree: 0,
       replyToPostId: replyToPostId,
+      visibility: visibility,
     );
 
     if (replyToPostId == null) {
@@ -391,6 +393,7 @@ class FeedProvider with ChangeNotifier {
         authorId: vId,
         content: content.trim(),
         replyToPostId: replyToPostId,
+        visibility: visibility,
       );
 
       if (replyToPostId == null) {
@@ -552,10 +555,11 @@ class FeedProvider with ChangeNotifier {
         );
       }
 
-      // 4. Send New Post notification to all connected users when creating a top-level post
+      // 4. Send New Post notification to connected users who have matching visibility reach
       if (replyToPostId == null) {
         final Set<int> notifiedUserIds = {authorId, ...mentionedUserIds};
         if (parentAuthorId != null) notifiedUserIds.add(parentAuthorId);
+        final postVis = createdPost.visibility;
 
         for (final conn in targetConnections) {
           final cId = conn['id'] is int
@@ -563,14 +567,21 @@ class FeedProvider with ChangeNotifier {
               : int.tryParse(conn['id']?.toString() ?? '');
 
           if (cId != null && !notifiedUserIds.contains(cId)) {
-            notifiedUserIds.add(cId);
-            await notifRepo.sendFeedNotification(
-              recipientUserId: cId,
-              actorUserId: authorId,
-              type: 'feed_post',
-              postId: createdPost.id,
-              rootPostId: createdPost.id,
-            );
+            final cardType = (conn['my_shared_card'] ?? conn['shared_card'] ?? 'both').toString();
+            final bool isReachable = postVis == 'both' ||
+                cardType == 'both' ||
+                cardType == postVis;
+
+            if (isReachable) {
+              notifiedUserIds.add(cId);
+              await notifRepo.sendFeedNotification(
+                recipientUserId: cId,
+                actorUserId: authorId,
+                type: 'feed_post',
+                postId: createdPost.id,
+                rootPostId: createdPost.id,
+              );
+            }
           }
         }
       }
@@ -901,13 +912,10 @@ class FeedProvider with ChangeNotifier {
           : int.tryParse(newRecord['author_id']?.toString() ?? '');
       final String? replyToPostId = newRecord['reply_to_post_id']?.toString();
 
-      // A top-level post from someone else → flag new posts
+      // A top-level post from someone else → verify reachability before flagging new posts
       if (replyToPostId == null && authorId != null && authorId != vId) {
-        if (!_hasNewPosts) {
-          _hasNewPosts = true;
-          notifyListeners();
-          debugPrint("[FeedProvider] New post flagged from author $authorId");
-        }
+        _checkForNewPosts();
+        fetchUnseenCount();
       }
 
       // A reply to a post in our feed → update reply count inline

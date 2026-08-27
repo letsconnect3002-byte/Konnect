@@ -6,6 +6,7 @@ import 'package:connect/Providers/connection_provider.dart';
 import 'package:connect/Providers/profile_provider.dart';
 import 'package:connect/services/linkrunner_service.dart';
 import 'package:connect/Config/supabase_config.dart';
+import 'package:connect/services/analytics_service.dart';
 
 class ReferralConnectionModal extends StatefulWidget {
   final Map<String, dynamic> referrerProfile;
@@ -355,6 +356,13 @@ class _ReferralConnectionModalState extends State<ReferralConnectionModal> {
                               widget.referrerId.toString(),
                               inviteCode: widget.inviteCode,
                             );
+                            AnalyticsService.logEvent(
+                              name: 'referral_intro_responded',
+                              parameters: {
+                                'referrer_id': widget.referrerId,
+                                'action': 'skipped',
+                              },
+                            );
                             if (context.mounted) Navigator.pop(context);
                           },
                     style: TextButton.styleFrom(
@@ -425,6 +433,13 @@ class _ReferralConnectionModalState extends State<ReferralConnectionModal> {
                               await LinkrunnerService.markReferrerAsProcessed(
                                 widget.referrerId.toString(),
                                 inviteCode: widget.inviteCode,
+                              );
+                              AnalyticsService.logEvent(
+                                name: 'referral_intro_responded',
+                                parameters: {
+                                  'referrer_id': widget.referrerId,
+                                  'action': 'accepted',
+                                },
                               );
 
                               if (context.mounted) {

@@ -10,6 +10,7 @@ import 'package:connect/Utils/profile_field_filter.dart';
 import 'package:connect/Utils/social_launcher.dart';
 import 'package:skeletonizer/skeletonizer.dart';
 import 'package:connect/Config/app_theme.dart';
+import 'package:connect/services/analytics_service.dart';
 
 class ConnectionProfilePage extends StatefulWidget {
   final Map<String, dynamic> profileData;
@@ -50,25 +51,15 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
 
   Map<String, String> get _activeFields {
     if (_sharedCardPermission == 'casual') return _casualFields;
-    if (_sharedCardPermission == 'professional') return _professionalFields;
-
-    // If 'both', show professional fields (no fallback merging)
     return _professionalFields;
   }
 
-  Map<String, String> get _previewFields {
-    if (_sharedCardPermission == 'both') {
-      return _selectedPreviewCardType == 'casual'
-          ? _casualFields
-          : _professionalFields;
-    }
-    return _activeFields;
-  }
+  Map<String, String> get _previewFields => _activeFields;
 
   late final ProfileProvider profileProvider;
   late final ConnectionProvider connectionProvider;
-  String _sharedCardPermission = 'both'; // what they share with me
-  String _mySharedCardToThem = 'both'; // what I share with them
+  String _sharedCardPermission = 'casual'; // what they share with me
+  String _mySharedCardToThem = 'casual'; // what I share with them
 
   @override
   void initState() {
@@ -85,14 +76,23 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
             data['shared_card'] ??
             data['sharedCardPermission'] ??
             data['shared_card_permission'] ??
-            'both')
+            'casual')
         .toString();
     _sharedCardPermission = permission;
     if (permission == 'casual') {
       _selectedPreviewCardType = 'casual';
-    } else if (permission == 'professional') {
+    } else {
       _selectedPreviewCardType = 'professional';
     }
+
+    AnalyticsService.logEvent(
+      name: 'profile_viewed',
+      parameters: {
+        'target_user_id': data['id'] ?? 0,
+        'degree': 1,
+        'shared_card': permission,
+      },
+    );
 
     _fieldAssignments = data['field_assignments'] is Map<String, dynamic>
         ? data['field_assignments'] as Map<String, dynamic>
@@ -1617,10 +1617,6 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
 
   @override
   Widget build(BuildContext context) {
-    final currentPreviewCardType = _sharedCardPermission == 'both'
-        ? _selectedPreviewCardType
-        : _sharedCardPermission;
-
     return Scaffold(
       backgroundColor: context.canvasBackground,
       body: SafeArea(
@@ -1632,45 +1628,6 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // 1. Premium Hero Banner & Avatar Overlay
-                // _buildHeroSection(context),
-
-                // 2. Profile Details Left-aligned
-                // Padding(
-                //   padding: const EdgeInsets.symmetric(horizontal: AppDimensions.marginStandard),
-                //   child: Column(
-                //     crossAxisAlignment: CrossAxisAlignment.start,
-                //     children: [
-                //       Text(
-                //         _name,
-                //         style: context.displayHeader,
-                //       ),
-                //       const SizedBox(height: 4),
-                //       if (_profession.isNotEmpty || _company.isNotEmpty) ...[
-                //         Text(
-                //           _company.isNotEmpty ? "$_profession at $_company" : _profession,
-                //           style: context.bodyText.copyWith(color: context.textSecondary),
-                //         ),
-                //         const SizedBox(height: 8),
-                //       ],
-                //       // Category tag Wrap
-                //       Wrap(
-                //         spacing: 8.0,
-                //         runSpacing: 8.0,
-                //         children: [
-                //           _buildTag("Konnection"),
-                //           if (_sharedCardPermission != 'both')
-                //             _buildTag(_sharedCardPermission.toUpperCase())
-                //           else ...[
-                //             _buildTag("CASUAL"),
-                //             _buildTag("PROFESSIONAL"),
-                //           ],
-                //         ],
-                //       ),
-                //       const SizedBox(height: 24),
-                //     ],
-                //   ),
-                // ),
                 Padding(
                   padding: const EdgeInsets.only(
                     left: AppDimensions.marginStandard,
@@ -1696,11 +1653,6 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
                           child: _buildFrontBackToggle(),
                         ),
                         const SizedBox(height: 16),
-
-                        if (_sharedCardPermission == 'both') ...[
-                          _buildPreviewTabSelector(),
-                          const SizedBox(height: 16),
-                        ],
                         // Business card graphic
                         _buildDigitalCard(),
                         const SizedBox(height: 32),
@@ -1866,7 +1818,7 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
                       ),
                       const SizedBox(height: 12),
 
-                      if (currentPreviewCardType == 'professional') ...[
+                      if (_sharedCardPermission == 'professional') ...[
                         _buildReadOnlyField(
                           label: 'Profession',
                           value: _profession,
@@ -1880,7 +1832,7 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
                       ],
 
                       _buildReadOnlyField(
-                        label: currentPreviewCardType == 'casual'
+                        label: _sharedCardPermission == 'casual'
                             ? 'Email Address'
                             : 'Professional Email',
                         value: _previewFields['email'] ?? '',
@@ -1888,7 +1840,7 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
                       ),
 
                       _buildReadOnlyField(
-                        label: currentPreviewCardType == 'casual'
+                        label: _sharedCardPermission == 'casual'
                             ? 'Phone Number'
                             : 'Professional Phone',
                         value: _previewFields['phoneNumber'] ?? '',
@@ -2023,77 +1975,6 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
     }
 
     return widgets;
-  }
-
-  Widget _buildPreviewTabSelector() {
-    return Container(
-      height: 40,
-      padding: const EdgeInsets.all(3),
-      decoration: BoxDecoration(
-        color: context.surfacePrimary,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: context.surfaceSecondary),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: _buildCardTab(
-              label: 'Casual',
-              icon: Icons.person_outline_rounded,
-              isActive: _selectedPreviewCardType == 'casual',
-              onTap: () => setState(() => _selectedPreviewCardType = 'casual'),
-            ),
-          ),
-          Expanded(
-            child: _buildCardTab(
-              label: 'Professional',
-              icon: Icons.work_outline_rounded,
-              isActive: _selectedPreviewCardType == 'professional',
-              onTap: () =>
-                  setState(() => _selectedPreviewCardType = 'professional'),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCardTab({
-    required String label,
-    required IconData icon,
-    required bool isActive,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: isActive ? context.accentSecondary : Colors.transparent,
-          borderRadius: BorderRadius.circular(17),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              icon,
-              size: 16,
-              color: isActive ? Colors.white : context.textSecondary,
-            ),
-            const SizedBox(width: 6),
-            Text(
-              label,
-              style: TextStyle(
-                color: isActive ? Colors.white : context.textSecondary,
-                fontSize: 13,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
   }
 
   Widget _buildAccessControlSection() {

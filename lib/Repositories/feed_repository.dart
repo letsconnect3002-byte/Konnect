@@ -26,6 +26,7 @@ abstract class FeedRepository {
     required int authorId,
     required String content,
     String? replyToPostId,
+    String visibility = 'both',
   });
 
   Future<void> deletePost({
@@ -220,7 +221,9 @@ class SupabaseFeedRepository implements FeedRepository {
     required int authorId,
     required String content,
     String? replyToPostId,
+    String visibility = 'both',
   }) async {
+    String effectiveVisibility = visibility;
     final Map<String, dynamic> insertData = {
       'author_id': authorId,
       'content': content,
@@ -230,17 +233,21 @@ class SupabaseFeedRepository implements FeedRepository {
       try {
         final parentRes = await _client
             .from('posts')
-            .select('root_post_id')
+            .select('root_post_id, visibility')
             .eq('id', replyToPostId)
             .maybeSingle();
         final String? parentRootId = parentRes?['root_post_id']?.toString();
         insertData['root_post_id'] = (parentRootId != null && parentRootId.isNotEmpty)
             ? parentRootId
             : replyToPostId;
+        if (parentRes?['visibility'] != null) {
+          effectiveVisibility = parentRes!['visibility'].toString();
+        }
       } catch (_) {
         insertData['root_post_id'] = replyToPostId;
       }
     }
+    insertData['visibility'] = effectiveVisibility;
 
     final response = await _client.from('posts').insert(insertData).select().single();
     final Map<String, dynamic> row = Map<String, dynamic>.from(response);
@@ -268,6 +275,7 @@ class SupabaseFeedRepository implements FeedRepository {
       degree: 0, // Own post
       isDeleted: row['is_deleted'] == true,
       replyToPostId: row['reply_to_post_id']?.toString(),
+      visibility: row['visibility']?.toString() ?? effectiveVisibility,
     );
   }
 
@@ -532,7 +540,11 @@ class SupabaseFeedRepository implements FeedRepository {
       int degree = (authorId == viewerId) ? 0 : 1;
       if (authorId != viewerId && viewerId != 0) {
         try {
-          final reachRes = await _client.rpc('get_network_reach', params: {'p_user_id': viewerId});
+          final postVis = response['visibility']?.toString() ?? 'both';
+          final reachRes = await _client.rpc('get_network_reach', params: {
+            'p_viewer_id': viewerId,
+            'p_visibility': postVis,
+          });
           if (reachRes is List) {
             final match = reachRes.firstWhere(
               (item) {

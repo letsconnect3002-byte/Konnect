@@ -1,5 +1,6 @@
 import 'package:connect/Config/app_theme.dart';
 import 'package:connect/Utils/error_handler.dart';
+import 'package:connect/services/analytics_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -38,6 +39,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
       await Supabase.instance.client.auth.updateUser(
         UserAttributes(password: password),
       );
+      AnalyticsService.logEvent(name: 'password_reset_completed');
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

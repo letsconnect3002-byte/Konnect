@@ -278,7 +278,7 @@ class _QRScannerPageState extends State<QRScannerPage> {
             final fetchedData =
                 await profileProvider.fetchProfileDataOnly(idToFetch);
             if (fetchedData.isNotEmpty) {
-              fetchedData['sharedCard'] = decodedData['sharedCard'] ?? 'both';
+              fetchedData['sharedCard'] = decodedData['sharedCard'] ?? 'casual';
             }
 
             setState(() {
@@ -312,7 +312,7 @@ class _QRScannerPageState extends State<QRScannerPage> {
               }
             }
           } else {
-            decodedData['sharedCard'] = decodedData['sharedCard'] ?? 'both';
+            decodedData['sharedCard'] = decodedData['sharedCard'] ?? 'casual';
             if (mounted) {
               Navigator.push(
                 context,

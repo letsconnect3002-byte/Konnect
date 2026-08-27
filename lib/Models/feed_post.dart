@@ -14,6 +14,7 @@ class FeedPost {
   final String? replyToPostId;
   final String? userReaction;
   final Map<String, int> reactionCounts;
+  final String visibility; // 'casual', 'professional', 'both'
 
   FeedPost({
     required this.id,
@@ -29,6 +30,7 @@ class FeedPost {
     this.replyToPostId,
     this.userReaction,
     this.reactionCounts = const {},
+    this.visibility = 'both',
   }) : activeReplyCount = activeReplyCount ?? replyCount;
 
 
@@ -96,6 +98,7 @@ class FeedPost {
       replyToPostId: json['reply_to_post_id']?.toString(),
       userReaction: json['user_reaction']?.toString(),
       reactionCounts: parsedReactionCounts,
+      visibility: json['visibility']?.toString() ?? 'both',
     );
   }
 
@@ -137,6 +140,7 @@ class FeedPost {
       replyToPostId: json['reply_to_post_id']?.toString(),
       userReaction: json['user_reaction']?.toString(),
       reactionCounts: parsedReactionCounts,
+      visibility: json['visibility']?.toString() ?? 'both',
     );
   }
 
@@ -155,6 +159,7 @@ class FeedPost {
     String? userReaction,
     bool nullifyUserReaction = false,
     Map<String, int>? reactionCounts,
+    String? visibility,
   }) {
     final int newReplyCount = replyCount ?? this.replyCount;
     final int newActiveReplyCount = activeReplyCount ??
@@ -173,6 +178,7 @@ class FeedPost {
       replyToPostId: replyToPostId ?? this.replyToPostId,
       userReaction: nullifyUserReaction ? null : (userReaction ?? this.userReaction),
       reactionCounts: reactionCounts ?? this.reactionCounts,
+      visibility: visibility ?? this.visibility,
     );
   }
 
@@ -192,6 +198,7 @@ class FeedPost {
         other.isDeleted == isDeleted &&
         other.replyToPostId == replyToPostId &&
         other.userReaction == userReaction &&
+        other.visibility == visibility &&
         mapEquals(other.reactionCounts, reactionCounts);
   }
 
@@ -202,6 +209,7 @@ class FeedPost {
         userReaction,
         replyCount,
         activeReplyCount,
+        visibility,
         Object.hashAll(reactionCounts.entries.map((e) => Object.hash(e.key, e.value))),
       );
 }

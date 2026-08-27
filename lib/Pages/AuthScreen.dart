@@ -9,6 +9,7 @@ import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:connect/Config/app_theme.dart';
 import 'package:connect/Utils/error_handler.dart';
+import 'package:connect/services/analytics_service.dart';
 
 class AuthScreen extends StatefulWidget {
   final bool initialIsSignIn;
@@ -77,6 +78,10 @@ class _AuthScreenState extends State<AuthScreen> {
           email: email,
           password: password,
         );
+        AnalyticsService.logEvent(
+          name: 'login_completed',
+          parameters: {'method': 'email'},
+        );
       } else {
         // Sign Up
         final confirmPassword = _confirmPasswordController.text.trim();
@@ -90,6 +95,10 @@ class _AuthScreenState extends State<AuthScreen> {
           data: {
             'gender': _selectedGender,
           },
+        );
+        AnalyticsService.logEvent(
+          name: 'signup_completed',
+          parameters: {'method': 'email'},
         );
 
         if (mounted) {
@@ -156,6 +165,10 @@ class _AuthScreenState extends State<AuthScreen> {
         type: OtpType.signup,
         token: token,
         email: email,
+      );
+      AnalyticsService.logEvent(
+        name: 'signup_verified',
+        parameters: {'method': 'email_otp'},
       );
 
       if (mounted) {
@@ -249,6 +262,10 @@ class _AuthScreenState extends State<AuthScreen> {
       );
       debugPrint(
           '[Google Sign-In] Supabase sign-in response received. User email: ${authResponse.user?.email}');
+      AnalyticsService.logEvent(
+        name: 'login_completed',
+        parameters: {'method': 'google'},
+      );
 
       if (mounted) {
         setState(() => _isLoading = false);
@@ -367,11 +384,19 @@ class _AuthScreenState extends State<AuthScreen> {
           provider: OAuthProvider.apple,
           idToken: idToken,
         );
+        AnalyticsService.logEvent(
+          name: 'login_completed',
+          parameters: {'method': 'apple'},
+        );
       } else {
         // Web-based Apple Sign-In on Android/Web
         await Supabase.instance.client.auth.signInWithOAuth(
           OAuthProvider.apple,
           redirectTo: 'connectapp://login-callback',
+        );
+        AnalyticsService.logEvent(
+          name: 'login_completed',
+          parameters: {'method': 'apple_web'},
         );
       }
 

@@ -1947,6 +1947,9 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
             } else if (type == "feed_mention") {
               title = "New Mention";
               body = "$actorName mentioned you on their post.";
+            } else if (type == "feed_post") {
+              title = "New Post";
+              body = "$actorName shared a new post with your network.";
             }
           } else {
             title = "New Connection";
@@ -2987,6 +2990,19 @@ class _AppShellGateState extends State<AppShellGate> {
                       }
                       title = "Mafia Approved";
                       body = "Your request to join \"$tribeName\" was approved";
+                    } else if (type == "feed_reply_mention") {
+                      title = "New Reply & Mention";
+                      body =
+                          "$actorName replied to your post and mentioned you on their post.";
+                    } else if (type == "feed_reply") {
+                      title = "New Reply";
+                      body = "$actorName replied to your post.";
+                    } else if (type == "feed_mention") {
+                      title = "New Mention";
+                      body = "$actorName mentioned you on their post.";
+                    } else if (type == "feed_post") {
+                      title = "New Post";
+                      body = "$actorName shared a new post with your network.";
                     }
                   } else {
                     title = "New Connection";
