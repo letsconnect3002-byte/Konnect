@@ -21,6 +21,21 @@ abstract class NotificationRepository {
     required String type,
     required String postId,
     required String rootPostId,
+    String? parentAuthorName,
+    String? replySnippet,
+  });
+  Future<void> sendBatchFeedNotifications({
+    required List<int> recipientUserIds,
+    required int actorUserId,
+    required String type,
+    required String postId,
+    required String rootPostId,
+    String? parentAuthorName,
+    String? replySnippet,
+  });
+  Future<Set<int>> getRecentNotifiedUserIdsForThread({
+    required String rootPostId,
+    required List<int> candidateUserIds,
   });
   Future<void> markAsSeen(String notificationId);
   Future<void> updateNotificationNote(String notificationId, String newNote);
@@ -179,14 +194,24 @@ class SupabaseNotificationRepository implements NotificationRepository {
     required String type,
     required String postId,
     required String rootPostId,
+    String? parentAuthorName,
+    String? replySnippet,
   }) async {
     if (recipientUserId == actorUserId) return;
 
-    final noteJson = jsonEncode({
+    final Map<String, dynamic> noteMap = {
       'real_type': type,
       'post_id': postId,
       'root_post_id': rootPostId,
-    });
+    };
+    if (parentAuthorName != null && parentAuthorName.isNotEmpty) {
+      noteMap['parent_author_name'] = parentAuthorName;
+    }
+    if (replySnippet != null && replySnippet.isNotEmpty) {
+      noteMap['reply_snippet'] = replySnippet;
+    }
+
+    final noteJson = jsonEncode(noteMap);
 
     await _client.from('connection_notifications').insert({
       'user_id': recipientUserId,
@@ -195,6 +220,71 @@ class SupabaseNotificationRepository implements NotificationRepository {
       'note': noteJson,
       'is_seen': false,
     });
+  }
+
+  @override
+  Future<void> sendBatchFeedNotifications({
+    required List<int> recipientUserIds,
+    required int actorUserId,
+    required String type,
+    required String postId,
+    required String rootPostId,
+    String? parentAuthorName,
+    String? replySnippet,
+  }) async {
+    if (recipientUserIds.isEmpty) return;
+
+    final Map<String, dynamic> noteMap = {
+      'real_type': type,
+      'post_id': postId,
+      'root_post_id': rootPostId,
+    };
+    if (parentAuthorName != null && parentAuthorName.isNotEmpty) {
+      noteMap['parent_author_name'] = parentAuthorName;
+    }
+    if (replySnippet != null && replySnippet.isNotEmpty) {
+      noteMap['reply_snippet'] = replySnippet;
+    }
+    final noteJson = jsonEncode(noteMap);
+
+    final rows = recipientUserIds
+        .where((id) => id != actorUserId)
+        .map((recipientId) => {
+              'user_id': recipientId,
+              'other_user_id': actorUserId,
+              'type': type,
+              'note': noteJson,
+              'is_seen': false,
+            })
+        .toList();
+
+    if (rows.isNotEmpty) {
+      await _client.from('connection_notifications').insert(rows);
+    }
+  }
+
+  @override
+  Future<Set<int>> getRecentNotifiedUserIdsForThread({
+    required String rootPostId,
+    required List<int> candidateUserIds,
+  }) async {
+    if (candidateUserIds.isEmpty) return {};
+    try {
+      final since = DateTime.now().subtract(const Duration(hours: 24)).toUtc().toIso8601String();
+      final res = await _client
+          .from('connection_notifications')
+          .select('user_id')
+          .inFilter('user_id', candidateUserIds)
+          .like('note', '%"root_post_id":"$rootPostId"%')
+          .gte('created_at', since);
+      final list = res as List;
+      return list
+          .map((r) => r['user_id'] is int ? r['user_id'] as int : int.tryParse(r['user_id']?.toString() ?? ''))
+          .whereType<int>()
+          .toSet();
+    } catch (_) {
+      return {};
+    }
   }
 
   @override

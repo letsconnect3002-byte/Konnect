@@ -33,6 +33,7 @@ serve(async (req) => {
     let realType = type
     let postId = ""
     let rootPostId = ""
+    let parentAuthorName = "a post"
 
     if (note && note.startsWith("{")) {
       try {
@@ -40,13 +41,14 @@ serve(async (req) => {
         if (parsed.real_type) realType = parsed.real_type
         if (parsed.post_id) postId = String(parsed.post_id)
         if (parsed.root_post_id) rootPostId = String(parsed.root_post_id)
+        if (parsed.parent_author_name) parentAuthorName = String(parsed.parent_author_name)
       } catch (e) {
         console.error("Error parsing feed notification note JSON:", e)
       }
     }
 
     // Only process feed notification types
-    const validFeedTypes = ["feed_reply", "feed_mention", "feed_reply_mention", "feed_post"]
+    const validFeedTypes = ["feed_reply", "feed_mention", "feed_reply_mention", "feed_post", "feed_connection_reply"]
     if (!validFeedTypes.includes(type) && !validFeedTypes.includes(realType)) {
       return new Response("Not a feed notification type, skipped", { status: 200 })
     }
@@ -80,6 +82,9 @@ serve(async (req) => {
     } else if (realType === "feed_post") {
       title = "New Post"
       bodyText = `${actorName} has uploaded a post, tap to see`
+    } else if (realType == "feed_connection_reply") {
+      title = `${actorName} joined a conversation`
+      bodyText = `${actorName} replied to ${parentAuthorName}, tap to join the conversation.`
     }
 
     // 4. Fetch recipient FCM tokens

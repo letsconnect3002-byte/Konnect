@@ -274,6 +274,7 @@ class _NotificationPageState extends State<NotificationPage> {
         notification['postId']?.toString() ??
         '';
     String realType = type;
+    String parentAuthorName = 'a post';
     final String? rawNote = notification['note'] as String?;
     if (rawNote != null && rawNote.startsWith('{')) {
       try {
@@ -284,6 +285,9 @@ class _NotificationPageState extends State<NotificationPage> {
         }
         if (parsed['post_id'] != null && targetPostId.isEmpty) {
           targetPostId = parsed['post_id'].toString();
+        }
+        if (parsed['parent_author_name'] != null) {
+          parentAuthorName = parsed['parent_author_name'].toString();
         }
       } catch (_) {}
     }
@@ -303,6 +307,9 @@ class _NotificationPageState extends State<NotificationPage> {
     } else if (realType == 'feed_post') {
       actionText = 'has uploaded a post, tap to see.';
       iconData = Icons.dynamic_feed_rounded;
+    } else if (realType == 'feed_connection_reply') {
+      actionText = 'replied to $parentAuthorName, tap to join the conversation.';
+      iconData = Icons.forum_outlined;
     }
 
     return Dismissible(
@@ -441,7 +448,8 @@ class _NotificationPageState extends State<NotificationPage> {
     if (type == 'feed_reply' ||
         type == 'feed_mention' ||
         type == 'feed_reply_mention' ||
-        type == 'feed_post') {
+        type == 'feed_post' ||
+        type == 'feed_connection_reply') {
       return _buildFeedNotificationItem(notification, provider);
     }
     if (type == 'tribe_invite' ||

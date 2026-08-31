@@ -45,7 +45,7 @@ serve(async (req) => {
         if (parsed.real_type) checkRealType = parsed.real_type
       } catch (_) {}
     }
-    const feedTypes = ["feed_reply", "feed_mention", "feed_reply_mention"]
+    const feedTypes = ["feed_reply", "feed_mention", "feed_reply_mention", "feed_post", "feed_connection_reply"]
     if (feedTypes.includes(type) || feedTypes.includes(checkRealType)) {
       console.log("Skipping feed notification in send-connection-notification-push (handled by send-feed-notification-push).")
       return new Response("Feed notification handled by send-feed-notification-push", { status: 200 })

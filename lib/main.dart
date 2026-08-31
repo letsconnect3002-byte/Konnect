@@ -1950,6 +1950,16 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
             } else if (type == "feed_post") {
               title = "New Post";
               body = "$actorName shared a new post with your network.";
+            } else if (type == "feed_connection_reply") {
+              String parentAuthorName = "a post";
+              if (note != null && note.startsWith('{')) {
+                try {
+                  final parsed = jsonDecode(note);
+                  parentAuthorName = parsed['parent_author_name']?.toString() ?? "a post";
+                } catch (_) {}
+              }
+              title = "$actorName joined a conversation";
+              body = "$actorName replied to $parentAuthorName, tap to join the conversation.";
             }
           } else {
             title = "New Connection";
@@ -3003,6 +3013,16 @@ class _AppShellGateState extends State<AppShellGate> {
                     } else if (type == "feed_post") {
                       title = "New Post";
                       body = "$actorName shared a new post with your network.";
+                    } else if (type == "feed_connection_reply") {
+                      String parentAuthorName = "a post";
+                      if (note != null && note.startsWith('{')) {
+                        try {
+                          final parsed = jsonDecode(note);
+                          parentAuthorName = parsed['parent_author_name']?.toString() ?? "a post";
+                        } catch (_) {}
+                      }
+                      title = "$actorName joined a conversation";
+                      body = "$actorName replied to $parentAuthorName, tap to join the conversation.";
                     }
                   } else {
                     title = "New Connection";

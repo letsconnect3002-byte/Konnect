@@ -175,20 +175,37 @@ class SupabaseFeedRepository implements FeedRepository {
         }
       }
 
+      final int totalActiveThreadReplies =
+          result.where((p) => p.id != rootPostId && !p.isDeleted).length;
+
       result = result.map((post) {
-        final int computedReplyCount = childCountMap[post.id] ??
-            (post.id == rootPostId ? post.replyCount : 0);
-        FeedPost updated = post;
-        if (post.id != rootPostId || computedReplyCount > 0) {
-          updated = updated.copyWith(
-            replyCount: computedReplyCount,
-            activeReplyCount: computedReplyCount,
+        if (post.id == rootPostId) {
+          // For root post: replyCount and activeReplyCount should represent total replies in the thread
+          final int effectiveRootReplyCount = totalActiveThreadReplies > 0
+              ? totalActiveThreadReplies
+              : (post.activeReplyCount > 0
+                  ? post.activeReplyCount
+                  : post.replyCount);
+          FeedPost updated = post.copyWith(
+            replyCount: effectiveRootReplyCount,
+            activeReplyCount: effectiveRootReplyCount,
           );
+          if (viewerId != null && updated.authorId == viewerId) {
+            updated = updated.copyWith(degree: 0);
+          }
+          return updated;
+        } else {
+          // For replies: replyCount is the direct child count
+          final int computedChildReplies = childCountMap[post.id] ?? 0;
+          FeedPost updated = post.copyWith(
+            replyCount: computedChildReplies,
+            activeReplyCount: computedChildReplies,
+          );
+          if (viewerId != null && updated.authorId == viewerId) {
+            updated = updated.copyWith(degree: 0);
+          }
+          return updated;
         }
-        if (viewerId != null && updated.authorId == viewerId) {
-          updated = updated.copyWith(degree: 0);
-        }
-        return updated;
       }).toList();
 
       return result;

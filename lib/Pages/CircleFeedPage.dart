@@ -1709,20 +1709,27 @@ class _FeedPostThreadItemState extends State<_FeedPostThreadItem> {
       if (_treeNode != null) {
         final feedProvider = Provider.of<FeedProvider>(context, listen: false);
 
-        CommentNode syncNodeWithLivePost(CommentNode node) {
+        CommentNode syncNodeWithLivePost(CommentNode node, {bool isRoot = false}) {
           final livePost = feedProvider.getPostById(node.id) ?? node.post;
+          final int effectiveCount = isRoot
+              ? ((livePost != null && livePost.activeReplyCount > 0)
+                  ? livePost.activeReplyCount
+                  : node.replyCount)
+              : node.replyCount;
           final updatedPost = livePost?.copyWith(
-            replyCount: node.replyCount,
-            activeReplyCount: node.replyCount,
+            replyCount: effectiveCount,
+            activeReplyCount: effectiveCount,
           );
           return node.copyWith(
             post: updatedPost,
-            replyCount: node.replyCount,
-            replies: node.replies.map(syncNodeWithLivePost).toList(),
+            replyCount: effectiveCount,
+            replies: node.replies
+                .map((child) => syncNodeWithLivePost(child, isRoot: false))
+                .toList(),
           );
         }
 
-        _treeNode = syncNodeWithLivePost(_treeNode!);
+        _treeNode = syncNodeWithLivePost(_treeNode!, isRoot: true);
       }
     });
 
@@ -1794,8 +1801,13 @@ class _FeedPostThreadItemState extends State<_FeedPostThreadItem> {
             );
           }
 
-          final activeCount = widget.post.activeReplyCount;
-          final int effectiveDegree = (rootPost.degree != 0 || rootPost.authorId == feedProvider.viewerId)
+          final int activeCount = (rootPost.activeReplyCount > 0)
+              ? rootPost.activeReplyCount
+              : (widget.post.activeReplyCount > 0
+                  ? widget.post.activeReplyCount
+                  : replyPosts.length);
+          final int effectiveDegree = (rootPost.degree != 0 ||
+                  rootPost.authorId == feedProvider.viewerId)
               ? rootPost.degree
               : widget.post.degree;
           final updatedRootPost = rootPost.copyWith(
