@@ -31,6 +31,7 @@ class ThreadDetailPage extends StatefulWidget {
 
 class _ThreadDetailPageState extends State<ThreadDetailPage> {
   final TextEditingController _replyController = TextEditingController();
+  final FocusNode _replyFocusNode = FocusNode();
   bool _isLoading = true;
   List<FeedPost> _threadPosts = [];
   FeedPost? _replyingToTarget;
@@ -164,6 +165,7 @@ class _ThreadDetailPageState extends State<ThreadDetailPage> {
     if (_threadChannel != null) {
       Supabase.instance.client.removeChannel(_threadChannel!);
     }
+    _replyFocusNode.dispose();
     _replyController.dispose();
     super.dispose();
   }
@@ -523,11 +525,13 @@ class _ThreadDetailPageState extends State<ThreadDetailPage> {
                                   setState(() {
                                     _replyingToTarget = rootPost;
                                   });
+                                  _replyFocusNode.requestFocus();
                                 },
                                 onCommentTap: () {
                                   setState(() {
                                     _replyingToTarget = rootPost;
                                   });
+                                  _replyFocusNode.requestFocus();
                                 },
                               ),
                             );
@@ -598,6 +602,7 @@ class _ThreadDetailPageState extends State<ThreadDetailPage> {
                                       setState(() {
                                         _replyingToTarget = targetPost;
                                       });
+                                      _replyFocusNode.requestFocus();
                                     }
                                   },
                                   onCommentTap: (node) {
@@ -629,6 +634,7 @@ class _ThreadDetailPageState extends State<ThreadDetailPage> {
                                       setState(() {
                                         _replyingToTarget = targetPost;
                                       });
+                                      _replyFocusNode.requestFocus();
                                     }
                                   },
                                 ),
@@ -685,6 +691,7 @@ class _ThreadDetailPageState extends State<ThreadDetailPage> {
                           Expanded(
                             child: TextField(
                               controller: _replyController,
+                              focusNode: _replyFocusNode,
                               maxLines: null,
                               maxLength: 500,
                               style: TextStyle(color: context.textPrimary, fontSize: 14),
