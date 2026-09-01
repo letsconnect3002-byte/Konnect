@@ -316,10 +316,13 @@ class _ThreadNodeWidgetState extends State<_ThreadNodeWidget>
   @override
   void initState() {
     super.initState();
-    if (widget.initialExpandPostId != null &&
-        (widget.comment.id == widget.initialExpandPostId ||
-            _hasDescendantWithId(widget.comment, widget.initialExpandPostId))) {
-      _isExpanded = true;
+    if (widget.initialExpandPostId != null) {
+      if (widget.isRootNode || widget.allowNestedExpansion) {
+        if (widget.comment.id == widget.initialExpandPostId ||
+            _hasDescendantWithId(widget.comment, widget.initialExpandPostId)) {
+          _isExpanded = true;
+        }
+      }
     }
     _updateKeys();
     WidgetsBinding.instance.addPostFrameCallback((_) => _computeOffsets());

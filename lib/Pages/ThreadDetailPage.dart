@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:connect/Config/app_theme.dart';
@@ -10,6 +11,75 @@ import 'package:connect/Providers/connection_provider.dart';
 import 'package:connect/Widgets/post_card.dart';
 import 'package:connect/Widgets/threaded_comment_tree.dart';
 import 'package:connect/services/analytics_service.dart';
+
+class _MentionTextEditingController extends TextEditingController {
+  Color accentColor;
+  List<String> connectionNames;
+
+  _MentionTextEditingController({
+    required this.accentColor,
+    required this.connectionNames,
+    String? text,
+  }) : super(text: text);
+
+  @override
+  TextSpan buildTextSpan({
+    required BuildContext context,
+    TextStyle? style,
+    required bool withComposing,
+  }) {
+    final textVal = text;
+    if (textVal.isEmpty) {
+      return TextSpan(style: style);
+    }
+
+    final sortedNames = List<String>.from(connectionNames)
+      ..sort((a, b) => b.length.compareTo(a.length));
+    final escapedNames = sortedNames.map((n) => RegExp.escape(n)).join('|');
+
+    final String pattern = escapedNames.isNotEmpty
+        ? r'@(' + escapedNames + r'|[A-Za-z0-9_\-\.]+)'
+        : r'@[A-Za-z0-9_\-\.]+';
+
+    final RegExp mentionRegex = RegExp(pattern, caseSensitive: false);
+    final matches = mentionRegex.allMatches(textVal);
+
+    final List<InlineSpan> children = [];
+    int lastIndex = 0;
+
+    for (final match in matches) {
+      if (match.start > lastIndex) {
+        children.add(TextSpan(
+          text: textVal.substring(lastIndex, match.start),
+          style: style,
+        ));
+      }
+
+      children.add(TextSpan(
+        text: match.group(0),
+        style: style?.copyWith(
+              color: accentColor,
+              fontWeight: FontWeight.bold,
+            ) ??
+            TextStyle(
+              color: accentColor,
+              fontWeight: FontWeight.bold,
+            ),
+      ));
+
+      lastIndex = match.end;
+    }
+
+    if (lastIndex < textVal.length) {
+      children.add(TextSpan(
+        text: textVal.substring(lastIndex),
+        style: style,
+      ));
+    }
+
+    return TextSpan(style: style, children: children);
+  }
+}
 
 class ThreadDetailPage extends StatefulWidget {
   final String rootPostId;
@@ -30,7 +100,7 @@ class ThreadDetailPage extends StatefulWidget {
 }
 
 class _ThreadDetailPageState extends State<ThreadDetailPage> {
-  final TextEditingController _replyController = TextEditingController();
+  late final _MentionTextEditingController _replyController;
   final FocusNode _replyFocusNode = FocusNode();
   bool _isLoading = true;
   List<FeedPost> _threadPosts = [];
@@ -39,6 +109,7 @@ class _ThreadDetailPageState extends State<ThreadDetailPage> {
   bool _isSubmitting = false;
   RealtimeChannel? _threadChannel;
 
+  late String _currentRootPostId;
   String? _highlightedPostId;
   Timer? _highlightTimer;
   final Map<String, GlobalKey> _itemKeys = {};
@@ -48,6 +119,14 @@ class _ThreadDetailPageState extends State<ThreadDetailPage> {
   @override
   void initState() {
     super.initState();
+    _currentRootPostId = widget.rootPostId;
+    _replyController = _MentionTextEditingController(
+      accentColor: const Color(0xFF6366F1),
+      connectionNames: [],
+    );
+    _replyController.addListener(() {
+      if (mounted) setState(() {});
+    });
     _highlightedPostId = widget.highlightPostId;
     _loadThread();
     _subscribeToThreadRealtime();
@@ -57,6 +136,19 @@ class _ThreadDetailPageState extends State<ThreadDetailPage> {
     );
   }
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final connectionProvider =
+        Provider.of<ConnectionProvider>(context, listen: false);
+    final names = connectionProvider.connections
+        .map((c) => (c['name'] ?? '').toString().trim())
+        .where((n) => n.isNotEmpty)
+        .toList();
+    _replyController.connectionNames = names;
+    _replyController.accentColor = context.accentPrimary;
+  }
+
   void _subscribeToThreadRealtime() {
     final client = Supabase.instance.client;
     if (_threadChannel != null) {
@@ -64,7 +156,7 @@ class _ThreadDetailPageState extends State<ThreadDetailPage> {
       _threadChannel = null;
     }
 
-    _threadChannel = client.channel('thread:${widget.rootPostId}');
+    _threadChannel = client.channel('thread:$_currentRootPostId');
 
     void handleReactionChange(String eventType, Map<String, dynamic> newRecord,
         Map<String, dynamic> oldRecord) {
@@ -101,7 +193,7 @@ class _ThreadDetailPageState extends State<ThreadDetailPage> {
           filter: PostgresChangeFilter(
             type: PostgresChangeFilterType.eq,
             column: 'id',
-            value: widget.rootPostId,
+            value: _currentRootPostId,
           ),
           callback: (payload) {
             if (mounted) _loadThread();
@@ -114,7 +206,7 @@ class _ThreadDetailPageState extends State<ThreadDetailPage> {
           filter: PostgresChangeFilter(
             type: PostgresChangeFilterType.eq,
             column: 'root_post_id',
-            value: widget.rootPostId,
+            value: _currentRootPostId,
           ),
           callback: (payload) {
             if (mounted) _loadThread();
@@ -174,30 +266,55 @@ class _ThreadDetailPageState extends State<ThreadDetailPage> {
     final currentRequestId = ++_loadRequestId;
     final feedProvider = Provider.of<FeedProvider>(context, listen: false);
     try {
-      final posts = await feedProvider.fetchThread(widget.rootPostId);
+      var posts = await feedProvider.fetchThread(_currentRootPostId);
+
+      // If a nested reply was highlighted, resolve its immediate parent as the sub-thread root
+      if (widget.highlightPostId != null &&
+          widget.highlightPostId!.isNotEmpty &&
+          widget.highlightPostId != _currentRootPostId) {
+        final targetPost =
+            posts.where((p) => p.id == widget.highlightPostId).firstOrNull;
+
+        if (targetPost != null &&
+            targetPost.replyToPostId != null &&
+            targetPost.replyToPostId!.isNotEmpty &&
+            targetPost.replyToPostId != _currentRootPostId) {
+          final parentId = targetPost.replyToPostId!;
+          final subPosts = await feedProvider.fetchThread(parentId);
+          if (subPosts.isNotEmpty) {
+            posts = subPosts;
+            _currentRootPostId = parentId;
+          }
+        }
+      }
+
       if (mounted && currentRequestId == _loadRequestId) {
         setState(() {
           _threadPosts = posts;
           _isLoading = false;
           if (!_hasSetInitialReplyTarget && _threadPosts.isNotEmpty) {
             _hasSetInitialReplyTarget = true;
-            // If a specific reply target was requested, find it in the thread
             if (widget.focusReplyToPostId != null) {
               final targetPost = _threadPosts
                   .where((p) => p.id == widget.focusReplyToPostId)
                   .firstOrNull;
               _replyingToTarget = targetPost ?? _threadPosts.first;
+            } else if (_highlightedPostId != null) {
+              final targetPost = _threadPosts
+                  .where((p) => p.id == _highlightedPostId)
+                  .firstOrNull;
+              _replyingToTarget = targetPost ?? _threadPosts.first;
             } else {
-              _replyingToTarget = _threadPosts.first; // Default reply to root post
+              _replyingToTarget = _threadPosts.first;
             }
           }
         });
 
-        // If a target post highlight is requested, scroll to it & fade highlight after 2.5s
+        // If a target post highlight is requested, scroll to it & fade highlight after 3.0s
         final targetId = _highlightedPostId;
         if (targetId != null && targetId.isNotEmpty) {
           _highlightTimer?.cancel();
-          _highlightTimer = Timer(const Duration(milliseconds: 2500), () {
+          _highlightTimer = Timer(const Duration(milliseconds: 3000), () {
             if (mounted) {
               setState(() {
                 _highlightedPostId = null;
@@ -228,7 +345,7 @@ class _ThreadDetailPageState extends State<ThreadDetailPage> {
         curve: Curves.easeOutCubic,
         alignment: 0.3,
       );
-    } else if (retryCount < 5) {
+    } else if (retryCount < 8) {
       Future.delayed(const Duration(milliseconds: 120), () {
         if (mounted) {
           _scrollToHighlightedPost(targetId, retryCount: retryCount + 1);
@@ -366,9 +483,9 @@ class _ThreadDetailPageState extends State<ThreadDetailPage> {
       AnalyticsService.logEvent(
         name: 'thread_reply_submitted',
         parameters: {
-          'root_post_id': widget.rootPostId,
+          'root_post_id': _currentRootPostId,
           'reply_to_post_id': target.id,
-          'is_nested': target.id != widget.rootPostId ? 1 : 0,
+          'is_nested': target.id != _currentRootPostId ? 1 : 0,
           'visibility': target.visibility,
           'char_count': text.length,
         },
@@ -446,7 +563,7 @@ class _ThreadDetailPageState extends State<ThreadDetailPage> {
   List<CommentNode> _buildThreadTrees() {
     if (_threadPosts.length <= 1) return [];
 
-    final rootId = widget.rootPostId;
+    final rootId = _currentRootPostId;
     final activeReplyPosts = _threadPosts.sublist(1).where((p) => !p.isDeleted).toList();
     if (activeReplyPosts.isEmpty) return [];
 
@@ -468,8 +585,53 @@ class _ThreadDetailPageState extends State<ThreadDetailPage> {
 
   @override
   Widget build(BuildContext context) {
-    final activeRepliesCount = _threadPosts.where((p) => p.id != widget.rootPostId && !p.isDeleted).length;
+    final activeRepliesCount = _threadPosts.where((p) => p.id != _currentRootPostId && !p.isDeleted).length;
     final commentTrees = _buildThreadTrees();
+
+    final connectionProvider = Provider.of<ConnectionProvider>(context);
+    final connections = connectionProvider.connections;
+
+    // Mention detection
+    final replyText = _replyController.text;
+    final cursorPos = _replyController.selection.baseOffset;
+    String mentionQuery = '';
+    int atIndex = -1;
+    List<Map<String, dynamic>> mentionSuggestions = [];
+
+    if (cursorPos > 0 && cursorPos <= replyText.length) {
+      final textBeforeCursor = replyText.substring(0, cursorPos);
+      atIndex = textBeforeCursor.lastIndexOf('@');
+      if (atIndex != -1) {
+        if (atIndex == 0 ||
+            RegExp(r'\s').hasMatch(textBeforeCursor[atIndex - 1])) {
+          mentionQuery = textBeforeCursor.substring(atIndex + 1);
+          if (!mentionQuery.contains('\n')) {
+            final q = mentionQuery.toLowerCase();
+            mentionSuggestions = connections
+                .where((c) {
+                  final name = (c['name'] ?? '').toString().toLowerCase();
+                  return name.contains(q);
+                })
+                .take(5)
+                .toList();
+          }
+        }
+      }
+    }
+
+    void insertMention(Map<String, dynamic> conn) {
+      HapticFeedback.lightImpact();
+      final name = conn['name']?.toString() ?? 'User';
+      final String replacement = "@$name ";
+      final String currentText = _replyController.text;
+      final String newText =
+          currentText.replaceRange(atIndex, cursorPos, replacement);
+      _replyController.text = newText;
+      final newCursorPos = atIndex + replacement.length;
+      _replyController.selection =
+          TextSelection.collapsed(offset: newCursorPos);
+      setState(() {});
+    }
 
     return Scaffold(
       backgroundColor: context.canvasBackground,
@@ -661,6 +823,77 @@ class _ThreadDetailPageState extends State<ThreadDetailPage> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
+                      if (mentionSuggestions.isNotEmpty) ...[
+                        Container(
+                          constraints: const BoxConstraints(maxHeight: 150),
+                          margin: const EdgeInsets.only(bottom: 8),
+                          child: Material(
+                            color: context.surfaceSecondary,
+                            clipBehavior: Clip.antiAlias,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                              side: BorderSide(
+                                  color: context.accentPrimary.withValues(alpha: 0.4)),
+                            ),
+                            child: ListView.separated(
+                              shrinkWrap: true,
+                              padding: const EdgeInsets.symmetric(vertical: 4),
+                              itemCount: mentionSuggestions.length,
+                              separatorBuilder: (_, __) => Divider(
+                                  height: 1,
+                                  color: Colors.white.withValues(alpha: 0.06)),
+                              itemBuilder: (context, idx) {
+                                final conn = mentionSuggestions[idx];
+                                final name = conn['name']?.toString() ?? 'User';
+                                final avatarUrl = conn['avatarUrl']?.toString() ??
+                                    conn['avatar_url']?.toString() ??
+                                    '';
+                                final profession =
+                                    conn['profession']?.toString() ?? '';
+
+                                return ListTile(
+                                  dense: true,
+                                  visualDensity: VisualDensity.compact,
+                                  leading: CircleAvatar(
+                                    radius: 14,
+                                    backgroundColor: context.accentPrimary,
+                                    backgroundImage: avatarUrl.isNotEmpty
+                                        ? NetworkImage(avatarUrl)
+                                        : null,
+                                    child: avatarUrl.isEmpty
+                                        ? Text(
+                                            name.isNotEmpty
+                                                ? name[0].toUpperCase()
+                                                : '?',
+                                            style: const TextStyle(
+                                                fontSize: 12, color: Colors.white))
+                                        : null,
+                                  ),
+                                  title: Text(
+                                    name,
+                                    style: TextStyle(
+                                      color: context.textPrimary,
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  subtitle: profession.isNotEmpty
+                                      ? Text(
+                                          profession,
+                                          style: TextStyle(
+                                              color: context.textMuted,
+                                              fontSize: 11),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        )
+                                      : null,
+                                  onTap: () => insertMention(conn),
+                                );
+                              },
+                            ),
+                          ),
+                        ),
+                      ],
                       if (_replyingToTarget != null)
                         Padding(
                           padding: const EdgeInsets.only(bottom: 6),
@@ -696,7 +929,7 @@ class _ThreadDetailPageState extends State<ThreadDetailPage> {
                               maxLength: 500,
                               style: TextStyle(color: context.textPrimary, fontSize: 14),
                               decoration: InputDecoration(
-                                hintText: "Post your reply...",
+                                hintText: "Post your reply... Use @ to mention",
                                 hintStyle: TextStyle(color: context.textMuted, fontSize: 13),
                                 counterText: "",
                                 border: InputBorder.none,

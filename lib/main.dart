@@ -1955,11 +1955,13 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
               if (note != null && note.startsWith('{')) {
                 try {
                   final parsed = jsonDecode(note);
-                  parentAuthorName = parsed['parent_author_name']?.toString() ?? "a post";
+                  parentAuthorName =
+                      parsed['parent_author_name']?.toString() ?? "a post";
                 } catch (_) {}
               }
               title = "$actorName joined a conversation";
-              body = "$actorName replied to $parentAuthorName, tap to join the conversation.";
+              body =
+                  "$actorName replied to $parentAuthorName, tap to join the conversation.";
             }
           } else {
             title = "New Connection";
@@ -3018,11 +3020,14 @@ class _AppShellGateState extends State<AppShellGate> {
                       if (note != null && note.startsWith('{')) {
                         try {
                           final parsed = jsonDecode(note);
-                          parentAuthorName = parsed['parent_author_name']?.toString() ?? "a post";
+                          parentAuthorName =
+                              parsed['parent_author_name']?.toString() ??
+                                  "a post";
                         } catch (_) {}
                       }
                       title = "$actorName joined a conversation";
-                      body = "$actorName replied to $parentAuthorName, tap to join the conversation.";
+                      body =
+                          "$actorName replied to $parentAuthorName, tap to join the conversation.";
                     }
                   } else {
                     title = "New Connection";
