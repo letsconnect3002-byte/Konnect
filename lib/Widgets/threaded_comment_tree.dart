@@ -537,19 +537,24 @@ class _ThreadNodeWidgetState extends State<_ThreadNodeWidget>
               const SizedBox(width: 5.0),
 
               // Text
-              Text(
-                widget.comment.replies.length > 1
-                    ? "Show ${widget.comment.replies.length} replies"
-                    : "Show replies",
-                style: TextStyle(
-                  color: Theme.of(context)
-                      .colorScheme
-                      .onSurface
-                      .withValues(alpha: 0.65),
-                  fontSize: 13.0,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
+              Builder(builder: (context) {
+                final int countToShow = (widget.comment.replyCount > 0)
+                    ? widget.comment.replyCount
+                    : widget.comment.replies.length;
+                return Text(
+                  countToShow > 1
+                      ? "Show $countToShow replies"
+                      : "Show reply",
+                  style: TextStyle(
+                    color: Theme.of(context)
+                        .colorScheme
+                        .onSurface
+                        .withValues(alpha: 0.65),
+                    fontSize: 13.0,
+                    fontWeight: FontWeight.w600,
+                  ),
+                );
+              }),
             ],
           ),
         ),

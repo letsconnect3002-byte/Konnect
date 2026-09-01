@@ -531,10 +531,23 @@ class _ThreadDetailPageState extends State<ThreadDetailPage> {
     return parent.id.isNotEmpty ? parent.authorName : null;
   }
 
+  int _countTotalActiveDescendants(FeedPost post, Map<String, List<FeedPost>> childrenMap) {
+    final children = childrenMap[post.id] ?? [];
+    int count = 0;
+    for (final child in children) {
+      if (!child.isDeleted) {
+        count += 1 + _countTotalActiveDescendants(child, childrenMap);
+      }
+    }
+    return count;
+  }
+
   CommentNode _buildNode(FeedPost post, Map<String, List<FeedPost>> childrenMap) {
     final children = childrenMap[post.id] ?? [];
-    final activeChildCount = children.where((c) => !c.isDeleted).length;
-    final effectiveReplyCount = activeChildCount;
+    final totalActiveDescendants = _countTotalActiveDescendants(post, childrenMap);
+    final effectiveReplyCount = (totalActiveDescendants > 0)
+        ? totalActiveDescendants
+        : (post.activeReplyCount > 0 ? post.activeReplyCount : post.replyCount);
     final updatedPost = post.copyWith(
       replyCount: effectiveReplyCount,
       activeReplyCount: effectiveReplyCount,

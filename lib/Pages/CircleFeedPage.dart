@@ -1779,12 +1779,26 @@ class _FeedPostThreadItemState extends State<_FeedPostThreadItem> {
 
           final rootChildren = childrenMap[rootPost.id] ?? replyPosts;
 
+          int countSubtreeReplies(FeedPost p) {
+            final children = childrenMap[p.id] ?? [];
+            int total = 0;
+            for (final child in children) {
+              if (!child.isDeleted) {
+                total += 1 + countSubtreeReplies(child);
+              }
+            }
+            return total;
+          }
+
           CommentNode buildNode(FeedPost p) {
             final children = childrenMap[p.id] ?? [];
-            final activeChildren = children.where((c) => !c.isDeleted).length;
+            final totalSubtree = countSubtreeReplies(p);
+            final effectiveReplyCount = (totalSubtree > 0)
+                ? totalSubtree
+                : (p.activeReplyCount > 0 ? p.activeReplyCount : p.replyCount);
             final updatedChildPost = p.copyWith(
-              replyCount: activeChildren,
-              activeReplyCount: activeChildren,
+              replyCount: effectiveReplyCount,
+              activeReplyCount: effectiveReplyCount,
             );
             return CommentNode(
               id: p.id,
@@ -1794,7 +1808,7 @@ class _FeedPostThreadItemState extends State<_FeedPostThreadItem> {
               content: p.content,
               timestamp: _formatTimeAgo(p.createdAt),
               degree: p.degree,
-              replyCount: activeChildren,
+              replyCount: effectiveReplyCount,
               isDeleted: p.isDeleted,
               post: updatedChildPost,
               replies: children.map<CommentNode>(buildNode).toList(),

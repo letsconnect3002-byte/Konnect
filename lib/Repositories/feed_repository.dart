@@ -164,48 +164,50 @@ class SupabaseFeedRepository implements FeedRepository {
         }
       }
 
-      // Compute direct child reply counts for each post in the thread
-      final Map<String, int> childCountMap = {};
+      // Compute total active subtree descendant reply counts for each post in the thread
+      final Map<String, List<FeedPost>> childrenPostsMap = {};
       for (final p in result) {
         if (p.replyToPostId != null &&
             p.replyToPostId!.isNotEmpty &&
             !p.isDeleted) {
-          childCountMap[p.replyToPostId!] =
-              (childCountMap[p.replyToPostId!] ?? 0) + 1;
+          childrenPostsMap.putIfAbsent(p.replyToPostId!, () => []).add(p);
         }
+      }
+
+      int countSubtreeReplies(String postId) {
+        final children = childrenPostsMap[postId] ?? [];
+        int total = 0;
+        for (final child in children) {
+          total += 1 + countSubtreeReplies(child.id);
+        }
+        return total;
+      }
+
+      final Map<String, int> subtreeCountMap = {};
+      for (final post in result) {
+        subtreeCountMap[post.id] = countSubtreeReplies(post.id);
       }
 
       final int totalActiveThreadReplies =
           result.where((p) => p.id != rootPostId && !p.isDeleted).length;
 
       result = result.map((post) {
-        if (post.id == rootPostId) {
-          // For root post: replyCount and activeReplyCount should represent total replies in the thread
-          final int effectiveRootReplyCount = totalActiveThreadReplies > 0
-              ? totalActiveThreadReplies
-              : (post.activeReplyCount > 0
-                  ? post.activeReplyCount
-                  : post.replyCount);
-          FeedPost updated = post.copyWith(
-            replyCount: effectiveRootReplyCount,
-            activeReplyCount: effectiveRootReplyCount,
-          );
-          if (viewerId != null && updated.authorId == viewerId) {
-            updated = updated.copyWith(degree: 0);
-          }
-          return updated;
-        } else {
-          // For replies: replyCount is the direct child count
-          final int computedChildReplies = childCountMap[post.id] ?? 0;
-          FeedPost updated = post.copyWith(
-            replyCount: computedChildReplies,
-            activeReplyCount: computedChildReplies,
-          );
-          if (viewerId != null && updated.authorId == viewerId) {
-            updated = updated.copyWith(degree: 0);
-          }
-          return updated;
+        final int computedSubtreeReplies = (post.id == rootPostId)
+            ? (totalActiveThreadReplies > 0
+                ? totalActiveThreadReplies
+                : (post.activeReplyCount > 0
+                    ? post.activeReplyCount
+                    : post.replyCount))
+            : (subtreeCountMap[post.id] ?? 0);
+
+        FeedPost updated = post.copyWith(
+          replyCount: computedSubtreeReplies,
+          activeReplyCount: computedSubtreeReplies,
+        );
+        if (viewerId != null && updated.authorId == viewerId) {
+          updated = updated.copyWith(degree: 0);
         }
+        return updated;
       }).toList();
 
       return result;
