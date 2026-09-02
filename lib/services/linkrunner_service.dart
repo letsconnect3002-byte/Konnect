@@ -45,12 +45,15 @@ class LinkrunnerService {
     return val;
   }
 
+  String? _initialUriHandled;
+
   /// Handles initial deep link on cold launch.
   Future<void> _handleInitialLink() async {
     try {
       final initialUri = await _appLinks.getInitialLink();
       if (initialUri != null) {
         debugPrint('[LinkrunnerService] Cold start link: $initialUri');
+        _initialUriHandled = initialUri.toString();
         wasColdStartDeepLink = true;
         await _processUri(initialUri);
       }
@@ -64,6 +67,11 @@ class LinkrunnerService {
     _linkSubscription?.cancel();
     _linkSubscription = _appLinks.uriLinkStream.listen(
       (Uri uri) async {
+        if (_initialUriHandled != null && uri.toString() == _initialUriHandled) {
+          _initialUriHandled = null;
+          return;
+        }
+        _initialUriHandled = null;
         debugPrint('[LinkrunnerService] Warm start link: $uri');
         await _processUri(uri);
         final navContext = navigatorKey.currentContext;

@@ -25,6 +25,7 @@ class _ProfilePageState extends State<ProfilePage> {
   bool _isLoading = false; // set properly in initState based on data presence
   bool _qrGenerated = false;
   String _selectedShareType = 'casual';
+  String _selectedKeyType = 'single_use';
 
   @override
   void initState() {
@@ -64,18 +65,21 @@ class _ProfilePageState extends State<ProfilePage> {
     }
   }
 
-  /// Silent background refresh — keeps the UI visible and just updates
-  /// provider fields when the server responds.
+  /// Background refresh — reads from Supabase without flipping _isLoading,
+  /// so the screen does not flicker with a loading spinner while pulling
+  /// fresh data.
   Future<void> _refreshSilently(ProfileProvider profileProvider) async {
     try {
-      final userId = profileProvider.userId;
-      if (userId != null) {
-        await profileProvider.loadProfile(userId);
+      final userid = profileProvider.userId;
+      if (userid != null) {
+        await profileProvider.loadProfile(userid);
       }
     } catch (e) {
-      debugPrint("Silent profile refresh error: $e");
+      debugPrint("Error silently refreshing profile: $e");
     }
   }
+
+
 
   /// Called by the pull-to-refresh indicator. Updates content in place
   /// without blanking the screen.
@@ -151,7 +155,10 @@ class _ProfilePageState extends State<ProfilePage> {
     }
 
     try {
-      final code = await profileProvider.generateInviteCode(_selectedShareType);
+      final code = await profileProvider.generateInviteCode(
+        _selectedShareType,
+        keyType: _selectedKeyType,
+      );
 
       if (mounted) {
         Navigator.pop(context); // Dismiss loading dialog
@@ -161,8 +168,15 @@ class _ProfilePageState extends State<ProfilePage> {
         senderUserId: profileProvider.userId ?? '',
         inviteCode: code,
       );
-      final shareMessage =
-          "Hey, I'm inviting you to my private circle on Jana. Click here to download & connect: $inviteLink or use my single-use Private Key: *$code*.";
+
+      final String shareMessage;
+      if (_selectedKeyType == 'group_24h') {
+        shareMessage =
+            "Hey everyone! I'm inviting the group to connect with me on Jana. Click here to connect within 24 hours: $inviteLink or use group key: *$code* (Active for 24 hours).";
+      } else {
+        shareMessage =
+            "Hey, I'm inviting you to my private circle on Jana. Click here to download & connect: $inviteLink or use my single-use Private Key: *$code*.";
+      }
 
       await SharePlus.instance.share(ShareParams(text: shareMessage));
     } catch (e) {
@@ -772,6 +786,9 @@ class _ProfilePageState extends State<ProfilePage> {
 
   void _showShareOptionsBottomSheet(
       BuildContext context, ProfileProvider profileProvider) {
+    String tempShareType = _selectedShareType;
+    String tempKeyType = _selectedKeyType;
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -818,9 +835,9 @@ class _ProfilePageState extends State<ProfilePage> {
                           fontFamily: 'Inter',
                         ),
                       ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 6),
                       Text(
-                        "Select which digital card you want to share with this Private Key code:",
+                        "Select key duration and which digital card to share:",
                         style: TextStyle(
                           color: context.textSecondary,
                           fontSize: 13,
@@ -828,33 +845,84 @@ class _ProfilePageState extends State<ProfilePage> {
                         ),
                       ),
                       const SizedBox(height: 20),
+
+                      // 1. Key Type Section
+                      Text(
+                        "KEY TYPE & DURATION",
+                        style: TextStyle(
+                          color: context.textMuted,
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 0.8,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      _buildOptionTile(
+                        title: "Single-Use Key",
+                        subtitle: "Expires once used. Perfect for personal 1-on-1 sharing.",
+                        value: "single_use",
+                        groupValue: tempKeyType,
+                        onChanged: (val) {
+                          setModalState(() {
+                            tempKeyType = val!;
+                          });
+                        },
+                      ),
+                      const SizedBox(height: 10),
+                      _buildOptionTile(
+                        title: "24-Hour Group Key",
+                        subtitle: "Active for 24 hours. Multiple people can join via link or key.",
+                        value: "group_24h",
+                        groupValue: tempKeyType,
+                        onChanged: (val) {
+                          setModalState(() {
+                            tempKeyType = val!;
+                          });
+                        },
+                      ),
+
+                      const SizedBox(height: 20),
+
+                      // 2. Card to Share Section
+                      Text(
+                        "DIGITAL CARD TO SHARE",
+                        style: TextStyle(
+                          color: context.textMuted,
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 0.8,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
                       _buildOptionTile(
                         title: "Casual Card Only",
                         subtitle: "Share bio, socials, name & basic details.",
                         value: "casual",
-                        groupValue: _selectedShareType,
+                        groupValue: tempShareType,
                         onChanged: (val) {
                           setModalState(() {
-                            _selectedShareType = val!;
+                            tempShareType = val!;
                           });
                         },
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 10),
                       _buildOptionTile(
                         title: "Professional Card Only",
                         subtitle:
                             "Share company, email, phone & professional bio.",
                         value: "professional",
-                        groupValue: _selectedShareType,
+                        groupValue: tempShareType,
                         onChanged: (val) {
                           setModalState(() {
-                            _selectedShareType = val!;
+                            tempShareType = val!;
                           });
                         },
                       ),
                       const SizedBox(height: 24),
                       ElevatedButton(
                         onPressed: () {
+                          _selectedShareType = tempShareType;
+                          _selectedKeyType = tempKeyType;
                           Navigator.pop(context);
                           _shareProfile(profileProvider);
                         },

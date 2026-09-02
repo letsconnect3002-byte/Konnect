@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 abstract class ConnectionRepository {
@@ -10,6 +11,8 @@ abstract class ConnectionRepository {
   Future<Map<String, dynamic>?> redeemInviteCode(String code);
   Future<void> markInviteCodeAsUsed(String id);
   Future<void> markInviteCodeAsUsedByCode(String code);
+  Future<String?> getInviteCodeUserAction(String code, int userId);
+  Future<void> recordInviteCodeAction(String code, int userId, String action);
   Future<void> deleteMyProfile(int id);
   Future<String?> resolveRoomId(int myUserId, int otherUserId);
   RealtimeChannel subscribeToConnections(void Function(dynamic payload) callback);
@@ -141,28 +144,120 @@ class SupabaseConnectionRepository implements ConnectionRepository {
 
   @override
   Future<Map<String, dynamic>?> redeemInviteCode(String code) async {
-    return await _client
+    final cleanCode = code.trim().toUpperCase();
+    final row = await _client
         .from('invite_codes')
         .select()
-        .eq('code', code.trim().toUpperCase())
-        .eq('is_used', false)
+        .ilike('code', cleanCode)
         .maybeSingle();
+
+    if (row == null) return null;
+
+    final keyType = row['key_type']?.toString() ?? 'single_use';
+    if (keyType == 'group_24h') {
+      final expiresAtStr = row['expires_at']?.toString();
+      if (expiresAtStr != null) {
+        final expiresAt = DateTime.parse(expiresAtStr);
+        if (DateTime.now().toUtc().isAfter(expiresAt.toUtc())) {
+          return {'expired': true, ...row};
+        }
+      }
+      return row;
+    } else {
+      final isUsed = row['is_used'] == true;
+      if (isUsed) {
+        return {'already_used': true, ...row};
+      }
+      return row;
+    }
   }
 
   @override
   Future<void> markInviteCodeAsUsed(String id) async {
-    await _client
-        .from('invite_codes')
-        .update({'is_used': true})
-        .eq('id', id);
+    try {
+      final row = await _client
+          .from('invite_codes')
+          .select('key_type, uses_count')
+          .eq('id', id)
+          .maybeSingle();
+
+      final keyType = row?['key_type']?.toString() ?? 'single_use';
+      final currentUses = (row?['uses_count'] as int?) ?? 0;
+
+      if (keyType == 'single_use') {
+        await _client
+            .from('invite_codes')
+            .update({
+              'is_used': true,
+              'uses_count': currentUses + 1,
+            })
+            .eq('id', id);
+      } else {
+        await _client
+            .from('invite_codes')
+            .update({
+              'uses_count': currentUses + 1,
+            })
+            .eq('id', id);
+      }
+    } catch (e) {
+      debugPrint('[ConnectionRepository] Error marking invite code as used: $e');
+    }
   }
 
   @override
   Future<void> markInviteCodeAsUsedByCode(String code) async {
-    await _client
-        .from('invite_codes')
-        .update({'is_used': true})
-        .eq('code', code.trim().toUpperCase());
+    try {
+      final cleanCode = code.trim().toUpperCase();
+      final row = await _client
+          .from('invite_codes')
+          .select('id')
+          .ilike('code', cleanCode)
+          .maybeSingle();
+
+      if (row != null) {
+        await markInviteCodeAsUsed(row['id'] as String);
+      }
+    } catch (e) {
+      debugPrint('[ConnectionRepository] Error marking invite code by code: $e');
+    }
+  }
+
+  @override
+  Future<String?> getInviteCodeUserAction(String code, int userId) async {
+    try {
+      final cleanCode = code.trim().toUpperCase();
+      final row = await _client
+          .from('invite_code_redemptions')
+          .select('action')
+          .ilike('code', cleanCode)
+          .eq('user_id', userId)
+          .maybeSingle();
+
+      return row?['action'] as String?;
+    } catch (e) {
+      debugPrint('[ConnectionRepository] Error querying invite code redemption action: $e');
+      return null;
+    }
+  }
+
+  @override
+  Future<void> recordInviteCodeAction(String code, int userId, String action) async {
+    try {
+      final cleanCode = code.trim().toUpperCase();
+      await _client.from('invite_code_redemptions').upsert(
+        {
+          'code': cleanCode,
+          'user_id': userId,
+          'action': action,
+          'created_at': DateTime.now().toUtc().toIso8601String(),
+        },
+        onConflict: 'code,user_id',
+      );
+      debugPrint('[ConnectionRepository] Recorded invite code action: $cleanCode by user $userId as $action');
+    } catch (e) {
+      debugPrint('[ConnectionRepository] Error recording invite code action: $e');
+    }
   }
 
   @override

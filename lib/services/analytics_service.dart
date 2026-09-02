@@ -25,6 +25,20 @@ class AnalyticsService {
     required String name,
     Map<String, Object>? parameters,
   }) async {
-    await _analytics.logEvent(name: name, parameters: parameters);
+    try {
+      Map<String, Object>? sanitizedParams;
+      if (parameters != null) {
+        sanitizedParams = parameters.map((key, value) {
+          if (value is String || value is num) {
+            return MapEntry(key, value);
+          } else if (value is bool) {
+            return MapEntry(key, value ? 'true' : 'false');
+          } else {
+            return MapEntry(key, value.toString());
+          }
+        });
+      }
+      await _analytics.logEvent(name: name, parameters: sanitizedParams);
+    } catch (_) {}
   }
 }

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 abstract class ProfileRepository {
@@ -18,7 +19,14 @@ abstract class ProfileRepository {
   Future<void> updateProfileField(int id, String dbField, dynamic value);
   Future<Map<String, dynamic>?> fetchProfileDataOnly(int id);
   Future<Map<String, dynamic>> fetchConnectionDetails(int myUserId, int idToFetch);
-  Future<void> insertInviteCode(String code, int senderId, String sharedCardType);
+  Future<void> insertInviteCode(
+    String code,
+    int senderId,
+    String sharedCardType, {
+    String keyType = 'single_use',
+    DateTime? expiresAt,
+  });
+  Future<Map<String, dynamic>?> fetchActiveInviteCode(int senderId, {String? keyType});
 }
 
 class SupabaseProfileRepository implements ProfileRepository {
@@ -166,12 +174,81 @@ class SupabaseProfileRepository implements ProfileRepository {
   }
 
   @override
-  Future<void> insertInviteCode(String code, int senderId, String sharedCardType) async {
-    await _client.from('invite_codes').insert({
+  Future<void> insertInviteCode(
+    String code,
+    int senderId,
+    String sharedCardType, {
+    String keyType = 'single_use',
+    DateTime? expiresAt,
+  }) async {
+    final Map<String, dynamic> row = {
       'code': code,
       'sender_id': senderId,
       'shared_card_type': sharedCardType,
       'is_used': false,
-    });
+      'key_type': keyType,
+      'uses_count': 0,
+    };
+    if (expiresAt != null) {
+      row['expires_at'] = expiresAt.toUtc().toIso8601String();
+    }
+    await _client.from('invite_codes').insert(row);
+  }
+
+  @override
+  Future<Map<String, dynamic>?> fetchActiveInviteCode(int senderId,
+      {String? keyType}) async {
+    try {
+      final nowUtcIso = DateTime.now().toUtc().toIso8601String();
+      if (keyType == 'group_24h') {
+        final row = await _client
+            .from('invite_codes')
+            .select()
+            .eq('sender_id', senderId)
+            .eq('key_type', 'group_24h')
+            .gt('expires_at', nowUtcIso)
+            .order('created_at', ascending: false)
+            .limit(1)
+            .maybeSingle();
+        return row;
+      } else if (keyType == 'single_use') {
+        final row = await _client
+            .from('invite_codes')
+            .select()
+            .eq('sender_id', senderId)
+            .eq('key_type', 'single_use')
+            .eq('is_used', false)
+            .order('created_at', ascending: false)
+            .limit(1)
+            .maybeSingle();
+        return row;
+      } else {
+        // Look for active 24h key first, fallback to unused single_use key
+        final groupRow = await _client
+            .from('invite_codes')
+            .select()
+            .eq('sender_id', senderId)
+            .eq('key_type', 'group_24h')
+            .gt('expires_at', nowUtcIso)
+            .order('created_at', ascending: false)
+            .limit(1)
+            .maybeSingle();
+        if (groupRow != null) return groupRow;
+
+        final singleRow = await _client
+            .from('invite_codes')
+            .select()
+            .eq('sender_id', senderId)
+            .eq('key_type', 'single_use')
+            .eq('is_used', false)
+            .order('created_at', ascending: false)
+            .limit(1)
+            .maybeSingle();
+        return singleRow;
+      }
+    } catch (e) {
+      debugPrint('[ProfileRepository] Error fetching active invite code: $e');
+      return null;
+    }
   }
 }

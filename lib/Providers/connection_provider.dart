@@ -137,7 +137,8 @@ class ConnectionProvider with ChangeNotifier {
           .from('blocked_users')
           .select('blocked_id')
           .eq('blocker_id', myUserId);
-      final Set<int> blockedIds = blocks.map((b) => b['blocked_id'] as int).toSet();
+      final Set<int> blockedIds =
+          blocks.map((b) => b['blocked_id'] as int).toSet();
       _blockedUserIds = blockedIds;
 
       // Fetch list of users who blocked us
@@ -145,7 +146,8 @@ class ConnectionProvider with ChangeNotifier {
           .from('blocked_users')
           .select('blocker_id')
           .eq('blocked_id', myUserId);
-      final Set<int> blockedByIds = blockedBy.map((b) => b['blocker_id'] as int).toSet();
+      final Set<int> blockedByIds =
+          blockedBy.map((b) => b['blocker_id'] as int).toSet();
       _blockedByUserIds = blockedByIds;
 
       // Mark connection attributes
@@ -153,7 +155,8 @@ class ConnectionProvider with ChangeNotifier {
         final id = conn['id'] as int? ?? 0;
         conn['isBlockedByMe'] = blockedIds.contains(id);
         conn['hasBlockedMe'] = blockedByIds.contains(id);
-        conn['isBlocked'] = blockedIds.contains(id) || blockedByIds.contains(id);
+        conn['isBlocked'] =
+            blockedIds.contains(id) || blockedByIds.contains(id);
       }
 
       _setLoadedState(list);
@@ -361,11 +364,22 @@ class ConnectionProvider with ChangeNotifier {
       final response = await _repository.redeemInviteCode(code);
 
       if (response == null) {
-        throw Exception("Invalid or already used code");
+        throw Exception("Invalid invite key");
+      }
+      if (response['expired'] == true) {
+        throw Exception("This 24-hour group invite key has expired");
+      }
+      if (response['already_used'] == true) {
+        throw Exception("This single-use invite key has already been used");
       }
 
-      final int senderId = response['sender_id'] as int;
-      final String sharedCardType = response['shared_card_type'] as String;
+      final int senderId = int.parse(response['sender_id'].toString());
+      final String sharedCardType =
+          (response['shared_card_type'] ?? 'casual').toString();
+
+      if (myUserId == senderId) {
+        throw Exception("You cannot redeem your own invite key");
+      }
 
       await connectUsers(
         myUserId,
@@ -376,6 +390,7 @@ class ConnectionProvider with ChangeNotifier {
       );
 
       await _repository.markInviteCodeAsUsed(response['id'] as String);
+      await _repository.recordInviteCodeAction(code, myUserId, 'connected');
 
       print("Successfully redeemed invite code: $code");
       return senderId;
@@ -383,6 +398,15 @@ class ConnectionProvider with ChangeNotifier {
       _setError(e);
       rethrow;
     }
+  }
+
+  Future<String?> getInviteCodeUserAction(String code, int userId) async {
+    return await _repository.getInviteCodeUserAction(code, userId);
+  }
+
+  Future<void> recordInviteCodeAction(
+      String code, int userId, String action) async {
+    await _repository.recordInviteCodeAction(code, userId, action);
   }
 
   Future<void> markInviteCodeAsUsedByCode(String code) async {

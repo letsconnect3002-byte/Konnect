@@ -36,8 +36,12 @@ class _ConnectHubBottomSheetState extends State<ConnectHubBottomSheet>
   final TextEditingController _codeController = TextEditingController();
 
   bool _isRedeeming = false;
+  String? _redeemErrorMessage;
   bool _isGeneratingCode = false;
   String? _generatedInviteCode;
+  String _selectedKeyType = 'single_use';
+  DateTime? _activeKeyExpiresAt;
+  int _activeKeyUsesCount = 0;
   QrImage? _qrImage;
   bool _qrGenerationError = false;
   String _selectedShareType = 'casual';
@@ -59,10 +63,48 @@ class _ConnectHubBottomSheetState extends State<ConnectHubBottomSheet>
       initialIndex: widget.initialTabIndex.clamp(0, 1),
     );
     _tabController.addListener(_onTabChanged);
+    _codeController.addListener(_onCodeChanged);
     if (widget.showOnboardingSteps) {
       _startStepTimer();
     }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadExistingActiveKey();
+    });
     AnalyticsService.logEvent(name: 'connect_hub_opened');
+  }
+
+  void _onCodeChanged() {
+    if (_redeemErrorMessage != null && mounted) {
+      setState(() {
+        _redeemErrorMessage = null;
+      });
+    }
+  }
+
+  Future<void> _loadExistingActiveKey() async {
+    try {
+      final profileProvider =
+          Provider.of<ProfileProvider>(context, listen: false);
+      // Only auto-load if there is an active running 24-Hour Group Key session
+      final activeRow =
+          await profileProvider.fetchActiveInviteCode(keyType: 'group_24h');
+      if (activeRow != null && mounted) {
+        setState(() {
+          _generatedInviteCode = activeRow['code']?.toString();
+          _selectedKeyShareType =
+              activeRow['shared_card_type']?.toString() ?? 'casual';
+          _selectedKeyType =
+              activeRow['key_type']?.toString() ?? 'group_24h';
+          _activeKeyUsesCount = (activeRow['uses_count'] as int?) ?? 0;
+          final expStr = activeRow['expires_at']?.toString();
+          if (expStr != null) {
+            _activeKeyExpiresAt = DateTime.parse(expStr);
+          }
+        });
+      }
+    } catch (e) {
+      debugPrint("Error loading existing active key: $e");
+    }
   }
 
   void _startStepTimer() {
@@ -87,6 +129,15 @@ class _ConnectHubBottomSheetState extends State<ConnectHubBottomSheet>
 
   void _onTabChanged() {
     setState(() {});
+  }
+
+  String _getRemainingTimeString(DateTime expiresAt) {
+    final diff = expiresAt.toUtc().difference(DateTime.now().toUtc());
+    if (diff.isNegative) return "Expired";
+    if (diff.inHours > 0) {
+      return "${diff.inHours}h ${diff.inMinutes % 60}m";
+    }
+    return "${diff.inMinutes}m";
   }
 
   void _initializeQrCode() {
@@ -118,9 +169,11 @@ class _ConnectHubBottomSheetState extends State<ConnectHubBottomSheet>
     }
   }
 
-  Future<void> _generateInviteCode([String? typeOverride]) async {
+  Future<void> _generateInviteCode(
+      [String? typeOverride, String? keyTypeOverride]) async {
     if (_isGeneratingCode) return;
     final shareType = typeOverride ?? _selectedKeyShareType;
+    final keyType = keyTypeOverride ?? _selectedKeyType;
     setState(() {
       _isGeneratingCode = true;
     });
@@ -128,14 +181,21 @@ class _ConnectHubBottomSheetState extends State<ConnectHubBottomSheet>
     try {
       final profileProvider =
           Provider.of<ProfileProvider>(context, listen: false);
-      final code = await profileProvider.generateInviteCode(shareType);
+      final code =
+          await profileProvider.generateInviteCode(shareType, keyType: keyType);
       AnalyticsService.logEvent(
         name: 'invite_code_generated',
-        parameters: {'share_type': shareType},
+        parameters: {'share_type': shareType, 'key_type': keyType},
       );
       if (mounted) {
         setState(() {
           _generatedInviteCode = code;
+          _selectedKeyShareType = shareType;
+          _selectedKeyType = keyType;
+          _activeKeyUsesCount = 0;
+          _activeKeyExpiresAt = keyType == 'group_24h'
+              ? DateTime.now().toUtc().add(const Duration(hours: 24))
+              : null;
           _isGeneratingCode = false;
         });
       }
@@ -155,6 +215,7 @@ class _ConnectHubBottomSheetState extends State<ConnectHubBottomSheet>
 
     setState(() {
       _isRedeeming = true;
+      _redeemErrorMessage = null;
     });
 
     try {
@@ -165,10 +226,11 @@ class _ConnectHubBottomSheetState extends State<ConnectHubBottomSheet>
 
       AnalyticsService.logEvent(
         name: 'invite_code_redeemed',
-        parameters: {'success': true},
+        parameters: {'status': 'success'},
       );
 
       if (mounted) {
+        Navigator.pop(context); // Close the bottom sheet first so SnackBar is front and center on the main screen
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Row(
@@ -194,29 +256,22 @@ class _ConnectHubBottomSheetState extends State<ConnectHubBottomSheet>
             ),
           ),
         );
-        Navigator.pop(context); // Close the bottom sheet
       }
     } catch (e) {
       AnalyticsService.logEvent(
         name: 'invite_code_redeemed',
-        parameters: {'success': false},
+        parameters: {'status': 'failed'},
       );
+      final rawError = e.toString().replaceAll("Exception: ", "").trim();
+      final displayError = rawError.isNotEmpty
+          ? rawError
+          : "Connection failed. Please verify the code.";
+
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              "Connection failed: ${e.toString().replaceAll("Exception: ", "")}",
-              style: const TextStyle(fontFamily: 'Inter', color: Colors.white),
-            ),
-            backgroundColor: Colors.redAccent,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      }
-    } finally {
-      if (mounted) {
+        HapticFeedback.vibrate();
         setState(() {
           _isRedeeming = false;
+          _redeemErrorMessage = displayError;
         });
       }
     }
@@ -257,9 +312,18 @@ class _ConnectHubBottomSheetState extends State<ConnectHubBottomSheet>
       inviteCode: _generatedInviteCode,
     );
     
-    final String shareMessage = (_generatedInviteCode != null)
-        ? "Hey! Connect with me on Jana! Click here to download & connect: $inviteLink or use my Private Key: $_generatedInviteCode"
-        : "Hey! Connect with me on Jana! Click here to download & connect: $inviteLink";
+    final String shareMessage;
+    if (_generatedInviteCode != null) {
+      if (_selectedKeyType == 'group_24h') {
+        shareMessage =
+            "Hey everyone! Connect with me on Jana using this 24-hour group invite: $inviteLink or use group key: *$_generatedInviteCode* (Active for 24 hours).";
+      } else {
+        shareMessage =
+            "Hey! Connect with me on Jana! Click here to download & connect: $inviteLink or use my Private Key: *$_generatedInviteCode*";
+      }
+    } else {
+      shareMessage = "Hey! Connect with me on Jana! Click here to download & connect: $inviteLink";
+    }
         
     await SharePlus.instance.share(ShareParams(text: shareMessage));
   }
@@ -539,16 +603,20 @@ class _ConnectHubBottomSheetState extends State<ConnectHubBottomSheet>
   }
 
   void _showKeyOptionsBottomSheet(BuildContext context) {
+    String tempShareType = _selectedKeyShareType;
+    String tempKeyType = _selectedKeyType;
+
     showModalBottomSheet(
       context: context,
-      isScrollControlled: true,
       backgroundColor: Colors.transparent,
+      isScrollControlled: true,
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setModalState) {
             return GlassmorphicContainer(
               borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(AppDimensions.radiusPremiumCard)),
+                top: Radius.circular(AppDimensions.radiusPremiumCard),
+              ),
               border: Border(
                 top: BorderSide(
                     color: Colors.white.withValues(alpha: 0.04), width: 1),
@@ -577,7 +645,7 @@ class _ConnectHubBottomSheetState extends State<ConnectHubBottomSheet>
                       ),
                       const SizedBox(height: 20),
                       Text(
-                        "Share Identity Options",
+                        "Generate Private Key",
                         style: TextStyle(
                           color: context.textPrimary,
                           fontSize: 20,
@@ -585,9 +653,9 @@ class _ConnectHubBottomSheetState extends State<ConnectHubBottomSheet>
                           fontFamily: 'Inter',
                         ),
                       ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 6),
                       Text(
-                        "Select which digital card you want to share with this Private Key:",
+                        "Select key duration and which digital card to share:",
                         style: TextStyle(
                           color: context.textSecondary,
                           fontSize: 13,
@@ -595,34 +663,85 @@ class _ConnectHubBottomSheetState extends State<ConnectHubBottomSheet>
                         ),
                       ),
                       const SizedBox(height: 20),
+
+                      // 1. Key Type Section
+                      Text(
+                        "KEY TYPE & DURATION",
+                        style: TextStyle(
+                          color: context.textMuted,
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 0.8,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      _buildOptionTile(
+                        title: "Single-Use Key",
+                        subtitle: "Expires once used. Perfect for personal 1-on-1 sharing.",
+                        value: "single_use",
+                        groupValue: tempKeyType,
+                        onChanged: (val) {
+                          setModalState(() {
+                            tempKeyType = val!;
+                          });
+                        },
+                      ),
+                      const SizedBox(height: 10),
+                      _buildOptionTile(
+                        title: "24-Hour Group Key",
+                        subtitle: "Active for 24 hours. Multiple people can join via link or key.",
+                        value: "group_24h",
+                        groupValue: tempKeyType,
+                        onChanged: (val) {
+                          setModalState(() {
+                            tempKeyType = val!;
+                          });
+                        },
+                      ),
+
+                      const SizedBox(height: 20),
+
+                      // 2. Card to Share Section
+                      Text(
+                        "DIGITAL CARD TO SHARE",
+                        style: TextStyle(
+                          color: context.textMuted,
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 0.8,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
                       _buildOptionTile(
                         title: "Casual Card Only",
                         subtitle: "Share bio, socials, name & basic details.",
                         value: "casual",
-                        groupValue: _selectedKeyShareType,
+                        groupValue: tempShareType,
                         onChanged: (val) {
                           setModalState(() {
-                            _selectedKeyShareType = val!;
+                            tempShareType = val!;
                           });
                         },
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 10),
                       _buildOptionTile(
                         title: "Professional Card Only",
                         subtitle:
                             "Share company, email, phone & professional bio.",
                         value: "professional",
-                        groupValue: _selectedKeyShareType,
+                        groupValue: tempShareType,
                         onChanged: (val) {
                           setModalState(() {
-                            _selectedKeyShareType = val!;
+                            tempShareType = val!;
                           });
                         },
                       ),
                       const SizedBox(height: 24),
                       ElevatedButton(
                         onPressed: () {
-                          _generateInviteCode(_selectedKeyShareType);
+                          _selectedKeyShareType = tempShareType;
+                          _selectedKeyType = tempKeyType;
+                          _generateInviteCode(tempShareType, tempKeyType);
                           Navigator.pop(context);
                         },
                         style: ElevatedButton.styleFrom(
@@ -634,7 +753,7 @@ class _ConnectHubBottomSheetState extends State<ConnectHubBottomSheet>
                           ),
                         ),
                         child: const Text(
-                          "Apply Selection",
+                          "Generate Key",
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
                             fontFamily: 'Inter',
@@ -953,8 +1072,12 @@ class _ConnectHubBottomSheetState extends State<ConnectHubBottomSheet>
                   decoration: BoxDecoration(
                     color: context.surfacePrimary,
                     borderRadius: BorderRadius.circular(14),
-                    border:
-                        Border.all(color: context.surfaceSecondary, width: 1.5),
+                    border: Border.all(
+                      color: _redeemErrorMessage != null
+                          ? Colors.redAccent.withValues(alpha: 0.7)
+                          : context.surfaceSecondary,
+                      width: 1.5,
+                    ),
                   ),
                   child: TextField(
                     controller: _codeController,
@@ -974,8 +1097,13 @@ class _ConnectHubBottomSheetState extends State<ConnectHubBottomSheet>
                         letterSpacing: 0.0,
                         fontSize: 12,
                       ),
-                      prefixIcon: Icon(Icons.vpn_key_rounded,
-                          color: context.textSecondary, size: 16),
+                      prefixIcon: Icon(
+                        Icons.vpn_key_rounded,
+                        color: _redeemErrorMessage != null
+                            ? Colors.redAccent
+                            : context.textSecondary,
+                        size: 16,
+                      ),
                       border: InputBorder.none,
                       contentPadding: const EdgeInsets.symmetric(vertical: 14),
                     ),
@@ -995,7 +1123,7 @@ class _ConnectHubBottomSheetState extends State<ConnectHubBottomSheet>
                   ),
                   child: Center(
                     child: _isRedeeming
-                        ? SizedBox(
+                        ? const SizedBox(
                             width: 18,
                             height: 18,
                             child: CircularProgressIndicator(
@@ -1018,6 +1146,42 @@ class _ConnectHubBottomSheetState extends State<ConnectHubBottomSheet>
               ),
             ],
           ),
+
+          if (_redeemErrorMessage != null) ...[
+            const SizedBox(height: 10),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: Colors.redAccent.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: Colors.redAccent.withValues(alpha: 0.35),
+                  width: 1,
+                ),
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.error_outline_rounded,
+                    color: Colors.redAccent,
+                    size: 16,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      _redeemErrorMessage!,
+                      style: const TextStyle(
+                        color: Colors.redAccent,
+                        fontFamily: 'Inter',
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -1324,60 +1488,87 @@ class _ConnectHubBottomSheetState extends State<ConnectHubBottomSheet>
                     child: Container(
                       padding: const EdgeInsets.symmetric(
                           horizontal: 16, vertical: 12),
-                      margin: const EdgeInsets.only(bottom: 16),
+                      margin: const EdgeInsets.only(bottom: 14),
                       decoration: BoxDecoration(
                         color: context.surfaceSecondary,
                         borderRadius: BorderRadius.circular(
                             AppDimensions.radiusPremiumCard),
                         border: Border.all(
-                          color: Colors.white.withValues(alpha: 0.04),
+                          color: _selectedKeyType == 'group_24h'
+                              ? context.accentPrimary.withValues(alpha: 0.3)
+                              : Colors.white.withValues(alpha: 0.04),
                         ),
                       ),
-                      child: Row(
+                      child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Container(
-                            width: 8,
-                            height: 8,
-                            decoration: BoxDecoration(
-                              color: context.accentSecondary,
-                              shape: BoxShape.circle,
-                              boxShadow: [
-                                BoxShadow(
-                                  color: context.accentSecondary
-                                      .withValues(alpha: 0.4),
-                                  blurRadius: 6,
-                                  spreadRadius: 2,
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                width: 8,
+                                height: 8,
+                                decoration: BoxDecoration(
+                                  color: _selectedKeyType == 'group_24h'
+                                      ? const Color(0xFF10B981)
+                                      : context.accentSecondary,
+                                  shape: BoxShape.circle,
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: (_selectedKeyType == 'group_24h'
+                                              ? const Color(0xFF10B981)
+                                              : context.accentSecondary)
+                                          .withValues(alpha: 0.4),
+                                      blurRadius: 6,
+                                      spreadRadius: 2,
+                                    ),
+                                  ],
                                 ),
-                              ],
-                            ),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                _selectedKeyType == 'group_24h'
+                                    ? "24H GROUP KEY (${_selectedKeyShareType.toUpperCase()})"
+                                    : "SINGLE-USE (${_selectedKeyShareType.toUpperCase()})",
+                                style: context.bodyText.copyWith(
+                                    fontWeight: FontWeight.bold, fontSize: 12),
+                              ),
+                              const SizedBox(width: 10),
+                              Container(
+                                width: 1,
+                                height: 14,
+                                color: Colors.white.withValues(alpha: 0.12),
+                              ),
+                              const SizedBox(width: 10),
+                              GestureDetector(
+                                onTap: () => _showKeyOptionsBottomSheet(context),
+                                child: Text(
+                                  "Change",
+                                  style: TextStyle(
+                                    color: context.accentSecondary,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    fontFamily: 'Inter',
+                                    decoration: TextDecoration.underline,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
-                          const SizedBox(width: 8),
-                          Text(
-                            "Sharing: ${_selectedKeyShareType.toUpperCase()}",
-                            style: context.bodyText.copyWith(
-                                fontWeight: FontWeight.w600, fontSize: 13),
-                          ),
-                          const SizedBox(width: 12),
-                          Container(
-                            width: 1,
-                            height: 14,
-                            color: Colors.white.withValues(alpha: 0.12),
-                          ),
-                          const SizedBox(width: 12),
-                          GestureDetector(
-                            onTap: () => _showKeyOptionsBottomSheet(context),
-                            child: Text(
-                              "Change",
-                              style: TextStyle(
-                                color: context.accentSecondary,
-                                fontSize: 13,
-                                fontWeight: FontWeight.bold,
+                          if (_selectedKeyType == 'group_24h') ...[
+                            const SizedBox(height: 6),
+                            Text(
+                              _activeKeyExpiresAt != null
+                                  ? "Active · Expires in ${_getRemainingTimeString(_activeKeyExpiresAt!)}${_activeKeyUsesCount > 0 ? ' · 👥 $_activeKeyUsesCount joined' : ''}"
+                                  : "Active for 24 hours",
+                              style: const TextStyle(
+                                color: Color(0xFF10B981),
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
                                 fontFamily: 'Inter',
-                                decoration: TextDecoration.underline,
                               ),
                             ),
-                          ),
+                          ],
                         ],
                       ),
                     ),
@@ -1468,6 +1659,47 @@ class _ConnectHubBottomSheetState extends State<ConnectHubBottomSheet>
                     ),
                   ],
                 ),
+                if (_generatedInviteCode != null) ...[
+                  const SizedBox(height: 10),
+                  GestureDetector(
+                    onTap: () {
+                      HapticFeedback.lightImpact();
+                      _showKeyOptionsBottomSheet(context);
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 7),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.04),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.06),
+                          width: 1,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.autorenew_rounded,
+                            color: context.accentPrimary,
+                            size: 14,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            "Create Private Key Again",
+                            style: TextStyle(
+                              color: context.accentPrimary,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              fontFamily: 'Inter',
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
               ],
             ),
           ),

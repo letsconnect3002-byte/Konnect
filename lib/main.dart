@@ -2300,19 +2300,14 @@ class MyApp extends StatelessWidget {
               );
             }
 
-            // Absorb referral / invite deep link routes silently.
+            // Route referral / invite deep links to AuthGate.
             // The link params are already handled by LinkrunnerService & ShareReceiverService.
+            // AuthGate handles auth → AppShellGate → referral modal flow over the fully rendered UI.
             if (name.contains('referrer=') ||
                 name.contains('MNDL-') ||
                 name.contains('invite_code=')) {
-              // Both warm start and cold start: absorb the deep link route silently.
-              // LinkrunnerService has already extracted and saved the URL params.
-              // The home AuthGate handles auth → AppShellGate → referral modal flow.
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                navigatorKey.currentState?.maybePop();
-              });
               return MaterialPageRoute(
-                builder: (_) => const SizedBox.shrink(),
+                builder: (_) => const AuthGate(),
                 settings: settings,
               );
             }
@@ -2433,10 +2428,11 @@ class _AppShellGateState extends State<AppShellGate> {
       if (mounted) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted) {
-            LinkrunnerService.consumeWasColdStartDeepLink();
+            final bool wasColdStart =
+                LinkrunnerService.consumeWasColdStartDeepLink();
             ReferralConnectionModal.checkAndShowPrompt(
               context,
-              isExplicitLinkClick: true,
+              isExplicitLinkClick: wasColdStart,
             );
           }
         });

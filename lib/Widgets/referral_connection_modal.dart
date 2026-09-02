@@ -76,7 +76,7 @@ class ReferralConnectionModal extends StatefulWidget {
 
       int? referrerId = pendingReferrerIdStr != null ? int.tryParse(pendingReferrerIdStr) : null;
 
-      // 1. Check invite_codes table status in Supabase
+      // 1. Check invite_codes and invite_code_redemptions status in Supabase
       if (pendingInviteCode != null && pendingInviteCode.isNotEmpty) {
         try {
           // Extract exact MNDL-XXXXXX code string (ignoring surrounding asterisks/punctuation/spaces)
@@ -88,6 +88,34 @@ class ReferralConnectionModal extends StatefulWidget {
 
           final adminClient =
               SupabaseClient(SupabaseConfig.url, SupabaseConfig.serviceRoleKey);
+
+          // Check if this current user already has a recorded action for this code in Supabase
+          final userActionRow = await adminClient
+              .from('invite_code_redemptions')
+              .select('action')
+              .ilike('code', cleanCode)
+              .eq('user_id', myUserId)
+              .maybeSingle();
+
+          if (userActionRow != null) {
+            final String action = userActionRow['action']?.toString() ?? 'connected';
+            if (action == 'connected') {
+              await LinkrunnerService.clearPendingReferralData();
+              if (isExplicitLinkClick && context.mounted) {
+                _showFeedbackSnackBar(context, "You are already connected using this invite!");
+              }
+              return;
+            } else if (action == 'skipped') {
+              if (!isExplicitLinkClick) {
+                // Routine app reload / reopen -> Suppress modal
+                await LinkrunnerService.clearPendingReferralData();
+                return;
+              }
+              // If isExplicitLinkClick is true, user intentionally clicked the link again in WhatsApp.
+              // Fall through to validate expiration and show the modal.
+            }
+          }
+
           final codeRow = await adminClient
               .from('invite_codes')
               .select()
@@ -95,32 +123,46 @@ class ReferralConnectionModal extends StatefulWidget {
               .maybeSingle();
 
           if (codeRow != null) {
-            final bool isUsed = codeRow['is_used'] == true;
-            if (isUsed) {
-              // Code has already been used -> Expired link
-              await LinkrunnerService.clearPendingReferralData();
-              if (isExplicitLinkClick && context.mounted) {
-                _showFeedbackSnackBar(context, "This invite link has already been used or has expired.");
+            final String keyType = codeRow['key_type']?.toString() ?? 'single_use';
+            if (keyType == 'group_24h') {
+              final expiresAtStr = codeRow['expires_at']?.toString();
+              if (expiresAtStr != null) {
+                final expiresAt = DateTime.parse(expiresAtStr);
+                if (DateTime.now().toUtc().isAfter(expiresAt.toUtc())) {
+                  await LinkrunnerService.clearPendingReferralData();
+                  if (isExplicitLinkClick && context.mounted) {
+                    _showFeedbackSnackBar(context, "This 24-hour group invite link has expired.");
+                  }
+                  return;
+                }
               }
-              return;
-            }
+            } else {
+              final bool isUsed = codeRow['is_used'] == true;
+              if (isUsed) {
+                // Code has already been used -> Expired link
+                await LinkrunnerService.clearPendingReferralData();
+                if (isExplicitLinkClick && context.mounted) {
+                  _showFeedbackSnackBar(context, "This single-use invite link has already been used.");
+                }
+                return;
+              }
 
-            final bool isSkipped = codeRow['is_skipped'] == true;
-            if (isSkipped && !isExplicitLinkClick) {
-              // User previously clicked Skip, and this is a routine app reopen.
-              // Do NOT show prompt.
-              await LinkrunnerService.clearPendingReferralData();
-              return;
-            }
-            if (isSkipped && isExplicitLinkClick) {
-              // User re-clicked the URL link. Reset is_skipped and show modal.
-              try {
-                await adminClient
-                    .from('invite_codes')
-                    .update({'is_skipped': false})
-                    .eq('id', codeRow['id']);
-              } catch (e) {
-                debugPrint('[ReferralConnectionModal] Error resetting is_skipped: $e');
+              final bool isSkipped = codeRow['is_skipped'] == true;
+              if (isSkipped && !isExplicitLinkClick) {
+                // User previously clicked Skip, and this is a routine app reopen.
+                await LinkrunnerService.clearPendingReferralData();
+                return;
+              }
+              if (isSkipped && isExplicitLinkClick) {
+                // User re-clicked the URL link. Reset is_skipped and show modal.
+                try {
+                  await adminClient
+                      .from('invite_codes')
+                      .update({'is_skipped': false})
+                      .eq('id', codeRow['id']);
+                } catch (e) {
+                  debugPrint('[ReferralConnectionModal] Error resetting is_skipped: $e');
+                }
               }
             }
 
@@ -133,14 +175,6 @@ class ReferralConnectionModal extends StatefulWidget {
             if (referrerId == null) {
               await LinkrunnerService.clearPendingReferralData();
               return;
-            }
-            // On routine reopens, block if referrer was already processed
-            if (!isExplicitLinkClick) {
-              final bool alreadyProcessed = await LinkrunnerService.isReferrerProcessed(referrerId.toString());
-              if (alreadyProcessed) {
-                await LinkrunnerService.clearPendingReferralData();
-                return;
-              }
             }
           }
         } catch (e) {
@@ -326,9 +360,10 @@ class _ReferralConnectionModalState extends State<ReferralConnectionModal> {
                     onPressed: _isConnecting
                         ? null
                         : () async {
+                            final myUserId = Provider.of<ProfileProvider>(context, listen: false).userId;
                             final codeToSkip = widget.inviteCode ??
                                 await LinkrunnerService.getPendingInviteCode();
-                            if (codeToSkip != null && codeToSkip.isNotEmpty) {
+                            if (codeToSkip != null && codeToSkip.isNotEmpty && myUserId != null) {
                               try {
                                 final RegExp codeRegex =
                                     RegExp(r'MNDL-[A-Za-z0-9]+', caseSensitive: false);
@@ -342,10 +377,31 @@ class _ReferralConnectionModalState extends State<ReferralConnectionModal> {
 
                                 final adminClient = SupabaseClient(
                                     SupabaseConfig.url, SupabaseConfig.serviceRoleKey);
-                                await adminClient
+
+                                // Record user skip in Supabase table
+                                await adminClient.from('invite_code_redemptions').upsert(
+                                  {
+                                    'code': cleanCode,
+                                    'user_id': myUserId,
+                                    'action': 'skipped',
+                                    'created_at': DateTime.now().toUtc().toIso8601String(),
+                                  },
+                                  onConflict: 'code,user_id',
+                                );
+
+                                final codeRow = await adminClient
                                     .from('invite_codes')
-                                    .update({'is_skipped': true})
-                                    .ilike('code', cleanCode);
+                                    .select('key_type')
+                                    .ilike('code', cleanCode)
+                                    .maybeSingle();
+
+                                final keyType = codeRow?['key_type']?.toString() ?? 'single_use';
+                                if (keyType == 'single_use') {
+                                  await adminClient
+                                      .from('invite_codes')
+                                      .update({'is_skipped': true})
+                                      .ilike('code', cleanCode);
+                                }
                               } catch (e) {
                                 debugPrint(
                                     '[ReferralConnectionModal] Error updating is_skipped: $e');
@@ -418,6 +474,7 @@ class _ReferralConnectionModalState extends State<ReferralConnectionModal> {
                                       connectionType: 'vip_pass_key',
                                     );
                                     await connectionProvider.markInviteCodeAsUsedByCode(codeToRedeem);
+                                    await connectionProvider.recordInviteCodeAction(codeToRedeem, myUserId, 'connected');
                                     await connectionProvider.fetchConnections();
                                   }
                                 }

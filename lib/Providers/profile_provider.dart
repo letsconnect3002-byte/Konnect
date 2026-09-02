@@ -949,7 +949,10 @@ class ProfileProvider with ChangeNotifier {
     }
   }
 
-  Future<String> generateInviteCode(String sharedCardType) async {
+  Future<String> generateInviteCode(
+    String sharedCardType, {
+    String keyType = 'single_use',
+  }) async {
     final currentUserId = userId;
     if (currentUserId == null) {
       throw Exception("User is not signed in or profile is not loaded");
@@ -960,14 +963,30 @@ class ProfileProvider with ChangeNotifier {
     final suffix = List.generate(6, (index) => chars[rand.nextInt(chars.length)]).join();
     final generatedCode = 'MNDL-$suffix';
 
+    final DateTime? expiresAt = keyType == 'group_24h'
+        ? DateTime.now().toUtc().add(const Duration(hours: 24))
+        : null;
+
     try {
-      await _repository.insertInviteCode(generatedCode, currentUserId, sharedCardType);
-      print("Successfully generated invite code: $generatedCode");
+      await _repository.insertInviteCode(
+        generatedCode,
+        currentUserId,
+        sharedCardType,
+        keyType: keyType,
+        expiresAt: expiresAt,
+      );
+      print("Successfully generated invite code: $generatedCode (type: $keyType, expires: $expiresAt)");
       return generatedCode;
     } catch (e) {
       _setError(e);
       rethrow;
     }
+  }
+
+  Future<Map<String, dynamic>?> fetchActiveInviteCode({String? keyType}) async {
+    final currentUserId = userId;
+    if (currentUserId == null) return null;
+    return await _repository.fetchActiveInviteCode(currentUserId, keyType: keyType);
   }
 
   Future<void> setQuickSetupComplete(bool val) async {
