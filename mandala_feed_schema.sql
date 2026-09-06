@@ -94,11 +94,90 @@ create or replace function public.posts_after_insert()
 returns trigger
 language plpgsql
 as $$
+declare
+  v_parent_author_id bigint;
+  v_parent_author_name text;
+  v_reply_snippet text;
+  v_note_json text;
+  v_actor_anon_name text;
 begin
   if new.reply_to_post_id is not null then
+    -- 1. Increment reply_count
     update public.posts
     set reply_count = reply_count + 1
     where id = new.root_post_id;
+
+    -- 2. Fetch parent post author with strict anonymity respect
+    select p.author_id,
+           case
+             when p.is_anonymous = true then coalesce(nullif(pr.anon_name, ''), 'Anonymous')
+             else coalesce(nullif(pr.name, ''), 'a post')
+           end
+    into v_parent_author_id, v_parent_author_name
+    from public.posts p
+    left join public.profiles pr on pr.id = p.author_id
+    where p.id = new.reply_to_post_id;
+
+    if v_parent_author_name is null or v_parent_author_name = '' then
+      v_parent_author_name := 'a post';
+    end if;
+
+    -- 3. Prepare snippet
+    if length(new.content) > 50 then
+      v_reply_snippet := substring(new.content from 1 for 50) || '...';
+    else
+      v_reply_snippet := new.content;
+    end if;
+
+    -- 4. Determine replier anonymous alias if anonymous
+    if new.is_anonymous = true then
+      select coalesce(nullif(anon_name, ''), 'Anonymous')
+      into v_actor_anon_name
+      from public.profiles
+      where id = new.author_id;
+      if v_actor_anon_name is null or v_actor_anon_name = '' then
+        v_actor_anon_name := 'Anonymous';
+      end if;
+    end if;
+
+    v_note_json := json_build_object(
+      'real_type', 'feed_connection_reply',
+      'post_id', new.id::text,
+      'root_post_id', new.root_post_id::text,
+      'parent_author_name', v_parent_author_name,
+      'reply_snippet', v_reply_snippet,
+      'is_anonymous', coalesce(new.is_anonymous, false),
+      'actor_name', case when new.is_anonymous = true then v_actor_anon_name else null end
+    )::text;
+
+    -- 5. Dispatch connection reply notification to eligible 1st-degree connections with 24h deduplication
+    insert into public.connection_notifications (
+      user_id,
+      other_user_id,
+      type,
+      note,
+      is_seen,
+      created_at
+    )
+    select 
+      ng.primary_user_id,
+      new.author_id,
+      'feed_connection_reply',
+      v_note_json,
+      false,
+      now()
+    from public.network_graph ng
+    where ng.connected_user_id = new.author_id
+      and (new.visibility = 'both' or ng.shared_card = 'both' or ng.shared_card = new.visibility)
+      and ng.primary_user_id != new.author_id
+      and (v_parent_author_id is null or ng.primary_user_id != v_parent_author_id)
+      and not exists (
+        select 1 from public.connection_notifications cn
+        where cn.user_id = ng.primary_user_id
+          and cn.type = 'feed_connection_reply'
+          and cn.note like '%"root_post_id":"' || new.root_post_id::text || '"%'
+          and cn.created_at > (now() - interval '24 hours')
+      );
   end if;
   return new;
 end;
@@ -109,6 +188,49 @@ create trigger trg_posts_after_insert
   after insert on public.posts
   for each row
   execute function public.posts_after_insert();
+
+create or replace function public.posts_after_update_or_delete()
+returns trigger
+language plpgsql
+as $$
+begin
+  -- 1. Handling DELETE (hard delete)
+  if tg_op = 'DELETE' then
+    if old.reply_to_post_id is not null and old.is_deleted = false then
+      update public.posts
+      set reply_count = greatest(0, reply_count - 1)
+      where id = old.root_post_id;
+    end if;
+    return old;
+  end if;
+
+  -- 2. Handling UPDATE (soft delete or undelete)
+  if tg_op = 'UPDATE' then
+    if old.reply_to_post_id is not null then
+      -- Newly marked as deleted
+      if old.is_deleted = false and new.is_deleted = true then
+        update public.posts
+        set reply_count = greatest(0, reply_count - 1)
+        where id = old.root_post_id;
+      -- Restored / un-deleted
+      elsif old.is_deleted = true and new.is_deleted = false then
+        update public.posts
+        set reply_count = reply_count + 1
+        where id = new.root_post_id;
+      end if;
+    end if;
+    return new;
+  end if;
+
+  return null;
+end;
+$$;
+
+drop trigger if exists trg_posts_after_update_or_delete on public.posts;
+create trigger trg_posts_after_update_or_delete
+  after update of is_deleted or delete on public.posts
+  for each row
+  execute function public.posts_after_update_or_delete();
 
 create or replace function public.post_reactions_after_change()
 returns trigger
@@ -189,6 +311,7 @@ create index if not exists user_connections_user_2_idx
 
 create or replace function public.get_network_reach(
   p_viewer_id bigint,
+  p_visibility text default 'both',
   p_max_degree int default 3
 )
 returns table (reachable_user_id bigint, degree int)
@@ -196,16 +319,34 @@ language sql
 stable
 as $$
   with recursive reach as (
-    select ng.connected_user_id as user_id, 1 as degree
+    -- Degree 1: Direct connections
+    select 
+      ng.connected_user_id as user_id, 
+      1 as degree,
+      array[p_viewer_id, ng.connected_user_id] as path
     from public.network_graph ng
     where ng.primary_user_id = p_viewer_id
+      and (p_visibility = 'both' or ng.shared_card = 'both' or ng.shared_card = p_visibility)
 
     union all
 
-    select ng.connected_user_id, r.degree + 1
+    -- Degree 2+: Multi-hop connections
+    select 
+      ng.connected_user_id, 
+      r.degree + 1,
+      r.path || ng.connected_user_id
     from reach r
     join public.network_graph ng on ng.primary_user_id = r.user_id
     where r.degree < p_max_degree
+      and not (ng.connected_user_id = any(r.path))
+      and (p_visibility = 'both' or ng.shared_card = 'both' or ng.shared_card = p_visibility)
+      -- Exclude anyone who is ALREADY a 1st-degree connection to the viewer!
+      and not exists (
+        select 1 
+        from public.network_graph direct_ng 
+        where direct_ng.primary_user_id = p_viewer_id 
+          and direct_ng.connected_user_id = ng.connected_user_id
+      )
   )
   select user_id as reachable_user_id, min(degree) as degree
   from reach
@@ -230,7 +371,8 @@ create or replace function public.get_feed(
   p_bucket text default 'unseen',
   p_cursor_created_at timestamptz default null,
   p_cursor_post_id uuid default null,
-  p_limit int default 20
+  p_limit int default 20,
+  p_scope text default 'network'
 )
 returns table (
   post_id uuid,
@@ -243,23 +385,18 @@ returns table (
   active_reply_count int,
   degree int,
   user_reaction text,
-  reaction_counts jsonb
+  reaction_counts jsonb,
+  visibility text
 )
 language plpgsql
 stable
 as $$
 begin
-  if p_bucket not in ('unseen', 'seen') then
-    raise exception 'p_bucket must be ''unseen'' or ''seen''';
+  if p_bucket not in ('unseen', 'seen', 'all') then
+    raise exception 'p_bucket must be ''unseen'', ''seen'', or ''all''';
   end if;
 
   return query
-  with visible_authors as (
-    select p_viewer_id as user_id, 0 as deg
-    union all
-    select r.reachable_user_id, r.degree as deg
-    from public.get_network_reach(p_viewer_id) r
-  )
   select
     p.id,
     p.author_id,
@@ -275,7 +412,7 @@ begin
         and r.id != p.id
         and r.is_deleted = false
     ) as active_reply_count,
-    va.deg as degree,
+    coalesce(va.deg, case when p.author_id = p_viewer_id then 0 else 3 end) as degree,
     (
       select pr_user.reaction_type
       from public.post_reactions pr_user
@@ -293,13 +430,33 @@ begin
         ) sub
       ),
       '{}'::jsonb
-    ) as reaction_counts
+    ) as reaction_counts,
+    p.visibility
   from public.posts p
-  join visible_authors va on va.user_id = p.author_id
   join public.profiles pr on pr.id = p.author_id
+  left join lateral (
+    select 0 as deg
+    where p.author_id = p_viewer_id
+    union all
+    select r.degree as deg
+    from public.get_network_reach(p_viewer_id) r
+    where r.reachable_user_id = p.author_id
+    limit 1
+  ) va on true
   where p.id = p.root_post_id          -- feed shows top-level posts only
     and p.is_deleted = false
     and (
+      p_scope = 'global'
+      or p.author_id = p_viewer_id
+      or exists (
+        select 1
+        from public.get_network_reach(p_viewer_id, p.visibility) vr
+        where vr.reachable_user_id = p.author_id
+      )
+    )
+    and (
+      p_bucket = 'all'
+      or
       (p_bucket = 'unseen' and not exists (
         select 1 from public.post_seen ps
         where ps.viewer_id = p_viewer_id and ps.post_id = p.id
@@ -411,7 +568,8 @@ $$;
 
 create or replace function public.get_unseen_count(
   p_viewer_id bigint,
-  p_cap int default 20
+  p_cap int default 20,
+  p_scope text default 'network'
 )
 returns int
 language sql
@@ -420,12 +578,16 @@ as $$
   select count(*)::int from (
     select p.id
     from public.posts p
-    join (
-      select reachable_user_id as user_id from public.get_network_reach(p_viewer_id)
-    ) va on va.user_id = p.author_id
+    left join lateral (
+      select r.degree
+      from public.get_network_reach(p_viewer_id, p.visibility) r
+      where r.reachable_user_id = p.author_id
+      limit 1
+    ) va on true
     where p.id = p.root_post_id
       and p.is_deleted = false
       and p.author_id != p_viewer_id
+      and (p_scope = 'global' or va.degree is not null)
       and not exists (
         select 1 from public.post_seen ps
         where ps.viewer_id = p_viewer_id and ps.post_id = p.id

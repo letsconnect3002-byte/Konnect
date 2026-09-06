@@ -384,6 +384,18 @@ Future<void> showConnectionLocalNotification({
       ];
       iosCategory = 'referral_connect_category';
     }
+  } else if (type == 'direct_connection_request') {
+    androidActions = [
+      const AndroidNotificationAction(
+        'action_direct_connect_accept',
+        'Accept',
+      ),
+      const AndroidNotificationAction(
+        'action_ignore',
+        'Ignore',
+      ),
+    ];
+    iosCategory = 'direct_connection_request_category';
   } else {
     androidActions = [
       const AndroidNotificationAction(
@@ -428,7 +440,7 @@ Future<void> showConnectionLocalNotification({
     playSound: true,
     enableVibration: true,
     showWhen: true,
-    category: AndroidNotificationCategory.promo,
+    category: AndroidNotificationCategory.social,
     actions: androidActions,
   );
 
@@ -717,6 +729,78 @@ Future<void> onNotificationActionReceived(NotificationResponse response) async {
           await client
               .from('connection_notifications')
               .update({'is_seen': true}).eq('id', notificationId);
+          await flutterLocalNotificationsPlugin.cancel(id: notifId);
+        } else if (actionId == 'action_direct_connect_accept') {
+          print(
+              "PushNotificationsAction: Direct connect accept action triggered");
+          final myUserId = await LocalDatabaseHelper.instance.getActiveUserId();
+          final senderIdStr = data['actor_id']?.toString() ??
+              data['other_user_id']?.toString() ??
+              data['sender_id']?.toString();
+          final senderId =
+              senderIdStr != null ? int.tryParse(senderIdStr) : null;
+
+          if (myUserId != null && senderId != null) {
+            final int id1 = myUserId < senderId ? myUserId : senderId;
+            final int id2 = myUserId > senderId ? myUserId : senderId;
+
+            // Extract sender's shared card from note JSON if available
+            String senderSharedCard = 'casual';
+            final rawNote = data['note']?.toString();
+            if (rawNote != null && rawNote.startsWith('{')) {
+              try {
+                final parsed = jsonDecode(rawNote);
+                if (parsed is Map && parsed['card'] != null) {
+                  senderSharedCard = parsed['card'].toString();
+                }
+              } catch (_) {}
+            }
+
+            final prefs = await SharedPreferences.getInstance();
+            final String recipientCard =
+                prefs.getString('default_card_visibility') ?? 'casual';
+
+            String u1Share = 'casual';
+            String u2Share = 'casual';
+
+            if (myUserId < senderId) {
+              u1Share = recipientCard;
+              u2Share = senderSharedCard;
+            } else {
+              u1Share = senderSharedCard;
+              u2Share = recipientCard;
+            }
+
+            await client.from('user_connections').upsert({
+              'user_id_1': id1,
+              'user_id_2': id2,
+              'user_1_shared_card': u1Share,
+              'user_2_shared_card': u2Share,
+            });
+
+            await client.from('connection_notifications').insert([
+              {
+                'user_id': myUserId,
+                'other_user_id': senderId,
+                'type': 'direct_connect',
+                'is_seen': false,
+              },
+              {
+                'user_id': senderId,
+                'other_user_id': myUserId,
+                'type': 'direct_connect',
+                'is_seen': false,
+              }
+            ]);
+
+            await client
+                .from('connection_notifications')
+                .update({'is_seen': true}).eq('id', notificationId);
+
+            await flutterLocalNotificationsPlugin.cancel(id: notifId);
+            print(
+                "PushNotificationsAction: Direct connect accepted and connected successfully");
+          }
         } else if (actionId == 'action_connect') {
           print("PushNotificationsAction: Connect action triggered");
           final myUserId = await LocalDatabaseHelper.instance.getActiveUserId();
@@ -1394,6 +1478,28 @@ List<DarwinNotificationCategory> buildDarwinNotificationCategories() {
         DarwinNotificationCategoryOption.hiddenPreviewShowTitle,
       },
     ),
+    DarwinNotificationCategory(
+      'direct_connection_request_category',
+      actions: <DarwinNotificationAction>[
+        DarwinNotificationAction.plain(
+          'action_direct_connect_accept',
+          'Accept',
+          options: <DarwinNotificationActionOption>{
+            DarwinNotificationActionOption.foreground,
+          },
+        ),
+        DarwinNotificationAction.plain(
+          'action_ignore',
+          'Ignore',
+          options: <DarwinNotificationActionOption>{
+            DarwinNotificationActionOption.destructive,
+          },
+        ),
+      ],
+      options: <DarwinNotificationCategoryOption>{
+        DarwinNotificationCategoryOption.hiddenPreviewShowTitle,
+      },
+    ),
   ];
 }
 
@@ -1717,13 +1823,13 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
         }
       }
     }
-  } else if (action == 'connection_notification' ||
-      action == 'feed_notification') {
+  } else if (action == 'feed_notification') {
     if (message.notification != null) {
       print(
           "PushNotifications: System notification already presented by FCM OS. Skipping duplicate local notification.");
       return;
     }
+  } else if (action == 'connection_notification') {
     final notificationId =
         data['notification_id']?.toString() ?? data['id']?.toString();
     if (notificationId != null) {
@@ -1733,24 +1839,38 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
         final notifRow = await client
             .from('connection_notifications')
             .select(
-                '*, other_user:profiles!other_user_id(id, name, avatar_url, profession), referred_user:profiles!referred_user_id(id, name, avatar_url, profession)')
+                '*, other_user:profiles!other_user_id(id, name, avatar_url, profession, anon_name), referred_user:profiles!referred_user_id(id, name, avatar_url, profession)')
             .eq('id', notificationId)
             .maybeSingle();
 
         if (notifRow != null) {
           var type = notifRow['type']?.toString() ?? 'referral';
           final note = notifRow['note']?.toString();
+          bool isAnonymous = false;
+          String? explicitActorName;
           if (note != null && note.startsWith('{')) {
             try {
               final parsed = jsonDecode(note);
               if (parsed['real_type'] != null) {
                 type = parsed['real_type'].toString();
               }
+              if (parsed['is_anonymous'] == true ||
+                  parsed['is_anonymous']?.toString() == 'true') {
+                isAnonymous = true;
+              }
+              if (parsed['actor_name'] != null) {
+                explicitActorName = parsed['actor_name']?.toString();
+              }
             } catch (_) {}
           }
 
           final actor = notifRow['other_user'] as Map<String, dynamic>? ?? {};
-          final actorName = actor['name']?.toString() ?? 'Someone';
+          var actorName = actor['name']?.toString() ?? 'Someone';
+          if (isAnonymous) {
+            actorName = explicitActorName ??
+                actor['anon_name']?.toString() ??
+                'Anonymous';
+          }
           final referred =
               notifRow['referred_user'] as Map<String, dynamic>? ?? {};
           final referredName = referred['name']?.toString() ?? 'Someone';
@@ -1764,6 +1884,22 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
           } else if (type == "referral_connect") {
             title = "New Connection";
             body = "$actorName connected via Referral";
+          } else if (type == "direct_connection_request") {
+            title = "Connection Request";
+            String msg = "";
+            if (note != null && note.startsWith('{')) {
+              try {
+                final parsed = jsonDecode(note);
+                if (parsed['message'] != null) {
+                  msg = parsed['message'].toString();
+                }
+              } catch (_) {}
+            } else if (note != null) {
+              msg = note;
+            }
+            body = msg.trim().isNotEmpty
+                ? "$actorName: ${msg.trim()}"
+                : "$actorName sent you a direct connection request";
           } else if (type == "referral") {
             final isRequest = note != null &&
                 (note.startsWith("[REFERRAL_REQUEST]") ||
@@ -1938,17 +2074,19 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
               title = "Removed from Mafia";
               body = "You were removed from \"$tribeName\"";
             } else if (type == "feed_reply_mention") {
-              title = "New Reply & Mention";
+              title = isAnonymous
+                  ? "New Anonymous Reply & Mention"
+                  : "New Reply & Mention";
               body =
                   "$actorName replied to your post and mentioned you on their post.";
             } else if (type == "feed_reply") {
-              title = "New Reply";
+              title = isAnonymous ? "New Anonymous Reply" : "New Reply";
               body = "$actorName replied to your post.";
             } else if (type == "feed_mention") {
-              title = "New Mention";
+              title = isAnonymous ? "New Anonymous Mention" : "New Mention";
               body = "$actorName mentioned you on their post.";
             } else if (type == "feed_post") {
-              title = "New Post";
+              title = isAnonymous ? "New Anonymous Post" : "New Post";
               body = "$actorName shared a new post with your network.";
             } else if (type == "feed_connection_reply") {
               String parentAuthorName = "a post";
@@ -2247,12 +2385,19 @@ class MyApp extends StatelessWidget {
             return pulseProvider;
           },
         ),
-        ChangeNotifierProxyProvider<ProfileProvider, FeedProvider>(
+        ChangeNotifierProxyProvider2<ProfileProvider, ConnectionProvider,
+            FeedProvider>(
           create: (_) => FeedProvider(
             repository: SupabaseFeedRepository(),
           ),
-          update: (_, profileProvider, feedProvider) {
-            feedProvider!.updateViewerId(profileProvider.userId);
+          update: (_, profileProvider, connectionProvider, feedProvider) {
+            feedProvider!.updateFromProviders(
+              profileProvider.userId,
+              connectionProvider.connections.length,
+              isConnectionsLoaded:
+                  connectionProvider.state is UserConnectionLoaded ||
+                      connectionProvider.state is UserConnectionError,
+            );
             return feedProvider;
           },
         ),
@@ -2788,26 +2933,41 @@ class _AppShellGateState extends State<AppShellGate> {
                 final notifRow = await client
                     .from('connection_notifications')
                     .select(
-                        '*, other_user:profiles!other_user_id(id, name, avatar_url, profession), referred_user:profiles!referred_user_id(id, name, avatar_url, profession)')
+                        '*, other_user:profiles!other_user_id(id, name, avatar_url, profession, anon_name), referred_user:profiles!referred_user_id(id, name, avatar_url, profession)')
                     .eq('id', notificationId)
                     .maybeSingle();
 
                 if (notifRow != null) {
                   var type = notifRow['type']?.toString() ?? 'referral';
                   final note = notifRow['note']?.toString();
+                  bool isAnonymous = false;
+                  String? explicitActorName;
                   if (note != null && note.startsWith('{')) {
                     try {
                       final parsed = jsonDecode(note);
                       if (parsed['real_type'] != null) {
                         type = parsed['real_type'].toString();
                       }
+                      if (parsed['is_anonymous'] == true ||
+                          parsed['is_anonymous']?.toString() == 'true') {
+                        isAnonymous = true;
+                      }
+                      if (parsed['actor_name'] != null) {
+                        explicitActorName = parsed['actor_name']?.toString();
+                      }
                     } catch (_) {}
                   }
 
                   final actor =
                       notifRow['other_user'] as Map<String, dynamic>? ?? {};
-                  final actorName = actor['name']?.toString() ?? 'Someone';
-                  final actorAvatar = actor['avatar_url']?.toString() ?? '';
+                  var actorName = actor['name']?.toString() ?? 'Someone';
+                  var actorAvatar = actor['avatar_url']?.toString() ?? '';
+                  if (isAnonymous) {
+                    actorName = explicitActorName ??
+                        actor['anon_name']?.toString() ??
+                        'Anonymous';
+                    actorAvatar = '';
+                  }
                   final actorId = actor['id'] as int? ?? 0;
                   final referred =
                       notifRow['referred_user'] as Map<String, dynamic>? ?? {};
@@ -2823,6 +2983,22 @@ class _AppShellGateState extends State<AppShellGate> {
                   } else if (type == "referral_connect") {
                     title = "New Connection";
                     body = "$actorName connected via Referral";
+                  } else if (type == "direct_connection_request") {
+                    title = "Connection Request";
+                    String msg = "";
+                    if (note != null && note.startsWith('{')) {
+                      try {
+                        final parsed = jsonDecode(note);
+                        if (parsed['message'] != null) {
+                          msg = parsed['message'].toString();
+                        }
+                      } catch (_) {}
+                    } else if (note != null) {
+                      msg = note;
+                    }
+                    body = msg.trim().isNotEmpty
+                        ? "$actorName: ${msg.trim()}"
+                        : "$actorName sent you a direct connection request";
                   } else if (type == "referral") {
                     final isRequest = note != null &&
                         (note.startsWith("[REFERRAL_REQUEST]") ||
@@ -2999,17 +3175,19 @@ class _AppShellGateState extends State<AppShellGate> {
                       title = "Mafia Approved";
                       body = "Your request to join \"$tribeName\" was approved";
                     } else if (type == "feed_reply_mention") {
-                      title = "New Reply & Mention";
+                      title = isAnonymous
+                          ? "New Anonymous Reply & Mention"
+                          : "New Reply & Mention";
                       body =
                           "$actorName replied to your post and mentioned you on their post.";
                     } else if (type == "feed_reply") {
-                      title = "New Reply";
+                      title = isAnonymous ? "New Anonymous Reply" : "New Reply";
                       body = "$actorName replied to your post.";
                     } else if (type == "feed_mention") {
-                      title = "New Mention";
+                      title = isAnonymous ? "New Anonymous Mention" : "New Mention";
                       body = "$actorName mentioned you on their post.";
                     } else if (type == "feed_post") {
-                      title = "New Post";
+                      title = isAnonymous ? "New Anonymous Post" : "New Post";
                       body = "$actorName shared a new post with your network.";
                     } else if (type == "feed_connection_reply") {
                       String parentAuthorName = "a post";
@@ -3037,6 +3215,8 @@ class _AppShellGateState extends State<AppShellGate> {
                       senderId: actorId,
                       senderName: title,
                       avatarUrl: actorAvatar,
+                      isAnonymous: isAnonymous,
+                      anonSeed: actorName,
                       message: body,
                       onTap: () {
                         navigatorKey.currentState?.push(
@@ -3056,8 +3236,13 @@ class _AppShellGateState extends State<AppShellGate> {
               }
             }
           } else if (action == 'feed_notification') {
-            final actorAvatar = data['actor_avatar']?.toString() ?? '';
-            final title = data['title']?.toString() ?? 'Network Feed Update';
+            final isAnonymous = data['is_anonymous'] == 'true' ||
+                data['is_anonymous'] == true;
+            final actorName = data['actor_name']?.toString() ?? 'Someone';
+            final actorAvatar =
+                isAnonymous ? '' : (data['actor_avatar']?.toString() ?? '');
+            final title = data['title']?.toString() ??
+                (isAnonymous ? 'Anonymous Feed Update' : 'Network Feed Update');
             final body = data['body']?.toString() ?? '';
             final rootPostId = data['root_post_id']?.toString() ??
                 data['post_id']?.toString() ??
@@ -3071,6 +3256,8 @@ class _AppShellGateState extends State<AppShellGate> {
                 senderId: 0,
                 senderName: title,
                 avatarUrl: actorAvatar,
+                isAnonymous: isAnonymous,
+                anonSeed: actorName,
                 message: body,
                 onTap: () {
                   appShellKey.currentState?.setSelectedIndex(0);

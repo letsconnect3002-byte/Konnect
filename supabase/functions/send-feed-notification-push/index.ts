@@ -34,6 +34,8 @@ serve(async (req) => {
     let postId = ""
     let rootPostId = ""
     let parentAuthorName = "a post"
+    let isAnonymous = false
+    let explicitActorName = ""
 
     if (note && note.startsWith("{")) {
       try {
@@ -42,6 +44,8 @@ serve(async (req) => {
         if (parsed.post_id) postId = String(parsed.post_id)
         if (parsed.root_post_id) rootPostId = String(parsed.root_post_id)
         if (parsed.parent_author_name) parentAuthorName = String(parsed.parent_author_name)
+        if (parsed.is_anonymous === true || parsed.is_anonymous === "true") isAnonymous = true
+        if (parsed.actor_name) explicitActorName = String(parsed.actor_name)
       } catch (e) {
         console.error("Error parsing feed notification note JSON:", e)
       }
@@ -56,33 +60,75 @@ serve(async (req) => {
     // 1. Initialize Supabase Client with Service Role Key
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-    // 2. Fetch actor profile name & avatar
+    // Double check post anonymity from DB if not already marked
+    if (!isAnonymous && postId) {
+      try {
+        const { data: postData } = await supabase
+          .from("posts")
+          .select("is_anonymous")
+          .eq("id", postId)
+          .single()
+        if (postData?.is_anonymous) {
+          isAnonymous = true
+        }
+      } catch (e) {
+        console.error("Error checking post anonymity from DB:", e)
+      }
+    }
+
+    // 2. Fetch actor profile name, avatar & anon_name
     const { data: actorProfile } = await supabase
       .from("profiles")
-      .select("name, avatar_url")
+      .select("name, avatar_url, anon_name")
       .eq("id", actorId)
       .single()
 
-    const actorName = actorProfile?.name || "Someone"
-    const actorAvatar = actorProfile?.avatar_url || ""
+    let actorName = actorProfile?.name || "Someone"
+    let actorAvatar = actorProfile?.avatar_url || ""
+
+    if (isAnonymous) {
+      actorName = explicitActorName || actorProfile?.anon_name || "Anonymous"
+      actorAvatar = ""
+    }
 
     // 3. Formulate push title & body (NEVER send post content)
-    let title = "Network Feed Update"
+    let title = isAnonymous ? "Anonymous Feed Update" : "Network Feed Update"
     let bodyText = `${actorName} updated the network feed.`
 
     if (realType === "feed_reply_mention") {
-      title = "New Reply & Mention"
+      title = isAnonymous ? "New Anonymous Reply & Mention" : "New Reply & Mention"
       bodyText = `${actorName} replied to your post and mentioned you on their post.`
     } else if (realType === "feed_reply") {
-      title = "New Reply"
+      title = isAnonymous ? "New Anonymous Reply" : "New Reply"
       bodyText = `${actorName} replied to your post.`
     } else if (realType === "feed_mention") {
-      title = "New Mention"
+      title = isAnonymous ? "New Anonymous Mention" : "New Mention"
       bodyText = `${actorName} mentioned you on their post.`
     } else if (realType === "feed_post") {
-      title = "New Post"
+      title = isAnonymous ? "New Anonymous Post" : "New Post"
       bodyText = `${actorName} has uploaded a post, tap to see`
     } else if (realType == "feed_connection_reply") {
+      if (postId) {
+        try {
+          const { data: currentPost } = await supabase
+            .from("posts")
+            .select("reply_to_post_id")
+            .eq("id", postId)
+            .single()
+          if (currentPost?.reply_to_post_id) {
+            const { data: parentPost } = await supabase
+              .from("posts")
+              .select("is_anonymous, author:profiles!author_id(name, anon_name)")
+              .eq("id", currentPost.reply_to_post_id)
+              .single()
+            if (parentPost?.is_anonymous) {
+              parentAuthorName = (parentPost.author as any)?.anon_name || "Anonymous"
+            }
+          }
+        } catch (e) {
+          console.error("Error double-checking parent post anonymity for feed_connection_reply:", e)
+        }
+      }
       title = `${actorName} joined a conversation`
       bodyText = `${actorName} replied to ${parentAuthorName}, tap to join the conversation.`
     }
@@ -126,6 +172,7 @@ serve(async (req) => {
             actor_id: String(actorId),
             actor_name: actorName,
             actor_avatar: actorAvatar,
+            is_anonymous: isAnonymous ? "true" : "false",
             post_id: postId,
             root_post_id: rootPostId,
             title: title,

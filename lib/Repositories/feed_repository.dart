@@ -9,6 +9,7 @@ abstract class FeedRepository {
     DateTime? cursorCreatedAt,
     String? cursorPostId,
     int limit = 20,
+    String scope = 'network',
   });
 
   Future<List<FeedPost>> getThread({
@@ -27,6 +28,7 @@ abstract class FeedRepository {
     required String content,
     String? replyToPostId,
     String visibility = 'both',
+    bool isAnonymous = false,
   });
 
   Future<void> deletePost({
@@ -42,6 +44,7 @@ abstract class FeedRepository {
   Future<int> getUnseenCount({
     required int viewerId,
     int cap = 20,
+    String scope = 'network',
   });
 
   Future<List<Map<String, dynamic>>> getMutualConnections({
@@ -88,11 +91,13 @@ class SupabaseFeedRepository implements FeedRepository {
     DateTime? cursorCreatedAt,
     String? cursorPostId,
     int limit = 20,
+    String scope = 'network',
   }) async {
     final Map<String, dynamic> params = {
       'p_viewer_id': viewerId,
       'p_bucket': bucket,
       'p_limit': limit,
+      'p_scope': scope,
     };
 
     if (cursorCreatedAt != null && cursorPostId != null) {
@@ -153,7 +158,7 @@ class SupabaseFeedRepository implements FeedRepository {
                     ? DateTime.parse(row['created_at'].toString()).toLocal()
                     : DateTime.now(),
                 replyCount: row['reply_count'] is int ? row['reply_count'] as int : (int.tryParse(row['reply_count']?.toString() ?? '') ?? 0),
-                degree: (viewerId != null && authorId == viewerId) ? 0 : 3,
+                degree: (viewerId != null && authorId == viewerId) ? 0 : -1,
                 isDeleted: row['is_deleted'] == true,
                 replyToPostId: row['reply_to_post_id']?.toString(),
               ));
@@ -193,11 +198,7 @@ class SupabaseFeedRepository implements FeedRepository {
 
       result = result.map((post) {
         final int computedSubtreeReplies = (post.id == rootPostId)
-            ? (totalActiveThreadReplies > 0
-                ? totalActiveThreadReplies
-                : (post.activeReplyCount > 0
-                    ? post.activeReplyCount
-                    : post.replyCount))
+            ? totalActiveThreadReplies
             : (subtreeCountMap[post.id] ?? 0);
 
         FeedPost updated = post.copyWith(
@@ -241,11 +242,13 @@ class SupabaseFeedRepository implements FeedRepository {
     required String content,
     String? replyToPostId,
     String visibility = 'both',
+    bool isAnonymous = false,
   }) async {
     String effectiveVisibility = visibility;
     final Map<String, dynamic> insertData = {
       'author_id': authorId,
       'content': content,
+      'is_anonymous': isAnonymous,
     };
     if (replyToPostId != null && replyToPostId.isNotEmpty) {
       insertData['reply_to_post_id'] = replyToPostId;
@@ -274,12 +277,16 @@ class SupabaseFeedRepository implements FeedRepository {
     // Fetch author profile details
     final profileRes = await _client
         .from('profiles')
-        .select('name, avatar_url')
+        .select('name, avatar_url, anon_name')
         .eq('id', authorId)
         .maybeSingle();
 
-    final String authorName = profileRes?['name']?.toString() ?? 'User';
-    final String authorAvatarUrl = profileRes?['avatar_url']?.toString() ?? '';
+    final bool anon = row['is_anonymous'] == true || isAnonymous;
+    final String authorName = anon
+        ? (profileRes?['anon_name']?.toString() ?? 'Anonymous')
+        : (profileRes?['name']?.toString() ?? 'User');
+    final String authorAvatarUrl =
+        anon ? '' : (profileRes?['avatar_url']?.toString() ?? '');
 
     return FeedPost(
       id: row['id'].toString(),
@@ -295,6 +302,7 @@ class SupabaseFeedRepository implements FeedRepository {
       isDeleted: row['is_deleted'] == true,
       replyToPostId: row['reply_to_post_id']?.toString(),
       visibility: row['visibility']?.toString() ?? effectiveVisibility,
+      isAnonymous: anon,
     );
   }
 
@@ -322,10 +330,12 @@ class SupabaseFeedRepository implements FeedRepository {
   Future<int> getUnseenCount({
     required int viewerId,
     int cap = 20,
+    String scope = 'network',
   }) async {
     final response = await _client.rpc('get_unseen_count', params: {
       'p_viewer_id': viewerId,
       'p_cap': cap,
+      'p_scope': scope,
     });
     return (response as int?) ?? 0;
   }
@@ -546,7 +556,7 @@ class SupabaseFeedRepository implements FeedRepository {
     try {
       final response = await _client
           .from('posts')
-          .select('*, profiles!author_id(name, avatar_url)')
+          .select('*, profiles!author_id(name, avatar_url, anon_name)')
           .eq('id', postId)
           .maybeSingle();
 
@@ -556,7 +566,7 @@ class SupabaseFeedRepository implements FeedRepository {
           ? response['author_id'] as int
           : (int.tryParse(response['author_id']?.toString() ?? '') ?? 0);
 
-      int degree = (authorId == viewerId) ? 0 : 1;
+      int degree = (authorId == viewerId) ? 0 : -1;
       if (authorId != viewerId && viewerId != 0) {
         try {
           final postVis = response['visibility']?.toString() ?? 'both';
@@ -584,6 +594,12 @@ class SupabaseFeedRepository implements FeedRepository {
       }
 
       final profile = response['profiles'] as Map<String, dynamic>?;
+      final bool isAnon = response['is_anonymous'] == true;
+      final String authorName = isAnon
+          ? (profile?['anon_name']?.toString() ?? 'Anonymous')
+          : (profile?['name']?.toString() ?? 'User');
+      final String authorAvatarUrl =
+          isAnon ? '' : (profile?['avatar_url']?.toString() ?? '');
 
       Map<String, int> reactionCounts = {};
       if (response['reaction_counts'] is Map) {
@@ -596,8 +612,8 @@ class SupabaseFeedRepository implements FeedRepository {
       return FeedPost(
         id: response['id'].toString(),
         authorId: authorId,
-        authorName: profile?['name']?.toString() ?? 'User',
-        authorAvatarUrl: profile?['avatar_url']?.toString() ?? '',
+        authorName: authorName,
+        authorAvatarUrl: authorAvatarUrl,
         content: response['content']?.toString() ?? '',
         createdAt: response['created_at'] != null
             ? DateTime.parse(response['created_at'].toString()).toLocal()
@@ -609,6 +625,7 @@ class SupabaseFeedRepository implements FeedRepository {
         isDeleted: response['is_deleted'] == true,
         replyToPostId: response['reply_to_post_id']?.toString(),
         reactionCounts: reactionCounts,
+        isAnonymous: isAnon,
       );
     } catch (e) {
       return null;

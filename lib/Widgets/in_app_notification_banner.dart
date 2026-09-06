@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:connect/Config/app_theme.dart';
 import 'package:connect/Pages/IndividualChatPage.dart';
+import 'package:connect/Widgets/anonymous_avatar.dart';
 import 'package:connect/main.dart';
 
 class InAppNotificationBanner extends StatefulWidget {
@@ -10,6 +11,8 @@ class InAppNotificationBanner extends StatefulWidget {
   final String senderName;
   final String avatarUrl;
   final String message;
+  final bool isAnonymous;
+  final String? anonSeed;
   final VoidCallback onDismiss;
   final VoidCallback? onTap;
 
@@ -19,6 +22,8 @@ class InAppNotificationBanner extends StatefulWidget {
     required this.senderName,
     required this.avatarUrl,
     required this.message,
+    this.isAnonymous = false,
+    this.anonSeed,
     required this.onDismiss,
     this.onTap,
   });
@@ -32,6 +37,8 @@ class InAppNotificationBanner extends StatefulWidget {
     required String senderName,
     required String avatarUrl,
     required String message,
+    bool isAnonymous = false,
+    String? anonSeed,
     VoidCallback? onTap,
   }) {
     // Dismiss any existing banner first
@@ -49,6 +56,8 @@ class InAppNotificationBanner extends StatefulWidget {
             senderName: senderName,
             avatarUrl: avatarUrl,
             message: message,
+            isAnonymous: isAnonymous,
+            anonSeed: anonSeed,
             onDismiss: () => dismiss(),
             onTap: onTap,
           ),
@@ -167,23 +176,28 @@ class _InAppNotificationBannerState extends State<InAppNotificationBanner>
               child: Row(
                 children: [
                   // Sender Avatar
-                  Container(
-                    width: 42,
-                    height: 42,
-                    decoration: const BoxDecoration(
-                      shape: BoxShape.circle,
-                    ),
-                    child: ClipOval(
-                      child: widget.avatarUrl.isNotEmpty
-                          ? Image.network(
-                              widget.avatarUrl,
-                              fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) =>
-                                  _buildAvatarFallback(),
-                            )
-                          : _buildAvatarFallback(),
-                    ),
-                  ),
+                  widget.isAnonymous
+                      ? AnonymousAvatar(
+                          seed: widget.anonSeed ?? widget.senderName,
+                          radius: 21,
+                        )
+                      : Container(
+                          width: 42,
+                          height: 42,
+                          decoration: const BoxDecoration(
+                            shape: BoxShape.circle,
+                          ),
+                          child: ClipOval(
+                            child: widget.avatarUrl.isNotEmpty
+                                ? Image.network(
+                                    widget.avatarUrl,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (context, error, stackTrace) =>
+                                        _buildAvatarFallback(),
+                                  )
+                                : _buildAvatarFallback(),
+                          ),
+                        ),
                   const SizedBox(width: 12),
                   // Sender Name and Message Snippet
                   Expanded(

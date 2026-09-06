@@ -15,6 +15,7 @@ class FeedPost {
   final String? userReaction;
   final Map<String, int> reactionCounts;
   final String visibility; // 'casual', 'professional', 'both'
+  final bool isAnonymous;
 
   FeedPost({
     required this.id,
@@ -31,8 +32,12 @@ class FeedPost {
     this.userReaction,
     this.reactionCounts = const {},
     this.visibility = 'both',
+    this.isAnonymous = false,
   }) : activeReplyCount = activeReplyCount ?? replyCount;
 
+
+  bool get isGlobalUnconnected => degree == -1;
+  bool get isConnectedInNetwork => degree >= 1 && degree <= 3;
 
   int get totalReactions {
     int total = 0;
@@ -93,16 +98,17 @@ class FeedPost {
           : int.tryParse(json['active_reply_count']?.toString() ?? ''),
       degree: json['degree'] is int
           ? json['degree'] as int
-          : (int.tryParse(json['degree']?.toString() ?? '') ?? 1),
+          : (int.tryParse(json['degree']?.toString() ?? '') ?? -1),
       isDeleted: json['is_deleted'] == true,
       replyToPostId: json['reply_to_post_id']?.toString(),
       userReaction: json['user_reaction']?.toString(),
       reactionCounts: parsedReactionCounts,
       visibility: json['visibility']?.toString() ?? 'both',
+      isAnonymous: json['is_anonymous'] == true,
     );
   }
 
-  factory FeedPost.fromThreadRpcJson(Map<String, dynamic> json, {int degree = 3}) {
+  factory FeedPost.fromThreadRpcJson(Map<String, dynamic> json, {int degree = -1}) {
     Map<String, int> parsedReactionCounts = {};
     if (json['reaction_counts'] != null && json['reaction_counts'] is Map) {
       final map = json['reaction_counts'] as Map;
@@ -141,6 +147,7 @@ class FeedPost {
       userReaction: json['user_reaction']?.toString(),
       reactionCounts: parsedReactionCounts,
       visibility: json['visibility']?.toString() ?? 'both',
+      isAnonymous: json['is_anonymous'] == true,
     );
   }
 
@@ -160,6 +167,7 @@ class FeedPost {
     bool nullifyUserReaction = false,
     Map<String, int>? reactionCounts,
     String? visibility,
+    bool? isAnonymous,
   }) {
     final int newReplyCount = replyCount ?? this.replyCount;
     final int newActiveReplyCount = activeReplyCount ??
@@ -179,6 +187,7 @@ class FeedPost {
       userReaction: nullifyUserReaction ? null : (userReaction ?? this.userReaction),
       reactionCounts: reactionCounts ?? this.reactionCounts,
       visibility: visibility ?? this.visibility,
+      isAnonymous: isAnonymous ?? this.isAnonymous,
     );
   }
 
@@ -199,6 +208,7 @@ class FeedPost {
         other.replyToPostId == replyToPostId &&
         other.userReaction == userReaction &&
         other.visibility == visibility &&
+        other.isAnonymous == isAnonymous &&
         mapEquals(other.reactionCounts, reactionCounts);
   }
 
@@ -210,6 +220,7 @@ class FeedPost {
         replyCount,
         activeReplyCount,
         visibility,
+        isAnonymous,
         Object.hashAll(reactionCounts.entries.map((e) => Object.hash(e.key, e.value))),
       );
 }

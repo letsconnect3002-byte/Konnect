@@ -70,6 +70,9 @@ class CircleFeedPage extends StatefulWidget {
     bool isSubmitting = false;
     bool isPreviewDetached = false;
     String postVisibility = 'both'; // 'both', 'casual', 'professional'
+    final feedProviderRef = Provider.of<FeedProvider>(context, listen: false);
+    final bool isGlobalFeed = feedProviderRef.feedFilter == FeedFilter.global;
+    bool isAnonymousPost = false;
 
     showModalBottomSheet(
       context: context,
@@ -237,36 +240,127 @@ class CircleFeedPage extends StatefulWidget {
                     ],
                   ),
                   const SizedBox(height: 6),
-                  Text(
-                    postVisibility == 'both'
-                        ? "Visible to all connections across your network."
-                        : postVisibility == 'professional'
-                            ? "Visible only to your professional network."
-                            : "Visible only to your casual / personal network.",
-                    style:
-                        TextStyle(color: context.textSecondary, fontSize: 12),
-                  ),
-                  const SizedBox(height: 14),
-
-                  // Audience Selector Segment
-                  Container(
-                    decoration: BoxDecoration(
-                      color: context.surfaceSecondary,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: Colors.white.withValues(alpha: 0.05),
+                  if (isGlobalFeed) ...[
+                    // Global Feed Anonymity Selector
+                    Container(
+                      decoration: BoxDecoration(
+                        color: context.surfaceSecondary,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: isAnonymousPost
+                              ? context.accentPrimary.withValues(alpha: 0.4)
+                              : Colors.white.withValues(alpha: 0.05),
+                        ),
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 10),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 36,
+                            height: 36,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: isAnonymousPost
+                                  ? context.accentPrimary.withValues(alpha: 0.15)
+                                  : Colors.white.withValues(alpha: 0.05),
+                            ),
+                            child: Icon(
+                              isAnonymousPost
+                                  ? Icons.visibility_off_rounded
+                                  : Icons.person_rounded,
+                              size: 18,
+                              color: isAnonymousPost
+                                  ? context.accentSecondary
+                                  : context.textMuted,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  "Post Anonymously",
+                                  style: TextStyle(
+                                    color: context.textPrimary,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Builder(
+                                  builder: (context) {
+                                    final profileProvider =
+                                        Provider.of<ProfileProvider>(context,
+                                            listen: false);
+                                    final anonAlias = profileProvider.anonName.isNotEmpty
+                                        ? profileProvider.anonName
+                                        : "Anonymous";
+                                    return Text(
+                                      isAnonymousPost
+                                          ? "Appearing as $anonAlias"
+                                          : "Appearing as ${profileProvider.name}",
+                                      style: TextStyle(
+                                        color: isAnonymousPost
+                                            ? context.accentSecondary
+                                            : context.textMuted,
+                                        fontSize: 11,
+                                        fontWeight: isAnonymousPost
+                                            ? FontWeight.w600
+                                            : FontWeight.normal,
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ],
+                            ),
+                          ),
+                          Switch.adaptive(
+                            value: isAnonymousPost,
+                            activeThumbColor: context.accentPrimary,
+                            activeTrackColor: context.accentPrimary.withValues(alpha: 0.5),
+                            onChanged: (val) {
+                              HapticFeedback.selectionClick();
+                              setSheetState(() => isAnonymousPost = val);
+                            },
+                          ),
+                        ],
                       ),
                     ),
-                    padding: const EdgeInsets.all(3),
-                    child: Row(
-                      children: [
-                        buildAudienceTab('both', 'All Circles', Icons.public_rounded),
-                        buildAudienceTab('casual', 'Casual', Icons.coffee_rounded),
-                        buildAudienceTab('professional', 'Professional', Icons.work_rounded),
-                      ],
+                    const SizedBox(height: 14),
+                  ] else ...[
+                    Text(
+                      postVisibility == 'both'
+                          ? "Visible to all connections across your network."
+                          : postVisibility == 'professional'
+                              ? "Visible only to your professional network."
+                              : "Visible only to your casual / personal network.",
+                      style:
+                          TextStyle(color: context.textSecondary, fontSize: 12),
                     ),
-                  ),
-                  const SizedBox(height: 14),
+                    const SizedBox(height: 14),
+
+                    // Audience Selector Segment
+                    Container(
+                      decoration: BoxDecoration(
+                        color: context.surfaceSecondary,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.05),
+                        ),
+                      ),
+                      padding: const EdgeInsets.all(3),
+                      child: Row(
+                        children: [
+                          buildAudienceTab('both', 'All Circles', Icons.public_rounded),
+                          buildAudienceTab('casual', 'Casual', Icons.coffee_rounded),
+                          buildAudienceTab('professional', 'Professional', Icons.work_rounded),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                  ],
 
                   TextField(
                     controller: controller,
@@ -469,10 +563,17 @@ class CircleFeedPage extends StatefulWidget {
                               try {
                                 await feedProvider.createPost(
                                   postContent,
-                                  authorName: profileProvider.name,
-                                  authorAvatarUrl: profileProvider.avatarUrl,
+                                  authorName: isAnonymousPost
+                                      ? (profileProvider.anonName.isNotEmpty
+                                          ? profileProvider.anonName
+                                          : 'Anonymous')
+                                      : profileProvider.name,
+                                  authorAvatarUrl: isAnonymousPost
+                                      ? ''
+                                      : profileProvider.avatarUrl,
                                   connections: connections,
                                   visibility: postVisibility,
+                                  isAnonymous: isAnonymousPost,
                                 );
                                 AnalyticsService.logEvent(
                                   name: 'post_created',
@@ -481,6 +582,7 @@ class CircleFeedPage extends StatefulWidget {
                                     'char_count': postContent.length,
                                     'has_link': (activeUrl != null && activeUrl.isNotEmpty) ? 1 : 0,
                                     'mentions_count': RegExp(r'@[a-zA-Z0-9_]+').allMatches(postContent).length,
+                                    'is_anonymous': isAnonymousPost ? 1 : 0,
                                   },
                                 );
                                 if (ctx.mounted) Navigator.pop(ctx);
@@ -501,9 +603,13 @@ class CircleFeedPage extends StatefulWidget {
                               child: CircularProgressIndicator(
                                   strokeWidth: 2, color: Colors.white),
                             )
-                          : const Text(
-                              "Post to Network",
-                              style: TextStyle(
+                          : Text(
+                              isAnonymousPost
+                                  ? "Post Anonymously"
+                                  : (isGlobalFeed
+                                      ? "Post to Global"
+                                      : "Post to Network"),
+                              style: const TextStyle(
                                   color: Colors.white,
                                   fontWeight: FontWeight.bold,
                                   fontSize: 14),
@@ -523,7 +629,6 @@ class CircleFeedPage extends StatefulWidget {
 class _CircleFeedPageState extends State<CircleFeedPage> {
   final ScrollController _scrollController = ScrollController();
   RealtimeChannel? _feedChannel;
-  bool _onlyFirstDegree = false;
 
   @override
   void initState() {
@@ -532,9 +637,17 @@ class _CircleFeedPageState extends State<CircleFeedPage> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final profileProvider =
           Provider.of<ProfileProvider>(context, listen: false);
+      final connectionProvider =
+          Provider.of<ConnectionProvider>(context, listen: false);
       final feedProvider = Provider.of<FeedProvider>(context, listen: false);
       if (feedProvider.viewerId != profileProvider.userId) {
-        feedProvider.updateViewerId(profileProvider.userId);
+        feedProvider.updateFromProviders(
+          profileProvider.userId,
+          connectionProvider.connections.length,
+          isConnectionsLoaded:
+              connectionProvider.state is UserConnectionLoaded ||
+                  connectionProvider.state is UserConnectionError,
+        );
       }
       _subscribeToFeedRealtime();
     });
@@ -679,6 +792,7 @@ class _CircleFeedPageState extends State<CircleFeedPage> {
 
   void _openFeedFilterSheet(BuildContext context) {
     HapticFeedback.lightImpact();
+    final feedProvider = Provider.of<FeedProvider>(context, listen: false);
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -747,15 +861,37 @@ class _CircleFeedPageState extends State<CircleFeedPage> {
                       ),
                       const SizedBox(height: 20),
                       _buildFeedOptionCard(
+                        title: "Global Feed",
+                        description:
+                            "All posts across the platform without any network filters",
+                        icon: Icons.language_rounded,
+                        isSelected: feedProvider.feedFilter == FeedFilter.global,
+                        onTap: () {
+                          if (feedProvider.feedFilter != FeedFilter.global) {
+                            HapticFeedback.selectionClick();
+                            feedProvider.setFilter(FeedFilter.global);
+                            setSheetState(() {});
+                            AnalyticsService.logEvent(
+                              name: 'feed_filter_changed',
+                              parameters: {'filter': 'global'},
+                            );
+                          }
+                          Navigator.pop(sheetContext);
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      _buildFeedOptionCard(
                         title: "Full Network",
                         description:
                             "Posts from direct connections and extended network",
                         icon: Icons.public_rounded,
-                        isSelected: !_onlyFirstDegree,
+                        isSelected:
+                            feedProvider.feedFilter == FeedFilter.fullNetwork,
                         onTap: () {
-                          if (_onlyFirstDegree) {
+                          if (feedProvider.feedFilter !=
+                              FeedFilter.fullNetwork) {
                             HapticFeedback.selectionClick();
-                            setState(() => _onlyFirstDegree = false);
+                            feedProvider.setFilter(FeedFilter.fullNetwork);
                             setSheetState(() {});
                             AnalyticsService.logEvent(
                               name: 'feed_filter_changed',
@@ -771,11 +907,13 @@ class _CircleFeedPageState extends State<CircleFeedPage> {
                         description:
                             "Posts exclusively from your direct 1st-degree connections",
                         icon: Icons.people_alt_rounded,
-                        isSelected: _onlyFirstDegree,
+                        isSelected:
+                            feedProvider.feedFilter == FeedFilter.innerCircle,
                         onTap: () {
-                          if (!_onlyFirstDegree) {
+                          if (feedProvider.feedFilter !=
+                              FeedFilter.innerCircle) {
                             HapticFeedback.selectionClick();
-                            setState(() => _onlyFirstDegree = true);
+                            feedProvider.setFilter(FeedFilter.innerCircle);
                             setSheetState(() {});
                             AnalyticsService.logEvent(
                               name: 'feed_filter_changed',
@@ -907,6 +1045,7 @@ class _CircleFeedPageState extends State<CircleFeedPage> {
   }
 
   Widget _buildEmpty1DegreeState(BuildContext context) {
+    final feedProvider = Provider.of<FeedProvider>(context, listen: false);
     return SingleChildScrollView(
       physics: const AlwaysScrollableScrollPhysics(),
       child: Column(
@@ -960,7 +1099,7 @@ class _CircleFeedPageState extends State<CircleFeedPage> {
                 ElevatedButton.icon(
                   onPressed: () {
                     HapticFeedback.selectionClick();
-                    setState(() => _onlyFirstDegree = false);
+                    feedProvider.setFilter(FeedFilter.fullNetwork);
                   },
                   icon: const Icon(Icons.public_rounded,
                       color: Colors.white, size: 18),
@@ -991,11 +1130,7 @@ class _CircleFeedPageState extends State<CircleFeedPage> {
   @override
   Widget build(BuildContext context) {
     final feedProvider = Provider.of<FeedProvider>(context);
-    final List<FeedPost> displayedPosts = _onlyFirstDegree
-        ? feedProvider.posts
-            .where((p) => p.degree == 1 || p.degree == 0)
-            .toList()
-        : feedProvider.posts;
+    final List<FeedPost> displayedPosts = feedProvider.displayedPosts;
 
     return Scaffold(
       backgroundColor: context.canvasBackground,
@@ -1072,15 +1207,23 @@ class _CircleFeedPageState extends State<CircleFeedPage> {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Icon(
-                            _onlyFirstDegree
-                                ? Icons.people_alt_rounded
-                                : Icons.public_rounded,
+                            feedProvider.feedFilter == FeedFilter.global
+                                ? Icons.language_rounded
+                                : (feedProvider.feedFilter ==
+                                        FeedFilter.innerCircle
+                                    ? Icons.people_alt_rounded
+                                    : Icons.public_rounded),
                             size: 14,
                             color: context.accentPrimary,
                           ),
                           const SizedBox(width: 6),
                           Text(
-                            _onlyFirstDegree ? "Inner Circle" : "Full Network",
+                            feedProvider.feedFilter == FeedFilter.global
+                                ? "Global Feed"
+                                : (feedProvider.feedFilter ==
+                                        FeedFilter.innerCircle
+                                    ? "Inner Circle"
+                                    : "Full Network"),
                             style: TextStyle(
                               color: context.textPrimary,
                               fontSize: 13,
@@ -1231,20 +1374,26 @@ class _CircleFeedPageState extends State<CircleFeedPage> {
                                                 ),
                                               ),
                                               child: Icon(
-                                                hasNoConnections
-                                                    ? Icons
-                                                        .people_outline_rounded
-                                                    : Icons
-                                                        .dynamic_feed_rounded,
+                                                feedProvider.feedFilter ==
+                                                        FeedFilter.global
+                                                    ? Icons.language_rounded
+                                                    : (hasNoConnections
+                                                        ? Icons
+                                                            .people_outline_rounded
+                                                        : Icons
+                                                            .dynamic_feed_rounded),
                                                 size: 32,
                                                 color: context.accentPrimary,
                                               ),
                                             ),
                                             const SizedBox(height: 16),
                                             Text(
-                                              hasNoConnections
-                                                  ? "Build Your Network"
-                                                  : "No Posts Yet",
+                                              feedProvider.feedFilter ==
+                                                      FeedFilter.global
+                                                  ? "No Global Posts Yet"
+                                                  : (hasNoConnections
+                                                      ? "Build Your Network"
+                                                      : "No Posts Yet"),
                                               textAlign: TextAlign.center,
                                               style: TextStyle(
                                                 color: context.textPrimary,
@@ -1254,9 +1403,12 @@ class _CircleFeedPageState extends State<CircleFeedPage> {
                                             ),
                                             const SizedBox(height: 8),
                                             Text(
-                                              hasNoConnections
-                                                  ? "Connect with friends and colleagues to start seeing posts and pulses in your feed."
-                                                  : "No post shared by your network yet, be first to do so.",
+                                              feedProvider.feedFilter ==
+                                                      FeedFilter.global
+                                                  ? "There are no posts shared in the global feed yet. Be the first to post!"
+                                                  : (hasNoConnections
+                                                      ? "Connect with friends and colleagues to start seeing posts and pulses in your feed."
+                                                      : "No post shared by your network yet, be first to do so."),
                                               textAlign: TextAlign.center,
                                               style: TextStyle(
                                                 color: context.textSecondary,
@@ -1267,7 +1419,10 @@ class _CircleFeedPageState extends State<CircleFeedPage> {
                                             const SizedBox(height: 22),
                                             ElevatedButton.icon(
                                               onPressed: () {
-                                                if (hasNoConnections) {
+                                                if (feedProvider.feedFilter ==
+                                                    FeedFilter.global) {
+                                                  _openComposeSheet(context);
+                                                } else if (hasNoConnections) {
                                                   showModalBottomSheet(
                                                     context: context,
                                                     isScrollControlled: true,
@@ -1284,14 +1439,20 @@ class _CircleFeedPageState extends State<CircleFeedPage> {
                                                 }
                                               },
                                               icon: Icon(
-                                                hasNoConnections
+                                                (feedProvider.feedFilter !=
+                                                            FeedFilter
+                                                                .global &&
+                                                        hasNoConnections)
                                                     ? Icons.person_add_rounded
                                                     : Icons.add_rounded,
                                                 color: Colors.white,
                                                 size: 18,
                                               ),
                                               label: Text(
-                                                hasNoConnections
+                                                (feedProvider.feedFilter !=
+                                                            FeedFilter
+                                                                .global &&
+                                                        hasNoConnections)
                                                     ? "Connect with People"
                                                     : "Share First Post",
                                                 style: const TextStyle(
@@ -1712,7 +1873,7 @@ class _FeedPostThreadItemState extends State<_FeedPostThreadItem> {
         CommentNode syncNodeWithLivePost(CommentNode node, {bool isRoot = false}) {
           final livePost = feedProvider.getPostById(node.id) ?? node.post;
           final int effectiveCount = isRoot
-              ? ((livePost != null && livePost.activeReplyCount > 0)
+              ? (livePost != null
                   ? livePost.activeReplyCount
                   : node.replyCount)
               : node.replyCount;
@@ -1793,9 +1954,7 @@ class _FeedPostThreadItemState extends State<_FeedPostThreadItem> {
           CommentNode buildNode(FeedPost p) {
             final children = childrenMap[p.id] ?? [];
             final totalSubtree = countSubtreeReplies(p);
-            final effectiveReplyCount = (totalSubtree > 0)
-                ? totalSubtree
-                : (p.activeReplyCount > 0 ? p.activeReplyCount : p.replyCount);
+            final effectiveReplyCount = totalSubtree;
             final updatedChildPost = p.copyWith(
               replyCount: effectiveReplyCount,
               activeReplyCount: effectiveReplyCount,
@@ -1810,16 +1969,13 @@ class _FeedPostThreadItemState extends State<_FeedPostThreadItem> {
               degree: p.degree,
               replyCount: effectiveReplyCount,
               isDeleted: p.isDeleted,
+              isAnonymous: p.isAnonymous,
               post: updatedChildPost,
               replies: children.map<CommentNode>(buildNode).toList(),
             );
           }
 
-          final int activeCount = (rootPost.activeReplyCount > 0)
-              ? rootPost.activeReplyCount
-              : (widget.post.activeReplyCount > 0
-                  ? widget.post.activeReplyCount
-                  : replyPosts.length);
+          final int activeCount = rootPost.activeReplyCount;
           final int effectiveDegree = (rootPost.degree != 0 ||
                   rootPost.authorId == feedProvider.viewerId)
               ? rootPost.degree
@@ -1839,6 +1995,7 @@ class _FeedPostThreadItemState extends State<_FeedPostThreadItem> {
             degree: effectiveDegree,
             replyCount: activeCount,
             isDeleted: rootPost.isDeleted,
+            isAnonymous: rootPost.isAnonymous,
             post: updatedRootPost,
             replies: rootChildren.map<CommentNode>(buildNode).toList(),
           );

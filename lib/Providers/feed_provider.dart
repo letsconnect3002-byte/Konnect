@@ -7,12 +7,62 @@ import 'package:connect/Repositories/feed_repository.dart';
 import 'package:connect/Repositories/notification_repository.dart';
 import 'package:connect/Repositories/connection_repository.dart';
 
+enum FeedFilter {
+  global,
+  fullNetwork,
+  innerCircle,
+}
+
 class FeedProvider with ChangeNotifier {
   final FeedRepository _repository;
 
   FeedProvider({FeedRepository? repository})
       : _repository = repository ?? SupabaseFeedRepository() {
     _startSeenFlushTimer();
+  }
+
+  FeedFilter _feedFilter = FeedFilter.fullNetwork;
+  FeedFilter get feedFilter => _feedFilter;
+  String get currentScope => _feedFilter == FeedFilter.global ? 'global' : 'network';
+
+  bool _hasUserExplicitlySelectedFilter = false;
+  bool get hasUserExplicitlySelectedFilter => _hasUserExplicitlySelectedFilter;
+
+  bool _hasDeterminedDefaultFilter = false;
+  bool get hasDeterminedDefaultFilter => _hasDeterminedDefaultFilter;
+
+  int? _lastKnownConnectionCount;
+  Timer? _initialLoadFallbackTimer;
+
+  List<FeedPost> get displayedPosts {
+    if (_feedFilter == FeedFilter.innerCircle) {
+      return _posts.where((p) => p.degree == 1 || p.degree == 0).toList();
+    }
+    return _posts;
+  }
+
+  Future<void> setFilter(FeedFilter filter, {bool isManual = true}) async {
+    if (isManual) {
+      _hasUserExplicitlySelectedFilter = true;
+    }
+    if (_feedFilter == filter) return;
+
+    final wasGlobal = _feedFilter == FeedFilter.global;
+    final isGlobal = filter == FeedFilter.global;
+    _feedFilter = filter;
+
+    if (wasGlobal != isGlobal) {
+      _posts = [];
+      _currentBucket = 'unseen';
+      _hasReachedEnd = false;
+      _hasShownCaughtUpDivider = false;
+      _latestKnownPostId = null;
+      notifyListeners();
+      await fetchInitialFeed();
+      await fetchUnseenCount();
+    } else {
+      notifyListeners();
+    }
   }
 
   int? _viewerId;
@@ -41,7 +91,8 @@ class FeedProvider with ChangeNotifier {
   String get currentBucket => _currentBucket;
 
   bool _isLoading = false;
-  bool get isLoading => _isLoading;
+  bool get isLoading =>
+      _isLoading || (_viewerId != null && !_hasDeterminedDefaultFilter);
 
   // Global Post Registry (caches all posts, thread previews, and replies)
   final Map<String, FeedPost> _postRegistry = {};
@@ -84,18 +135,23 @@ class FeedProvider with ChangeNotifier {
   Timer? _seenFlushTimer;
 
   // -------------------------------------------------------
-  //  Viewer ID management
+  //  Viewer ID and Connection management
   // -------------------------------------------------------
 
-  void updateViewerId(int? id) {
-    if (_viewerId != id) {
-      _viewerId = id;
-      if (id != null) {
-        fetchInitialFeed();
-        fetchUnseenCount();
-        _subscribeToRealtime();
-        _startNewPostPollTimer();
-      } else {
+  void updateFromProviders(
+    int? id,
+    int connectionCount, {
+    required bool isConnectionsLoaded,
+  }) {
+    _lastKnownConnectionCount = connectionCount;
+
+    if (id == null) {
+      if (_viewerId != null) {
+        _viewerId = null;
+        _hasUserExplicitlySelectedFilter = false;
+        _hasDeterminedDefaultFilter = false;
+        _initialLoadFallbackTimer?.cancel();
+        _initialLoadFallbackTimer = null;
         _unsubscribeRealtime();
         _stopNewPostPollTimer();
         _posts = [];
@@ -104,11 +160,82 @@ class FeedProvider with ChangeNotifier {
         _latestKnownPostId = null;
         notifyListeners();
       }
+      return;
     }
+
+    if (_viewerId != id) {
+      _viewerId = id;
+      _hasUserExplicitlySelectedFilter = false;
+      _hasDeterminedDefaultFilter = false;
+      _initialLoadFallbackTimer?.cancel();
+      _initialLoadFallbackTimer = null;
+      _posts = [];
+      _unseenCount = 0;
+      _hasNewPosts = false;
+      _latestKnownPostId = null;
+
+      if (isConnectionsLoaded) {
+        _hasDeterminedDefaultFilter = true;
+        _feedFilter =
+            connectionCount == 0 ? FeedFilter.global : FeedFilter.fullNetwork;
+        notifyListeners();
+        fetchInitialFeed();
+        fetchUnseenCount();
+        _subscribeToRealtime();
+        _startNewPostPollTimer();
+      } else {
+        notifyListeners();
+        // Fallback timer: if connections do not finish loading within 1500ms, proceed with fallback
+        _initialLoadFallbackTimer =
+            Timer(const Duration(milliseconds: 1500), () {
+          if (_viewerId == id && !_hasDeterminedDefaultFilter) {
+            _hasDeterminedDefaultFilter = true;
+            _feedFilter = (_lastKnownConnectionCount ?? 0) == 0
+                ? FeedFilter.global
+                : FeedFilter.fullNetwork;
+            notifyListeners();
+            fetchInitialFeed();
+            fetchUnseenCount();
+            _subscribeToRealtime();
+            _startNewPostPollTimer();
+          }
+        });
+      }
+      return;
+    }
+
+    // Same viewer:
+    if (!_hasDeterminedDefaultFilter && isConnectionsLoaded) {
+      _initialLoadFallbackTimer?.cancel();
+      _initialLoadFallbackTimer = null;
+      _hasDeterminedDefaultFilter = true;
+      _feedFilter =
+          connectionCount == 0 ? FeedFilter.global : FeedFilter.fullNetwork;
+      notifyListeners();
+      fetchInitialFeed();
+      fetchUnseenCount();
+      _subscribeToRealtime();
+      _startNewPostPollTimer();
+      return;
+    }
+
+    // Once the initial default filter has been determined for the session,
+    // do not automatically flip the filter or reload the feed when connection count changes.
+    // This preserves user context and prevents unexpected reloads while browsing.
+  }
+
+  void updateViewerId(int? id) {
+    updateFromProviders(
+      id,
+      _lastKnownConnectionCount ?? 0,
+      isConnectionsLoaded: _hasDeterminedDefaultFilter,
+    );
   }
 
   void ensureRealtimeSubscribed() {
-    if (_viewerId != null && _realtimeChannel == null) {
+    if (_viewerId != null &&
+        _hasDeterminedDefaultFilter &&
+        _realtimeChannel == null) {
       _subscribeToRealtime();
     }
   }
@@ -162,7 +289,10 @@ class FeedProvider with ChangeNotifier {
     final vId = _viewerId;
     if (vId == null) return;
     try {
-      _unseenCount = await _repository.getUnseenCount(viewerId: vId);
+      _unseenCount = await _repository.getUnseenCount(
+        viewerId: vId,
+        scope: currentScope,
+      );
       notifyListeners();
     } catch (e) {
       debugPrint("[FeedProvider] Error fetching unseen count: $e");
@@ -193,6 +323,7 @@ class FeedProvider with ChangeNotifier {
         viewerId: vId,
         bucket: 'unseen',
         limit: 20,
+        scope: currentScope,
       );
 
       final List<FeedPost> updatedPosts = List.from(fetched);
@@ -209,6 +340,7 @@ class FeedProvider with ChangeNotifier {
           viewerId: vId,
           bucket: 'seen',
           limit: 20,
+          scope: currentScope,
         );
         updatedPosts.addAll(seenFetched);
         if (seenFetched.length < 20) {
@@ -309,6 +441,7 @@ class FeedProvider with ChangeNotifier {
           cursorCreatedAt: cursorCreatedAt,
           cursorPostId: cursorPostId,
           limit: 20,
+          scope: currentScope,
         );
 
         _posts.addAll(fetched);
@@ -321,6 +454,7 @@ class FeedProvider with ChangeNotifier {
             viewerId: vId,
             bucket: 'seen',
             limit: 20,
+            scope: currentScope,
           );
           _posts.addAll(seenFetched);
           registerPosts(seenFetched);
@@ -335,6 +469,7 @@ class FeedProvider with ChangeNotifier {
           cursorCreatedAt: cursorCreatedAt,
           cursorPostId: cursorPostId,
           limit: 20,
+          scope: currentScope,
         );
 
         _posts.addAll(fetched);
@@ -363,6 +498,7 @@ class FeedProvider with ChangeNotifier {
     String? replyToPostId,
     List<Map<String, dynamic>>? connections,
     String visibility = 'both',
+    bool isAnonymous = false,
   }) async {
     final vId = _viewerId;
     if (vId == null || content.trim().isEmpty) {
@@ -381,6 +517,7 @@ class FeedProvider with ChangeNotifier {
       degree: 0,
       replyToPostId: replyToPostId,
       visibility: visibility,
+      isAnonymous: isAnonymous,
     );
 
     if (replyToPostId == null) {
@@ -394,6 +531,7 @@ class FeedProvider with ChangeNotifier {
         content: content.trim(),
         replyToPostId: replyToPostId,
         visibility: visibility,
+        isAnonymous: isAnonymous,
       );
 
       if (replyToPostId == null) {
@@ -540,6 +678,9 @@ class FeedProvider with ChangeNotifier {
           type: notifType,
           postId: createdPost.id,
           rootPostId: rootPostId,
+          isAnonymous: createdPost.isAnonymous,
+          actorName: createdPost.authorName,
+          replySnippet: createdPost.content,
         );
 
         mentionedUserIds.remove(parentAuthorId);
@@ -552,6 +693,9 @@ class FeedProvider with ChangeNotifier {
           type: 'feed_mention',
           postId: createdPost.id,
           rootPostId: rootPostId,
+          isAnonymous: createdPost.isAnonymous,
+          actorName: createdPost.authorName,
+          replySnippet: createdPost.content,
         );
       }
 
@@ -580,6 +724,8 @@ class FeedProvider with ChangeNotifier {
                 type: 'feed_post',
                 postId: createdPost.id,
                 rootPostId: createdPost.id,
+                isAnonymous: createdPost.isAnonymous,
+                actorName: createdPost.authorName,
               );
             }
           }
@@ -594,13 +740,26 @@ class FeedProvider with ChangeNotifier {
   //  Post deletion
   // -------------------------------------------------------
 
-  Future<void> deletePost(String postId) async {
+  Future<void> deletePost(String postId, {String? replyToPostId}) async {
     final vId = _viewerId;
     if (vId == null) return;
 
     try {
       await _repository.deletePost(postId: postId, authorId: vId);
       _posts.removeWhere((p) => p.id == postId);
+      if (replyToPostId != null) {
+        for (int i = 0; i < _posts.length; i++) {
+          final root = _posts[i];
+          if (root.id == replyToPostId) {
+            final newCount = (root.activeReplyCount - 1).clamp(0, 999999);
+            _posts[i] = root.copyWith(
+              replyCount: newCount,
+              activeReplyCount: newCount,
+            );
+            break;
+          }
+        }
+      }
       notifyListeners();
     } catch (e) {
       debugPrint("[FeedProvider] Error deleting post: $e");
@@ -1175,6 +1334,7 @@ class FeedProvider with ChangeNotifier {
         viewerId: vId,
         bucket: 'unseen',
         limit: 1,
+        scope: currentScope,
       );
 
       if (topPosts.isNotEmpty) {
@@ -1200,6 +1360,7 @@ class FeedProvider with ChangeNotifier {
 
   @override
   void dispose() {
+    _initialLoadFallbackTimer?.cancel();
     _unsubscribeRealtime();
     _stopNewPostPollTimer();
     flushSeenBuffer();

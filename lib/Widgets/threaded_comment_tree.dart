@@ -5,6 +5,7 @@ import 'package:connect/Models/feed_post.dart';
 import 'package:connect/Providers/profile_provider.dart';
 import 'package:connect/Providers/feed_provider.dart';
 import 'package:connect/Widgets/post_card.dart';
+import 'package:connect/Widgets/anonymous_avatar.dart';
 
 /// Data model representing a single comment node within a thread hierarchy.
 class CommentNode {
@@ -17,6 +18,7 @@ class CommentNode {
   final int degree;
   final int replyCount;
   final bool isDeleted;
+  final bool isAnonymous;
   final String? replyToName;
   final FeedPost?
       post; // Reference to original FeedPost for full PostCard rendering
@@ -32,6 +34,7 @@ class CommentNode {
     this.degree = 0,
     this.replyCount = 0,
     this.isDeleted = false,
+    this.isAnonymous = false,
     this.replyToName,
     this.post,
     this.replies = const [],
@@ -47,6 +50,7 @@ class CommentNode {
     int? degree,
     int? replyCount,
     bool? isDeleted,
+    bool? isAnonymous,
     String? replyToName,
     FeedPost? post,
     List<CommentNode>? replies,
@@ -61,6 +65,7 @@ class CommentNode {
       degree: degree ?? this.degree,
       replyCount: replyCount ?? this.replyCount,
       isDeleted: isDeleted ?? this.isDeleted,
+      isAnonymous: isAnonymous ?? this.isAnonymous,
       replyToName: replyToName ?? this.replyToName,
       post: post ?? this.post,
       replies: replies ?? this.replies,
@@ -770,26 +775,33 @@ class _ThreadNodeWidgetState extends State<_ThreadNodeWidget>
           // Profile Avatar wrapped with activeKey for RenderBox tracking
           KeyedSubtree(
             key: activeKey,
-            child: CircleAvatar(
-              radius: avatarRadius,
-              backgroundColor:
-                  Theme.of(context).primaryColor.withValues(alpha: 0.2),
-              backgroundImage: node.authorAvatarUrl.isNotEmpty
-                  ? NetworkImage(node.authorAvatarUrl)
-                  : null,
-              child: node.authorAvatarUrl.isEmpty
-                  ? Text(
-                      node.authorName.isNotEmpty
-                          ? node.authorName[0].toUpperCase()
-                          : '?',
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.onSurface,
-                        fontWeight: FontWeight.bold,
-                        fontSize: avatarRadius * 0.75,
-                      ),
-                    )
-                  : null,
-            ),
+            child: node.isAnonymous
+                ? AnonymousAvatar(
+                    seed: node.authorId != 0
+                        ? node.authorId.toString()
+                        : node.authorName,
+                    radius: avatarRadius,
+                  )
+                : CircleAvatar(
+                    radius: avatarRadius,
+                    backgroundColor:
+                        Theme.of(context).primaryColor.withValues(alpha: 0.2),
+                    backgroundImage: node.authorAvatarUrl.isNotEmpty
+                        ? NetworkImage(node.authorAvatarUrl)
+                        : null,
+                    child: node.authorAvatarUrl.isEmpty
+                        ? Text(
+                            node.authorName.isNotEmpty
+                                ? node.authorName[0].toUpperCase()
+                                : '?',
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.onSurface,
+                              fontWeight: FontWeight.bold,
+                              fontSize: avatarRadius * 0.75,
+                            ),
+                          )
+                        : null,
+                  ),
           ),
           const SizedBox(width: 10.0),
 

@@ -15,6 +15,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:skeletonizer/skeletonizer.dart';
 import 'package:connect/services/analytics_service.dart';
+import 'package:connect/Widgets/anonymous_avatar.dart';
 
 class NotificationPage extends StatefulWidget {
   const NotificationPage({super.key});
@@ -259,9 +260,6 @@ class _NotificationPageState extends State<NotificationPage> {
   Widget _buildFeedNotificationItem(
       Map<String, dynamic> notification, NotificationProvider provider) {
     final otherUser = notification['other_user'] as Map<String, dynamic>? ?? {};
-    final String name = otherUser['name'] ?? 'Connection';
-    final String avatarUrl =
-        otherUser['avatar_url'] ?? otherUser['avatarUrl'] ?? '';
     final String timeStr =
         _getRelativeTime(notification['created_at'] as String?);
     final bool isUnseen = notification['is_seen'] == false;
@@ -275,6 +273,9 @@ class _NotificationPageState extends State<NotificationPage> {
         '';
     String realType = type;
     String parentAuthorName = 'a post';
+    bool isAnonymous = false;
+    String? explicitActorName;
+
     final String? rawNote = notification['note'] as String?;
     if (rawNote != null && rawNote.startsWith('{')) {
       try {
@@ -289,11 +290,24 @@ class _NotificationPageState extends State<NotificationPage> {
         if (parsed['parent_author_name'] != null) {
           parentAuthorName = parsed['parent_author_name'].toString();
         }
+        if (parsed['is_anonymous'] == true) {
+          isAnonymous = true;
+        }
+        if (parsed['actor_name'] != null && parsed['actor_name'].toString().isNotEmpty) {
+          explicitActorName = parsed['actor_name'].toString();
+        }
       } catch (_) {}
     }
     if (rootPostId.isEmpty && targetPostId.isNotEmpty) {
       rootPostId = targetPostId;
     }
+
+    final String name = isAnonymous
+        ? (explicitActorName ?? (otherUser['anon_name']?.toString().isNotEmpty == true ? otherUser['anon_name'].toString() : 'Anonymous'))
+        : (otherUser['name'] ?? 'Connection');
+    final String avatarUrl = isAnonymous
+        ? ''
+        : (otherUser['avatar_url'] ?? otherUser['avatarUrl'] ?? '');
 
     String actionText = 'replied to your post.';
     IconData iconData = Icons.chat_bubble_outline_rounded;
@@ -359,21 +373,26 @@ class _NotificationPageState extends State<NotificationPage> {
             children: [
               Stack(
                 children: [
-                  CircleAvatar(
-                    radius: 20,
-                    backgroundColor: context.accentPrimary,
-                    backgroundImage: avatarUrl.isNotEmpty ? NetworkImage(avatarUrl) : null,
-                    child: avatarUrl.isEmpty
-                        ? Text(
-                            _getInitials(name),
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 13,
-                            ),
-                          )
-                        : null,
-                  ),
+                  isAnonymous
+                      ? AnonymousAvatar(
+                          seed: (notification['other_user_id'] ?? otherUser['id'] ?? name).toString(),
+                          radius: 20,
+                        )
+                      : CircleAvatar(
+                          radius: 20,
+                          backgroundColor: context.accentPrimary,
+                          backgroundImage: avatarUrl.isNotEmpty ? NetworkImage(avatarUrl) : null,
+                          child: avatarUrl.isEmpty
+                              ? Text(
+                                  _getInitials(name),
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 13,
+                                  ),
+                                )
+                              : null,
+                        ),
                   Positioned(
                     right: 0,
                     bottom: 0,
@@ -483,7 +502,8 @@ class _NotificationPageState extends State<NotificationPage> {
     final bool isReferral = type == 'referral';
     final bool isQr = type == 'qr_code';
     final bool isReferralConnect = type == 'referral_connect';
-    final Color accentColor = (isReferral || isReferralConnect)
+    final bool isDirectRequest = type == 'direct_connection_request';
+    final Color accentColor = (isReferral || isReferralConnect || isDirectRequest)
         ? context.accentSecondary
         : (isQr ? const Color(0xFF00F2FE) : const Color(0xFF8B5CF6));
 
@@ -493,6 +513,20 @@ class _NotificationPageState extends State<NotificationPage> {
     final String referredAvatarUrl =
         referredUser['avatar_url'] ?? referredUser['avatarUrl'] ?? '';
     final String referredProfession = referredUser['profession'] ?? '';
+
+    String? directRequestCard;
+    String? directRequestMessage;
+    if (isDirectRequest && rawNote != null && rawNote.isNotEmpty) {
+      try {
+        final parsed = jsonDecode(rawNote);
+        if (parsed is Map) {
+          directRequestCard = parsed['card']?.toString();
+          directRequestMessage = parsed['message']?.toString();
+        }
+      } catch (_) {
+        directRequestMessage = rawNote;
+      }
+    }
 
     String? displayNote;
     if (rawNote != null) {
@@ -510,9 +544,11 @@ class _NotificationPageState extends State<NotificationPage> {
 
     final connectionProvider =
         Provider.of<ConnectionProvider>(context, listen: false);
-    final bool isAlreadyConnected = referredUser['id'] != null &&
+    final targetConnectionUserId =
+        isReferral ? referredUser['id'] : otherUser['id'];
+    final bool isAlreadyConnected = targetConnectionUserId != null &&
         connectionProvider.connections
-            .any((c) => c['id'] == referredUser['id']);
+            .any((c) => c['id'] == targetConnectionUserId);
 
     return Dismissible(
       key: Key(notification['id'].toString()),
@@ -540,6 +576,19 @@ class _NotificationPageState extends State<NotificationPage> {
           onTap: () {
             HapticFeedback.lightImpact();
             provider.markAsSeen(notification['id']);
+            if (isDirectRequest) {
+              _showDirectRequestNoteModal(
+                context: context,
+                notification: notification,
+                senderName: name,
+                senderAvatar: avatarUrl,
+                senderProfession: profession,
+                cardType: directRequestCard ?? 'casual',
+                noteMessage: directRequestMessage ?? '',
+                isAlreadyConnected: isAlreadyConnected,
+              );
+              return;
+            }
             final targetUser = isReferral ? referredUser : otherUser;
             final profileMap = {
               'id': targetUser['id'],
@@ -682,11 +731,13 @@ class _NotificationPageState extends State<NotificationPage> {
                                 ),
                               ),
                               TextSpan(
-                                text: isQr
-                                    ? " connected via QR scan"
-                                    : (type == 'referral_connect'
-                                        ? " connected via Referral"
-                                        : " connected via Private Key"),
+                                text: isDirectRequest
+                                    ? " sent you a direct connection request"
+                                    : (isQr
+                                        ? " connected via QR scan"
+                                        : (type == 'referral_connect'
+                                            ? " connected via Referral"
+                                            : " connected via Private Key")),
                                 style: const TextStyle(color: Colors.white70),
                               ),
                               if (timeStr.isNotEmpty)
@@ -700,6 +751,171 @@ class _NotificationPageState extends State<NotificationPage> {
                             ],
                           ),
                         ),
+                      if (isDirectRequest) ...[
+                        const SizedBox(height: 8),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.start,
+                          children: [
+                            SizedBox(
+                              width: 76,
+                              height: 30,
+                              child: isAlreadyConnected
+                                  ? ElevatedButton(
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor:
+                                            const Color(0xFF1F2030),
+                                        foregroundColor:
+                                            const Color(0xFF8B8C9E),
+                                        shadowColor: Colors.transparent,
+                                        padding: EdgeInsets.zero,
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(10),
+                                          side: BorderSide(
+                                            color: Colors.white
+                                                .withValues(alpha: 0.03),
+                                            width: 1,
+                                          ),
+                                        ),
+                                      ),
+                                      onPressed: () {
+                                        HapticFeedback.lightImpact();
+                                        final chatProfileMap = {
+                                          'id': otherUser['id'],
+                                          'name': name,
+                                          'profession': profession,
+                                          'avatarUrl': avatarUrl,
+                                          'avatar_url': avatarUrl,
+                                        };
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (context) =>
+                                                IndividualChatPage(
+                                                    connectionData:
+                                                        chatProfileMap),
+                                          ),
+                                        );
+                                      },
+                                      child: const Text(
+                                        "Message",
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w600,
+                                          fontFamily: 'Inter',
+                                        ),
+                                      ),
+                                    )
+                                  : Container(
+                                      decoration: BoxDecoration(
+                                        gradient: LinearGradient(
+                                          colors: [
+                                            context.accentSecondary,
+                                            context.accentSecondary
+                                                .withValues(alpha: 0.7)
+                                          ],
+                                        ),
+                                        borderRadius:
+                                            BorderRadius.circular(10),
+                                      ),
+                                      child: ElevatedButton(
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: Colors.transparent,
+                                          foregroundColor: Colors.white,
+                                          shadowColor: Colors.transparent,
+                                          padding: EdgeInsets.zero,
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius:
+                                                BorderRadius.circular(10),
+                                          ),
+                                        ),
+                                        onPressed: () {
+                                          HapticFeedback.lightImpact();
+                                          final messenger =
+                                              ScaffoldMessenger.of(context);
+                                          final targetId = otherUser['id'];
+                                          final sharedCard =
+                                              directRequestCard ?? 'casual';
+                                          connectionProvider
+                                              .connectUsers(
+                                            provider.userId!,
+                                            targetId,
+                                            sharedCardByPresenter: sharedCard,
+                                            connectionType: 'direct_connect',
+                                          )
+                                              .then((_) {
+                                            provider.markAsSeen(
+                                                notification['id']);
+                                          }).catchError((err) {
+                                            messenger.showSnackBar(
+                                              const SnackBar(
+                                                  content: Text(
+                                                      "Could not connect. Please try again.")),
+                                            );
+                                          });
+                                        },
+                                        child: const Text(
+                                          "Connect",
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.bold,
+                                            fontFamily: 'Inter',
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                            ),
+                            const SizedBox(width: 8),
+                            GestureDetector(
+                              onTap: () => _showDirectRequestNoteModal(
+                                context: context,
+                                notification: notification,
+                                senderName: name,
+                                senderAvatar: avatarUrl,
+                                senderProfession: profession,
+                                cardType: directRequestCard ?? 'casual',
+                                noteMessage: directRequestMessage ?? '',
+                                isAlreadyConnected: isAlreadyConnected,
+                              ),
+                              child: Container(
+                                height: 30,
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 10),
+                                decoration: BoxDecoration(
+                                  color: Colors.white
+                                      .withValues(alpha: 0.08),
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(
+                                    color: Colors.white
+                                        .withValues(alpha: 0.18),
+                                    width: 0.8,
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      Icons.chat_bubble_outline_rounded,
+                                      size: 11.5,
+                                      color: context.textPrimary,
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      "View Note",
+                                      style: TextStyle(
+                                        color: context.textPrimary,
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w600,
+                                        fontFamily: 'Inter',
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                       if (isReferral &&
                           displayNote != null &&
                           displayNote.isNotEmpty) ...[
@@ -853,7 +1069,7 @@ class _NotificationPageState extends State<NotificationPage> {
                     ],
                   ),
                 ),
-                if (!isReferralRequest) ...[
+                if (!isReferralRequest && !isDirectRequest) ...[
                   const SizedBox(width: 8),
                   SizedBox(
                     width: 76,
@@ -878,12 +1094,23 @@ class _NotificationPageState extends State<NotificationPage> {
                               ),
                               onPressed: () {
                                 HapticFeedback.lightImpact();
+                                final targetId = isReferral
+                                    ? referredUser['id']
+                                    : otherUser['id'];
+                                final targetName =
+                                    isReferral ? referredName : name;
+                                final targetProf = isReferral
+                                    ? referredProfession
+                                    : profession;
+                                final targetAvatar = isReferral
+                                    ? referredAvatarUrl
+                                    : avatarUrl;
                                 final chatProfileMap = {
-                                  'id': referredUser['id'],
-                                  'name': referredName,
-                                  'profession': referredProfession,
-                                  'avatarUrl': referredAvatarUrl,
-                                  'avatar_url': referredAvatarUrl,
+                                  'id': targetId,
+                                  'name': targetName,
+                                  'profession': targetProf,
+                                  'avatarUrl': targetAvatar,
+                                  'avatar_url': targetAvatar,
                                 };
                                 Navigator.push(
                                   context,
@@ -928,18 +1155,31 @@ class _NotificationPageState extends State<NotificationPage> {
                                   HapticFeedback.lightImpact();
                                   final messenger =
                                       ScaffoldMessenger.of(context);
+                                  final targetId = isReferral
+                                      ? referredUser['id']
+                                      : otherUser['id'];
+                                  final sharedCard = isReferral
+                                      ? (referredUser[
+                                                  'default_card_visibility']
+                                              ?.toString() ??
+                                          'casual')
+                                      : (directRequestCard ?? 'casual');
                                   connectionProvider
                                       .connectUsers(
                                     provider.userId!,
-                                    referredUser['id'],
-                                    sharedCardByPresenter: referredUser['default_card_visibility']?.toString(),
-                                    connectionType: 'referral_connect',
+                                    targetId,
+                                    sharedCardByPresenter: sharedCard,
+                                    connectionType: isReferral
+                                        ? 'referral_connect'
+                                        : 'direct_connect',
                                   )
                                       .then((_) {
                                     provider.markAsSeen(notification['id']);
                                   }).catchError((err) {
                                     messenger.showSnackBar(
-                                      const SnackBar(content: Text("Could not connect. Please try again.")),
+                                      const SnackBar(
+                                          content: Text(
+                                              "Could not connect. Please try again.")),
                                     );
                                   });
                                 },
@@ -1552,6 +1792,287 @@ class _NotificationPageState extends State<NotificationPage> {
           ),
         );
       },
+    );
+  }
+
+  void _showDirectRequestNoteModal({
+    required BuildContext context,
+    required Map<String, dynamic> notification,
+    required String senderName,
+    required String senderAvatar,
+    required String senderProfession,
+    required String cardType,
+    required String noteMessage,
+    required bool isAlreadyConnected,
+  }) {
+    HapticFeedback.mediumImpact();
+    final connectionProvider =
+        Provider.of<ConnectionProvider>(context, listen: false);
+    final notificationProvider =
+        Provider.of<NotificationProvider>(context, listen: false);
+
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+        child: Container(
+          decoration: BoxDecoration(
+            color: const Color(0xFF1E202C),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: Colors.white.withValues(alpha: 0.08),
+              width: 1,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.5),
+                blurRadius: 20,
+                offset: const Offset(0, 10),
+              ),
+            ],
+          ),
+          padding: const EdgeInsets.all(22),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Header with Title & Close
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    "Connection Note",
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      fontFamily: 'Outfit',
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close_rounded,
+                        color: Colors.white60, size: 20),
+                    onPressed: () => Navigator.pop(ctx),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 18),
+
+              // Sender profile preview
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF13141F),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.04),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: const BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Color(0xFF1A1B2E),
+                      ),
+                      child: ClipOval(
+                        child: senderAvatar.startsWith('http')
+                            ? Image.network(
+                                senderAvatar,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) => Center(
+                                  child: Text(
+                                    _getInitials(senderName),
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                ),
+                              )
+                            : Center(
+                                child: Text(
+                                  _getInitials(senderName),
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            senderName,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                              fontFamily: 'Inter',
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            senderProfession.isNotEmpty
+                                ? senderProfession
+                                : "Direct Connection Request",
+                            style: TextStyle(
+                              color: context.textSecondary,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 16),
+
+              // Note quote card
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: context.surfaceSecondary.withValues(alpha: 0.5),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.08),
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.format_quote_rounded,
+                          size: 16,
+                          color: context.accentSecondary,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          "MESSAGE",
+                          style: context.captionText.copyWith(
+                            color: context.textSecondary,
+                            letterSpacing: 1.2,
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      noteMessage.trim().isNotEmpty
+                          ? noteMessage
+                          : "No message included with this request.",
+                      style: TextStyle(
+                        color: noteMessage.trim().isNotEmpty
+                            ? Colors.white
+                            : context.textSecondary,
+                        fontSize: 13.5,
+                        fontStyle: noteMessage.trim().isNotEmpty
+                            ? FontStyle.normal
+                            : FontStyle.italic,
+                        fontFamily: 'Inter',
+                        height: 1.4,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 22),
+
+              // Action button
+              if (!isAlreadyConnected)
+                Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        context.accentSecondary,
+                        context.accentSecondary.withValues(alpha: 0.7),
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.transparent,
+                      foregroundColor: Colors.white,
+                      shadowColor: Colors.transparent,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    onPressed: () {
+                      HapticFeedback.lightImpact();
+                      final otherUser = notification['other_user'] as Map<String, dynamic>? ?? {};
+                      final senderId = otherUser['id'] as int;
+                      final messenger = ScaffoldMessenger.of(context);
+                      Navigator.pop(ctx);
+                      connectionProvider.connectUsers(
+                        notificationProvider.userId!,
+                        senderId,
+                        sharedCardByPresenter: cardType,
+                        connectionType: 'direct_connect',
+                      ).then((_) {
+                        notificationProvider.markAsSeen(notification['id']);
+                      }).catchError((err) {
+                        messenger.showSnackBar(
+                          const SnackBar(content: Text("Could not connect. Please try again.")),
+                        );
+                      });
+                    },
+                    child: const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.person_add_rounded, size: 16, color: Colors.white),
+                        SizedBox(width: 8),
+                        Text(
+                          "Accept & Connect",
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                            fontFamily: 'Inter',
+                            color: Colors.white,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              else
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF1F2030),
+                    foregroundColor: const Color(0xFF8B8C9E),
+                    shadowColor: Colors.transparent,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text("Close"),
+                ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 

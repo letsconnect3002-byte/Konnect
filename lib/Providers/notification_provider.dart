@@ -33,6 +33,12 @@ class NotificationProvider with ChangeNotifier {
   RealtimeChannel? _notificationsSubscription;
   List<Map<String, dynamic>> _lastKnownNotifications = [];
 
+  Set<int> _sentDirectRequestUserIds = {};
+  Set<int> get sentDirectRequestUserIds => _sentDirectRequestUserIds;
+
+  bool hasSentDirectRequest(int toUserId) =>
+      _sentDirectRequestUserIds.contains(toUserId);
+
   NotificationState _state = NotificationInitial();
   NotificationState get state => _state;
 
@@ -66,8 +72,10 @@ class NotificationProvider with ChangeNotifier {
       _userId = newUserId;
       if (_userId != null) {
         subscribeToNotifications();
+        fetchSentDirectRequests();
       } else {
         unsubscribeFromNotifications();
+        _sentDirectRequestUserIds.clear();
         _setLoadedState([]);
         notifyListeners();
       }
@@ -120,6 +128,7 @@ class NotificationProvider with ChangeNotifier {
     _state = NotificationLoading();
     notifyListeners();
     fetchNotifications();
+    fetchSentDirectRequests();
   }
 
   void unsubscribeFromNotifications() {
@@ -220,6 +229,54 @@ class NotificationProvider with ChangeNotifier {
       print("Error sending referral request: $e");
       _setError(e);
       rethrow;
+    }
+  }
+
+  Future<void> fetchSentDirectRequests() async {
+    final myUserId = _userId;
+    if (myUserId == null) return;
+    try {
+      final userIds = await _repository.getSentDirectRequestUserIds(myUserId);
+      _sentDirectRequestUserIds = userIds.toSet();
+      notifyListeners();
+    } catch (e) {
+      print("Error fetching sent direct requests: $e");
+    }
+  }
+
+  Future<void> sendDirectConnectionRequest({
+    required int toUserId,
+    required String sharedCard,
+    String? note,
+  }) async {
+    final myUserId = _userId;
+    if (myUserId == null) return;
+    try {
+      await _repository.sendDirectConnectionRequest(
+        toUserId: toUserId,
+        fromUserId: myUserId,
+        sharedCard: sharedCard,
+        note: note,
+      );
+      _sentDirectRequestUserIds.add(toUserId);
+      notifyListeners();
+    } catch (e) {
+      print("Error sending direct connection request: $e");
+      _setError(e);
+      rethrow;
+    }
+  }
+
+  Future<bool> hasPendingDirectConnectionRequest(int toUserId) async {
+    final myUserId = _userId;
+    if (myUserId == null) return false;
+    try {
+      return await _repository.hasPendingDirectConnectionRequest(
+        fromUserId: myUserId,
+        toUserId: toUserId,
+      );
+    } catch (e) {
+      return false;
     }
   }
 

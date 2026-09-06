@@ -137,6 +137,18 @@ serve(async (req) => {
         title = "New Referral"
         bodyText = `${actorName} referred ${targetName} to you`
       }
+    } else if (type === "direct_connection_request") {
+      title = "Connection Request"
+      let msg = ""
+      if (note && note.startsWith("{")) {
+        try {
+          const parsed = JSON.parse(note)
+          if (parsed.message) msg = parsed.message
+        } catch (_) {}
+      } else if (note) {
+        msg = note
+      }
+      bodyText = msg.trim() ? `${actorName}: ${msg.trim()}` : `${actorName} sent you a direct connection request`
     } else {
       // Fallback for other potential types
       title = "New Connection"
@@ -174,6 +186,8 @@ serve(async (req) => {
       }
     } else if (type === "vip_pass_key" || type === "referral_connect") {
       apnsCategory = "default_category"
+    } else if (type === "direct_connection_request") {
+      apnsCategory = "direct_connection_request_category"
     } else {
       apnsCategory = "connection_accept_category"
     }
@@ -206,10 +220,6 @@ serve(async (req) => {
       const fcmBody = {
         message: {
           token: fcmToken,
-          notification: {
-            title: title,
-            body: bodyText,
-          },
           data: {
             action: "connection_notification",
             notification_id: String(notificationId),
@@ -223,15 +233,6 @@ serve(async (req) => {
           },
           android: {
             priority: "high",
-            notification: {
-              title: title,
-              body: bodyText,
-              channel_id: "connections_channel",
-              sound: "default",
-              default_sound: true,
-              default_vibrate_timings: true,
-              notification_priority: "PRIORITY_MAX",
-            },
           },
           apns: {
             headers: {

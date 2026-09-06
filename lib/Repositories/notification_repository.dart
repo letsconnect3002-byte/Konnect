@@ -15,6 +15,17 @@ abstract class NotificationRepository {
     required int referredUserId,
     String? note,
   });
+  Future<void> sendDirectConnectionRequest({
+    required int toUserId,
+    required int fromUserId,
+    required String sharedCard,
+    String? note,
+  });
+  Future<bool> hasPendingDirectConnectionRequest({
+    required int fromUserId,
+    required int toUserId,
+  });
+  Future<List<int>> getSentDirectRequestUserIds(int fromUserId);
   Future<void> sendFeedNotification({
     required int recipientUserId,
     required int actorUserId,
@@ -23,6 +34,8 @@ abstract class NotificationRepository {
     required String rootPostId,
     String? parentAuthorName,
     String? replySnippet,
+    bool isAnonymous = false,
+    String? actorName,
   });
   Future<void> sendBatchFeedNotifications({
     required List<int> recipientUserIds,
@@ -32,6 +45,8 @@ abstract class NotificationRepository {
     required String rootPostId,
     String? parentAuthorName,
     String? replySnippet,
+    bool isAnonymous = false,
+    String? actorName,
   });
   Future<Set<int>> getRecentNotifiedUserIdsForThread({
     required String rootPostId,
@@ -188,6 +203,63 @@ class SupabaseNotificationRepository implements NotificationRepository {
   }
 
   @override
+  Future<void> sendDirectConnectionRequest({
+    required int toUserId,
+    required int fromUserId,
+    required String sharedCard,
+    String? note,
+  }) async {
+    final payload = {
+      'card': sharedCard,
+      if (note != null && note.trim().isNotEmpty) 'message': note.trim(),
+    };
+    await _client.from('connection_notifications').insert({
+      'user_id': toUserId,
+      'other_user_id': fromUserId,
+      'type': 'direct_connection_request',
+      'note': jsonEncode(payload),
+      'is_seen': false,
+    });
+  }
+
+  @override
+  Future<bool> hasPendingDirectConnectionRequest({
+    required int fromUserId,
+    required int toUserId,
+  }) async {
+    final response = await _client
+        .from('connection_notifications')
+        .select('id')
+        .eq('user_id', toUserId)
+        .eq('other_user_id', fromUserId)
+        .eq('type', 'direct_connection_request')
+        .limit(1);
+    return (response as List).isNotEmpty;
+  }
+
+  @override
+  Future<List<int>> getSentDirectRequestUserIds(int fromUserId) async {
+    try {
+      final response = await _client
+          .from('connection_notifications')
+          .select('user_id')
+          .eq('other_user_id', fromUserId)
+          .eq('type', 'direct_connection_request');
+      final list = response as List;
+      return list
+          .map((item) => item['user_id'])
+          .where((id) => id != null)
+          .map((id) => id is int ? id : int.tryParse(id.toString()) ?? 0)
+          .where((id) => id > 0)
+          .toSet()
+          .toList();
+    } catch (e) {
+      print("Error getting sent direct request user IDs: $e");
+      return [];
+    }
+  }
+
+  @override
   Future<void> sendFeedNotification({
     required int recipientUserId,
     required int actorUserId,
@@ -196,6 +268,8 @@ class SupabaseNotificationRepository implements NotificationRepository {
     required String rootPostId,
     String? parentAuthorName,
     String? replySnippet,
+    bool isAnonymous = false,
+    String? actorName,
   }) async {
     if (recipientUserId == actorUserId) return;
 
@@ -204,6 +278,12 @@ class SupabaseNotificationRepository implements NotificationRepository {
       'post_id': postId,
       'root_post_id': rootPostId,
     };
+    if (isAnonymous) {
+      noteMap['is_anonymous'] = true;
+      if (actorName != null && actorName.isNotEmpty) {
+        noteMap['actor_name'] = actorName;
+      }
+    }
     if (parentAuthorName != null && parentAuthorName.isNotEmpty) {
       noteMap['parent_author_name'] = parentAuthorName;
     }
@@ -231,6 +311,8 @@ class SupabaseNotificationRepository implements NotificationRepository {
     required String rootPostId,
     String? parentAuthorName,
     String? replySnippet,
+    bool isAnonymous = false,
+    String? actorName,
   }) async {
     if (recipientUserIds.isEmpty) return;
 
@@ -239,6 +321,12 @@ class SupabaseNotificationRepository implements NotificationRepository {
       'post_id': postId,
       'root_post_id': rootPostId,
     };
+    if (isAnonymous) {
+      noteMap['is_anonymous'] = true;
+      if (actorName != null && actorName.isNotEmpty) {
+        noteMap['actor_name'] = actorName;
+      }
+    }
     if (parentAuthorName != null && parentAuthorName.isNotEmpty) {
       noteMap['parent_author_name'] = parentAuthorName;
     }

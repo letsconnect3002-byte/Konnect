@@ -9,9 +9,12 @@ import 'package:connect/Providers/profile_provider.dart';
 import 'package:connect/Providers/connection_provider.dart';
 import 'package:connect/Pages/ConnectionProfilePage.dart';
 import 'package:connect/Widgets/referral_intro_sheet.dart';
+import 'package:connect/Widgets/direct_connection_sheet.dart';
 import 'package:connect/Widgets/post_engagement_bar.dart';
 import 'package:connect/Widgets/link_preview_card.dart';
 import 'package:connect/services/analytics_service.dart';
+import 'package:connect/Providers/notification_provider.dart';
+import 'package:connect/Widgets/anonymous_avatar.dart';
 
 class PostCard extends StatelessWidget {
   final FeedPost post;
@@ -92,7 +95,8 @@ class PostCard extends StatelessWidget {
                   onTap: () async {
                     Navigator.pop(ctx);
                     try {
-                      await feedProvider.deletePost(post.id);
+                      await feedProvider.deletePost(post.id,
+                          replyToPostId: post.replyToPostId);
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(content: Text("Post deleted")),
                       );
@@ -285,25 +289,194 @@ class PostCard extends StatelessWidget {
   }
 
   Widget _buildDegreeBadge(BuildContext context, {bool isMe = false}) {
-    String text = "";
+    if (post.isAnonymous) {
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.visibility_off_rounded,
+            size: 11,
+            color: context.textMuted,
+          ),
+          const SizedBox(width: 3),
+          Text(
+            isMe || post.degree == 0 ? "You • Anonymous" : "Anonymous",
+            style: TextStyle(
+              color: context.textMuted,
+              fontSize: 11,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      );
+    }
     if (isMe || post.degree == 0) {
-      text = "You";
+      return Text(
+        "You",
+        style: TextStyle(
+          color: context.textMuted,
+          fontSize: 11,
+          fontWeight: FontWeight.w500,
+        ),
+      );
     } else if (post.degree == 1) {
-      text = "1°";
+      return Text(
+        "1°",
+        style: TextStyle(
+          color: context.textMuted,
+          fontSize: 11,
+          fontWeight: FontWeight.w500,
+        ),
+      );
     } else if (post.degree == 2) {
-      text = "2°";
+      return Text(
+        "2°",
+        style: TextStyle(
+          color: context.textMuted,
+          fontSize: 11,
+          fontWeight: FontWeight.w500,
+        ),
+      );
     } else if (post.degree >= 3) {
-      text = "3°";
+      return Text(
+        "3°",
+        style: TextStyle(
+          color: context.textMuted,
+          fontSize: 11,
+          fontWeight: FontWeight.w500,
+        ),
+      );
+    } else if (post.degree == -1) {
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.language_rounded,
+            size: 10,
+            color: context.textMuted,
+          ),
+          const SizedBox(width: 2),
+          Text(
+            "Global",
+            style: TextStyle(
+              color: context.textMuted,
+              fontSize: 11,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      );
+    }
+    return const SizedBox.shrink();
+  }
+
+  Widget _buildConnectButton(BuildContext context, {required bool isThread}) {
+    final connectionProvider =
+        Provider.of<ConnectionProvider>(context, listen: false);
+    if (connectionProvider.connections.any((c) => c['id'] == post.authorId)) {
+      return const SizedBox.shrink();
     }
 
-    if (text.isEmpty) return const SizedBox.shrink();
+    final notifProvider = Provider.of<NotificationProvider>(context);
+    final bool isDirectRequest = post.degree == -1;
+    final bool isRequestSent =
+        isDirectRequest && notifProvider.hasSentDirectRequest(post.authorId);
 
-    return Text(
-      text,
-      style: TextStyle(
-        color: context.textMuted,
-        fontSize: 11,
-        fontWeight: FontWeight.w500,
+    void handleConnectTap() {
+      if (isRequestSent) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Direct request already sent to ${post.authorName}'),
+            duration: const Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        return;
+      }
+
+      if (isDirectRequest) {
+        DirectConnectionSheet.show(
+          context: context,
+          targetUserId: post.authorId,
+          targetUserName: post.authorName,
+          targetUserAvatar: post.isAnonymous ? '' : post.authorAvatarUrl,
+          isAnonymous: post.isAnonymous,
+        );
+      } else {
+        ReferralIntroSheet.show(
+          context: context,
+          targetUserId: post.authorId,
+          targetUserName: post.authorName,
+          degree: post.degree,
+        );
+      }
+    }
+
+    if (isThread) {
+      return BounceTap(
+        onTap: handleConnectTap,
+        child: Container(
+          padding: const EdgeInsets.all(5),
+          decoration: BoxDecoration(
+            color: isRequestSent
+                ? Colors.white.withValues(alpha: 0.06)
+                : context.accentPrimary.withValues(alpha: 0.12),
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: isRequestSent
+                  ? Colors.white.withValues(alpha: 0.25)
+                  : context.accentPrimary.withValues(alpha: 0.4),
+              width: 0.8,
+            ),
+          ),
+          child: Icon(
+            isRequestSent
+                ? Icons.done_rounded
+                : (isDirectRequest ? Icons.send_rounded : Icons.person_add_rounded),
+            size: 13,
+            color: isRequestSent ? Colors.white70 : context.accentSecondary,
+          ),
+        ),
+      );
+    }
+
+    return BounceTap(
+      onTap: handleConnectTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        decoration: BoxDecoration(
+          color: isRequestSent ? Colors.white.withValues(alpha: 0.05) : null,
+          borderRadius: BorderRadius.circular(99),
+          border: Border.all(
+            color: isRequestSent
+                ? Colors.white.withValues(alpha: 0.25)
+                : context.accentPrimary.withValues(alpha: 0.6),
+            width: 0.8,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              isRequestSent
+                  ? Icons.done_rounded
+                  : (isDirectRequest ? Icons.send_rounded : Icons.person_add_outlined),
+              size: 13,
+              color: isRequestSent ? Colors.white70 : context.accentPrimary,
+            ),
+            const SizedBox(width: 4),
+            Text(
+              isRequestSent
+                  ? "Request Sent"
+                  : (isDirectRequest ? "Direct Request" : "Connect"),
+              style: TextStyle(
+                color: isRequestSent ? Colors.white70 : context.accentPrimary,
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -327,31 +500,42 @@ class PostCard extends StatelessWidget {
     final postName = post.authorName.trim().toLowerCase();
 
     final isMe = (myUserId != 0 && post.authorId == myUserId) ||
-        (myName.isNotEmpty && postName.isNotEmpty && myName == postName);
+        (!post.isAnonymous &&
+            myName.isNotEmpty &&
+            postName.isNotEmpty &&
+            myName == postName);
 
-    final rawAvatar = CircleAvatar(
-      radius: 18,
-      backgroundColor: post.isDeleted
-          ? Colors.white.withValues(alpha: 0.08)
-          : context.surfaceSecondary,
-      backgroundImage: (!post.isDeleted && post.authorAvatarUrl.isNotEmpty)
-          ? NetworkImage(post.authorAvatarUrl)
-          : null,
-      child: post.isDeleted
-          ? Icon(Icons.remove_circle_outline_rounded,
-              size: 16, color: context.textMuted)
-          : (post.authorAvatarUrl.isEmpty
-              ? Text(
-                  post.authorName.isNotEmpty
-                      ? post.authorName.substring(0, 1).toUpperCase()
-                      : "?",
-                  style: TextStyle(
-                      color: context.textPrimary,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 13),
-                )
-              : null),
-    );
+    final Widget rawAvatar;
+    if (post.isAnonymous) {
+      rawAvatar = AnonymousAvatar(
+        seed: post.authorId != 0 ? post.authorId.toString() : post.authorName,
+        radius: 18,
+      );
+    } else {
+      rawAvatar = CircleAvatar(
+        radius: 18,
+        backgroundColor: post.isDeleted
+            ? Colors.white.withValues(alpha: 0.08)
+            : context.surfaceSecondary,
+        backgroundImage: (!post.isDeleted && post.authorAvatarUrl.isNotEmpty)
+            ? NetworkImage(post.authorAvatarUrl)
+            : null,
+        child: post.isDeleted
+            ? Icon(Icons.remove_circle_outline_rounded,
+                size: 16, color: context.textMuted)
+            : (post.authorAvatarUrl.isEmpty
+                ? Text(
+                    post.authorName.isNotEmpty
+                        ? post.authorName.substring(0, 1).toUpperCase()
+                        : "?",
+                    style: TextStyle(
+                        color: context.textPrimary,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13),
+                  )
+                : null),
+      );
+    }
 
     final avatarWidget = avatarKey != null
         ? KeyedSubtree(key: avatarKey, child: rawAvatar)
@@ -520,74 +704,8 @@ class PostCard extends StatelessWidget {
                                 onReactionToggle: onReactionToggle,
                               ),
                               const Spacer(),
-                              if (post.degree >= 2 && !isMe) ...[
-                                if (isThreadView)
-                                  BounceTap(
-                                    onTap: () {
-                                      ReferralIntroSheet.show(
-                                        context: context,
-                                        targetUserId: post.authorId,
-                                        targetUserName: post.authorName,
-                                        degree: post.degree,
-                                      );
-                                    },
-                                    child: Container(
-                                      padding: const EdgeInsets.all(5),
-                                      decoration: BoxDecoration(
-                                        color: context.accentPrimary
-                                            .withValues(alpha: 0.12),
-                                        shape: BoxShape.circle,
-                                        border: Border.all(
-                                          color: context.accentPrimary
-                                              .withValues(alpha: 0.4),
-                                          width: 0.8,
-                                        ),
-                                      ),
-                                      child: Icon(Icons.person_add_rounded,
-                                          size: 13,
-                                          color: context.accentSecondary),
-                                    ),
-                                  )
-                                else
-                                  BounceTap(
-                                    onTap: () {
-                                      ReferralIntroSheet.show(
-                                        context: context,
-                                        targetUserId: post.authorId,
-                                        targetUserName: post.authorName,
-                                        degree: post.degree,
-                                      );
-                                    },
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 10, vertical: 4),
-                                      decoration: BoxDecoration(
-                                        borderRadius: BorderRadius.circular(99),
-                                        border: Border.all(
-                                          color: context.accentPrimary
-                                              .withValues(alpha: 0.6),
-                                          width: 0.8,
-                                        ),
-                                      ),
-                                      child: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Icon(Icons.person_add_outlined,
-                                              size: 14,
-                                              color: context.accentPrimary),
-                                          const SizedBox(width: 4),
-                                          Text(
-                                            "Connect",
-                                            style: TextStyle(
-                                              color: context.accentPrimary,
-                                              fontSize: 11,
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
+                              if (!isMe && (post.degree == -1 || post.degree >= 2)) ...[
+                                _buildConnectButton(context, isThread: isThreadView),
                               ],
                             ],
                           ),
@@ -737,74 +855,8 @@ class PostCard extends StatelessWidget {
                           onReactionToggle: onReactionToggle,
                         ),
                         const Spacer(),
-                        if (post.degree >= 2 && !isMe) ...[
-                          if (isThreadView)
-                            BounceTap(
-                              onTap: () {
-                                ReferralIntroSheet.show(
-                                  context: context,
-                                  targetUserId: post.authorId,
-                                  targetUserName: post.authorName,
-                                  degree: post.degree,
-                                );
-                              },
-                              child: Container(
-                                padding: const EdgeInsets.all(5),
-                                decoration: BoxDecoration(
-                                  color: context.accentPrimary
-                                      .withValues(alpha: 0.12),
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                    color: context.accentPrimary
-                                        .withValues(alpha: 0.4),
-                                    width: 0.8,
-                                  ),
-                                ),
-                                child: Icon(Icons.person_add_rounded,
-                                    size: 13,
-                                    color: context.accentSecondary),
-                              ),
-                            )
-                          else
-                            BounceTap(
-                              onTap: () {
-                                ReferralIntroSheet.show(
-                                  context: context,
-                                  targetUserId: post.authorId,
-                                  targetUserName: post.authorName,
-                                  degree: post.degree,
-                                );
-                              },
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 10, vertical: 4),
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(99),
-                                  border: Border.all(
-                                    color: context.accentPrimary
-                                        .withValues(alpha: 0.6),
-                                    width: 0.8,
-                                  ),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(Icons.person_add_outlined,
-                                        size: 14,
-                                        color: context.accentPrimary),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      "Connect",
-                                      style: TextStyle(
-                                        color: context.accentPrimary,
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
+                        if (!isMe && (post.degree == -1 || post.degree >= 2)) ...[
+                          _buildConnectButton(context, isThread: isThreadView),
                         ],
                       ],
                     ),

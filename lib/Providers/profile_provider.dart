@@ -91,6 +91,7 @@ class ProfileProvider with ChangeNotifier {
   String bio = '';
   String professionalBio = '';
   String avatarUrl = '';
+  String anonName = '';
   String gender = '';
   String spotify = '';
   List<CustomLink> customLinks = [];
@@ -214,6 +215,7 @@ class ProfileProvider with ChangeNotifier {
     bio = '';
     professionalBio = '';
     avatarUrl = '';
+    anonName = '';
     gender = '';
     customLinks = [];
     vibeTag = '';
@@ -663,6 +665,7 @@ class ProfileProvider with ChangeNotifier {
         bio = response['bio'] ?? '';
         professionalBio = response['professional_bio'] ?? '';
         avatarUrl = response['avatar_url'] ?? '';
+        anonName = response['anon_name']?.toString() ?? '';
         gender = response['gender'] ?? '';
         showProfileToConnections =
             response['show_profile_to_connections'] == true;
@@ -874,9 +877,9 @@ class ProfileProvider with ChangeNotifier {
     bio = '';
     professionalBio = '';
     avatarUrl = '';
+    anonName = '';
     gender = '';
     showProfileToConnections = true;
-    vibeTag = '';
     vibeTag = '';
     interestTags = [];
     quickSetupComplete = false;

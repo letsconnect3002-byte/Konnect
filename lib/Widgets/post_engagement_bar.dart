@@ -214,7 +214,7 @@ class _ReplyButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final int count = post.activeReplyCount > 0 ? post.activeReplyCount : post.replyCount;
+    final int count = post.activeReplyCount;
 
     return InkWell(
       onTap: onTap,

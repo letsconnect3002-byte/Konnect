@@ -11,6 +11,7 @@ import 'package:connect/Providers/connection_provider.dart';
 import 'package:connect/Widgets/post_card.dart';
 import 'package:connect/Widgets/threaded_comment_tree.dart';
 import 'package:connect/services/analytics_service.dart';
+import 'package:connect/Widgets/anonymous_avatar.dart';
 
 class _MentionTextEditingController extends TextEditingController {
   Color accentColor;
@@ -107,6 +108,7 @@ class _ThreadDetailPageState extends State<ThreadDetailPage> {
   FeedPost? _replyingToTarget;
   bool _hasSetInitialReplyTarget = false;
   bool _isSubmitting = false;
+  bool _isAnonymousReply = false;
   RealtimeChannel? _threadChannel;
 
   late String _currentRootPostId;
@@ -451,18 +453,28 @@ class _ThreadDetailPageState extends State<ThreadDetailPage> {
     final feedProvider = Provider.of<FeedProvider>(context, listen: false);
     final connectionProvider = Provider.of<ConnectionProvider>(context, listen: false);
 
+    final bool useAnonymous = _isAnonymousReply;
+    final String authorName = useAnonymous
+        ? (profileProvider.anonName.isNotEmpty
+            ? profileProvider.anonName
+            : 'Anonymous')
+        : profileProvider.name;
+    final String authorAvatarUrl =
+        useAnonymous ? '' : profileProvider.avatarUrl;
+
     final String tempId = 'temp_${DateTime.now().millisecondsSinceEpoch}';
     final tempPost = FeedPost(
       id: tempId,
       authorId: profileProvider.userId ?? 0,
-      authorName: profileProvider.name,
-      authorAvatarUrl: profileProvider.avatarUrl,
+      authorName: authorName,
+      authorAvatarUrl: authorAvatarUrl,
       content: text,
       createdAt: DateTime.now(),
       replyCount: 0,
       degree: 0,
       replyToPostId: target.id,
       visibility: target.visibility,
+      isAnonymous: useAnonymous,
     );
 
     // Optimistic UI addition
@@ -474,11 +486,12 @@ class _ThreadDetailPageState extends State<ThreadDetailPage> {
     try {
       final realPost = await feedProvider.createPost(
         text,
-        authorName: profileProvider.name,
-        authorAvatarUrl: profileProvider.avatarUrl,
+        authorName: authorName,
+        authorAvatarUrl: authorAvatarUrl,
         replyToPostId: target.id,
         connections: connectionProvider.connections,
         visibility: target.visibility,
+        isAnonymous: useAnonymous,
       );
       AnalyticsService.logEvent(
         name: 'thread_reply_submitted',
@@ -545,9 +558,7 @@ class _ThreadDetailPageState extends State<ThreadDetailPage> {
   CommentNode _buildNode(FeedPost post, Map<String, List<FeedPost>> childrenMap) {
     final children = childrenMap[post.id] ?? [];
     final totalActiveDescendants = _countTotalActiveDescendants(post, childrenMap);
-    final effectiveReplyCount = (totalActiveDescendants > 0)
-        ? totalActiveDescendants
-        : (post.activeReplyCount > 0 ? post.activeReplyCount : post.replyCount);
+    final effectiveReplyCount = totalActiveDescendants;
     final updatedPost = post.copyWith(
       replyCount: effectiveReplyCount,
       activeReplyCount: effectiveReplyCount,
@@ -567,6 +578,7 @@ class _ThreadDetailPageState extends State<ThreadDetailPage> {
       degree: post.degree,
       replyCount: effectiveReplyCount,
       isDeleted: post.isDeleted,
+      isAnonymous: post.isAnonymous,
       replyToName: replyToName,
       post: updatedPost,
       replies: children.map((c) => _buildNode(c, childrenMap)).toList(),
@@ -932,6 +944,161 @@ class _ThreadDetailPageState extends State<ThreadDetailPage> {
                             ],
                           ),
                         ),
+                      // Prominent Reply Identity Selector Bar
+                      Consumer<ProfileProvider>(
+                        builder: (context, profileProvider, _) {
+                          final currentName = _isAnonymousReply
+                              ? (profileProvider.anonName.isNotEmpty
+                                  ? profileProvider.anonName
+                                  : "Anonymous")
+                              : (profileProvider.name.isNotEmpty
+                                  ? profileProvider.name
+                                  : "You");
+
+                          return Container(
+                            margin: const EdgeInsets.only(bottom: 8),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: _isAnonymousReply
+                                  ? context.accentPrimary
+                                      .withValues(alpha: 0.12)
+                                  : context.surfaceSecondary,
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: _isAnonymousReply
+                                    ? context.accentPrimary
+                                        .withValues(alpha: 0.4)
+                                    : Colors.white.withValues(alpha: 0.06),
+                                width: 0.8,
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                _isAnonymousReply
+                                    ? AnonymousAvatar(
+                                        seed: (profileProvider.userId ?? 0)
+                                            .toString(),
+                                        radius: 12,
+                                      )
+                                    : CircleAvatar(
+                                        radius: 12,
+                                        backgroundColor:
+                                            context.surfaceSecondary,
+                                        backgroundImage: profileProvider
+                                                .avatarUrl.isNotEmpty
+                                            ? NetworkImage(
+                                                profileProvider.avatarUrl)
+                                            : null,
+                                        child: profileProvider.avatarUrl.isEmpty
+                                            ? Text(
+                                                profileProvider.name.isNotEmpty
+                                                    ? profileProvider.name[0]
+                                                        .toUpperCase()
+                                                    : '?',
+                                                style: const TextStyle(
+                                                    fontSize: 10,
+                                                    fontWeight: FontWeight.bold,
+                                                    color: Colors.white),
+                                              )
+                                            : null,
+                                      ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: RichText(
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    text: TextSpan(
+                                      style: TextStyle(
+                                          color: context.textMuted,
+                                          fontSize: 12),
+                                      children: [
+                                        const TextSpan(text: "Replying as "),
+                                        TextSpan(
+                                          text: currentName,
+                                          style: TextStyle(
+                                            color: _isAnonymousReply
+                                                ? context.accentSecondary
+                                                : context.textPrimary,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                        TextSpan(
+                                          text: _isAnonymousReply
+                                              ? " • Anonymous"
+                                              : " • Real Profile",
+                                          style: TextStyle(
+                                            color: _isAnonymousReply
+                                                ? context.accentSecondary
+                                                    .withValues(alpha: 0.8)
+                                                : context.textMuted,
+                                            fontSize: 11,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                                InkWell(
+                                  onTap: () {
+                                    HapticFeedback.selectionClick();
+                                    setState(() {
+                                      _isAnonymousReply = !_isAnonymousReply;
+                                    });
+                                  },
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 8, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: _isAnonymousReply
+                                          ? context.accentPrimary
+                                              .withValues(alpha: 0.25)
+                                          : Colors.white.withValues(alpha: 0.08),
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(
+                                        color: _isAnonymousReply
+                                            ? context.accentPrimary
+                                                .withValues(alpha: 0.4)
+                                            : Colors.white
+                                                .withValues(alpha: 0.1),
+                                        width: 0.6,
+                                      ),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          _isAnonymousReply
+                                              ? Icons.visibility_off_rounded
+                                              : Icons.person_rounded,
+                                          size: 13,
+                                          color: _isAnonymousReply
+                                              ? context.accentSecondary
+                                              : context.textPrimary,
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          _isAnonymousReply
+                                              ? "Go Real Profile"
+                                              : "Go Anonymous",
+                                          style: TextStyle(
+                                            color: _isAnonymousReply
+                                                ? context.accentSecondary
+                                                : context.textPrimary,
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
                       Row(
                         children: [
                           Expanded(
@@ -942,7 +1109,9 @@ class _ThreadDetailPageState extends State<ThreadDetailPage> {
                               maxLength: 500,
                               style: TextStyle(color: context.textPrimary, fontSize: 14),
                               decoration: InputDecoration(
-                                hintText: "Post your reply... Use @ to mention",
+                                hintText: _isAnonymousReply
+                                    ? "Post anonymous reply..."
+                                    : "Post your reply... Use @ to mention",
                                 hintStyle: TextStyle(color: context.textMuted, fontSize: 13),
                                 counterText: "",
                                 border: InputBorder.none,
