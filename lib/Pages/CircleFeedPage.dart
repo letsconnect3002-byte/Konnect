@@ -150,11 +150,14 @@ class CircleFeedPage extends StatefulWidget {
                   padding: const EdgeInsets.symmetric(vertical: 7),
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(10),
-                    color: isSelected ? context.accentSecondary : Colors.transparent,
+                    color: isSelected
+                        ? context.accentSecondary
+                        : Colors.transparent,
                     boxShadow: isSelected
                         ? [
                             BoxShadow(
-                              color: context.accentSecondary.withValues(alpha: 0.3),
+                              color: context.accentSecondary
+                                  .withValues(alpha: 0.3),
                               blurRadius: 6,
                               offset: const Offset(0, 2),
                             )
@@ -169,14 +172,17 @@ class CircleFeedPage extends StatefulWidget {
                       Icon(
                         icon,
                         size: 13,
-                        color: isSelected ? Colors.white : context.textSecondary,
+                        color:
+                            isSelected ? Colors.white : context.textSecondary,
                       ),
                       const SizedBox(width: 5),
                       Text(
                         title,
                         style: TextStyle(
-                          color: isSelected ? Colors.white : context.textSecondary,
-                          fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                          color:
+                              isSelected ? Colors.white : context.textSecondary,
+                          fontWeight:
+                              isSelected ? FontWeight.bold : FontWeight.w600,
                           fontSize: 12,
                         ),
                       ),
@@ -262,7 +268,8 @@ class CircleFeedPage extends StatefulWidget {
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
                               color: isAnonymousPost
-                                  ? context.accentPrimary.withValues(alpha: 0.15)
+                                  ? context.accentPrimary
+                                      .withValues(alpha: 0.15)
                                   : Colors.white.withValues(alpha: 0.05),
                             ),
                             child: Icon(
@@ -294,9 +301,10 @@ class CircleFeedPage extends StatefulWidget {
                                     final profileProvider =
                                         Provider.of<ProfileProvider>(context,
                                             listen: false);
-                                    final anonAlias = profileProvider.anonName.isNotEmpty
-                                        ? profileProvider.anonName
-                                        : "Anonymous";
+                                    final anonAlias =
+                                        profileProvider.anonName.isNotEmpty
+                                            ? profileProvider.anonName
+                                            : "Anonymous";
                                     return Text(
                                       isAnonymousPost
                                           ? "Appearing as $anonAlias"
@@ -319,7 +327,8 @@ class CircleFeedPage extends StatefulWidget {
                           Switch.adaptive(
                             value: isAnonymousPost,
                             activeThumbColor: context.accentPrimary,
-                            activeTrackColor: context.accentPrimary.withValues(alpha: 0.5),
+                            activeTrackColor:
+                                context.accentPrimary.withValues(alpha: 0.5),
                             onChanged: (val) {
                               HapticFeedback.selectionClick();
                               setSheetState(() => isAnonymousPost = val);
@@ -353,15 +362,17 @@ class CircleFeedPage extends StatefulWidget {
                       padding: const EdgeInsets.all(3),
                       child: Row(
                         children: [
-                          buildAudienceTab('both', 'All Circles', Icons.public_rounded),
-                          buildAudienceTab('casual', 'Casual', Icons.coffee_rounded),
-                          buildAudienceTab('professional', 'Professional', Icons.work_rounded),
+                          buildAudienceTab(
+                              'both', 'All Circles', Icons.public_rounded),
+                          buildAudienceTab(
+                              'casual', 'Casual', Icons.coffee_rounded),
+                          buildAudienceTab('professional', 'Professional',
+                              Icons.work_rounded),
                         ],
                       ),
                     ),
                     const SizedBox(height: 14),
                   ],
-
                   TextField(
                     controller: controller,
                     maxLines: 4,
@@ -580,8 +591,13 @@ class CircleFeedPage extends StatefulWidget {
                                   parameters: {
                                     'visibility': postVisibility,
                                     'char_count': postContent.length,
-                                    'has_link': (activeUrl != null && activeUrl.isNotEmpty) ? 1 : 0,
-                                    'mentions_count': RegExp(r'@[a-zA-Z0-9_]+').allMatches(postContent).length,
+                                    'has_link': (activeUrl != null &&
+                                            activeUrl.isNotEmpty)
+                                        ? 1
+                                        : 0,
+                                    'mentions_count': RegExp(r'@[a-zA-Z0-9_]+')
+                                        .allMatches(postContent)
+                                        .length,
                                     'is_anonymous': isAnonymousPost ? 1 : 0,
                                   },
                                 );
@@ -666,75 +682,75 @@ class _CircleFeedPageState extends State<CircleFeedPage> {
 
     _feedChannel = client.channel('feed:viewer_$userId');
     _feedChannel!
-      .onPostgresChanges(
-        event: PostgresChangeEvent.insert,
-        schema: 'public',
-        table: 'post_reactions',
-        callback: (payload) {
-          debugPrint(
-              '[REALTIME_SIGNAL: CIRCLE_FEED] post_reactions INSERT received: ${payload.newRecord}');
-          final feedProvider =
-              Provider.of<FeedProvider>(context, listen: false);
-          feedProvider.handleReactionRealtimePayload(
-            eventType: 'INSERT',
-            newRecord: Map<String, dynamic>.from(payload.newRecord),
-            oldRecord: Map<String, dynamic>.from(payload.oldRecord),
-          );
-          if (mounted) setState(() {});
-        },
-      )
-      .onPostgresChanges(
-        event: PostgresChangeEvent.update,
-        schema: 'public',
-        table: 'post_reactions',
-        callback: (payload) {
-          debugPrint(
-              '[REALTIME_SIGNAL: CIRCLE_FEED] post_reactions UPDATE received: ${payload.newRecord}');
-          final feedProvider =
-              Provider.of<FeedProvider>(context, listen: false);
-          feedProvider.handleReactionRealtimePayload(
-            eventType: 'UPDATE',
-            newRecord: Map<String, dynamic>.from(payload.newRecord),
-            oldRecord: Map<String, dynamic>.from(payload.oldRecord),
-          );
-          if (mounted) setState(() {});
-        },
-      )
-      .onPostgresChanges(
-        event: PostgresChangeEvent.delete,
-        schema: 'public',
-        table: 'post_reactions',
-        callback: (payload) {
-          debugPrint(
-              '[REALTIME_SIGNAL: CIRCLE_FEED] post_reactions DELETE received: ${payload.oldRecord}');
-          final feedProvider =
-              Provider.of<FeedProvider>(context, listen: false);
-          feedProvider.handleReactionRealtimePayload(
-            eventType: 'DELETE',
-            newRecord: Map<String, dynamic>.from(payload.newRecord),
-            oldRecord: Map<String, dynamic>.from(payload.oldRecord),
-          );
-          if (mounted) setState(() {});
-        },
-      )
-      .onPostgresChanges(
-        event: PostgresChangeEvent.update,
-        schema: 'public',
-        table: 'posts',
-        callback: (payload) {
-          debugPrint(
-              '[REALTIME_SIGNAL: CIRCLE_FEED] posts UPDATE received: ${payload.newRecord['id']} -> ${payload.newRecord['reaction_counts']}');
-          final feedProvider =
-              Provider.of<FeedProvider>(context, listen: false);
-          feedProvider.handlePostRealtimePayload(
-              Map<String, dynamic>.from(payload.newRecord));
-          if (mounted) setState(() {});
-        },
-      )
-      .subscribe((status, error) {
-        debugPrint(
-            '[REALTIME_SIGNAL: CIRCLE_FEED] Channel status: $status, error: $error');
-      });
+        .onPostgresChanges(
+          event: PostgresChangeEvent.insert,
+          schema: 'public',
+          table: 'post_reactions',
+          callback: (payload) {
+            debugPrint(
+                '[REALTIME_SIGNAL: CIRCLE_FEED] post_reactions INSERT received: ${payload.newRecord}');
+            final feedProvider =
+                Provider.of<FeedProvider>(context, listen: false);
+            feedProvider.handleReactionRealtimePayload(
+              eventType: 'INSERT',
+              newRecord: Map<String, dynamic>.from(payload.newRecord),
+              oldRecord: Map<String, dynamic>.from(payload.oldRecord),
+            );
+            if (mounted) setState(() {});
+          },
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.update,
+          schema: 'public',
+          table: 'post_reactions',
+          callback: (payload) {
+            debugPrint(
+                '[REALTIME_SIGNAL: CIRCLE_FEED] post_reactions UPDATE received: ${payload.newRecord}');
+            final feedProvider =
+                Provider.of<FeedProvider>(context, listen: false);
+            feedProvider.handleReactionRealtimePayload(
+              eventType: 'UPDATE',
+              newRecord: Map<String, dynamic>.from(payload.newRecord),
+              oldRecord: Map<String, dynamic>.from(payload.oldRecord),
+            );
+            if (mounted) setState(() {});
+          },
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.delete,
+          schema: 'public',
+          table: 'post_reactions',
+          callback: (payload) {
+            debugPrint(
+                '[REALTIME_SIGNAL: CIRCLE_FEED] post_reactions DELETE received: ${payload.oldRecord}');
+            final feedProvider =
+                Provider.of<FeedProvider>(context, listen: false);
+            feedProvider.handleReactionRealtimePayload(
+              eventType: 'DELETE',
+              newRecord: Map<String, dynamic>.from(payload.newRecord),
+              oldRecord: Map<String, dynamic>.from(payload.oldRecord),
+            );
+            if (mounted) setState(() {});
+          },
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.update,
+          schema: 'public',
+          table: 'posts',
+          callback: (payload) {
+            debugPrint(
+                '[REALTIME_SIGNAL: CIRCLE_FEED] posts UPDATE received: ${payload.newRecord['id']} -> ${payload.newRecord['reaction_counts']}');
+            final feedProvider =
+                Provider.of<FeedProvider>(context, listen: false);
+            feedProvider.handlePostRealtimePayload(
+                Map<String, dynamic>.from(payload.newRecord));
+            if (mounted) setState(() {});
+          },
+        )
+        .subscribe((status, error) {
+      debugPrint(
+          '[REALTIME_SIGNAL: CIRCLE_FEED] Channel status: $status, error: $error');
+    });
   }
 
   @override
@@ -790,267 +806,126 @@ class _CircleFeedPageState extends State<CircleFeedPage> {
     );
   }
 
-  void _openFeedFilterSheet(BuildContext context) {
-    HapticFeedback.lightImpact();
-    final feedProvider = Provider.of<FeedProvider>(context, listen: false);
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (sheetContext) {
-        return StatefulBuilder(
-          builder: (ctx, setSheetState) {
-            return Container(
-              decoration: BoxDecoration(
-                color: context.surfacePrimary,
-                borderRadius:
-                    const BorderRadius.vertical(top: Radius.circular(24)),
-                border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.08),
-                  width: 1,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.6),
-                    blurRadius: 24,
-                    offset: const Offset(0, -6),
-                  ),
-                ],
-              ),
-              child: SafeArea(
-                top: false,
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        width: 36,
-                        height: 4,
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.2),
-                          borderRadius: BorderRadius.circular(2),
-                        ),
-                      ),
-                      const SizedBox(height: 18),
-                      Row(
-                        children: [
-                          Text(
-                            "Feed Selection",
-                            style: TextStyle(
-                              color: context.textPrimary,
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              fontFamily: 'Inter',
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          Text(
-                            "Choose which circle of posts to display",
-                            style: TextStyle(
-                              color: context.textSecondary,
-                              fontSize: 13,
-                              fontFamily: 'Inter',
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 20),
-                      _buildFeedOptionCard(
-                        title: "Global Feed",
-                        description:
-                            "All posts across the platform without any network filters",
-                        icon: Icons.language_rounded,
-                        isSelected: feedProvider.feedFilter == FeedFilter.global,
-                        onTap: () {
-                          if (feedProvider.feedFilter != FeedFilter.global) {
-                            HapticFeedback.selectionClick();
-                            feedProvider.setFilter(FeedFilter.global);
-                            setSheetState(() {});
-                            AnalyticsService.logEvent(
-                              name: 'feed_filter_changed',
-                              parameters: {'filter': 'global'},
-                            );
-                          }
-                          Navigator.pop(sheetContext);
-                        },
-                      ),
-                      const SizedBox(height: 12),
-                      _buildFeedOptionCard(
-                        title: "Full Network",
-                        description:
-                            "Posts from direct connections and extended network",
-                        icon: Icons.public_rounded,
-                        isSelected:
-                            feedProvider.feedFilter == FeedFilter.fullNetwork,
-                        onTap: () {
-                          if (feedProvider.feedFilter !=
-                              FeedFilter.fullNetwork) {
-                            HapticFeedback.selectionClick();
-                            feedProvider.setFilter(FeedFilter.fullNetwork);
-                            setSheetState(() {});
-                            AnalyticsService.logEvent(
-                              name: 'feed_filter_changed',
-                              parameters: {'filter': 'full_network'},
-                            );
-                          }
-                          Navigator.pop(sheetContext);
-                        },
-                      ),
-                      const SizedBox(height: 12),
-                      _buildFeedOptionCard(
-                        title: "Inner Circle",
-                        description:
-                            "Posts exclusively from your direct 1st-degree connections",
-                        icon: Icons.people_alt_rounded,
-                        isSelected:
-                            feedProvider.feedFilter == FeedFilter.innerCircle,
-                        onTap: () {
-                          if (feedProvider.feedFilter !=
-                              FeedFilter.innerCircle) {
-                            HapticFeedback.selectionClick();
-                            feedProvider.setFilter(FeedFilter.innerCircle);
-                            setSheetState(() {});
-                            AnalyticsService.logEvent(
-                              name: 'feed_filter_changed',
-                              parameters: {'filter': 'inner_circle'},
-                            );
-                          }
-                          Navigator.pop(sheetContext);
-                        },
-                      ),
-                      const SizedBox(height: 8),
-                    ],
-                  ),
-                ),
-              ),
-            );
-          },
-        );
-      },
+  Widget _buildFeedFilterBar(BuildContext context, FeedProvider feedProvider) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+      child: Row(
+        children: [
+          _buildFilterTabItem(
+            context: context,
+            feedProvider: feedProvider,
+            filter: FeedFilter.global,
+            title: "Global Feed",
+            icon: Icons.language_rounded,
+          ),
+          const SizedBox(width: 8),
+          _buildFilterTabItem(
+            context: context,
+            feedProvider: feedProvider,
+            filter: FeedFilter.fullNetwork,
+            title: "Full Network",
+            icon: Icons.public_rounded,
+          ),
+          const SizedBox(width: 8),
+          _buildFilterTabItem(
+            context: context,
+            feedProvider: feedProvider,
+            filter: FeedFilter.innerCircle,
+            title: "Inner Circle",
+            icon: Icons.people_alt_rounded,
+          ),
+        ],
+      ),
     );
   }
 
-  Widget _buildFeedOptionCard({
+  Widget _buildFilterTabItem({
+    required BuildContext context,
+    required FeedProvider feedProvider,
+    required FeedFilter filter,
     required String title,
-    required String description,
     required IconData icon,
-    required bool isSelected,
-    required VoidCallback onTap,
   }) {
-    return BounceTap(
-      onTap: onTap,
-      scaleDown: 0.98,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        curve: Curves.easeOutCubic,
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? context.accentPrimary.withValues(alpha: 0.12)
-              : context.surfaceSecondary,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
+    final isSelected = feedProvider.feedFilter == filter;
+    return Expanded(
+      child: BounceTap(
+        scaleDown: 0.96,
+        onTap: () {
+          if (!isSelected) {
+            HapticFeedback.selectionClick();
+            feedProvider.setFilter(filter);
+            AnalyticsService.logEvent(
+              name: 'feed_filter_changed',
+              parameters: {'filter': filter.name},
+            );
+          }
+        },
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeOutCubic,
+          padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
+          decoration: BoxDecoration(
             color: isSelected
-                ? context.accentPrimary.withValues(alpha: 0.5)
-                : Colors.white.withValues(alpha: 0.05),
-            width: 1.2,
+                ? context.accentPrimary.withValues(alpha: 0.14)
+                : context.surfacePrimary.withValues(alpha: 0.6),
+            borderRadius: BorderRadius.circular(99),
+            border: Border.all(
+              color: isSelected
+                  ? context.accentPrimary.withValues(alpha: 0.5)
+                  : Colors.white.withValues(alpha: 0.08),
+              width: isSelected ? 1.2 : 1.0,
+            ),
+            boxShadow: isSelected
+                ? [
+                    BoxShadow(
+                      color: context.accentPrimary.withValues(alpha: 0.18),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ]
+                : null,
           ),
-          boxShadow: isSelected
-              ? [
-                  BoxShadow(
-                    color: context.accentPrimary.withValues(alpha: 0.15),
-                    blurRadius: 10,
-                    offset: const Offset(0, 3),
-                  ),
-                ]
-              : null,
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 42,
-              height: 42,
-              decoration: BoxDecoration(
-                color: isSelected
-                    ? context.accentPrimary.withValues(alpha: 0.2)
-                    : Colors.white.withValues(alpha: 0.05),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
                 icon,
-                size: 20,
-                color: isSelected
-                    ? context.accentPrimary
-                    : context.textSecondary,
+                size: 13,
+                color:
+                    isSelected ? context.accentPrimary : context.textSecondary,
               ),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: TextStyle(
-                      color: isSelected ? Colors.white : context.textPrimary,
-                      fontSize: 15,
-                      fontWeight: FontWeight.bold,
-                      fontFamily: 'Inter',
-                    ),
+              const SizedBox(width: 5),
+              Flexible(
+                child: Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: isSelected
+                        ? context.textPrimary
+                        : context.textSecondary,
+                    fontSize: 11,
+                    fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                    fontFamily: 'Inter',
+                    letterSpacing: -0.1,
                   ),
-                  const SizedBox(height: 3),
-                  Text(
-                    description,
-                    style: TextStyle(
-                      color: context.textSecondary,
-                      fontSize: 12.5,
-                      height: 1.3,
-                      fontFamily: 'Inter',
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 10),
-            Container(
-              width: 22,
-              height: 22,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: isSelected ? context.accentPrimary : Colors.transparent,
-                border: Border.all(
-                  color: isSelected
-                      ? context.accentPrimary
-                      : context.textSecondary.withValues(alpha: 0.4),
-                  width: 2,
                 ),
               ),
-              child: isSelected
-                  ? const Icon(
-                      Icons.check,
-                      size: 14,
-                      color: Colors.white,
-                    )
-                  : null,
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
 
   Widget _buildEmpty1DegreeState(BuildContext context) {
-    final feedProvider = Provider.of<FeedProvider>(context, listen: false);
+    final feedProvider = Provider.of<FeedProvider>(context);
     return SingleChildScrollView(
       physics: const AlwaysScrollableScrollPhysics(),
       child: Column(
         children: [
           const PulseRowWidget(),
+          _buildFeedFilterBar(context, feedProvider),
           Container(
             height: MediaQuery.of(context).size.height * 0.52,
             alignment: Alignment.center,
@@ -1180,68 +1055,6 @@ class _CircleFeedPageState extends State<CircleFeedPage> {
                     ],
                   ),
                 ),
-                // Center: Perfectly centered filter button
-                Center(
-                  child: BounceTap(
-                    onTap: () => _openFeedFilterSheet(context),
-                    scaleDown: 0.94,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 14, vertical: 7),
-                      decoration: BoxDecoration(
-                        color: context.surfacePrimary,
-                        borderRadius: BorderRadius.circular(99),
-                        border: Border.all(
-                          color: Colors.white.withValues(alpha: 0.08),
-                          width: 1.0,
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.3),
-                            blurRadius: 8,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            feedProvider.feedFilter == FeedFilter.global
-                                ? Icons.language_rounded
-                                : (feedProvider.feedFilter ==
-                                        FeedFilter.innerCircle
-                                    ? Icons.people_alt_rounded
-                                    : Icons.public_rounded),
-                            size: 14,
-                            color: context.accentPrimary,
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            feedProvider.feedFilter == FeedFilter.global
-                                ? "Global Feed"
-                                : (feedProvider.feedFilter ==
-                                        FeedFilter.innerCircle
-                                    ? "Inner Circle"
-                                    : "Full Network"),
-                            style: TextStyle(
-                              color: context.textPrimary,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              fontFamily: 'Inter',
-                            ),
-                          ),
-                          const SizedBox(width: 4),
-                          Icon(
-                            Icons.keyboard_arrow_down_rounded,
-                            size: 17,
-                            color: context.textSecondary,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
                 // Right: Notification Icon Button
                 Positioned(
                   right: 16,
@@ -1315,308 +1128,316 @@ class _CircleFeedPageState extends State<CircleFeedPage> {
           ),
         ),
       ),
-      body: feedProvider.isLoading && feedProvider.posts.isEmpty
-          ? const Center(child: CircularProgressIndicator())
-          : Stack(
-              children: [
-                    RefreshIndicator(
-                      onRefresh: () async {
-                        AnalyticsService.logEvent(
-                          name: 'feed_refresh_triggered',
-                          parameters: {'trigger': 'pull_to_refresh'},
-                        );
-                        final pulseProvider =
-                            Provider.of<PulseProvider>(context, listen: false);
-                        await Future.wait([
-                          feedProvider.fetchInitialFeed(),
-                          pulseProvider.loadFeed(),
-                          pulseProvider.loadMyPulse(),
-                        ]);
-                      },
-                      backgroundColor: context.surfacePrimary,
-                      color: context.accentPrimary,
-                      child: feedProvider.posts.isEmpty
-                          ? Builder(
-                              builder: (context) {
-                                final connectionProvider =
-                                    Provider.of<ConnectionProvider>(context);
-                                final bool hasNoConnections =
-                                    connectionProvider.connections.isEmpty;
+      body: Stack(
+        children: [
+          RefreshIndicator(
+            onRefresh: () async {
+              AnalyticsService.logEvent(
+                name: 'feed_refresh_triggered',
+                parameters: {'trigger': 'pull_to_refresh'},
+              );
+              final pulseProvider =
+                  Provider.of<PulseProvider>(context, listen: false);
+              await Future.wait([
+                feedProvider.fetchInitialFeed(),
+                pulseProvider.loadFeed(),
+                pulseProvider.loadMyPulse(),
+              ]);
+            },
+            backgroundColor: context.surfacePrimary,
+            color: context.accentPrimary,
+            child: (feedProvider.isLoading && feedProvider.posts.isEmpty)
+                ? SingleChildScrollView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    child: Column(
+                      children: [
+                        const PulseRowWidget(),
+                        _buildFeedFilterBar(context, feedProvider),
+                        Container(
+                          height: MediaQuery.of(context).size.height * 0.45,
+                          alignment: Alignment.center,
+                          child: CircularProgressIndicator(
+                            color: context.accentPrimary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                : feedProvider.posts.isEmpty
+                    ? Builder(
+                        builder: (context) {
+                          final connectionProvider =
+                              Provider.of<ConnectionProvider>(context);
+                          final bool hasNoConnections =
+                              connectionProvider.connections.isEmpty;
 
-                                return SingleChildScrollView(
-                                  physics:
-                                      const AlwaysScrollableScrollPhysics(),
+                          return SingleChildScrollView(
+                            physics: const AlwaysScrollableScrollPhysics(),
+                            child: Column(
+                              children: [
+                                const PulseRowWidget(),
+                                _buildFeedFilterBar(context, feedProvider),
+                                Container(
+                                  height:
+                                      MediaQuery.of(context).size.height * 0.55,
+                                  alignment: Alignment.center,
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 32),
                                   child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
-                                      const PulseRowWidget(),
                                       Container(
-                                        height:
-                                            MediaQuery.of(context).size.height *
-                                                0.55,
-                                        alignment: Alignment.center,
-                                        padding: const EdgeInsets.symmetric(
-                                            horizontal: 32),
-                                        child: Column(
-                                          mainAxisAlignment:
-                                              MainAxisAlignment.center,
-                                          children: [
-                                            Container(
-                                              width: 64,
-                                              height: 64,
-                                              decoration: BoxDecoration(
-                                                color: context.accentPrimary
-                                                    .withValues(alpha: 0.12),
-                                                shape: BoxShape.circle,
-                                                border: Border.all(
-                                                  color: context.accentPrimary
-                                                      .withValues(alpha: 0.3),
-                                                  width: 1.5,
-                                                ),
+                                        width: 64,
+                                        height: 64,
+                                        decoration: BoxDecoration(
+                                          color: context.accentPrimary
+                                              .withValues(alpha: 0.12),
+                                          shape: BoxShape.circle,
+                                          border: Border.all(
+                                            color: context.accentPrimary
+                                                .withValues(alpha: 0.3),
+                                            width: 1.5,
+                                          ),
+                                        ),
+                                        child: Icon(
+                                          feedProvider.feedFilter ==
+                                                  FeedFilter.global
+                                              ? Icons.language_rounded
+                                              : (hasNoConnections
+                                                  ? Icons.people_outline_rounded
+                                                  : Icons.dynamic_feed_rounded),
+                                          size: 32,
+                                          color: context.accentPrimary,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 16),
+                                      Text(
+                                        feedProvider.feedFilter ==
+                                                FeedFilter.global
+                                            ? "No Global Posts Yet"
+                                            : (hasNoConnections
+                                                ? "Build Your Network"
+                                                : "No Posts Yet"),
+                                        textAlign: TextAlign.center,
+                                        style: TextStyle(
+                                          color: context.textPrimary,
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        feedProvider.feedFilter ==
+                                                FeedFilter.global
+                                            ? "There are no posts shared in the global feed yet. Be the first to post!"
+                                            : (hasNoConnections
+                                                ? "Connect with friends and colleagues to start seeing posts and pulses in your feed."
+                                                : "No post shared by your network yet, be first to do so."),
+                                        textAlign: TextAlign.center,
+                                        style: TextStyle(
+                                          color: context.textSecondary,
+                                          fontSize: 13.5,
+                                          height: 1.4,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 22),
+                                      ElevatedButton.icon(
+                                        onPressed: () {
+                                          if (feedProvider.feedFilter ==
+                                              FeedFilter.global) {
+                                            _openComposeSheet(context);
+                                          } else if (hasNoConnections) {
+                                            showModalBottomSheet(
+                                              context: context,
+                                              isScrollControlled: true,
+                                              backgroundColor:
+                                                  Colors.transparent,
+                                              builder: (context) =>
+                                                  const ConnectHubBottomSheet(
+                                                initialTabIndex: 1,
+                                                showOnboardingSteps: true,
                                               ),
-                                              child: Icon(
-                                                feedProvider.feedFilter ==
-                                                        FeedFilter.global
-                                                    ? Icons.language_rounded
-                                                    : (hasNoConnections
-                                                        ? Icons
-                                                            .people_outline_rounded
-                                                        : Icons
-                                                            .dynamic_feed_rounded),
-                                                size: 32,
-                                                color: context.accentPrimary,
-                                              ),
-                                            ),
-                                            const SizedBox(height: 16),
-                                            Text(
-                                              feedProvider.feedFilter ==
-                                                      FeedFilter.global
-                                                  ? "No Global Posts Yet"
-                                                  : (hasNoConnections
-                                                      ? "Build Your Network"
-                                                      : "No Posts Yet"),
-                                              textAlign: TextAlign.center,
-                                              style: TextStyle(
-                                                color: context.textPrimary,
-                                                fontSize: 18,
-                                                fontWeight: FontWeight.bold,
-                                              ),
-                                            ),
-                                            const SizedBox(height: 8),
-                                            Text(
-                                              feedProvider.feedFilter ==
-                                                      FeedFilter.global
-                                                  ? "There are no posts shared in the global feed yet. Be the first to post!"
-                                                  : (hasNoConnections
-                                                      ? "Connect with friends and colleagues to start seeing posts and pulses in your feed."
-                                                      : "No post shared by your network yet, be first to do so."),
-                                              textAlign: TextAlign.center,
-                                              style: TextStyle(
-                                                color: context.textSecondary,
-                                                fontSize: 13.5,
-                                                height: 1.4,
-                                              ),
-                                            ),
-                                            const SizedBox(height: 22),
-                                            ElevatedButton.icon(
-                                              onPressed: () {
-                                                if (feedProvider.feedFilter ==
-                                                    FeedFilter.global) {
-                                                  _openComposeSheet(context);
-                                                } else if (hasNoConnections) {
-                                                  showModalBottomSheet(
-                                                    context: context,
-                                                    isScrollControlled: true,
-                                                    backgroundColor:
-                                                        Colors.transparent,
-                                                    builder: (context) =>
-                                                        const ConnectHubBottomSheet(
-                                                      initialTabIndex: 1,
-                                                      showOnboardingSteps: true,
-                                                    ),
-                                                  );
-                                                } else {
-                                                  _openComposeSheet(context);
-                                                }
-                                              },
-                                              icon: Icon(
-                                                (feedProvider.feedFilter !=
-                                                            FeedFilter
-                                                                .global &&
-                                                        hasNoConnections)
-                                                    ? Icons.person_add_rounded
-                                                    : Icons.add_rounded,
-                                                color: Colors.white,
-                                                size: 18,
-                                              ),
-                                              label: Text(
-                                                (feedProvider.feedFilter !=
-                                                            FeedFilter
-                                                                .global &&
-                                                        hasNoConnections)
-                                                    ? "Connect with People"
-                                                    : "Share First Post",
-                                                style: const TextStyle(
-                                                  color: Colors.white,
-                                                  fontWeight: FontWeight.bold,
-                                                ),
-                                              ),
-                                              style: ElevatedButton.styleFrom(
-                                                backgroundColor:
-                                                    context.accentPrimary,
-                                                padding:
-                                                    const EdgeInsets.symmetric(
-                                                        horizontal: 24,
-                                                        vertical: 12),
-                                                shape: RoundedRectangleBorder(
-                                                  borderRadius:
-                                                      BorderRadius.circular(12),
-                                                ),
-                                              ),
-                                            ),
-                                          ],
+                                            );
+                                          } else {
+                                            _openComposeSheet(context);
+                                          }
+                                        },
+                                        icon: Icon(
+                                          (feedProvider.feedFilter !=
+                                                      FeedFilter.global &&
+                                                  hasNoConnections)
+                                              ? Icons.person_add_rounded
+                                              : Icons.add_rounded,
+                                          color: Colors.white,
+                                          size: 18,
+                                        ),
+                                        label: Text(
+                                          (feedProvider.feedFilter !=
+                                                      FeedFilter.global &&
+                                                  hasNoConnections)
+                                              ? "Connect with People"
+                                              : "Share First Post",
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor:
+                                              context.accentPrimary,
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 24, vertical: 12),
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius:
+                                                BorderRadius.circular(12),
+                                          ),
                                         ),
                                       ),
                                     ],
                                   ),
-                                );
-                              },
-                            )
-                          : displayedPosts.isEmpty
-                              ? _buildEmpty1DegreeState(context)
-                              : ListView.builder(
-                                  controller: _scrollController,
-                                  physics:
-                                      const AlwaysScrollableScrollPhysics(),
-                                  itemCount: displayedPosts.length + 2,
-                                  itemBuilder: (context, index) {
-                                    if (index == 0) {
-                                      return const PulseRowWidget();
-                                    }
-
-                                    if (index == displayedPosts.length + 1) {
-                                      if (feedProvider.isLoadingMore) {
-                                        return const Padding(
-                                          padding: EdgeInsets.symmetric(
-                                              vertical: 20),
-                                          child: Center(
-                                              child:
-                                                  CircularProgressIndicator()),
-                                        );
-                                      }
-                                      return const SizedBox(height: 80);
-                                    }
-
-                                    final post = displayedPosts[index - 1];
-                                    final postIndex = index - 1;
-
-                                    final bool showDividerHere = feedProvider
-                                            .hasShownCaughtUpDivider &&
-                                        postIndex > 0 &&
-                                        displayedPosts[postIndex - 1].degree ==
-                                            post.degree;
-                                    return Column(
-                                      children: [
-                                        if (showDividerHere && postIndex == 5)
-                                          _buildCaughtUpDivider(context),
-                                        DwellDetector(
-                                          onDwell: () {
-                                            feedProvider
-                                                .markPostSeenLocally(post.id);
-                                            AnalyticsService.logEvent(
-                                              name: 'feed_post_dwelled',
-                                              parameters: {
-                                                'post_id': post.id,
-                                                'author_degree': post.degree,
-                                              },
-                                            );
-                                          },
-                                          child: _FeedPostThreadItem(
-                                            key: ValueKey(
-                                                "feed_item_${post.id}"),
-                                            post: post,
-                                            onTap: () {
-                                              Navigator.push(
-                                                context,
-                                                MaterialPageRoute(
-                                                  builder: (context) =>
-                                                      ThreadDetailPage(
-                                                          rootPostId: post.id),
-                                                ),
-                                              );
-                                            },
-                                          ),
-                                        ),
-                                      ],
-                                    );
-                                  },
                                 ),
-                    ),
-                    if (feedProvider.hasNewPosts)
-                      Positioned(
-                        top: 14,
-                        left: 0,
-                        right: 0,
-                        child: Center(
-                          child: Material(
-                            color: Colors.transparent,
-                            child: InkWell(
-                              onTap: () {
-                                HapticFeedback.mediumImpact();
-                                AnalyticsService.logEvent(
-                                  name: 'feed_refresh_triggered',
-                                  parameters: {'trigger': 'banner_click'},
+                              ],
+                            ),
+                          );
+                        },
+                      )
+                    : displayedPosts.isEmpty
+                        ? _buildEmpty1DegreeState(context)
+                        : ListView.builder(
+                            controller: _scrollController,
+                            physics: const AlwaysScrollableScrollPhysics(),
+                            itemCount: displayedPosts.length + 2,
+                            itemBuilder: (context, index) {
+                              if (index == 0) {
+                                return Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const PulseRowWidget(),
+                                    _buildFeedFilterBar(context, feedProvider),
+                                  ],
                                 );
-                                feedProvider.loadNewPosts();
-                                if (_scrollController.hasClients) {
-                                  _scrollController.animateTo(
-                                    0,
-                                    duration: const Duration(milliseconds: 300),
-                                    curve: Curves.easeOut,
+                              }
+
+                              if (index == displayedPosts.length + 1) {
+                                if (feedProvider.isLoadingMore) {
+                                  return const Padding(
+                                    padding: EdgeInsets.symmetric(vertical: 20),
+                                    child: Center(
+                                        child: CircularProgressIndicator()),
                                   );
                                 }
-                              },
-                              borderRadius: BorderRadius.circular(99),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 16, vertical: 9),
-                                decoration: BoxDecoration(
-                                  color: context.accentPrimary,
-                                  borderRadius: BorderRadius.circular(99),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: context.accentPrimary
-                                          .withValues(alpha: 0.4),
-                                      blurRadius: 14,
-                                      offset: const Offset(0, 4),
+                                return const SizedBox(height: 80);
+                              }
+
+                              final post = displayedPosts[index - 1];
+                              final postIndex = index - 1;
+
+                              final bool showDividerHere =
+                                  feedProvider.hasShownCaughtUpDivider &&
+                                      postIndex > 0 &&
+                                      displayedPosts[postIndex - 1].degree ==
+                                          post.degree;
+                              return Column(
+                                children: [
+                                  if (showDividerHere && postIndex == 5)
+                                    _buildCaughtUpDivider(context),
+                                  DwellDetector(
+                                    onDwell: () {
+                                      feedProvider.markPostSeenLocally(post.id);
+                                      AnalyticsService.logEvent(
+                                        name: 'feed_post_dwelled',
+                                        parameters: {
+                                          'post_id': post.id,
+                                          'author_degree': post.degree,
+                                        },
+                                      );
+                                    },
+                                    child: _FeedPostThreadItem(
+                                      key: ValueKey("feed_item_${post.id}"),
+                                      post: post,
+                                      onTap: () {
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (context) =>
+                                                ThreadDetailPage(
+                                                    rootPostId: post.id),
+                                          ),
+                                        );
+                                      },
                                     ),
-                                  ],
-                                ),
-                                child: const Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Text(
-                                      "New post",
-                                      style: TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                    SizedBox(width: 6),
-                                    Icon(
-                                      Icons.arrow_upward_rounded,
-                                      color: Colors.white,
-                                      size: 16,
-                                    ),
-                                  ],
-                                ),
-                              ),
+                                  ),
+                                ],
+                              );
+                            },
+                          ),
+          ),
+          if (feedProvider.hasNewPosts)
+            Positioned(
+              top: 14,
+              left: 0,
+              right: 0,
+              child: Center(
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: () {
+                      HapticFeedback.mediumImpact();
+                      AnalyticsService.logEvent(
+                        name: 'feed_refresh_triggered',
+                        parameters: {'trigger': 'banner_click'},
+                      );
+                      feedProvider.loadNewPosts();
+                      if (_scrollController.hasClients) {
+                        _scrollController.animateTo(
+                          0,
+                          duration: const Duration(milliseconds: 300),
+                          curve: Curves.easeOut,
+                        );
+                      }
+                    },
+                    borderRadius: BorderRadius.circular(99),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 9),
+                      decoration: BoxDecoration(
+                        color: context.accentPrimary,
+                        borderRadius: BorderRadius.circular(99),
+                        boxShadow: [
+                          BoxShadow(
+                            color: context.accentPrimary.withValues(alpha: 0.4),
+                            blurRadius: 14,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            "New post",
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
                             ),
                           ),
-                        ),
+                          SizedBox(width: 6),
+                          Icon(
+                            Icons.arrow_upward_rounded,
+                            color: Colors.white,
+                            size: 16,
+                          ),
+                        ],
                       ),
-                  ],
+                    ),
+                  ),
                 ),
+              ),
+            ),
+        ],
+      ),
       floatingActionButton: Padding(
         padding: const EdgeInsets.only(bottom: 70.0),
         child: FloatingActionButton(
@@ -1800,7 +1621,8 @@ class _FeedPostThreadItemState extends State<_FeedPostThreadItem> {
           _treeNode = applyReactionUpdate(_treeNode!);
         });
       } else if (targetPostId == widget.post.id) {
-        debugPrint('[REALTIME_SIGNAL: UI] Calling setState on root post card ${widget.post.id}');
+        debugPrint(
+            '[REALTIME_SIGNAL: UI] Calling setState on root post card ${widget.post.id}');
         setState(() {});
       }
     } else if (table == 'posts') {
@@ -1812,7 +1634,8 @@ class _FeedPostThreadItemState extends State<_FeedPostThreadItem> {
           replyToPostId != null &&
           (rootPostId == widget.post.id ||
               replyToPostId == widget.post.id ||
-              (_treeNode != null && _isPostIdInTree(_treeNode!, replyToPostId)))) {
+              (_treeNode != null &&
+                  _isPostIdInTree(_treeNode!, replyToPostId)))) {
         _loadThreadPreview(forceReload: true);
         return;
       }
@@ -1870,12 +1693,11 @@ class _FeedPostThreadItemState extends State<_FeedPostThreadItem> {
       if (_treeNode != null) {
         final feedProvider = Provider.of<FeedProvider>(context, listen: false);
 
-        CommentNode syncNodeWithLivePost(CommentNode node, {bool isRoot = false}) {
+        CommentNode syncNodeWithLivePost(CommentNode node,
+            {bool isRoot = false}) {
           final livePost = feedProvider.getPostById(node.id) ?? node.post;
           final int effectiveCount = isRoot
-              ? (livePost != null
-                  ? livePost.activeReplyCount
-                  : node.replyCount)
+              ? (livePost != null ? livePost.activeReplyCount : node.replyCount)
               : node.replyCount;
           final updatedPost = livePost?.copyWith(
             replyCount: effectiveCount,
@@ -2138,10 +1960,11 @@ class _FeedPostThreadItemState extends State<_FeedPostThreadItem> {
     );
 
     if (_treeNode != null && _treeNode!.replies.isNotEmpty) {
-      final updatedTree = (_treeNode!.post?.reactionCounts != effectivePost.reactionCounts ||
-              _treeNode!.post?.userReaction != effectivePost.userReaction)
-          ? _treeNode!.copyWith(post: effectivePost)
-          : _treeNode!;
+      final updatedTree =
+          (_treeNode!.post?.reactionCounts != effectivePost.reactionCounts ||
+                  _treeNode!.post?.userReaction != effectivePost.userReaction)
+              ? _treeNode!.copyWith(post: effectivePost)
+              : _treeNode!;
 
       return ThreadedCommentTree(
         comment: updatedTree,

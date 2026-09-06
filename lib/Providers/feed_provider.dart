@@ -41,6 +41,18 @@ class FeedProvider with ChangeNotifier {
     return _posts;
   }
 
+  List<FeedPost>? _savedNetworkPosts;
+  String? _savedNetworkBucket;
+  bool? _savedNetworkReachedEnd;
+  bool? _savedNetworkShownCaughtUp;
+  String? _savedNetworkLatestId;
+
+  List<FeedPost>? _savedGlobalPosts;
+  String? _savedGlobalBucket;
+  bool? _savedGlobalReachedEnd;
+  bool? _savedGlobalShownCaughtUp;
+  String? _savedGlobalLatestId;
+
   Future<void> setFilter(FeedFilter filter, {bool isManual = true}) async {
     if (isManual) {
       _hasUserExplicitlySelectedFilter = true;
@@ -52,14 +64,54 @@ class FeedProvider with ChangeNotifier {
     _feedFilter = filter;
 
     if (wasGlobal != isGlobal) {
-      _posts = [];
-      _currentBucket = 'unseen';
-      _hasReachedEnd = false;
-      _hasShownCaughtUpDivider = false;
-      _latestKnownPostId = null;
-      notifyListeners();
-      await fetchInitialFeed();
-      await fetchUnseenCount();
+      // Save state of outgoing filter
+      if (wasGlobal) {
+        _savedGlobalPosts = List.from(_posts);
+        _savedGlobalBucket = _currentBucket;
+        _savedGlobalReachedEnd = _hasReachedEnd;
+        _savedGlobalShownCaughtUp = _hasShownCaughtUpDivider;
+        _savedGlobalLatestId = _latestKnownPostId;
+      } else {
+        _savedNetworkPosts = List.from(_posts);
+        _savedNetworkBucket = _currentBucket;
+        _savedNetworkReachedEnd = _hasReachedEnd;
+        _savedNetworkShownCaughtUp = _hasShownCaughtUpDivider;
+        _savedNetworkLatestId = _latestKnownPostId;
+      }
+
+      // Check if we already have cached posts for incoming filter
+      final hasCached = isGlobal
+          ? (_savedGlobalPosts != null && _savedGlobalPosts!.isNotEmpty)
+          : (_savedNetworkPosts != null && _savedNetworkPosts!.isNotEmpty);
+
+      if (hasCached) {
+        if (isGlobal) {
+          _posts = List.from(_savedGlobalPosts!);
+          _currentBucket = _savedGlobalBucket ?? 'unseen';
+          _hasReachedEnd = _savedGlobalReachedEnd ?? false;
+          _hasShownCaughtUpDivider = _savedGlobalShownCaughtUp ?? false;
+          _latestKnownPostId = _savedGlobalLatestId;
+        } else {
+          _posts = List.from(_savedNetworkPosts!);
+          _currentBucket = _savedNetworkBucket ?? 'unseen';
+          _hasReachedEnd = _savedNetworkReachedEnd ?? false;
+          _hasShownCaughtUpDivider = _savedNetworkShownCaughtUp ?? false;
+          _latestKnownPostId = _savedNetworkLatestId;
+        }
+        notifyListeners();
+        // Silently refresh in background without clearing posts or blocking UI
+        fetchInitialFeed(silent: true);
+        fetchUnseenCount();
+      } else {
+        _posts = [];
+        _currentBucket = 'unseen';
+        _hasReachedEnd = false;
+        _hasShownCaughtUpDivider = false;
+        _latestKnownPostId = null;
+        notifyListeners();
+        await fetchInitialFeed();
+        await fetchUnseenCount();
+      }
     } else {
       notifyListeners();
     }
@@ -155,6 +207,8 @@ class FeedProvider with ChangeNotifier {
         _unsubscribeRealtime();
         _stopNewPostPollTimer();
         _posts = [];
+        _savedNetworkPosts = null;
+        _savedGlobalPosts = null;
         _unseenCount = 0;
         _hasNewPosts = false;
         _latestKnownPostId = null;
@@ -170,6 +224,8 @@ class FeedProvider with ChangeNotifier {
       _initialLoadFallbackTimer?.cancel();
       _initialLoadFallbackTimer = null;
       _posts = [];
+      _savedNetworkPosts = null;
+      _savedGlobalPosts = null;
       _unseenCount = 0;
       _hasNewPosts = false;
       _latestKnownPostId = null;

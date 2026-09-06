@@ -3184,7 +3184,8 @@ class _AppShellGateState extends State<AppShellGate> {
                       title = isAnonymous ? "New Anonymous Reply" : "New Reply";
                       body = "$actorName replied to your post.";
                     } else if (type == "feed_mention") {
-                      title = isAnonymous ? "New Anonymous Mention" : "New Mention";
+                      title =
+                          isAnonymous ? "New Anonymous Mention" : "New Mention";
                       body = "$actorName mentioned you on their post.";
                     } else if (type == "feed_post") {
                       title = isAnonymous ? "New Anonymous Post" : "New Post";
@@ -3236,8 +3237,8 @@ class _AppShellGateState extends State<AppShellGate> {
               }
             }
           } else if (action == 'feed_notification') {
-            final isAnonymous = data['is_anonymous'] == 'true' ||
-                data['is_anonymous'] == true;
+            final isAnonymous =
+                data['is_anonymous'] == 'true' || data['is_anonymous'] == true;
             final actorName = data['actor_name']?.toString() ?? 'Someone';
             final actorAvatar =
                 isAnonymous ? '' : (data['actor_avatar']?.toString() ?? '');
