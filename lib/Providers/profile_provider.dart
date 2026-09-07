@@ -5,6 +5,7 @@ import 'package:connect/Providers/LocalDatabaseHelper.dart';
 import 'package:connect/Models/profile_card_type.dart';
 import 'package:connect/Models/app_error.dart';
 import 'package:connect/Models/custom_link.dart';
+import 'package:connect/Models/resume_models.dart';
 import 'package:connect/Repositories/profile_repository.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -95,6 +96,9 @@ class ProfileProvider with ChangeNotifier {
   String gender = '';
   String spotify = '';
   List<CustomLink> customLinks = [];
+  List<ExperienceItem> experience = [];
+  List<EducationItem> education = [];
+  List<String> skills = [];
   bool showProfileToConnections = true;
 
   // Quick Identity fields
@@ -550,6 +554,72 @@ class ProfileProvider with ChangeNotifier {
     }
   }
 
+  // Experience CRUD
+  Future<void> addExperience(ExperienceItem item) async {
+    experience.add(item);
+    notifyListeners();
+    await saveOrUpdateProfile();
+  }
+
+  Future<void> updateExperience(ExperienceItem item) async {
+    final idx = experience.indexWhere((e) => e.id == item.id);
+    if (idx != -1) {
+      experience[idx] = item;
+      notifyListeners();
+      await saveOrUpdateProfile();
+    }
+  }
+
+  Future<void> deleteExperience(String id) async {
+    experience.removeWhere((e) => e.id == id);
+    notifyListeners();
+    await saveOrUpdateProfile();
+  }
+
+  // Education CRUD
+  Future<void> addEducation(EducationItem item) async {
+    education.add(item);
+    notifyListeners();
+    await saveOrUpdateProfile();
+  }
+
+  Future<void> updateEducation(EducationItem item) async {
+    final idx = education.indexWhere((e) => e.id == item.id);
+    if (idx != -1) {
+      education[idx] = item;
+      notifyListeners();
+      await saveOrUpdateProfile();
+    }
+  }
+
+  Future<void> deleteEducation(String id) async {
+    education.removeWhere((e) => e.id == id);
+    notifyListeners();
+    await saveOrUpdateProfile();
+  }
+
+  // Skills CRUD
+  Future<void> setSkills(List<String> newSkills) async {
+    skills = newSkills;
+    notifyListeners();
+    await saveOrUpdateProfile();
+  }
+
+  Future<void> addSkill(String skill) async {
+    final trimmed = skill.trim();
+    if (trimmed.isNotEmpty && !skills.contains(trimmed)) {
+      skills.add(trimmed);
+      notifyListeners();
+      await saveOrUpdateProfile();
+    }
+  }
+
+  Future<void> removeSkill(String skill) async {
+    skills.remove(skill);
+    notifyListeners();
+    await saveOrUpdateProfile();
+  }
+
   Future<void> setShowProfileToConnections(bool value) async {
     showProfileToConnections = value;
     notifyListeners();
@@ -708,6 +778,42 @@ class ProfileProvider with ChangeNotifier {
           }
         }
 
+        experience = [];
+        if (response['experience'] != null) {
+          try {
+            final List<dynamic> decoded = response['experience'] is String
+                ? jsonDecode(response['experience'] as String) as List<dynamic>
+                : response['experience'] as List<dynamic>;
+            experience = decoded.map((item) => ExperienceItem.fromJson(item as Map<String, dynamic>)).toList();
+          } catch (e) {
+            print("Error parsing experience: $e");
+          }
+        }
+
+        education = [];
+        if (response['education'] != null) {
+          try {
+            final List<dynamic> decoded = response['education'] is String
+                ? jsonDecode(response['education'] as String) as List<dynamic>
+                : response['education'] as List<dynamic>;
+            education = decoded.map((item) => EducationItem.fromJson(item as Map<String, dynamic>)).toList();
+          } catch (e) {
+            print("Error parsing education: $e");
+          }
+        }
+
+        skills = [];
+        if (response['skills'] != null) {
+          try {
+            final List<dynamic> decoded = response['skills'] is String
+                ? jsonDecode(response['skills'] as String) as List<dynamic>
+                : response['skills'] as List<dynamic>;
+            skills = decoded.map((item) => item.toString()).toList();
+          } catch (e) {
+            print("Error parsing skills: $e");
+          }
+        }
+
         profileData["name"] = name;
         profileData["profession"] = profession;
         profileData["email"] = email;
@@ -724,6 +830,9 @@ class ProfileProvider with ChangeNotifier {
         profileData["avatarUrl"] = avatarUrl;
         profileData["gender"] = gender;
         profileData["custom_links"] = customLinks.map((l) => l.toJson()).toList();
+        profileData["experience"] = experience.map((e) => e.toJson()).toList();
+        profileData["education"] = education.map((e) => e.toJson()).toList();
+        profileData["skills"] = skills;
         profileData["showProfileToConnections"] = showProfileToConnections;
         profileData["vibeTag"] = vibeTag;
         profileData["vibeTag"] = vibeTag;
@@ -794,6 +903,9 @@ class ProfileProvider with ChangeNotifier {
           'show_profile_to_connections': showProfileToConnections,
           'field_assignments': assignmentsMap,
           'custom_links': customLinks.map((l) => l.toJson()).toList(),
+          'experience': experience.map((e) => e.toJson()).toList(),
+          'education': education.map((e) => e.toJson()).toList(),
+          'skills': skills,
           'vibe_tag': vibeTag,
           'interest_tags': interestTags,
           'quick_setup_complete': quickSetupComplete,
@@ -833,6 +945,9 @@ class ProfileProvider with ChangeNotifier {
       'show_profile_to_connections': showProfileToConnections,
       'field_assignments': assignmentsMap,
       'custom_links': customLinks.map((l) => l.toJson()).toList(),
+      'experience': experience.map((e) => e.toJson()).toList(),
+      'education': education.map((e) => e.toJson()).toList(),
+      'skills': skills,
       'vibe_tag': vibeTag,
       'interest_tags': interestTags,
       'quick_setup_complete': quickSetupComplete,
@@ -873,6 +988,9 @@ class ProfileProvider with ChangeNotifier {
     twitter = '';
     spotify = '';
     customLinks = [];
+    experience = [];
+    education = [];
+    skills = [];
     company = '';
     bio = '';
     professionalBio = '';
@@ -920,6 +1038,21 @@ class ProfileProvider with ChangeNotifier {
               ? (response['custom_links'] is String
                   ? jsonDecode(response['custom_links'] as String) as List<dynamic>
                   : response['custom_links'] as List<dynamic>)
+              : <dynamic>[],
+          'experience': response['experience'] != null
+              ? (response['experience'] is String
+                  ? jsonDecode(response['experience'] as String) as List<dynamic>
+                  : response['experience'] as List<dynamic>)
+              : <dynamic>[],
+          'education': response['education'] != null
+              ? (response['education'] is String
+                  ? jsonDecode(response['education'] as String) as List<dynamic>
+                  : response['education'] as List<dynamic>)
+              : <dynamic>[],
+          'skills': response['skills'] != null
+              ? (response['skills'] is String
+                  ? jsonDecode(response['skills'] as String) as List<dynamic>
+                  : response['skills'] as List<dynamic>)
               : <dynamic>[],
         };
       }

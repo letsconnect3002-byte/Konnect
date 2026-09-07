@@ -62,4 +62,36 @@ class SocialLauncher {
       print("Error launching social link: $e");
     }
   }
+
+  /// Opens any generic web URL in an external browser
+  static Future<void> openUrl(BuildContext context, String url) async {
+    final trimmed = url.trim();
+    if (trimmed.isEmpty) return;
+    final resolved = trimmed.startsWith('http://') || trimmed.startsWith('https://')
+        ? trimmed
+        : 'https://$trimmed';
+    try {
+      final uri = Uri.parse(resolved);
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Could not open $url'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
+    } catch (e) {
+      print("Error opening url: $e");
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Could not open $url'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
+    }
+  }
 }

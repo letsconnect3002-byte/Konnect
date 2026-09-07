@@ -11,6 +11,8 @@ import 'package:connect/Utils/social_launcher.dart';
 import 'package:skeletonizer/skeletonizer.dart';
 import 'package:connect/Config/app_theme.dart';
 import 'package:connect/services/analytics_service.dart';
+import 'package:connect/Models/resume_models.dart';
+import 'package:connect/Widgets/resume_sections_widget.dart';
 
 class ConnectionProfilePage extends StatefulWidget {
   final Map<String, dynamic> profileData;
@@ -44,6 +46,9 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
   late String _twitter;
   late String _spotify;
   List<dynamic> _customLinks = [];
+  List<ExperienceItem> _experience = [];
+  List<EducationItem> _education = [];
+  List<String> _skills = [];
   Map<String, String> _casualFields = {};
   Map<String, String> _professionalFields = {};
 
@@ -122,6 +127,43 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
     _customLinks = data['custom_links'] != null
         ? List<dynamic>.from(data['custom_links'] as List)
         : [];
+
+    if (data['experience'] != null) {
+      final expData = data['experience'] is String
+          ? jsonDecode(data['experience'] as String)
+          : data['experience'];
+      if (expData is List) {
+        _experience = expData
+            .map((e) => ExperienceItem.fromJson(e as Map<String, dynamic>))
+            .toList();
+      }
+    } else {
+      _experience = [];
+    }
+
+    if (data['education'] != null) {
+      final eduData = data['education'] is String
+          ? jsonDecode(data['education'] as String)
+          : data['education'];
+      if (eduData is List) {
+        _education = eduData
+            .map((e) => EducationItem.fromJson(e as Map<String, dynamic>))
+            .toList();
+      }
+    } else {
+      _education = [];
+    }
+
+    if (data['skills'] != null) {
+      final skillsData = data['skills'] is String
+          ? jsonDecode(data['skills'] as String)
+          : data['skills'];
+      if (skillsData is List) {
+        _skills = List<String>.from(skillsData.map((e) => e.toString()));
+      }
+    } else {
+      _skills = [];
+    }
 
     // Fallbacks for skeleton loading shapes
     if (_name.isEmpty) _name = "Jane Doe";
@@ -248,6 +290,46 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
                         as List<dynamic>
                     : response['custom_links'] as List<dynamic>)
                 : [];
+
+            if (response['experience'] != null) {
+              final expData = response['experience'] is String
+                  ? jsonDecode(response['experience'] as String)
+                  : response['experience'];
+              if (expData is List) {
+                _experience = expData
+                    .map((e) =>
+                        ExperienceItem.fromJson(e as Map<String, dynamic>))
+                    .toList();
+              }
+            } else {
+              _experience = [];
+            }
+
+            if (response['education'] != null) {
+              final eduData = response['education'] is String
+                  ? jsonDecode(response['education'] as String)
+                  : response['education'];
+              if (eduData is List) {
+                _education = eduData
+                    .map((e) =>
+                        EducationItem.fromJson(e as Map<String, dynamic>))
+                    .toList();
+              }
+            } else {
+              _education = [];
+            }
+
+            if (response['skills'] != null) {
+              final skillsData = response['skills'] is String
+                  ? jsonDecode(response['skills'] as String)
+                  : response['skills'];
+              if (skillsData is List) {
+                _skills =
+                    List<String>.from(skillsData.map((e) => e.toString()));
+              }
+            } else {
+              _skills = [];
+            }
           });
 
           // Build per-card filtered field sets
@@ -1852,6 +1934,32 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
 
                       // CUSTOM LINKS
                       ..._buildCustomLinksList(_fieldAssignments),
+
+                      if (_sharedCardPermission == 'professional') ...[
+                        const SizedBox(height: 24),
+                        PublicResumeShareBar(
+                          userId: int.tryParse((widget.profileData['id'] ??
+                                  widget.profileData['connection_profile_id'] ??
+                                  widget.profileData['user_id'] ??
+                                  '')
+                              .toString()),
+                        ),
+                        const SizedBox(height: 28),
+                        ExperienceTimelineSection(
+                          experience: _experience,
+                          isOwner: false,
+                        ),
+                        const SizedBox(height: 28),
+                        EducationSection(
+                          education: _education,
+                          isOwner: false,
+                        ),
+                        const SizedBox(height: 28),
+                        SkillsSection(
+                          skills: _skills,
+                          isOwner: false,
+                        ),
+                      ],
                       const SizedBox(height: 32),
                     ],
                   ),

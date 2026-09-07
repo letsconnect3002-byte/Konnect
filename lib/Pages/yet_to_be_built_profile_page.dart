@@ -15,6 +15,9 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:connect/services/image_upload_service.dart';
 import 'package:connect/Pages/crop_image_page.dart';
+import 'package:connect/Models/resume_models.dart';
+import 'package:connect/Widgets/resume_sections_widget.dart';
+import 'package:connect/Widgets/resume_edit_sheets.dart';
 
 class YetToBeBuiltProfilePage extends StatefulWidget {
   final bool isEditingMode;
@@ -1178,19 +1181,17 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                   ),
                   const SizedBox(height: 16),
                   _buildDigitalCard(),
-                  const SizedBox(height: 32),
+                  const SizedBox(height: 20),
+
+                  // Public Resume Link Bar
+                  PublicResumeShareBar(userId: provider.userId),
+
                   // Section: My Story (Professional Bio)
                   _buildSectionHeader(
                       'MY STORY', _showEditProfessionalBioSheet),
                   const SizedBox(height: 0),
                   Container(
                     padding: const EdgeInsets.fromLTRB(1, 8, 8, 8),
-                    // decoration: BoxDecoration(
-                    //   color: context.surfacePrimary,
-                    //   borderRadius: BorderRadius.circular(16),
-                    //   border: Border.all(
-                    //       color: context.textMuted.withValues(alpha: 0.15)),
-                    // ),
                     child: Text(
                       provider.professionalBio.trim().isEmpty
                           ? 'No professional bio added yet. Tap edit to write a summary for your professional network!'
@@ -1203,6 +1204,32 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                         fontSize: 14,
                       ),
                     ),
+                  ),
+                  const SizedBox(height: 28),
+
+                  // Experience Timeline Section (LinkedIn style)
+                  ExperienceTimelineSection(
+                    experience: provider.experience,
+                    isOwner: true,
+                    onAdd: () => _showAddExperienceSheet(context),
+                    onEdit: (item) => _showEditExperienceSheet(context, item),
+                  ),
+                  const SizedBox(height: 28),
+
+                  // Education Section
+                  EducationSection(
+                    education: provider.education,
+                    isOwner: true,
+                    onAdd: () => _showAddEducationSheet(context),
+                    onEdit: (item) => _showEditEducationSheet(context, item),
+                  ),
+                  const SizedBox(height: 28),
+
+                  // Skills & Superpowers Section
+                  SkillsSection(
+                    skills: provider.skills,
+                    isOwner: true,
+                    onEdit: () => _showEditSkillsSheet(context),
                   ),
                   const SizedBox(height: 32),
                   _buildProfileDetailsSection(),
@@ -3586,6 +3613,76 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
           ),
         );
       },
+    );
+  }
+
+  void _showAddExperienceSheet(BuildContext context) {
+    final provider = Provider.of<ProfileProvider>(context, listen: false);
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      barrierColor: Colors.black.withValues(alpha: 0.6),
+      builder: (ctx) => ExperienceEditSheet(
+        onSave: (item) => provider.addExperience(item),
+      ),
+    );
+  }
+
+  void _showEditExperienceSheet(BuildContext context, ExperienceItem item) {
+    final provider = Provider.of<ProfileProvider>(context, listen: false);
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      barrierColor: Colors.black.withValues(alpha: 0.6),
+      builder: (ctx) => ExperienceEditSheet(
+        item: item,
+        onSave: (updated) => provider.updateExperience(updated),
+        onDelete: () => provider.deleteExperience(item.id),
+      ),
+    );
+  }
+
+  void _showAddEducationSheet(BuildContext context) {
+    final provider = Provider.of<ProfileProvider>(context, listen: false);
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      barrierColor: Colors.black.withValues(alpha: 0.6),
+      builder: (ctx) => EducationEditSheet(
+        onSave: (item) => provider.addEducation(item),
+      ),
+    );
+  }
+
+  void _showEditEducationSheet(BuildContext context, EducationItem item) {
+    final provider = Provider.of<ProfileProvider>(context, listen: false);
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      barrierColor: Colors.black.withValues(alpha: 0.6),
+      builder: (ctx) => EducationEditSheet(
+        item: item,
+        onSave: (updated) => provider.updateEducation(updated),
+        onDelete: () => provider.deleteEducation(item.id),
+      ),
+    );
+  }
+
+  void _showEditSkillsSheet(BuildContext context) {
+    final provider = Provider.of<ProfileProvider>(context, listen: false);
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      barrierColor: Colors.black.withValues(alpha: 0.6),
+      builder: (ctx) => SkillsEditSheet(
+        currentSkills: provider.skills,
+        onSave: (skills) => provider.setSkills(skills),
+      ),
     );
   }
 
