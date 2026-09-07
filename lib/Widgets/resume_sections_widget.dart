@@ -661,8 +661,11 @@ class EducationSection extends StatelessWidget {
                       width: 42,
                       height: 42,
                       decoration: BoxDecoration(
-                        color: context.accentSecondary.withValues(alpha: 0.15),
+                        color: context.surfaceSecondary,
                         borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.08),
+                        ),
                       ),
                       child: Icon(
                         Icons.school_rounded,

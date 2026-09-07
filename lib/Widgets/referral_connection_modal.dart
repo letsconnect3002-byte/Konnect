@@ -521,7 +521,7 @@ class _ReferralConnectionModalState extends State<ReferralConnectionModal> {
                           },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: context.accentPrimary,
-                      foregroundColor: Colors.white,
+                      foregroundColor: Colors.black,
                       padding: const EdgeInsets.symmetric(vertical: 14),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(AppDimensions.radiusPill),
@@ -534,7 +534,7 @@ class _ReferralConnectionModalState extends State<ReferralConnectionModal> {
                             height: 20,
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                              valueColor: AlwaysStoppedAnimation<Color>(Colors.black),
                             ),
                           )
                         : const Text(
@@ -542,7 +542,7 @@ class _ReferralConnectionModalState extends State<ReferralConnectionModal> {
                             style: TextStyle(
                               fontWeight: FontWeight.bold,
                               fontSize: 15,
-                              color: Colors.white,
+                              color: Colors.black,
                             ),
                           ),
                   ),

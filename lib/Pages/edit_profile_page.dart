@@ -833,7 +833,8 @@ class _EditProfilePageState extends State<EditProfilePage> {
                 if (context.mounted) Navigator.pop(context);
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: context.accentSecondary,
+                backgroundColor: context.accentPrimary,
+                foregroundColor: Colors.black,
                 shape: RoundedRectangleBorder(
                   borderRadius:
                       BorderRadius.circular(AppDimensions.radiusComponent),
@@ -841,7 +842,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
               ),
               child: const Text("Save",
                   style: TextStyle(
-                      color: Colors.white, fontWeight: FontWeight.bold)),
+                      color: Colors.black, fontWeight: FontWeight.bold)),
             ),
           ],
         );
@@ -1118,7 +1119,8 @@ class _EditProfilePageState extends State<EditProfilePage> {
                 if (context.mounted) Navigator.pop(context);
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: context.accentSecondary,
+                backgroundColor: context.accentPrimary,
+                foregroundColor: Colors.black,
                 shape: RoundedRectangleBorder(
                   borderRadius:
                       BorderRadius.circular(AppDimensions.radiusComponent),
@@ -1126,7 +1128,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
               ),
               child: const Text("Save",
                   style: TextStyle(
-                      color: Colors.white, fontWeight: FontWeight.bold)),
+                      color: Colors.black, fontWeight: FontWeight.bold)),
             ),
           ],
         );

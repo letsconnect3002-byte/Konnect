@@ -349,7 +349,7 @@ class _ExperienceEditSheetState extends State<ExperienceEditSheet> {
                 child: Text(
                   isEditing ? 'Update Experience' : 'Save Experience',
                   style: const TextStyle(
-                    color: Colors.white,
+                    color: Colors.black,
                     fontSize: 15,
                     fontWeight: FontWeight.bold,
                     fontFamily: 'Inter',
@@ -631,7 +631,7 @@ class _EducationEditSheetState extends State<EducationEditSheet> {
                 child: Text(
                   isEditing ? 'Update Education' : 'Save Education',
                   style: const TextStyle(
-                    color: Colors.white,
+                    color: Colors.black,
                     fontSize: 15,
                     fontWeight: FontWeight.bold,
                     fontFamily: 'Inter',
@@ -864,7 +864,7 @@ class _SkillsEditSheetState extends State<SkillsEditSheet> {
                     ),
                     child: const Text('Add',
                         style: TextStyle(
-                            color: Colors.white, fontWeight: FontWeight.bold)),
+                            color: Colors.black, fontWeight: FontWeight.bold)),
                   ),
                 ],
               ),
@@ -978,7 +978,7 @@ class _SkillsEditSheetState extends State<SkillsEditSheet> {
                 child: const Text(
                   'Done',
                   style: TextStyle(
-                    color: Colors.white,
+                    color: Colors.black,
                     fontSize: 15,
                     fontWeight: FontWeight.bold,
                     fontFamily: 'Inter',

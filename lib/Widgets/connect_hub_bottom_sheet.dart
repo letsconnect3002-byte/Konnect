@@ -447,7 +447,7 @@ class _ConnectHubBottomSheetState extends State<ConnectHubBottomSheet>
                         onPressed: () => _showQrOptionsBottomSheet(context),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: context.accentPrimary,
-                          foregroundColor: Colors.white,
+                          foregroundColor: Colors.black,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),
@@ -458,6 +458,7 @@ class _ConnectHubBottomSheetState extends State<ConnectHubBottomSheet>
                         child: const Text(
                           "Generate QR",
                           style: TextStyle(
+                              color: Colors.black,
                               fontWeight: FontWeight.bold, fontSize: 13),
                         ),
                       ),
@@ -576,7 +577,7 @@ class _ConnectHubBottomSheetState extends State<ConnectHubBottomSheet>
                         },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: context.accentPrimary,
-                          foregroundColor: Colors.white,
+                          foregroundColor: Colors.black,
                           padding: const EdgeInsets.symmetric(vertical: 14),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(16),
@@ -585,6 +586,7 @@ class _ConnectHubBottomSheetState extends State<ConnectHubBottomSheet>
                         child: const Text(
                           "Apply Selection",
                           style: TextStyle(
+                            color: Colors.black,
                             fontWeight: FontWeight.bold,
                             fontFamily: 'Inter',
                             fontSize: 14,
@@ -746,7 +748,7 @@ class _ConnectHubBottomSheetState extends State<ConnectHubBottomSheet>
                         },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: context.accentPrimary,
-                          foregroundColor: Colors.white,
+                          foregroundColor: Colors.black,
                           padding: const EdgeInsets.symmetric(vertical: 14),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(16),
@@ -755,6 +757,7 @@ class _ConnectHubBottomSheetState extends State<ConnectHubBottomSheet>
                         child: const Text(
                           "Generate Key",
                           style: TextStyle(
+                            color: Colors.black,
                             fontWeight: FontWeight.bold,
                             fontFamily: 'Inter',
                             fontSize: 14,
@@ -1466,7 +1469,7 @@ class _ConnectHubBottomSheetState extends State<ConnectHubBottomSheet>
                           onPressed: () => _showKeyOptionsBottomSheet(context),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: context.accentPrimary,
-                            foregroundColor: Colors.white,
+                            foregroundColor: Colors.black,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),
                             ),
@@ -1477,6 +1480,7 @@ class _ConnectHubBottomSheetState extends State<ConnectHubBottomSheet>
                           child: const Text(
                             "Generate Private Key",
                             style: TextStyle(
+                                color: Colors.black,
                                 fontWeight: FontWeight.bold, fontSize: 13),
                           ),
                         ),
@@ -1784,7 +1788,7 @@ class _ConnectHubBottomSheetState extends State<ConnectHubBottomSheet>
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: context.accentPrimary,
-              foregroundColor: Colors.white,
+              foregroundColor: Colors.black,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(14),
               ),
@@ -1794,6 +1798,7 @@ class _ConnectHubBottomSheetState extends State<ConnectHubBottomSheet>
             child: const Text(
               "Go to Profile",
               style: TextStyle(
+                color: Colors.black,
                 fontWeight: FontWeight.bold,
                 fontSize: 14,
                 fontFamily: 'Inter',

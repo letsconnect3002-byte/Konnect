@@ -233,8 +233,8 @@ class _YourNetworkPageState extends State<YourNetworkPage> {
                             shape: BoxShape.circle,
                             border: Border.all(
                               color: degree == "2nd"
-                                  ? const Color(0xFF3B82F6)
-                                      .withValues(alpha: 0.4)
+                                  ? const Color(0xFF3F3F45)
+                                      .withValues(alpha: 0.6)
                                   : const Color(0xFF8B5CF6)
                                       .withValues(alpha: 0.4),
                               width: 2.0,
@@ -306,8 +306,8 @@ class _YourNetworkPageState extends State<YourNetworkPage> {
                                         horizontal: 7, vertical: 2),
                                     decoration: BoxDecoration(
                                       color: degree == "2nd"
-                                          ? const Color(0xFF3B82F6)
-                                              .withValues(alpha: 0.12)
+                                          ? const Color(0xFF3F3F45)
+                                              .withValues(alpha: 0.25)
                                           : const Color(0xFF8B5CF6)
                                               .withValues(alpha: 0.12),
                                       borderRadius: BorderRadius.circular(6),
@@ -316,7 +316,7 @@ class _YourNetworkPageState extends State<YourNetworkPage> {
                                       degree,
                                       style: TextStyle(
                                         color: degree == "2nd"
-                                            ? const Color(0xFF60A5FA)
+                                            ? Colors.white
                                             : const Color(0xFFA78BFA),
                                         fontSize: 9.5,
                                         fontWeight: FontWeight.bold,
@@ -749,7 +749,7 @@ class _YourNetworkPageState extends State<YourNetworkPage> {
                                       title: "Secondary",
                                       count: networkProvider.secondaryCount
                                           .toString(),
-                                      ringColor: const Color(0xFF3B82F6),
+                                      ringColor: const Color(0xFF3F3F45),
                                       progressValue: 0.6,
                                     ),
                                   ),
@@ -1083,8 +1083,8 @@ class _YourNetworkPageState extends State<YourNetworkPage> {
                                 horizontal: 8, vertical: 3),
                             decoration: BoxDecoration(
                               color: degree == "2nd"
-                                  ? const Color(0xFF3B82F6)
-                                      .withValues(alpha: 0.12)
+                                  ? const Color(0xFF3F3F45)
+                                      .withValues(alpha: 0.25)
                                   : const Color(0xFF8B5CF6)
                                       .withValues(alpha: 0.12),
                               borderRadius: BorderRadius.circular(6),
@@ -1093,7 +1093,7 @@ class _YourNetworkPageState extends State<YourNetworkPage> {
                               degree,
                               style: TextStyle(
                                 color: degree == "2nd"
-                                    ? const Color(0xFF60A5FA)
+                                    ? Colors.white
                                     : const Color(0xFFA78BFA),
                                 fontSize: 10.5,
                                 fontWeight: FontWeight.bold,

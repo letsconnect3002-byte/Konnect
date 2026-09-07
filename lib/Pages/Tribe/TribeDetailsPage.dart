@@ -1561,7 +1561,7 @@ class _TribeDetailsPageState extends State<TribeDetailsPage> {
                                                     Icons
                                                         .admin_panel_settings_rounded,
                                                     size: 18,
-                                                    color: Colors.blueAccent),
+                                                    color: Colors.white),
                                                 onPressed: () =>
                                                     _showMemberRolePicker(
                                                         context, mem, roles),

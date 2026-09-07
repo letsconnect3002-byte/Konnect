@@ -617,7 +617,7 @@ class CircleFeedPage extends StatefulWidget {
                               width: 20,
                               height: 20,
                               child: CircularProgressIndicator(
-                                  strokeWidth: 2, color: Colors.white),
+                                  strokeWidth: 2, color: Colors.black),
                             )
                           : Text(
                               isAnonymousPost
@@ -626,7 +626,7 @@ class CircleFeedPage extends StatefulWidget {
                                       ? "Post to Global"
                                       : "Post to Network"),
                               style: const TextStyle(
-                                  color: Colors.white,
+                                  color: Colors.black,
                                   fontWeight: FontWeight.bold,
                                   fontSize: 14),
                             ),
@@ -866,19 +866,19 @@ class _CircleFeedPageState extends State<CircleFeedPage> {
           padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
           decoration: BoxDecoration(
             color: isSelected
-                ? context.accentPrimary.withValues(alpha: 0.14)
+                ? Colors.white
                 : context.surfacePrimary.withValues(alpha: 0.6),
             borderRadius: BorderRadius.circular(99),
             border: Border.all(
               color: isSelected
-                  ? context.accentPrimary.withValues(alpha: 0.5)
+                  ? Colors.white
                   : Colors.white.withValues(alpha: 0.08),
               width: isSelected ? 1.2 : 1.0,
             ),
             boxShadow: isSelected
                 ? [
                     BoxShadow(
-                      color: context.accentPrimary.withValues(alpha: 0.18),
+                      color: Colors.white.withValues(alpha: 0.15),
                       blurRadius: 8,
                       offset: const Offset(0, 2),
                     ),
@@ -892,7 +892,7 @@ class _CircleFeedPageState extends State<CircleFeedPage> {
                 icon,
                 size: 13,
                 color:
-                    isSelected ? context.accentPrimary : context.textSecondary,
+                    isSelected ? Colors.black : context.textSecondary,
               ),
               const SizedBox(width: 5),
               Flexible(
@@ -902,7 +902,7 @@ class _CircleFeedPageState extends State<CircleFeedPage> {
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     color: isSelected
-                        ? context.textPrimary
+                        ? Colors.black
                         : context.textSecondary,
                     fontSize: 11,
                     fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
@@ -977,11 +977,11 @@ class _CircleFeedPageState extends State<CircleFeedPage> {
                     feedProvider.setFilter(FeedFilter.fullNetwork);
                   },
                   icon: const Icon(Icons.public_rounded,
-                      color: Colors.white, size: 18),
+                      color: Colors.black, size: 18),
                   label: const Text(
                     "View Full Network",
                     style: TextStyle(
-                      color: Colors.white,
+                      color: Colors.black,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
@@ -1442,10 +1442,10 @@ class _CircleFeedPageState extends State<CircleFeedPage> {
         padding: const EdgeInsets.only(bottom: 70.0),
         child: FloatingActionButton(
           heroTag: 'network_feed_fab',
-          backgroundColor: context.accentPrimary,
+          backgroundColor: Colors.white,
           elevation: 4,
           onPressed: () => _openComposeSheet(context),
-          child: const Icon(Icons.add_rounded, color: Colors.white, size: 28),
+          child: const Icon(Icons.add_rounded, color: Colors.black, size: 28),
         ),
       ),
     );

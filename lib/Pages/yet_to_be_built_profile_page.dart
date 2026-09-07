@@ -409,9 +409,9 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                   }
                 : null,
             style: ElevatedButton.styleFrom(
-              backgroundColor: context.accentSecondary,
+              backgroundColor: context.accentPrimary,
               disabledBackgroundColor: Colors.white10,
-              foregroundColor: Colors.white,
+              foregroundColor: Colors.black,
               disabledForegroundColor: Colors.white24,
               padding: const EdgeInsets.symmetric(vertical: 16),
               shape: RoundedRectangleBorder(
@@ -419,7 +419,7 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
             ),
             child: const Text(
               "Continue",
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black),
             ),
           ),
         ],
@@ -628,9 +628,9 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                   }
                 : null,
             style: ElevatedButton.styleFrom(
-              backgroundColor: context.accentSecondary,
+              backgroundColor: context.accentPrimary,
               disabledBackgroundColor: Colors.white10,
-              foregroundColor: Colors.white,
+              foregroundColor: Colors.black,
               disabledForegroundColor: Colors.white24,
               padding: const EdgeInsets.symmetric(vertical: 16),
               shape: RoundedRectangleBorder(
@@ -638,7 +638,7 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
             ),
             child: const Text(
               "Continue",
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black),
             ),
           ),
         ],
@@ -828,9 +828,9 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                   }
                 : null,
             style: ElevatedButton.styleFrom(
-              backgroundColor: context.accentSecondary,
+              backgroundColor: context.accentPrimary,
               disabledBackgroundColor: Colors.white10,
-              foregroundColor: Colors.white,
+              foregroundColor: Colors.black,
               disabledForegroundColor: Colors.white24,
               padding: const EdgeInsets.symmetric(vertical: 16),
               shape: RoundedRectangleBorder(
@@ -838,7 +838,7 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
             ),
             child: const Text(
               "All Done",
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black),
             ),
           ),
         ],
@@ -1008,15 +1008,15 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                         onPressed: () =>
                             _finishQuickIdentity(openProfessionalEditor: false),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: context.accentSecondary,
-                          foregroundColor: Colors.white,
+                          backgroundColor: context.accentPrimary,
+                          foregroundColor: Colors.black,
                           padding: const EdgeInsets.symmetric(vertical: 16),
                           shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(16)),
                         ),
                         child: const Text(
                           "Continue",
-                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black),
                         ),
                       ),
                       const SizedBox(height: 12),
@@ -1329,7 +1329,7 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
         duration: const Duration(milliseconds: 200),
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: isActive ? context.accentSecondary : Colors.transparent,
+          color: isActive ? Colors.white : Colors.transparent,
           borderRadius: BorderRadius.circular(17),
         ),
         child: Row(
@@ -1338,14 +1338,15 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
             Icon(
               icon,
               size: 16,
-              color: isActive ? Colors.white : context.textSecondary,
+              color: isActive ? Colors.black : context.textSecondary,
             ),
             const SizedBox(width: 6),
             Text(
               label,
               style: context.captionText.copyWith(
-                color: isActive ? Colors.white : context.textSecondary,
+                color: isActive ? Colors.black : context.textSecondary,
                 fontSize: 13,
+                fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
               ),
             ),
           ],

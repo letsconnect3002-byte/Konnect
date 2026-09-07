@@ -528,8 +528,8 @@ class _ReferralIntroSheetState extends State<ReferralIntroSheet> {
               ElevatedButton(
                 onPressed: isButtonEnabled ? _sendRequest : null,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: context.accentSecondary,
-                  foregroundColor: Colors.white,
+                  backgroundColor: context.accentPrimary,
+                  foregroundColor: Colors.black,
                   disabledBackgroundColor:
                       context.surfaceSecondary.withValues(alpha: 0.5),
                   disabledForegroundColor: context.textMuted,
@@ -547,7 +547,7 @@ class _ReferralIntroSheetState extends State<ReferralIntroSheet> {
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
                           valueColor:
-                              AlwaysStoppedAnimation<Color>(Colors.white),
+                              AlwaysStoppedAnimation<Color>(Colors.black),
                         ),
                       )
                     : Text(
@@ -558,7 +558,7 @@ class _ReferralIntroSheetState extends State<ReferralIntroSheet> {
                           fontWeight: FontWeight.bold,
                           color: !isButtonEnabled
                               ? context.textMuted
-                              : Colors.white,
+                              : Colors.black,
                         ),
                       ),
               ),

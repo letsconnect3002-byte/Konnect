@@ -622,13 +622,12 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(12),
                           color: _selectedTab == 'casual'
-                              ? context.accentSecondary
+                              ? Colors.white
                               : Colors.transparent,
                           boxShadow: _selectedTab == 'casual'
                               ? [
                                   BoxShadow(
-                                    color: context.accentSecondary
-                                        .withValues(alpha: 0.3),
+                                    color: Colors.white.withValues(alpha: 0.2),
                                     blurRadius: 8,
                                     offset: const Offset(0, 2),
                                   ),
@@ -644,7 +643,7 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
                               "Casual",
                               style: TextStyle(
                                 color: _selectedTab == 'casual'
-                                    ? Colors.white
+                                    ? Colors.black
                                     : context.textSecondary,
                                 fontWeight: FontWeight.bold,
                                 fontSize: 13,
@@ -681,13 +680,12 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(12),
                           color: _selectedTab == 'professional'
-                              ? context.accentPrimary
+                              ? Colors.white
                               : Colors.transparent,
                           boxShadow: _selectedTab == 'professional'
                               ? [
                                   BoxShadow(
-                                    color: context.accentPrimary
-                                        .withValues(alpha: 0.3),
+                                    color: Colors.white.withValues(alpha: 0.2),
                                     blurRadius: 8,
                                     offset: const Offset(0, 2),
                                   ),
@@ -703,7 +701,7 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
                               "Professional",
                               style: TextStyle(
                                 color: _selectedTab == 'professional'
-                                    ? Colors.white
+                                    ? Colors.black
                                     : context.textSecondary,
                                 fontWeight: FontWeight.bold,
                                 fontSize: 13,
@@ -747,13 +745,12 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(12),
                           color: _selectedTab == 'tribes'
-                              ? context.accentSecondary
+                              ? Colors.white
                               : Colors.transparent,
                           boxShadow: _selectedTab == 'tribes'
                               ? [
                                   BoxShadow(
-                                    color: context.accentSecondary
-                                        .withValues(alpha: 0.3),
+                                    color: Colors.white.withValues(alpha: 0.2),
                                     blurRadius: 8,
                                     offset: const Offset(0, 2),
                                   ),
@@ -769,7 +766,7 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
                               "Mafias",
                               style: TextStyle(
                                 color: _selectedTab == 'tribes'
-                                    ? Colors.white
+                                    ? Colors.black
                                     : context.textSecondary,
                                 fontWeight: FontWeight.bold,
                                 fontSize: 13,
@@ -781,7 +778,7 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
                               "(beta)",
                               style: TextStyle(
                                 color: _selectedTab == 'tribes'
-                                    ? Colors.white.withValues(alpha: 0.8)
+                                    ? Colors.black.withValues(alpha: 0.7)
                                     : context.textMuted,
                                 fontWeight: FontWeight.w500,
                                 fontSize: 10,
@@ -831,7 +828,7 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
                         controller: _searchController,
                         style: context.bodyText
                             .copyWith(color: context.textPrimary),
-                        cursorColor: context.accentSecondary,
+                        cursorColor: Colors.white,
                         textAlignVertical: TextAlignVertical.center,
                         decoration: InputDecoration(
                           hintText: 'Search connections...',
@@ -1183,7 +1180,7 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
                                                                                   const TextSpan(
                                                                                     text: "Draft: ",
                                                                                     style: TextStyle(
-                                                                                      color: Colors.blueAccent,
+                                                                                      color: Colors.white,
                                                                                       fontWeight: FontWeight.bold,
                                                                                       fontSize: 12.5,
                                                                                       fontFamily: 'Inter',
@@ -1257,12 +1254,12 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
               );
             }
           },
-          backgroundColor: context.accentSecondary,
+          backgroundColor: Colors.white,
           elevation: 8,
           shape: const CircleBorder(),
           child: const Icon(
             Icons.add_rounded,
-            color: Colors.white,
+            color: Colors.black,
             size: 28,
           ),
         ),

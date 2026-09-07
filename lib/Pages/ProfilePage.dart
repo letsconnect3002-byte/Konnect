@@ -576,7 +576,7 @@ class _ProfilePageState extends State<ProfilePage> {
                           },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: context.accentPrimary,
-                            foregroundColor: Colors.white,
+                            foregroundColor: Colors.black,
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 16, vertical: 8),
                             shape: RoundedRectangleBorder(
@@ -587,6 +587,7 @@ class _ProfilePageState extends State<ProfilePage> {
                           child: const Text(
                             "Set Up Profile",
                             style: TextStyle(
+                                color: Colors.black,
                                 fontWeight: FontWeight.bold, fontSize: 13),
                           ),
                         ),
@@ -643,7 +644,7 @@ class _ProfilePageState extends State<ProfilePage> {
                               },
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: context.accentPrimary,
-                                foregroundColor: Colors.white,
+                                foregroundColor: Colors.black,
                                 padding: const EdgeInsets.symmetric(
                                     horizontal: 16, vertical: 8),
                                 shape: RoundedRectangleBorder(
@@ -654,6 +655,7 @@ class _ProfilePageState extends State<ProfilePage> {
                               child: const Text(
                                 "Generate QR",
                                 style: TextStyle(
+                                    color: Colors.black,
                                     fontWeight: FontWeight.bold, fontSize: 13),
                               ),
                             ),
@@ -757,7 +759,7 @@ class _ProfilePageState extends State<ProfilePage> {
                         },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: context.accentPrimary,
-                          foregroundColor: Colors.white,
+                          foregroundColor: Colors.black,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(
                                 AppDimensions.radiusComponent),
@@ -767,6 +769,7 @@ class _ProfilePageState extends State<ProfilePage> {
                         child: const Text(
                           "Generate QR Code",
                           style: TextStyle(
+                            color: Colors.black,
                             fontWeight: FontWeight.bold,
                             fontSize: 14,
                             fontFamily: 'Inter',
@@ -928,7 +931,7 @@ class _ProfilePageState extends State<ProfilePage> {
                         },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: context.accentPrimary,
-                          foregroundColor: Colors.white,
+                          foregroundColor: Colors.black,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(
                                 AppDimensions.radiusComponent),
@@ -938,6 +941,7 @@ class _ProfilePageState extends State<ProfilePage> {
                         child: const Text(
                           "Share Private Key",
                           style: TextStyle(
+                            color: Colors.black,
                             fontWeight: FontWeight.bold,
                             fontSize: 14,
                             fontFamily: 'Inter',

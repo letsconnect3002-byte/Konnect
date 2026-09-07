@@ -2413,9 +2413,7 @@ class MyApp extends StatelessWidget {
             children: [
               Positioned.fill(
                 child: Container(
-                  decoration: BoxDecoration(
-                    gradient: context.ambientCanvasGradient,
-                  ),
+                  color: Colors.black,
                 ),
               ),
               if (child != null) Positioned.fill(child: child),

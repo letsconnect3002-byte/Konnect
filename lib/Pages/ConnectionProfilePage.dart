@@ -2020,7 +2020,7 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: context.accentPrimary,
-                    foregroundColor: Colors.white,
+                    foregroundColor: Colors.black,
                     shape: const StadiumBorder(),
                     padding: const EdgeInsets.symmetric(vertical: 16.0),
                     elevation: 0,
@@ -2028,7 +2028,7 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
                   child: Text(
                     "Message",
                     style: context.bodyText.copyWith(
-                      color: Colors.white,
+                      color: Colors.black,
                       fontWeight: FontWeight.bold,
                     ),
                   ),

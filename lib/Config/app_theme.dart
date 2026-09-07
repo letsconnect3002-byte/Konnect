@@ -25,14 +25,14 @@ class AppColors {
   static const Color textSecondary = Color(0xFFA1A4B0); // Cool gray
   static const Color textMuted = Color(0xFF5E626E); // Slate gray
 
-  // Unified Accent System (Electric Sapphire)
-  static const Color accentPrimary = Color(0xFF2563EB); // Electric Sapphire
-  static const Color accentSecondary = Color(0xFF3B82F6); // Vibrant Sapphire
-  static const Color accentGlow = Color(0x402563EB); // 25% glow backing
+  // Unified Accent System (Monochrome / Slate)
+  static const Color accentPrimary = Color(0xFFFFFFFF); // Pure White (Primary buttons & active controls)
+  static const Color accentSecondary = Color(0xFF3F3F45); // Slate / Charcoal (Icons on dark background, active pills)
+  static const Color accentGlow = Color(0x40FFFFFF); // 25% white glow backing
 
-  static const Color felineColor10 = Color(0xFF000000);
-  static const Color felineColor20 = Color(0xFF07090F);
-  static const Color felineColor30 = Color(0xFF0B1224); // Deep ambient sapphire tone
+  static const Color felineColor10 = Color(0xFFFFFFFF);
+  static const Color felineColor20 = Color(0xFF000000);
+  static const Color felineColor30 = Color(0xFF3F3F45);
 }
 
 /// AppGradients contains high-fidelity ambient gradients and specular edge highlights.
@@ -44,10 +44,10 @@ class AppGradients {
     center: Alignment(0.65, -0.35),
     radius: 1.25,
     colors: [
-      Color(0xFF0B142B),
+      Color(0xFF000000),
       Color(0xFF000000),
     ],
-    stops: [0.0, 0.75],
+    stops: [0.0, 1.0],
   );
 
   /// Specular gradient border reflecting ambient top-light
@@ -60,13 +60,13 @@ class AppGradients {
     ],
   );
 
-  /// Electric Sapphire hero accent gradient
+  /// Hero accent gradient
   static const LinearGradient sapphireAccentGradient = LinearGradient(
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
     colors: [
-      Color(0xFF3B82F6),
-      Color(0xFF1D4ED8),
+      Color(0xFF3F3F45),
+      Color(0xFF000000),
     ],
   );
 
@@ -81,13 +81,13 @@ class AppGradients {
   );
 
   static const LinearGradient voltScanGradient = LinearGradient(
-    colors: [Color(0xFF3B82F6), Color(0xFF2563EB)],
+    colors: [Color(0xFFFFFFFF), Color(0xFF3F3F45)],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
 
   static const LinearGradient ticketGradient = LinearGradient(
-    colors: [Color(0xFF3B82F6), Color(0xFF6366F1), Color(0xFF2563EB)],
+    colors: [Color(0xFFFFFFFF), Color(0xFF3F3F45), Color(0xFF000000)],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
@@ -160,6 +160,16 @@ class AppTheme {
       ),
       chipTheme: const ChipThemeData(
         checkmarkColor: Colors.white,
+      ),
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.white,
+          foregroundColor: Colors.black,
+        ),
+      ),
+      floatingActionButtonTheme: const FloatingActionButtonThemeData(
+        backgroundColor: Colors.white,
+        foregroundColor: Colors.black,
       ),
       colorScheme: const ColorScheme.dark(
         primary: AppColors.accentPrimary,

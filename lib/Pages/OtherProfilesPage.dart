@@ -160,7 +160,9 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
                       } catch (e) {
                         if (!mounted) return;
                         scaffoldMessenger.showSnackBar(
-                          const SnackBar(content: Text("Could not unblock user. Please try again.")),
+                          const SnackBar(
+                              content: Text(
+                                  "Could not unblock user. Please try again.")),
                         );
                       }
                     },
@@ -186,7 +188,9 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
                       } catch (e) {
                         if (!mounted) return;
                         scaffoldMessenger.showSnackBar(
-                          const SnackBar(content: Text("Could not block user. Please try again.")),
+                          const SnackBar(
+                              content: Text(
+                                  "Could not block user. Please try again.")),
                         );
                       }
                     },
@@ -214,7 +218,8 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
                     ),
                     content: const Row(
                       children: [
-                        Icon(Icons.check_circle_rounded, color: Colors.redAccent, size: 20),
+                        Icon(Icons.check_circle_rounded,
+                            color: Colors.redAccent, size: 20),
                         SizedBox(width: 10),
                         Expanded(
                           child: Text(
@@ -240,7 +245,8 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
     );
   }
 
-  void _showReportUserDialog(BuildContext context, Map<String, dynamic> connection, ConnectionProvider provider) {
+  void _showReportUserDialog(BuildContext context,
+      Map<String, dynamic> connection, ConnectionProvider provider) {
     final name = connection['name'] ?? 'this contact';
     final profileIdStr = (connection['id'] ?? '').toString();
     final intId = int.tryParse(profileIdStr) ?? 0;
@@ -257,7 +263,8 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
             return GlassmorphicAlertDialog(
               title: Text(
                 "Report & Disconnect $name",
-                style: context.screenHeading.copyWith(fontWeight: FontWeight.bold),
+                style:
+                    context.screenHeading.copyWith(fontWeight: FontWeight.bold),
               ),
               content: SizedBox(
                 width: double.maxFinite,
@@ -268,17 +275,25 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
                     children: [
                       Text(
                         "Please select the reason for reporting this user:",
-                        style: context.bodyText.copyWith(color: context.textSecondary),
+                        style: context.bodyText
+                            .copyWith(color: context.textSecondary),
                       ),
                       const SizedBox(height: 12),
-                      ...['Spam', 'Harassment or Abuse', 'Inappropriate Behavior', 'Other'].map((reason) {
+                      ...[
+                        'Spam',
+                        'Harassment or Abuse',
+                        'Inappropriate Behavior',
+                        'Other'
+                      ].map((reason) {
                         final isSelected = selectedReason == reason;
                         return InkWell(
-                          onTap: isSubmitting ? null : () {
-                            setStateBuilder(() {
-                              selectedReason = reason;
-                            });
-                          },
+                          onTap: isSubmitting
+                              ? null
+                              : () {
+                                  setStateBuilder(() {
+                                    selectedReason = reason;
+                                  });
+                                },
                           child: Padding(
                             padding: const EdgeInsets.symmetric(vertical: 8.0),
                             child: Row(
@@ -299,7 +314,9 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
                                     color: isSelected
                                         ? context.textPrimary
                                         : context.textSecondary,
-                                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                    fontWeight: isSelected
+                                        ? FontWeight.bold
+                                        : FontWeight.normal,
                                   ),
                                 ),
                               ],
@@ -310,7 +327,8 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
                       const SizedBox(height: 16),
                       Text(
                         "Additional Details (Optional):",
-                        style: context.bodyText.copyWith(color: context.textSecondary),
+                        style: context.bodyText
+                            .copyWith(color: context.textSecondary),
                       ),
                       const SizedBox(height: 8),
                       TextField(
@@ -319,7 +337,8 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
                         enabled: !isSubmitting,
                         decoration: InputDecoration(
                           hintText: "Enter details here...",
-                          hintStyle: TextStyle(color: context.textMuted, fontSize: 13),
+                          hintStyle:
+                              TextStyle(color: context.textMuted, fontSize: 13),
                           fillColor: context.surfaceSecondary,
                           filled: true,
                           border: OutlineInputBorder(
@@ -328,7 +347,8 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
                           ),
                           focusedBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(8),
-                            borderSide: BorderSide(color: context.accentPrimary),
+                            borderSide:
+                                BorderSide(color: context.accentPrimary),
                           ),
                           contentPadding: const EdgeInsets.all(12),
                         ),
@@ -354,24 +374,28 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
                   : [
                       TextButton(
                         onPressed: () => Navigator.of(dialogContext).pop(),
-                        child: Text("Cancel", style: TextStyle(color: context.textSecondary)),
+                        child: Text("Cancel",
+                            style: TextStyle(color: context.textSecondary)),
                       ),
                       TextButton(
                         onPressed: () async {
                           setStateBuilder(() {
                             isSubmitting = true;
                           });
-                          
+
                           try {
                             // 1. Report User
-                            await Provider.of<ChatProvider>(context, listen: false).reportMessage(
+                            await Provider.of<ChatProvider>(context,
+                                    listen: false)
+                                .reportMessage(
                               reportedUserId: intId,
                               reason: selectedReason,
-                              additionalDetails: detailsController.text.trim().isEmpty 
-                                  ? null 
-                                  : detailsController.text.trim(),
+                              additionalDetails:
+                                  detailsController.text.trim().isEmpty
+                                      ? null
+                                      : detailsController.text.trim(),
                             );
-                            
+
                             final messenger = ScaffoldMessenger.of(context);
                             Navigator.of(dialogContext).pop();
                             if (mounted) {
@@ -384,13 +408,15 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(12),
                                   side: BorderSide(
-                                    color: context.borderMuted.withValues(alpha: 0.3),
+                                    color: context.borderMuted
+                                        .withValues(alpha: 0.3),
                                     width: 1,
                                   ),
                                 ),
                                 content: const Row(
                                   children: [
-                                    Icon(Icons.check_circle_rounded, color: Colors.greenAccent, size: 20),
+                                    Icon(Icons.check_circle_rounded,
+                                        color: Colors.greenAccent, size: 20),
                                     SizedBox(width: 10),
                                     Expanded(
                                       child: Text(
@@ -414,7 +440,8 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
                               });
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(
-                                  content: Text("Could not file report. Please check your network and try again."),
+                                  content: Text(
+                                      "Could not file report. Please check your network and try again."),
                                   backgroundColor: Colors.redAccent,
                                   behavior: SnackBarBehavior.floating,
                                 ),
@@ -422,7 +449,10 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
                             }
                           }
                         },
-                        child: const Text("Submit & Delete", style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
+                        child: const Text("Submit & Delete",
+                            style: TextStyle(
+                                color: Colors.redAccent,
+                                fontWeight: FontWeight.bold)),
                       ),
                     ],
             );
@@ -558,15 +588,13 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
                     width: 38,
                     height: 34,
                     decoration: BoxDecoration(
-                      color: _isGridView
-                          ? context.accentSecondary
-                          : Colors.transparent,
+                      color: _isGridView ? Colors.white : Colors.transparent,
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Icon(
                       Icons.grid_view_rounded,
                       size: 18,
-                      color: _isGridView ? Colors.white : context.textSecondary,
+                      color: _isGridView ? Colors.black : context.textSecondary,
                     ),
                   ),
                 ),
@@ -581,16 +609,14 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
                     width: 38,
                     height: 34,
                     decoration: BoxDecoration(
-                      color: !_isGridView
-                          ? context.accentSecondary
-                          : Colors.transparent,
+                      color: !_isGridView ? Colors.white : Colors.transparent,
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Icon(
                       Icons.view_list_rounded,
                       size: 18,
                       color:
-                          !_isGridView ? Colors.white : context.textSecondary,
+                          !_isGridView ? Colors.black : context.textSecondary,
                     ),
                   ),
                 ),
@@ -724,11 +750,15 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
                           if (profileData['isBlockedByMe'] == true) ...[
                             const SizedBox(width: 8),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 6, vertical: 2),
                               decoration: BoxDecoration(
                                 color: Colors.redAccent.withValues(alpha: 0.2),
                                 borderRadius: BorderRadius.circular(4),
-                                border: Border.all(color: Colors.redAccent.withValues(alpha: 0.4), width: 0.5),
+                                border: Border.all(
+                                    color:
+                                        Colors.redAccent.withValues(alpha: 0.4),
+                                    width: 0.5),
                               ),
                               child: const Text(
                                 "Blocked",
@@ -830,7 +860,7 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: context.accentPrimary,
-                      foregroundColor: Colors.white,
+                      foregroundColor: Colors.black,
                       shape: const StadiumBorder(),
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       elevation: 0,
@@ -838,7 +868,7 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
                     child: Text(
                       "Message",
                       style: context.bodyText.copyWith(
-                        color: Colors.white,
+                        color: Colors.black,
                         fontWeight: FontWeight.bold,
                       ),
                     ),

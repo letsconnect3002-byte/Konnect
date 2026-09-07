@@ -123,7 +123,7 @@ class _ThreadDetailPageState extends State<ThreadDetailPage> {
     super.initState();
     _currentRootPostId = widget.rootPostId;
     _replyController = _MentionTextEditingController(
-      accentColor: const Color(0xFF6366F1),
+      accentColor: const Color(0xFFFFFFFF),
       connectionNames: [],
     );
     _replyController.addListener(() {
@@ -148,7 +148,7 @@ class _ThreadDetailPageState extends State<ThreadDetailPage> {
         .where((n) => n.isNotEmpty)
         .toList();
     _replyController.connectionNames = names;
-    _replyController.accentColor = context.accentPrimary;
+    _replyController.accentColor = context.accentSecondary;
   }
 
   void _subscribeToThreadRealtime() {
@@ -1127,8 +1127,8 @@ class _ThreadDetailPageState extends State<ThreadDetailPage> {
 
                               return IconButton(
                                 icon: _isSubmitting
-                                    ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                                    : Icon(Icons.send_rounded, color: isValid ? context.accentPrimary : context.textMuted),
+                                     ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                                     : Icon(Icons.send_rounded, color: isValid ? Colors.white : context.textMuted),
                                 onPressed: isValid ? _submitReply : null,
                               );
                             },
