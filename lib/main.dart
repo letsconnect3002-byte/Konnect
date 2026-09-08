@@ -1915,6 +1915,7 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
               type == "plan_update" ||
               type == "plan_reminder_30" ||
               type == "plan_reminder_start" ||
+              type == "tribe_added" ||
               type == "tribe_invite" ||
               type == "tribe_request" ||
               type == "tribe_approved" ||
@@ -3013,6 +3014,7 @@ class _AppShellGateState extends State<AppShellGate> {
                       type == "plan_update" ||
                       type == "plan_reminder_30" ||
                       type == "plan_reminder_start" ||
+                      type == "tribe_added" ||
                       type == "tribe_invite" ||
                       type == "tribe_request" ||
                       type == "tribe_approved" ||
@@ -3115,6 +3117,17 @@ class _AppShellGateState extends State<AppShellGate> {
                     } else if (type == "plan_reminder_start") {
                       title = "Plan Starting Now";
                       body = "\"$planTitle\" is starting now!";
+                    } else if (type == "tribe_added") {
+                      String tribeName = "a Mafia";
+                      if (note != null && note.startsWith('{')) {
+                        try {
+                          final parsed = jsonDecode(note);
+                          tribeName =
+                              parsed['tribe_name']?.toString() ?? "a Mafia";
+                        } catch (_) {}
+                      }
+                      title = "Added to $tribeName";
+                      body = "$actorName added you to \"$tribeName\"";
                     } else if (type == "tribe_invite") {
                       String tribeName = "a Mafia";
                       if (note != null && note.startsWith('{')) {

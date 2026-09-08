@@ -26,6 +26,8 @@ abstract class TribeRepository {
       Map<String, dynamic> memberData);
   Future<void> updateTribeMemberStatus(String tribeId, int userId,
       Map<String, dynamic> updates, Map<String, dynamic> activityLogData);
+  Future<void> updateMemberViewOnly(String tribeId, int userId,
+      bool isViewOnly, Map<String, dynamic> activityLogData);
   Future<void> changeMemberRole(String tribeId, int userId, String? roleId,
       Map<String, dynamic> updates, Map<String, dynamic> activityLogData);
   Future<int> getActiveMembersCount(String tribeId);
@@ -83,29 +85,30 @@ class SupabaseTribeRepository implements TribeRepository {
     final tribeId = tribeResponse['id'] as String;
 
     try {
-      // 2. Insert roles
-      final rolesToInsert = rolesData.map((role) {
-        final newRole = Map<String, dynamic>.from(role);
-        newRole['tribe_id'] = tribeId;
-        return newRole;
-      }).toList();
-
-      final rolesResponse =
-          await _client.from('tribe_roles').insert(rolesToInsert).select();
-
-      // Find Don role id to assign to creator
-      final donRole = (rolesResponse as List).firstWhereOrNull(
-        (r) => r['slug'] == 'don',
-      );
-      if (donRole == null) {
-        throw Exception("Don role could not be seeded.");
-      }
-
-      // 3. Insert creator as member
       final memberToInsert = Map<String, dynamic>.from(creatorMemberData);
       memberToInsert['tribe_id'] = tribeId;
-      memberToInsert['role_id'] = donRole['id'];
+      memberToInsert['is_view_only'] = false;
 
+      // Optional backward compatibility if rolesData provided
+      if (rolesData.isNotEmpty) {
+        final rolesToInsert = rolesData.map((role) {
+          final newRole = Map<String, dynamic>.from(role);
+          newRole['tribe_id'] = tribeId;
+          return newRole;
+        }).toList();
+
+        final rolesResponse =
+            await _client.from('tribe_roles').insert(rolesToInsert).select();
+
+        final donRole = (rolesResponse as List).firstWhereOrNull(
+          (r) => r['slug'] == 'don',
+        );
+        if (donRole != null) {
+          memberToInsert['role_id'] = donRole['id'];
+        }
+      }
+
+      // Insert creator as member
       await _client.from('tribe_members').insert(memberToInsert);
 
       return Map<String, dynamic>.from(tribeResponse);
@@ -245,6 +248,25 @@ class SupabaseTribeRepository implements TribeRepository {
     Map<String, dynamic> activityLogData,
   ) async {
     updates['updated_at'] = DateTime.now().toUtc().toIso8601String();
+    await _client
+        .from('tribe_members')
+        .update(updates)
+        .eq('tribe_id', tribeId)
+        .eq('user_id', userId);
+    await insertTribeActivityLog(activityLogData);
+  }
+
+  @override
+  Future<void> updateMemberViewOnly(
+    String tribeId,
+    int userId,
+    bool isViewOnly,
+    Map<String, dynamic> activityLogData,
+  ) async {
+    final updates = {
+      'is_view_only': isViewOnly,
+      'updated_at': DateTime.now().toUtc().toIso8601String(),
+    };
     await _client
         .from('tribe_members')
         .update(updates)

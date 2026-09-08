@@ -295,7 +295,7 @@ class _TribeCreatePageState extends State<TribeCreatePage> {
                     title: Text("Requires Approval to Join", style: context.bodyText.copyWith(color: context.textPrimary)),
                     subtitle: Text("Elders must approve join requests", style: context.captionText.copyWith(color: context.textMuted)),
                     value: _requiresApproval,
-                    activeColor: context.accentSecondary,
+                    activeThumbColor: context.accentSecondary,
                     onChanged: (val) {
                       setState(() {
                         _requiresApproval = val;

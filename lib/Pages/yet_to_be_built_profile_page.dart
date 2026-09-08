@@ -1181,10 +1181,7 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                   ),
                   const SizedBox(height: 16),
                   _buildDigitalCard(),
-                  const SizedBox(height: 20),
-
-                  // Public Resume Link Bar
-                  PublicResumeShareBar(userId: provider.userId),
+                  const SizedBox(height: 28),
 
                   // Section: My Story (Professional Bio)
                   _buildSectionHeader(
@@ -1825,8 +1822,16 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
 
               // Email
               _buildDetailRow(
-                icon: Icons.email_rounded,
-                label: isCasual ? 'Casual Email' : 'Professional Email',
+                icon: provider.isFieldPrivate(isCasual ? 'email' : 'professionalEmail')
+                    ? Icons.lock_outline_rounded
+                    : Icons.email_rounded,
+                label: isCasual
+                    ? (provider.isFieldPrivate('email')
+                        ? 'Casual Email (Private)'
+                        : 'Casual Email')
+                    : (provider.isFieldPrivate('professionalEmail')
+                        ? 'Professional Email (Private)'
+                        : 'Professional Email'),
                 value: isCasual
                     ? (provider.email.trim().isEmpty
                         ? 'Not set'
@@ -1834,6 +1839,46 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                     : (provider.professionalEmail.trim().isEmpty
                         ? 'Not set'
                         : provider.professionalEmail.trim()),
+                isPrivate: provider.isFieldPrivate(isCasual ? 'email' : 'professionalEmail'),
+                onTogglePrivacy: () async {
+                  final fieldKey = isCasual ? 'email' : 'professionalEmail';
+                  final currentPrivate = provider.isFieldPrivate(fieldKey);
+                  await provider.setFieldPrivate(fieldKey, !currentPrivate);
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Row(
+                          children: [
+                            Icon(
+                              !currentPrivate
+                                  ? Icons.lock_outline_rounded
+                                  : Icons.lock_open_rounded,
+                              color: context.accentSecondary,
+                              size: 18,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              !currentPrivate
+                                  ? 'Email is now private'
+                                  : 'Email is now public',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                fontFamily: 'Inter',
+                              ),
+                            ),
+                          ],
+                        ),
+                        backgroundColor: const Color(0xFF1C1D22),
+                        behavior: SnackBarBehavior.floating,
+                        duration: const Duration(seconds: 1),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10)),
+                      ),
+                    );
+                  }
+                },
                 onCopy: () {
                   final textToCopy = isCasual
                       ? provider.email.trim()
@@ -4753,7 +4798,9 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
       backgroundColor: Colors.transparent,
       barrierColor: Colors.black.withValues(alpha: 0.5),
       builder: (sheetCtx) {
+        bool casualEmailPrivate = provider.isFieldPrivate('email');
         bool casualPhonePrivate = provider.isFieldPrivate('phoneNumber');
+        bool profEmailPrivate = provider.isFieldPrivate('professionalEmail');
         bool profPhonePrivate = provider.isFieldPrivate('professionalPhoneNumber');
 
         return StatefulBuilder(
@@ -4795,7 +4842,7 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                           fontFamily: 'Inter',
                         ),
                       ),
-                      const SizedBox(height: 20),
+                      const SizedBox(height: 18),
 
                       if (isCasual) ...[
                         // --- SECTION 1: CASUAL DETAILS ---
@@ -4820,6 +4867,41 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                           icon: Icons.email_outlined,
                           accentColor: context.accentSecondary,
                         ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            SizedBox(
+                              height: 24,
+                              width: 24,
+                              child: Checkbox(
+                                value: casualEmailPrivate,
+                                activeColor: context.accentSecondary,
+                                checkColor: Colors.white,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                side: BorderSide(
+                                  color: context.textSecondary.withValues(alpha: 0.5),
+                                  width: 1.5,
+                                ),
+                                onChanged: (val) {
+                                  setModalState(() {
+                                    casualEmailPrivate = val ?? false;
+                                  });
+                                },
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              "Keep email private",
+                              style: TextStyle(
+                                color: context.textSecondary,
+                                fontSize: 13,
+                                fontFamily: 'Inter',
+                              ),
+                            ),
+                          ],
+                        ),
                         const SizedBox(height: 14),
                         _buildSheetField(
                           label: 'Casual Phone',
@@ -4827,7 +4909,7 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                           icon: Icons.phone_android_outlined,
                           accentColor: context.accentSecondary,
                         ),
-                        const SizedBox(height: 10),
+                        const SizedBox(height: 8),
                         Row(
                           children: [
                             SizedBox(
@@ -4899,6 +4981,41 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                           icon: Icons.email_outlined,
                           accentColor: context.accentSecondary,
                         ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            SizedBox(
+                              height: 24,
+                              width: 24,
+                              child: Checkbox(
+                                value: profEmailPrivate,
+                                activeColor: context.accentSecondary,
+                                checkColor: Colors.white,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                side: BorderSide(
+                                  color: context.textSecondary.withValues(alpha: 0.5),
+                                  width: 1.5,
+                                ),
+                                onChanged: (val) {
+                                  setModalState(() {
+                                    profEmailPrivate = val ?? false;
+                                  });
+                                },
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              "Keep email private",
+                              style: TextStyle(
+                                color: context.textSecondary,
+                                fontSize: 13,
+                                fontFamily: 'Inter',
+                              ),
+                            ),
+                          ],
+                        ),
                         const SizedBox(height: 14),
                         _buildSheetField(
                           label: 'Professional Phone',
@@ -4906,7 +5023,7 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                           icon: Icons.phone_android_outlined,
                           accentColor: context.accentSecondary,
                         ),
-                        const SizedBox(height: 10),
+                        const SizedBox(height: 8),
                         Row(
                           children: [
                             SizedBox(
@@ -4954,6 +5071,8 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                             await provider.updateProfileField(
                                 'phoneNumber', casualPhoneC.text.trim(), uid);
                             await provider.setFieldPrivate(
+                                'email', casualEmailPrivate);
+                            await provider.setFieldPrivate(
                                 'phoneNumber', casualPhonePrivate);
                           } else {
                             await provider.updateProfileField(
@@ -4966,6 +5085,8 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                                 'profession', professionC.text.trim(), uid);
                             await provider.updateProfileField(
                                 'company', companyC.text.trim(), uid);
+                            await provider.setFieldPrivate(
+                                'professionalEmail', profEmailPrivate);
                             await provider.setFieldPrivate(
                                 'professionalPhoneNumber', profPhonePrivate);
                           }

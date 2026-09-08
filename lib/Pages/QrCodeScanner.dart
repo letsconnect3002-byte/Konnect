@@ -394,8 +394,8 @@ class _ProfileCardState extends State<ProfileCard> {
         final existingConnection = connectionProvider.connections
             .firstWhere((c) => c['id'] == scannedUserId);
         final myShared = existingConnection['my_shared_card'] ?? 'casual';
-        if (myShared == 'professional' || myShared == 'both') {
-          _shareBackType = myShared;
+        if (myShared == 'professional') {
+          _shareBackType = 'professional';
         } else {
           _shareBackType = 'casual';
         }
@@ -431,7 +431,7 @@ class _ProfileCardState extends State<ProfileCard> {
         : int.parse(otherUserIdVal.toString());
 
     final String presenterSharedCard =
-        widget.profileData['sharedCard'] ?? 'both';
+        widget.profileData['sharedCard'] ?? 'casual';
 
     final messenger = ScaffoldMessenger.of(context);
     final navigator = Navigator.of(context);
@@ -518,7 +518,7 @@ class _ProfileCardState extends State<ProfileCard> {
   Widget _buildProfileHeaderCard() {
     final String name = widget.profileData['name'] ?? 'Unknown';
     final String sharedCard =
-        (widget.profileData['sharedCard'] ?? 'both').toString();
+        (widget.profileData['sharedCard'] ?? 'casual').toString();
     final bool isCasual = sharedCard == 'casual';
     final Color accentColor =
         isCasual ? context.accentSecondary : context.accentPrimary;
@@ -659,7 +659,7 @@ class _ProfileCardState extends State<ProfileCard> {
 
   Widget _buildProfileDetailsSection() {
     final String sharedCard =
-        (widget.profileData['sharedCard'] ?? 'both').toString();
+        (widget.profileData['sharedCard'] ?? 'casual').toString();
     final bool isCasual = sharedCard == 'casual';
     final Color accentColor =
         isCasual ? context.accentSecondary : context.accentPrimary;

@@ -2,7 +2,6 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:connect/Models/app_error.dart';
-import 'package:connect/Models/mafia_role_details.dart';
 import 'package:connect/Repositories/tribe_repository.dart';
 import 'package:connect/Repositories/notification_repository.dart';
 import 'package:collection/collection.dart';
@@ -128,14 +127,16 @@ class TribeProvider with ChangeNotifier {
   bool hasPermission(String tribeId, String permissionKey) {
     if (_userId == null) return false;
 
-    // Fallback logic check creator
+    // Check creator / owner
     final tribe = _myTribes.firstWhere(
       (t) => t['tribe_id'] == tribeId || t['id'] == tribeId,
       orElse: () => <String, dynamic>{},
     );
     final actualTribe = tribe.containsKey('tribe') ? tribe['tribe'] : tribe;
-    if (actualTribe != null && actualTribe['creator_id'] == _userId) {
-      return true; // Creator always has full access
+    final isCreator = actualTribe != null && actualTribe['creator_id'] == _userId;
+
+    if (isCreator) {
+      return true; // Creator/Owner always has full access
     }
 
     final members = _tribeMembers[tribeId] ?? [];
@@ -144,18 +145,30 @@ class TribeProvider with ChangeNotifier {
       orElse: () => <String, dynamic>{},
     );
     if (myMemberRow.isEmpty) return false;
-    final role = myMemberRow['role'];
-    if (role == null) return false;
-    final roleSlug = role['slug']?.toString() ?? '';
 
-    // Strictly enforce delete_tribe and manage_roles are only allowed for the Boss (don)
-    if (permissionKey == 'delete_tribe' || permissionKey == 'manage_roles') {
-      return roleSlug == 'don';
+    // Owner-only permissions: edit, delete, manage members
+    if (permissionKey == 'delete_tribe' ||
+        permissionKey == 'manage_roles' ||
+        permissionKey == 'edit_tribe' ||
+        permissionKey == 'manage_members') {
+      return false;
     }
 
-    final perms = role['permissions'];
-    if (perms == null) return false;
-    return perms[permissionKey] == true;
+    // Inviting members: allowed if owner enabled 'members_can_invite' in settings
+    if (permissionKey == 'invite_members') {
+      return actualTribe?['members_can_invite'] == true;
+    }
+
+    // Posting messages: allowed unless member is flagged as is_view_only
+    if (permissionKey == 'post_messages') {
+      return myMemberRow['is_view_only'] != true;
+    }
+
+    if (permissionKey == 'view_activity_log') {
+      return true;
+    }
+
+    return true;
   }
 
   // ── Fetch My Tribes ──
@@ -298,121 +311,17 @@ class TribeProvider with ChangeNotifier {
         'updated_at': nowStr,
       };
 
-      final rolesSeed = [
-        {
-          'slug': 'don',
-          'name': 'The Don (Boss)',
-          'icon': '👑',
-          'color': '#FFD700',
-          'permissions': {
-            'manage_roles': true,
-            'delete_tribe': true,
-            'manage_members': true,
-            'edit_tribe': true,
-            'invite_members': true,
-            'view_activity_log': true,
-            'post_messages': true,
-          },
-          'is_default': false,
-          'created_at': nowStr,
-        },
-        {
-          'slug': 'consigliere',
-          'name': 'Consigliere',
-          'icon': '📜',
-          'color': '#C55BFF',
-          'permissions': {
-            'manage_roles': false,
-            'delete_tribe': false,
-            'manage_members': false,
-            'edit_tribe': false,
-            'invite_members': false,
-            'view_activity_log': true,
-            'post_messages': false,
-          },
-          'is_default': false,
-          'created_at': nowStr,
-        },
-        {
-          'slug': 'underboss',
-          'name': 'Underboss',
-          'icon': '🛡️',
-          'color': '#5B9AFF',
-          'permissions': {
-            'manage_roles': false,
-            'delete_tribe': false,
-            'manage_members': true,
-            'edit_tribe': true,
-            'invite_members': true,
-            'view_activity_log': true,
-            'post_messages': true,
-          },
-          'is_default': false,
-          'created_at': nowStr,
-        },
-        {
-          'slug': 'capo',
-          'name': 'Caporegime (Capo)',
-          'icon': '⚔️',
-          'color': '#FF4500',
-          'permissions': {
-            'manage_roles': false,
-            'delete_tribe': false,
-            'manage_members': false,
-            'edit_tribe': true,
-            'invite_members': true,
-            'view_activity_log': true,
-            'post_messages': true,
-          },
-          'is_default': false,
-          'created_at': nowStr,
-        },
-        {
-          'slug': 'soldier',
-          'name': 'Soldier',
-          'icon': '👤',
-          'color': '#FF5B5B',
-          'permissions': {
-            'manage_roles': false,
-            'delete_tribe': false,
-            'manage_members': false,
-            'edit_tribe': false,
-            'invite_members': true,
-            'view_activity_log': true,
-            'post_messages': true,
-          },
-          'is_default': false,
-          'created_at': nowStr,
-        },
-        {
-          'slug': 'associate',
-          'name': 'Associate',
-          'icon': '👤',
-          'color': '#808080',
-          'permissions': {
-            'manage_roles': false,
-            'delete_tribe': false,
-            'manage_members': false,
-            'edit_tribe': false,
-            'invite_members': false,
-            'view_activity_log': false,
-            'post_messages': true,
-          },
-          'is_default': true,
-          'created_at': nowStr,
-        }
-      ];
-
       final creatorMemberData = {
         'user_id': myUserId,
         'status': 'active',
+        'is_view_only': false,
         'joined_at': nowStr,
         'created_at': nowStr,
         'updated_at': nowStr,
       };
 
       final result = await _repository.createTribe(
-          tribeData, rolesSeed, creatorMemberData);
+          tribeData, [], creatorMemberData);
 
       // Log creation activity
       final tribeId = result['id'] as String;
@@ -457,16 +366,6 @@ class TribeProvider with ChangeNotifier {
         }
       }
 
-      // Check default role
-      final roles = await _repository.getTribeRoles(tribeId);
-      final defaultRole =
-          roles.firstWhereOrNull((r) => r['is_default'] == true);
-      if (defaultRole == null) throw Exception("No default role found.");
-
-      final assignedRoleId = (existing != null && existing['role_id'] != null)
-          ? existing['role_id'] as String
-          : defaultRole['id'] as String;
-
       final nowStr = DateTime.now().toUtc().toIso8601String();
 
       final activityLog = {
@@ -480,7 +379,7 @@ class TribeProvider with ChangeNotifier {
         // Update existing row
         final updates = {
           'status': 'active',
-          'role_id': assignedRoleId,
+          'is_view_only': false,
           'joined_at': nowStr,
         };
         await _repository.updateTribeMemberStatus(
@@ -499,8 +398,8 @@ class TribeProvider with ChangeNotifier {
         final memberData = {
           'tribe_id': tribeId,
           'user_id': myUserId,
-          'role_id': assignedRoleId,
           'status': 'active',
+          'is_view_only': false,
           'joined_at': nowStr,
           'created_at': nowStr,
           'updated_at': nowStr,
@@ -601,16 +500,16 @@ class TribeProvider with ChangeNotifier {
   }
 
   // ── Add Member Flows ──
-  Future<void> inviteUser(String tribeId, int inviteeId, String roleId) async {
+  Future<void> inviteUser(String tribeId, int inviteeId, [String? roleId]) async {
     await addMember(tribeId, inviteeId, roleId);
   }
 
-  Future<void> addMember(String tribeId, int inviteeId, String roleId) async {
+  Future<void> addMember(String tribeId, int inviteeId, [String? roleId]) async {
     final myUserId = _userId;
     if (myUserId == null) return;
 
-    if (!hasPermission(tribeId, 'manage_members')) {
-      throw Exception("You do not have permission to add members.");
+    if (!hasPermission(tribeId, 'invite_members')) {
+      throw Exception("You do not have permission to invite members.");
     }
 
     try {
@@ -645,14 +544,6 @@ class TribeProvider with ChangeNotifier {
         inviteeName = profile?['name']?.toString() ?? 'a user';
       }
 
-      // Resolve role name
-      final roles =
-          _tribeRoles[tribeId] ?? await _repository.getTribeRoles(tribeId);
-      final selectedRole = roles.firstWhereOrNull((r) => r['id'] == roleId);
-      final roleSlug = selectedRole?['slug']?.toString() ?? '';
-      final roleDetails = MafiaRoleDetails.getForSlug(roleSlug);
-      final roleTitle = selectedRole?['name']?.toString() ?? roleDetails.title;
-
       final activityLog = {
         'tribe_id': tribeId,
         'actor_id': myUserId,
@@ -660,7 +551,6 @@ class TribeProvider with ChangeNotifier {
         'metadata': {
           'target_user_id': inviteeId,
           'target_name': inviteeName,
-          'role_name': roleTitle,
         },
         'created_at': nowStr,
       };
@@ -669,7 +559,7 @@ class TribeProvider with ChangeNotifier {
         final updates = {
           'status': 'active',
           'invited_by': myUserId,
-          'role_id': roleId,
+          'is_view_only': false,
           'joined_at': nowStr,
           'updated_at': nowStr,
         };
@@ -679,8 +569,8 @@ class TribeProvider with ChangeNotifier {
         final memberData = {
           'tribe_id': tribeId,
           'user_id': inviteeId,
-          'role_id': roleId,
           'status': 'active',
+          'is_view_only': false,
           'invited_by': myUserId,
           'joined_at': nowStr,
           'created_at': nowStr,
@@ -736,15 +626,10 @@ class TribeProvider with ChangeNotifier {
         }
       }
 
-      final roles = await _repository.getTribeRoles(tribeId);
-      final defaultRole =
-          roles.firstWhereOrNull((r) => r['is_default'] == true);
-      if (defaultRole == null) throw Exception("No default role found.");
-
       final nowStr = DateTime.now().toUtc().toIso8601String();
       final updates = {
         'status': 'active',
-        'role_id': defaultRole['id'],
+        'is_view_only': false,
         'joined_at': nowStr,
       };
 
@@ -996,6 +881,45 @@ class TribeProvider with ChangeNotifier {
       await fetchTribeDetails(tribeId);
     } catch (e) {
       print("Error changing member role: $e");
+      rethrow;
+    }
+  }
+
+  // ── Toggle Member View Only Mode ──
+  Future<void> toggleMemberViewOnly(
+      String tribeId, int memberUserId, bool isViewOnly) async {
+    final myUserId = _userId;
+    if (myUserId == null) return;
+
+    if (!hasPermission(tribeId, 'manage_members')) {
+      throw Exception("Only the Mafia owner can manage member permissions.");
+    }
+
+    try {
+      final nowStr = DateTime.now().toUtc().toIso8601String();
+      final members = _tribeMembers[tribeId] ?? [];
+      final member =
+          members.firstWhereOrNull((m) => m['user_id'] == memberUserId);
+      final targetProfile = member?['profile'] as Map<String, dynamic>?;
+      final targetName = targetProfile?['name']?.toString() ?? 'a member';
+
+      final activityLog = {
+        'tribe_id': tribeId,
+        'actor_id': myUserId,
+        'action_type': isViewOnly ? 'set_view_only' : 'set_can_chat',
+        'metadata': {
+          'target_user_id': memberUserId,
+          'target_name': targetName,
+          'is_view_only': isViewOnly,
+        },
+        'created_at': nowStr,
+      };
+
+      await _repository.updateMemberViewOnly(
+          tribeId, memberUserId, isViewOnly, activityLog);
+      await fetchTribeDetails(tribeId);
+    } catch (e) {
+      print("Error toggling member view only: $e");
       rethrow;
     }
   }

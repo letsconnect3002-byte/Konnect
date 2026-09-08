@@ -380,9 +380,17 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
                 _sharedCardPermission,
                 fieldAssignments);
 
+            final String effectiveProfEmail = filterProfEmail.isNotEmpty
+                ? filterProfEmail
+                : filterFieldPro('email', rawEmail);
+
+            final String effectiveProfPhone = filterProfPhone.isNotEmpty
+                ? filterProfPhone
+                : filterFieldPro('phoneNumber', rawPhone);
+
             _professionalFields = {
-              'email': filterProfEmail,
-              'phoneNumber': filterProfPhone,
+              'email': effectiveProfEmail,
+              'phoneNumber': effectiveProfPhone,
               'instagram':
                   filterFieldPro('instagram', response['instagram'] ?? ''),
               'linkedin':
@@ -1936,14 +1944,6 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
                       ..._buildCustomLinksList(_fieldAssignments),
 
                       if (_sharedCardPermission == 'professional') ...[
-                        const SizedBox(height: 24),
-                        PublicResumeShareBar(
-                          userId: int.tryParse((widget.profileData['id'] ??
-                                  widget.profileData['connection_profile_id'] ??
-                                  widget.profileData['user_id'] ??
-                                  '')
-                              .toString()),
-                        ),
                         const SizedBox(height: 28),
                         ExperienceTimelineSection(
                           experience: _experience,
@@ -2160,7 +2160,7 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
           child: Text(
             label,
             style: TextStyle(
-              color: isSelected ? Colors.white : context.textSecondary,
+              color: isSelected ? Colors.black : context.textSecondary,
               fontWeight: FontWeight.bold,
               fontSize: 11,
               fontFamily: 'Inter',

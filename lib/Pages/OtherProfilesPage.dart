@@ -648,7 +648,7 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
     final name = profileData["name"] ?? "Unknown";
     final profession = profileData["profession"] ?? "";
     final String sharedCard =
-        (profileData['sharedCard'] ?? profileData['shared_card'] ?? 'both')
+        (profileData['sharedCard'] ?? profileData['shared_card'] ?? 'casual')
             .toString();
     final String email = ProfileFieldFilter.getVisibleValue(
       'email',
@@ -905,7 +905,7 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
     final name = profileData["name"] ?? "Unknown";
     final profession = profileData["profession"] ?? "";
     final String sharedCard =
-        (profileData['sharedCard'] ?? profileData['shared_card'] ?? 'both')
+        (profileData['sharedCard'] ?? profileData['shared_card'] ?? 'casual')
             .toString();
     final String company = ProfileFieldFilter.getVisibleValue(
       'company',

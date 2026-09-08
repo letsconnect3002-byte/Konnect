@@ -227,7 +227,8 @@ class _IndividualChatPageState extends State<IndividualChatPage>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive) {
       _saveDraft();
     }
   }
@@ -291,7 +292,8 @@ class _IndividualChatPageState extends State<IndividualChatPage>
     if (replyMsg != null) {
       final isReplyMe = replyMsg['sender_id'] == _myUserId;
       final myName = Provider.of<ProfileProvider>(context, listen: false).name;
-      final replySenderName = isReplyMe ? (myName.isNotEmpty ? myName : 'You') : _name;
+      final replySenderName =
+          isReplyMe ? (myName.isNotEmpty ? myName : 'You') : _name;
       await _provider.sendChatMessage(
         roomId: _roomId!,
         text: text,
@@ -413,7 +415,7 @@ class _IndividualChatPageState extends State<IndividualChatPage>
     final avatar = _getAvatarUrl(_name, _avatarUrl);
     final provider = Provider.of<ChatProvider>(context);
     final connectionProvider = Provider.of<ConnectionProvider>(context);
-    
+
     final otherUserId = _connectionData != null
         ? (_connectionData!['id'] as int?)
         : widget.otherUserId;
@@ -432,7 +434,8 @@ class _IndividualChatPageState extends State<IndividualChatPage>
 
     var messages = provider.activeRoomMessages;
     if (isBlockedByMe && otherUserId != null) {
-      messages = messages.where((msg) => msg['sender_id'] != otherUserId).toList();
+      messages =
+          messages.where((msg) => msg['sender_id'] != otherUserId).toList();
     }
 
     final isOtherTyping = provider.isOtherUserTyping;
@@ -462,7 +465,8 @@ class _IndividualChatPageState extends State<IndividualChatPage>
         flexibleSpace: const GlassmorphicFlexibleSpace(),
         leading: _selectedMessage != null
             ? IconButton(
-                icon: const Icon(Icons.close_rounded, color: Colors.white, size: 22),
+                icon: const Icon(Icons.close_rounded,
+                    color: Colors.white, size: 22),
                 onPressed: () {
                   setState(() {
                     _selectedMessage = null;
@@ -528,13 +532,16 @@ class _IndividualChatPageState extends State<IndividualChatPage>
                                     ? Image.network(
                                         avatar,
                                         fit: BoxFit.cover,
-                                        errorBuilder: (context, error, stackTrace) =>
-                                            Container(
+                                        errorBuilder:
+                                            (context, error, stackTrace) =>
+                                                Container(
                                           color: context.surfaceSecondary,
                                           alignment: Alignment.center,
                                           child: Text(
                                             _name.isNotEmpty
-                                                ? _name.substring(0, 1).toUpperCase()
+                                                ? _name
+                                                    .substring(0, 1)
+                                                    .toUpperCase()
                                                 : "?",
                                             style: TextStyle(
                                                 color: context.textPrimary,
@@ -548,7 +555,9 @@ class _IndividualChatPageState extends State<IndividualChatPage>
                                         alignment: Alignment.center,
                                         child: Text(
                                           _name.isNotEmpty
-                                              ? _name.substring(0, 1).toUpperCase()
+                                              ? _name
+                                                  .substring(0, 1)
+                                                  .toUpperCase()
                                               : "?",
                                           style: TextStyle(
                                               color: context.textPrimary,
@@ -606,7 +615,8 @@ class _IndividualChatPageState extends State<IndividualChatPage>
                 if (_selectedMessage!['sender_id'] == _myUserId &&
                     _selectedMessage!['status'] == 'error')
                   IconButton(
-                    icon: const Icon(Icons.refresh_rounded, color: Color(0xFF00F2FE)),
+                    icon: const Icon(Icons.refresh_rounded,
+                        color: Color(0xFF00F2FE)),
                     tooltip: 'Resend',
                     onPressed: () {
                       final msg = _selectedMessage!;
@@ -617,7 +627,8 @@ class _IndividualChatPageState extends State<IndividualChatPage>
                     },
                   ),
                 IconButton(
-                  icon: const Icon(Icons.report_gmailerrorred_outlined, color: Colors.orangeAccent),
+                  icon: const Icon(Icons.report_gmailerrorred_outlined,
+                      color: Colors.orangeAccent),
                   tooltip: 'Report Message',
                   onPressed: () {
                     final msg = _selectedMessage!;
@@ -640,7 +651,8 @@ class _IndividualChatPageState extends State<IndividualChatPage>
                   },
                 ),
                 IconButton(
-                  icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent),
+                  icon: const Icon(Icons.delete_outline_rounded,
+                      color: Colors.redAccent),
                   tooltip: 'Delete',
                   onPressed: () {
                     final msg = _selectedMessage!;
@@ -664,192 +676,195 @@ class _IndividualChatPageState extends State<IndividualChatPage>
         behavior: HitTestBehavior.opaque,
         child: Column(
           children: [
-              Expanded(
-                child: (_isRoomLoading || _isProfileLoading)
-                    ? Center(
-                        child: CircularProgressIndicator(
-                          valueColor:
-                              AlwaysStoppedAnimation<Color>(context.accentPrimary),
-                        ),
-                      )
-                    : Stack(
-                        children: [
-                          ListView.builder(
-                            controller: _scrollController,
-                            reverse: true,
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 16, vertical: 20),
-                            itemCount: messages.length + (isOtherTyping ? 1 : 0),
-                            itemBuilder: (context, index) {
-                              if (isOtherTyping && index == 0) {
-                                  return _buildTypingIndicator();
-                              }
+            Expanded(
+              child: (_isRoomLoading || _isProfileLoading)
+                  ? Center(
+                      child: CircularProgressIndicator(
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                            context.accentPrimary),
+                      ),
+                    )
+                  : Stack(
+                      children: [
+                        ListView.builder(
+                          controller: _scrollController,
+                          reverse: true,
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 20),
+                          itemCount: messages.length + (isOtherTyping ? 1 : 0),
+                          itemBuilder: (context, index) {
+                            if (isOtherTyping && index == 0) {
+                              return _buildTypingIndicator();
+                            }
 
-                              final int msgIndex = isOtherTyping
-                                  ? messages.length - index
-                                  : messages.length - 1 - index;
+                            final int msgIndex = isOtherTyping
+                                ? messages.length - index
+                                : messages.length - 1 - index;
 
-                              final msg = messages[msgIndex];
-                              final msgId = msg['id'] as String;
-                              final key = _messageKeys.putIfAbsent(
-                                  msgId, () => GlobalKey());
-                              final isMe = msg['sender_id'] == _myUserId;
-                              final timeString =
-                                  _formatMessageTime(msg['created_at'] as String);
-                              final status = msg['status'] as String?;
-                              final replyToId =
-                                  msg['reply_to_message_id'] as String?;
-                              final replyToPayload =
-                                  msg['reply_to_message_payload'] as String?;
-                              final replyToSenderName =
-                                  msg['reply_to_message_sender_name'] as String?;
-                              final isHighlighted = msgId == _highlightedMessageId;
+                            final msg = messages[msgIndex];
+                            final msgId = msg['id'] as String;
+                            final key = _messageKeys.putIfAbsent(
+                                msgId, () => GlobalKey());
+                            final isMe = msg['sender_id'] == _myUserId;
+                            final timeString =
+                                _formatMessageTime(msg['created_at'] as String);
+                            final status = msg['status'] as String?;
+                            final replyToId =
+                                msg['reply_to_message_id'] as String?;
+                            final replyToPayload =
+                                msg['reply_to_message_payload'] as String?;
+                            final replyToSenderName =
+                                msg['reply_to_message_sender_name'] as String?;
+                            final isHighlighted =
+                                msgId == _highlightedMessageId;
 
-                              Offset tapPosition = Offset.zero;
+                            Offset tapPosition = Offset.zero;
 
-                              final prevCreatedAt = msgIndex > 0
-                                  ? (messages[msgIndex - 1]['created_at']
-                                          as String? ??
-                                      '')
-                                  : '';
-                              final currentCreatedAt =
-                                  msg['created_at'] as String? ?? '';
-                              final showDateHeader = msgIndex == 0 ||
-                                  _isDifferentDay(prevCreatedAt, currentCreatedAt);
+                            final prevCreatedAt = msgIndex > 0
+                                ? (messages[msgIndex - 1]['created_at']
+                                        as String? ??
+                                    '')
+                                : '';
+                            final currentCreatedAt =
+                                msg['created_at'] as String? ?? '';
+                            final showDateHeader = msgIndex == 0 ||
+                                _isDifferentDay(
+                                    prevCreatedAt, currentCreatedAt);
 
-                              final hasAlreadyAnimated =
-                                  _animatedMessageIds.contains(msgId);
-                              if (!hasAlreadyAnimated) {
-                                _animatedMessageIds.add(msgId);
-                              }
+                            final hasAlreadyAnimated =
+                                _animatedMessageIds.contains(msgId);
+                            if (!hasAlreadyAnimated) {
+                              _animatedMessageIds.add(msgId);
+                            }
 
-                              final childWidget = SwipeToReply(
-                                key: key,
-                                onReply: () {
-                                  _setReplyMessage(msg, isMe);
-                                  _messageFocusNode.requestFocus();
+                            final childWidget = SwipeToReply(
+                              key: key,
+                              onReply: () {
+                                _setReplyMessage(msg, isMe);
+                                _messageFocusNode.requestFocus();
+                              },
+                              child: GestureDetector(
+                                onTapDown: (details) {
+                                  tapPosition = details.globalPosition;
                                 },
-                                child: GestureDetector(
-                                  onTapDown: (details) {
-                                    tapPosition = details.globalPosition;
-                                  },
-                                  onTap: () {
-                                    if (_selectedMessage != null) {
-                                      setState(() {
-                                        _selectedMessage = null;
-                                      });
-                                    }
-                                  },
-                                  onLongPress: () {
-                                    _messageFocusNode.unfocus();
-                                    HapticFeedback.mediumImpact();
+                                onTap: () {
+                                  if (_selectedMessage != null) {
                                     setState(() {
-                                      _selectedMessage = msg;
+                                      _selectedMessage = null;
                                     });
-                                  },
-                                  child: _buildMessageBubble(
-                                    text: msg['payload'] ?? '',
-                                    time: timeString,
-                                    isMe: isMe,
-                                    status: status,
-                                    replyToId: replyToId,
-                                    replyToPayload: replyToPayload,
-                                    replyToSenderName: replyToSenderName,
-                                    isHighlighted: isHighlighted || (_selectedMessage?['id'] == msgId),
-                                  ),
+                                  }
+                                },
+                                onLongPress: () {
+                                  _messageFocusNode.unfocus();
+                                  HapticFeedback.mediumImpact();
+                                  setState(() {
+                                    _selectedMessage = msg;
+                                  });
+                                },
+                                child: _buildMessageBubble(
+                                  text: msg['payload'] ?? '',
+                                  time: timeString,
+                                  isMe: isMe,
+                                  status: status,
+                                  replyToId: replyToId,
+                                  replyToPayload: replyToPayload,
+                                  replyToSenderName: replyToSenderName,
+                                  isHighlighted: isHighlighted ||
+                                      (_selectedMessage?['id'] == msgId),
                                 ),
+                              ),
+                            );
+
+                            final bubbleWidget = RepaintBoundary(
+                              key: ValueKey('${msgId}_bubble'),
+                              child: hasAlreadyAnimated
+                                  ? childWidget
+                                  : childWidget
+                                      .animate()
+                                      .fadeIn(
+                                          duration: 150.ms,
+                                          curve: Curves.easeOut)
+                                      .scale(
+                                        duration: 200.ms,
+                                        curve: Curves.easeOutBack,
+                                        alignment: isMe
+                                            ? Alignment.bottomRight
+                                            : Alignment.bottomLeft,
+                                      ),
+                            );
+
+                            if (showDateHeader) {
+                              final dateText =
+                                  _formatMessageDateHeader(currentCreatedAt);
+                              return Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  _buildDateHeader(dateText),
+                                  bubbleWidget,
+                                ],
                               );
+                            }
 
-                              final bubbleWidget = RepaintBoundary(
-                                key: ValueKey('${msgId}_bubble'),
-                                child: hasAlreadyAnimated
-                                    ? childWidget
-                                    : childWidget
-                                        .animate()
-                                        .fadeIn(
-                                            duration: 150.ms,
-                                            curve: Curves.easeOut)
-                                        .scale(
-                                          duration: 200.ms,
-                                          curve: Curves.easeOutBack,
-                                          alignment: isMe
-                                              ? Alignment.bottomRight
-                                              : Alignment.bottomLeft,
-                                        ),
-                              );
-
-                              if (showDateHeader) {
-                                final dateText =
-                                    _formatMessageDateHeader(currentCreatedAt);
-                                return Column(
-                                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                                  children: [
-                                    _buildDateHeader(dateText),
-                                    bubbleWidget,
-                                  ],
-                                );
-                              }
-
-                              return bubbleWidget;
-                            },
-                          ),
-                          // ── Scroll-to-bottom FAB ──
-                          Positioned(
-                            right: 16,
-                            bottom: 16,
-                            child: AnimatedScale(
-                              scale: _showScrollToBottom ? 1.0 : 0.0,
-                              duration: const Duration(milliseconds: 250),
-                              curve: Curves.easeOutBack,
-                              child: AnimatedOpacity(
-                                opacity: _showScrollToBottom ? 1.0 : 0.0,
-                                duration: const Duration(milliseconds: 200),
-                                child: GestureDetector(
-                                  onTap: _scrollToBottom,
-                                  behavior: HitTestBehavior.opaque,
+                            return bubbleWidget;
+                          },
+                        ),
+                        // ── Scroll-to-bottom FAB ──
+                        Positioned(
+                          right: 16,
+                          bottom: 16,
+                          child: AnimatedScale(
+                            scale: _showScrollToBottom ? 1.0 : 0.0,
+                            duration: const Duration(milliseconds: 250),
+                            curve: Curves.easeOutBack,
+                            child: AnimatedOpacity(
+                              opacity: _showScrollToBottom ? 1.0 : 0.0,
+                              duration: const Duration(milliseconds: 200),
+                              child: GestureDetector(
+                                onTap: _scrollToBottom,
+                                behavior: HitTestBehavior.opaque,
+                                child: Container(
+                                  width: 42,
+                                  height: 42,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: context.accentSecondary,
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: context.accentSecondary
+                                            .withValues(alpha: 0.35),
+                                        blurRadius: 10,
+                                        offset: const Offset(0, 4),
+                                      ),
+                                    ],
+                                  ),
                                   child: Container(
-                                    width: 42,
-                                    height: 42,
+                                    margin: const EdgeInsets.all(1.5),
                                     decoration: BoxDecoration(
                                       shape: BoxShape.circle,
-                                      color: context.accentSecondary,
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: context.accentSecondary
-                                              .withValues(alpha: 0.35),
-                                          blurRadius: 10,
-                                          offset: const Offset(0, 4),
-                                        ),
-                                      ],
+                                      color: context
+                                          .surfacePrimary, // Blend with dark background
                                     ),
-                                    child: Container(
-                                      margin: const EdgeInsets.all(1.5),
-                                      decoration: BoxDecoration(
-                                        shape: BoxShape.circle,
-                                        color: context
-                                            .surfacePrimary, // Blend with dark background
-                                      ),
-                                      child: const Icon(
-                                        Icons.keyboard_arrow_down_rounded,
-                                        color: Colors.white,
-                                        size: 24,
-                                      ),
+                                    child: const Icon(
+                                      Icons.keyboard_arrow_down_rounded,
+                                      color: Colors.white,
+                                      size: 24,
                                     ),
                                   ),
                                 ),
                               ),
                             ),
                           ),
-                        ],
-                      ),
-              ),
-              _buildReplyPreview(),
-              _buildInputBar(),
-            ],
-          ),
+                        ),
+                      ],
+                    ),
+            ),
+            _buildReplyPreview(),
+            _buildInputBar(),
+          ],
         ),
-      );
-    }
+      ),
+    );
+  }
 
   Widget _buildMessageBubble({
     required String text,
@@ -862,14 +877,20 @@ class _IndividualChatPageState extends State<IndividualChatPage>
     bool isHighlighted = false,
   }) {
     final bubbleRadius = BorderRadius.only(
-      topLeft: const Radius.circular(AppDimensions.radiusPremiumCard),
-      topRight: const Radius.circular(AppDimensions.radiusPremiumCard),
-      bottomLeft: isMe
-          ? const Radius.circular(AppDimensions.radiusPremiumCard)
-          : const Radius.circular(4.0),
-      bottomRight: isMe
-          ? const Radius.circular(4.0)
-          : const Radius.circular(AppDimensions.radiusPremiumCard),
+      topLeft: const Radius.circular(20),
+      topRight: const Radius.circular(20),
+      bottomLeft: isMe ? const Radius.circular(20) : const Radius.circular(4.0),
+      bottomRight:
+          isMe ? const Radius.circular(4.0) : const Radius.circular(20),
+    );
+
+    final innerBubbleRadius = BorderRadius.only(
+      topLeft: const Radius.circular(19.0),
+      topRight: const Radius.circular(19.0),
+      bottomLeft:
+          isMe ? const Radius.circular(19.0) : const Radius.circular(3.0),
+      bottomRight:
+          isMe ? const Radius.circular(3.0) : const Radius.circular(19.0),
     );
 
     return Padding(
@@ -896,68 +917,120 @@ class _IndividualChatPageState extends State<IndividualChatPage>
                   minWidth: 80,
                   maxWidth: MediaQuery.of(context).size.width * 0.75,
                 ),
-                decoration: BoxDecoration(
-                  borderRadius: bubbleRadius,
-                  color: isMe ? context.accentPrimary : context.surfacePrimary,
-                  border: Border.all(
-                    color: isMe
-                        ? context.accentSecondary.withValues(alpha: 0.5)
-                        : context.surfaceSecondary.withValues(alpha: 0.5),
-                    width: 1.5,
-                  ),
-                ),
-                padding: EdgeInsets.only(
-                  left: 12,
-                  right: isMe ? 8 : 12,
-                  top: 10,
-                  bottom: 6,
-                ),
-                child: IntrinsicWidth(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (replyToId != null) ...[
-                        GestureDetector(
-                          onTap: () {
-                            _scrollToAndHighlightMessage(
-                                replyToId, _provider.activeRoomMessages);
-                          },
-                          child: _buildBubbleReplyQuote(
-                              _resolveReplySenderName(replyToSenderName),
-                              replyToPayload ?? '', isMe),
-                        ),
-                        const SizedBox(height: 6),
-                      ],
-                      Text(
-                        text,
-                        style: context.bodyText.copyWith(
-                          color: context.textPrimary,
-                          height: 1.35,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            status == 'error' ? 'Failed to send' : time,
-                            style: context.captionText.copyWith(
-                              color: status == 'error'
-                                  ? Colors.redAccent
-                                  : const Color.fromARGB(133, 255, 255, 255),
-                              fontSize: 9.5,
-                              fontWeight: FontWeight.normal,
-                            ),
-                          ),
-                          if (isMe && status != null) ...[
-                            const SizedBox(width: 4),
-                            _buildStatusIcon(status),
+                decoration: isMe
+                    ? BoxDecoration(
+                        borderRadius: bubbleRadius,
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            const Color(0xFFDDD0F5)
+                                .withValues(alpha: 0.55), // Soft muted lilac
+                            const Color(0xFFB197E6)
+                                .withValues(alpha: 0.40), // Gentle lavender
+                            const Color(0xFF6B72D6)
+                                .withValues(alpha: 0.35), // Subtle muted indigo
+                            const Color(0xFF38BDF8)
+                                .withValues(alpha: 0.45), // Soft sky blue
+                            const Color(0xFF06B6D4)
+                                .withValues(alpha: 0.50), // Muted cyan
                           ],
+                          stops: const [0.0, 0.25, 0.55, 0.85, 1.0],
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color:
+                                const Color(0xFF38BDF8).withValues(alpha: 0.06),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
                         ],
+                      )
+                    : BoxDecoration(
+                        borderRadius: bubbleRadius,
+                        color: context.surfaceSecondary,
+                        border: Border.all(
+                          color:
+                              context.surfaceSecondary.withValues(alpha: 0.8),
+                          width: 1.0,
+                        ),
                       ),
-                    ],
+                padding: isMe ? const EdgeInsets.all(1.0) : EdgeInsets.zero,
+                child: Container(
+                  padding: EdgeInsets.only(
+                    left: 14,
+                    right: isMe ? 10 : 12,
+                    top: 10,
+                    bottom: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    borderRadius: isMe ? innerBubbleRadius : bubbleRadius,
+                    gradient: isMe
+                        ? const LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              Color(0xFF181926), // Deep rich obsidian
+                              Color(0xFF0F1017), // Pure obsidian floor
+                            ],
+                          )
+                        : null,
+                    color: isMe ? null : context.surfaceSecondary,
+                  ),
+                  child: IntrinsicWidth(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (replyToId != null) ...[
+                          GestureDetector(
+                            onTap: () {
+                              _scrollToAndHighlightMessage(
+                                  replyToId, _provider.activeRoomMessages);
+                            },
+                            child: _buildBubbleReplyQuote(
+                                _resolveReplySenderName(replyToSenderName),
+                                replyToPayload ?? '',
+                                isMe),
+                          ),
+                          const SizedBox(height: 6),
+                        ],
+                        Text(
+                          text,
+                          style: context.bodyText.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w400,
+                            fontSize: 14.5,
+                            letterSpacing: -0.1,
+                            height: 1.35,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              status == 'error' ? 'Failed to send' : time,
+                              style: context.captionText.copyWith(
+                                color: status == 'error'
+                                    ? Colors.redAccent
+                                    : (isMe
+                                        ? Colors.white.withValues(alpha: 0.60)
+                                        : const Color.fromARGB(
+                                            133, 255, 255, 255)),
+                                fontSize: 9.5,
+                                fontWeight: FontWeight.normal,
+                              ),
+                            ),
+                            if (isMe && status != null) ...[
+                              const SizedBox(width: 4),
+                              _buildStatusIcon(status),
+                            ],
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -982,7 +1055,7 @@ class _IndividualChatPageState extends State<IndividualChatPage>
       return Icon(
         Icons.access_time_rounded,
         size: 12,
-        color: context.textMuted,
+        color: Colors.white.withValues(alpha: 0.50),
       );
     }
 
@@ -991,11 +1064,11 @@ class _IndividualChatPageState extends State<IndividualChatPage>
       return Icon(
         Icons.check_rounded,
         size: 12,
-        color: context.textSecondary.withValues(alpha: 0.5),
+        color: Colors.white.withValues(alpha: 0.65),
       );
     }
 
-    // ✓✓ DELIVERED — landed on recipient's device (grey)
+    // ✓✓ DELIVERED — landed on recipient's device (grey/white)
     if (status == 'delivered') {
       return SizedBox(
         width: 17,
@@ -1003,30 +1076,28 @@ class _IndividualChatPageState extends State<IndividualChatPage>
         child: Stack(
           children: [
             Icon(Icons.check_rounded,
-                size: 12, color: context.textSecondary.withValues(alpha: 0.6)),
+                size: 12, color: Colors.white.withValues(alpha: 0.65)),
             Positioned(
               left: 5,
               child: Icon(Icons.check_rounded,
-                  size: 12,
-                  color: context.textSecondary.withValues(alpha: 0.6)),
+                  size: 12, color: Colors.white.withValues(alpha: 0.65)),
             ),
           ],
         ),
       );
     }
 
-    // ✓✓ READ — recipient opened the chat (blue)
+    // ✓✓ READ — recipient opened the chat (electric cyan)
     return const SizedBox(
       width: 17,
       height: 12,
       child: Stack(
         children: [
-          Icon(Icons.check_rounded,
-              size: 12, color: Color.fromARGB(255, 255, 255, 255)),
+          Icon(Icons.check_rounded, size: 12, color: Color(0xFF00F2FE)),
           Positioned(
             left: 5,
-            child: Icon(Icons.check_rounded,
-                size: 12, color: Color.fromARGB(255, 255, 255, 255)),
+            child:
+                Icon(Icons.check_rounded, size: 12, color: Color(0xFF00F2FE)),
           ),
         ],
       ),
@@ -1084,7 +1155,8 @@ class _IndividualChatPageState extends State<IndividualChatPage>
           padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
           decoration: BoxDecoration(
             color: Colors.redAccent.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(AppDimensions.radiusPremiumCard),
+            borderRadius:
+                BorderRadius.circular(AppDimensions.radiusPremiumCard),
             border: Border.all(
                 color: Colors.redAccent.withValues(alpha: 0.3), width: 1),
           ),
@@ -1116,11 +1188,13 @@ class _IndividualChatPageState extends State<IndividualChatPage>
                   }
                 },
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                   decoration: BoxDecoration(
                     color: Colors.green.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.green.withValues(alpha: 0.3)),
+                    border:
+                        Border.all(color: Colors.green.withValues(alpha: 0.3)),
                   ),
                   child: const Text(
                     "Unblock",
@@ -1145,7 +1219,8 @@ class _IndividualChatPageState extends State<IndividualChatPage>
           padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 16.0),
           decoration: BoxDecoration(
             color: Colors.redAccent.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(AppDimensions.radiusPremiumCard),
+            borderRadius:
+                BorderRadius.circular(AppDimensions.radiusPremiumCard),
             border: Border.all(
                 color: Colors.redAccent.withValues(alpha: 0.3), width: 1),
           ),
@@ -1244,7 +1319,9 @@ class _IndividualChatPageState extends State<IndividualChatPage>
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
           decoration: BoxDecoration(
-            color: Colors.black.withValues(alpha: isMe ? 0.15 : 0.22),
+            color: isMe
+                ? Colors.white.withValues(alpha: 0.08)
+                : Colors.black.withValues(alpha: 0.22),
             borderRadius: BorderRadius.circular(6),
           ),
           child: Row(
@@ -1255,7 +1332,7 @@ class _IndividualChatPageState extends State<IndividualChatPage>
                 width: 3,
                 decoration: BoxDecoration(
                   color:
-                      isMe ? const Color(0xFF00F2FE) : context.accentSecondary,
+                      isMe ? const Color(0xFF38BDF8) : context.accentSecondary,
                   borderRadius: BorderRadius.circular(1.5),
                 ),
               ),
@@ -1269,7 +1346,7 @@ class _IndividualChatPageState extends State<IndividualChatPage>
                       senderName,
                       style: TextStyle(
                         color: isMe
-                            ? const Color(0xFF00F2FE)
+                            ? const Color(0xFF38BDF8)
                             : context.accentSecondary,
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
@@ -1282,8 +1359,10 @@ class _IndividualChatPageState extends State<IndividualChatPage>
                     Text(
                       text,
                       style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.65),
-                        fontSize: 12,
+                        color: isMe
+                            ? Colors.white.withValues(alpha: 0.85)
+                            : Colors.white.withValues(alpha: 0.65),
+                        fontSize: 11,
                         fontFamily: 'Inter',
                       ),
                       maxLines: 1,
@@ -1447,7 +1526,8 @@ class _IndividualChatPageState extends State<IndividualChatPage>
             return GlassmorphicAlertDialog(
               title: Text(
                 "Report Message",
-                style: context.screenHeading.copyWith(fontWeight: FontWeight.bold),
+                style:
+                    context.screenHeading.copyWith(fontWeight: FontWeight.bold),
               ),
               content: SizedBox(
                 width: double.maxFinite,
@@ -1458,17 +1538,25 @@ class _IndividualChatPageState extends State<IndividualChatPage>
                     children: [
                       Text(
                         "Please select the reason for flagging this content:",
-                        style: context.bodyText.copyWith(color: context.textSecondary),
+                        style: context.bodyText
+                            .copyWith(color: context.textSecondary),
                       ),
                       const SizedBox(height: 12),
-                      ...['Spam', 'Harassment or Abuse', 'Inappropriate Content', 'Other'].map((reason) {
+                      ...[
+                        'Spam',
+                        'Harassment or Abuse',
+                        'Inappropriate Content',
+                        'Other'
+                      ].map((reason) {
                         final isSelected = selectedReason == reason;
                         return InkWell(
-                          onTap: isSubmitting ? null : () {
-                            setStateBuilder(() {
-                              selectedReason = reason;
-                            });
-                          },
+                          onTap: isSubmitting
+                              ? null
+                              : () {
+                                  setStateBuilder(() {
+                                    selectedReason = reason;
+                                  });
+                                },
                           child: Padding(
                             padding: const EdgeInsets.symmetric(vertical: 8.0),
                             child: Row(
@@ -1489,7 +1577,9 @@ class _IndividualChatPageState extends State<IndividualChatPage>
                                     color: isSelected
                                         ? context.textPrimary
                                         : context.textSecondary,
-                                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                    fontWeight: isSelected
+                                        ? FontWeight.bold
+                                        : FontWeight.normal,
                                   ),
                                 ),
                               ],
@@ -1500,7 +1590,8 @@ class _IndividualChatPageState extends State<IndividualChatPage>
                       const SizedBox(height: 16),
                       Text(
                         "Additional Details (Optional):",
-                        style: context.bodyText.copyWith(color: context.textSecondary),
+                        style: context.bodyText
+                            .copyWith(color: context.textSecondary),
                       ),
                       const SizedBox(height: 8),
                       TextField(
@@ -1509,7 +1600,8 @@ class _IndividualChatPageState extends State<IndividualChatPage>
                         enabled: !isSubmitting,
                         decoration: InputDecoration(
                           hintText: "Enter details here...",
-                          hintStyle: TextStyle(color: context.textMuted, fontSize: 13),
+                          hintStyle:
+                              TextStyle(color: context.textMuted, fontSize: 13),
                           fillColor: context.surfaceSecondary,
                           filled: true,
                           border: OutlineInputBorder(
@@ -1518,7 +1610,8 @@ class _IndividualChatPageState extends State<IndividualChatPage>
                           ),
                           focusedBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(8),
-                            borderSide: BorderSide(color: context.accentPrimary),
+                            borderSide:
+                                BorderSide(color: context.accentPrimary),
                           ),
                           contentPadding: const EdgeInsets.all(12),
                         ),
@@ -1544,30 +1637,34 @@ class _IndividualChatPageState extends State<IndividualChatPage>
                   : [
                       TextButton(
                         onPressed: () => Navigator.of(dialogContext).pop(),
-                        child: Text("Cancel", style: TextStyle(color: context.textSecondary)),
+                        child: Text("Cancel",
+                            style: TextStyle(color: context.textSecondary)),
                       ),
                       TextButton(
                         onPressed: () async {
                           setStateBuilder(() {
                             isSubmitting = true;
                           });
-                          
+
                           try {
                             await _provider.reportMessage(
                               reportedUserId: message['sender_id'] as int,
                               messageId: message['id'] as String,
-                              messageContent: message['payload'] as String? ?? '',
+                              messageContent:
+                                  message['payload'] as String? ?? '',
                               reason: selectedReason,
-                              additionalDetails: detailsController.text.trim().isEmpty 
-                                  ? null 
-                                  : detailsController.text.trim(),
+                              additionalDetails:
+                                  detailsController.text.trim().isEmpty
+                                      ? null
+                                      : detailsController.text.trim(),
                             );
-                            
+
                             if (mounted) {
                               Navigator.of(dialogContext).pop();
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(
-                                  content: Text("Thank you, this content has been flagged for review."),
+                                  content: Text(
+                                      "Thank you, this content has been flagged for review."),
                                   backgroundColor: Colors.green,
                                   behavior: SnackBarBehavior.floating,
                                 ),
@@ -1580,7 +1677,8 @@ class _IndividualChatPageState extends State<IndividualChatPage>
                               });
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(
-                                  content: Text("Could not report message. Please try again."),
+                                  content: Text(
+                                      "Could not report message. Please try again."),
                                   backgroundColor: Colors.redAccent,
                                   behavior: SnackBarBehavior.floating,
                                 ),
@@ -1588,7 +1686,8 @@ class _IndividualChatPageState extends State<IndividualChatPage>
                             }
                           }
                         },
-                        child: const Text("Submit Report", style: TextStyle(color: Colors.orangeAccent)),
+                        child: const Text("Submit Report",
+                            style: TextStyle(color: Colors.orangeAccent)),
                       ),
                     ],
             );

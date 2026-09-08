@@ -193,6 +193,18 @@ class _TribeChatPageState extends State<TribeChatPage> {
         return isMe
             ? "You declined invitation"
             : "$actorName declined invitation";
+      case 'set_view_only':
+        final isTargetMe = metadata['target_user_id'] == myUserId;
+        if (isTargetMe) return "Your access was set to View-Only";
+        return isMe
+            ? "You set $targetName to View-Only"
+            : "$actorName set $targetName to View-Only";
+      case 'set_can_chat':
+        final isTargetMe = metadata['target_user_id'] == myUserId;
+        if (isTargetMe) return "You can now chat in this Mafia";
+        return isMe
+            ? "You allowed $targetName to chat"
+            : "$actorName allowed $targetName to chat";
       case 'role_changed':
         return isMe
             ? "You updated $targetName's role"

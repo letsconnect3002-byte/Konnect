@@ -34,14 +34,11 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
 
   List<String> _getCardTypesForConnection(Map<String, dynamic> connection) {
     final sharedCard =
-        (connection['my_shared_card'] ?? 'both').toString().toLowerCase();
-    if (sharedCard == 'casual') {
-      return ['casual'];
-    } else if (sharedCard == 'professional') {
+        (connection['my_shared_card'] ?? 'casual').toString().toLowerCase();
+    if (sharedCard == 'professional') {
       return ['professional'];
-    } else {
-      return ['casual', 'professional'];
     }
+    return ['casual'];
   }
 
   @override

@@ -151,13 +151,12 @@ class CircleFeedPage extends StatefulWidget {
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(10),
                     color: isSelected
-                        ? context.accentSecondary
+                        ? Colors.white
                         : Colors.transparent,
                     boxShadow: isSelected
                         ? [
                             BoxShadow(
-                              color: context.accentSecondary
-                                  .withValues(alpha: 0.3),
+                              color: Colors.white.withValues(alpha: 0.15),
                               blurRadius: 6,
                               offset: const Offset(0, 2),
                             )
@@ -173,14 +172,14 @@ class CircleFeedPage extends StatefulWidget {
                         icon,
                         size: 13,
                         color:
-                            isSelected ? Colors.white : context.textSecondary,
+                            isSelected ? Colors.black : context.textSecondary,
                       ),
                       const SizedBox(width: 5),
                       Text(
                         title,
                         style: TextStyle(
                           color:
-                              isSelected ? Colors.white : context.textSecondary,
+                              isSelected ? Colors.black : context.textSecondary,
                           fontWeight:
                               isSelected ? FontWeight.bold : FontWeight.w600,
                           fontSize: 12,

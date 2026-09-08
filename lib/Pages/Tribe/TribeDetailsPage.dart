@@ -11,9 +11,6 @@ import 'package:connect/Providers/tribe_provider.dart';
 import 'package:connect/Providers/profile_provider.dart';
 import 'package:connect/Providers/connection_provider.dart';
 import 'package:connect/Providers/notification_provider.dart';
-import 'package:connect/Pages/Tribe/TribeRoleBuilderPage.dart';
-import 'package:connect/Models/mafia_role_details.dart';
-import 'package:connect/services/analytics_service.dart';
 
 class TribeDetailsPage extends StatefulWidget {
   final String tribeId;
@@ -34,6 +31,7 @@ class _TribeDetailsPageState extends State<TribeDetailsPage> {
   String? _uploadedAvatarUrl;
   bool _isUploadingImage = false;
   bool _requiresApproval = false;
+  bool _membersCanInvite = false;
 
   @override
   void dispose() {
@@ -117,226 +115,6 @@ class _TribeDetailsPageState extends State<TribeDetailsPage> {
     }
   }
 
-  Future<bool> _showInviteRoleSelectionDialog(
-      BuildContext context, Map<String, dynamic> connection) async {
-    final tribeProvider = Provider.of<TribeProvider>(context, listen: false);
-    final scaffoldMessenger = ScaffoldMessenger.of(context);
-    final roles = tribeProvider.getRoles(widget.tribeId);
-    final name = connection['name'] ?? 'this member';
-
-    final result = await showDialog<bool>(
-      context: context,
-      barrierDismissible: false,
-      builder: (dialogContext) {
-        bool isAdding = false;
-        String selectedRoleTitle = '';
-
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            return PopScope(
-              canPop: !isAdding,
-              child: Dialog(
-                backgroundColor: Colors.transparent,
-                elevation: 0,
-                child: GlassmorphicContainer(
-                  borderRadius: BorderRadius.circular(24),
-                  padding: const EdgeInsets.all(24),
-                  child: isAdding
-                      ? Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const SizedBox(height: 12),
-                            const SizedBox(
-                              width: 44,
-                              height: 44,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 3.5,
-                                valueColor:
-                                    AlwaysStoppedAnimation<Color>(Colors.white),
-                              ),
-                            ),
-                            const SizedBox(height: 24),
-                            const Text(
-                              "Adding to Mafia...",
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              "Assigning $name the $selectedRoleTitle role...",
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                color: context.textSecondary,
-                                fontSize: 13,
-                              ),
-                            ),
-                            const SizedBox(height: 12),
-                          ],
-                        )
-                      : Column(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text("Select Role for $name",
-                                style: const TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 16)),
-                            const SizedBox(height: 8),
-                            Text(
-                                "Choose which role this user will be assigned.",
-                                style: TextStyle(
-                                    color: context.textSecondary, fontSize: 12)),
-                            const SizedBox(height: 16),
-                            Flexible(
-                              child: ConstrainedBox(
-                                constraints: BoxConstraints(
-                                  maxHeight:
-                                      MediaQuery.of(context).size.height * 0.5,
-                                ),
-                                child: ListView.builder(
-                                  shrinkWrap: true,
-                                  itemCount: roles.length,
-                                  itemBuilder: (context, index) {
-                                    final role = roles[index];
-                                    final roleColorStr =
-                                        role['color']?.toString() ?? '#FFFFFF';
-                                    final roleColor = Color(int.parse(
-                                        roleColorStr.replaceAll('#', '0xFF')));
-                                    final slug = role['slug']?.toString() ?? '';
-                                    final roleDetails =
-                                        MafiaRoleDetails.getForSlug(slug);
-                                    final displayTitle = role['name']?.toString() ??
-                                        roleDetails.title;
-
-                                    return Padding(
-                                      padding: const EdgeInsets.only(bottom: 8.0),
-                                      child: BounceTap(
-                                        onTap: isAdding
-                                            ? null
-                                            : () async {
-                                                setDialogState(() {
-                                                  isAdding = true;
-                                                  selectedRoleTitle =
-                                                      displayTitle;
-                                                });
-                                                try {
-                                                  await tribeProvider.addMember(
-                                                      widget.tribeId,
-                                                      connection['id'] as int,
-                                                      role['id'] as String);
-                                                  AnalyticsService.logEvent(
-                                                    name: 'tribe_invite_sent',
-                                                    parameters: {
-                                                      'tribe_id': widget.tribeId,
-                                                      'invitee_id': connection['id'] as int,
-                                                      'role_slug': slug,
-                                                    },
-                                                  );
-
-                                                  if (dialogContext.mounted) {
-                                                    Navigator.of(dialogContext).pop(true);
-                                                  }
-                                                } catch (e) {
-                                                  print("Error adding member: $e");
-                                                  if (dialogContext.mounted) {
-                                                    setDialogState(() {
-                                                      isAdding = false;
-                                                    });
-                                                  }
-                                                  scaffoldMessenger.showSnackBar(
-                                                    SnackBar(
-                                                        content: Text(e
-                                                            .toString()
-                                                            .replaceAll(
-                                                                "Exception: ",
-                                                                "")),
-                                                        backgroundColor:
-                                                            Colors.redAccent),
-                                                  );
-                                                }
-                                              },
-                                        child: Container(
-                                          padding: const EdgeInsets.all(12),
-                                          decoration: BoxDecoration(
-                                            color: context.surfaceSecondary,
-                                            borderRadius: BorderRadius.circular(14),
-                                            border: Border.all(
-                                              color: roleColor.withValues(alpha: 0.25),
-                                              width: 1.0,
-                                            ),
-                                          ),
-                                          child: Row(
-                                            children: [
-                                              Container(
-                                                width: 38,
-                                                height: 38,
-                                                decoration: BoxDecoration(
-                                                  color: roleColor.withValues(alpha: 0.12),
-                                                  shape: BoxShape.circle,
-                                                ),
-                                                alignment: Alignment.center,
-                                                child: Text(roleDetails.icon,
-                                                    style: const TextStyle(fontSize: 18)),
-                                              ),
-                                              const SizedBox(width: 12),
-                                              Expanded(
-                                                child: Column(
-                                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                                  children: [
-                                                    Text(displayTitle,
-                                                        style: TextStyle(
-                                                            color: roleColor,
-                                                            fontWeight: FontWeight.bold,
-                                                            fontSize: 14)),
-                                                    if (roleDetails.uxProfile.isNotEmpty) ...[
-                                                      const SizedBox(height: 2),
-                                                      Text(roleDetails.uxProfile,
-                                                          style: TextStyle(
-                                                              color: context.textSecondary,
-                                                              fontSize: 11)),
-                                                    ],
-                                                  ],
-                                                ),
-                                              ),
-                                              Icon(Icons.chevron_right_rounded,
-                                                  color: context.textMuted, size: 20),
-                                            ],
-                                          ),
-                                        ),
-                                      ),
-                                    );
-                                  },
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Align(
-                              alignment: Alignment.centerRight,
-                              child: TextButton(
-                                child: const Text("Cancel",
-                                    style: TextStyle(color: Colors.white70)),
-                                onPressed: isAdding
-                                    ? null
-                                    : () => Navigator.pop(dialogContext, false),
-                              ),
-                            )
-                          ],
-                        ),
-                ),
-              ),
-            );
-          },
-        );
-      },
-    );
-
-    return result ?? false;
-  }
-
   void _showInviteUserSheet(BuildContext context) {
     final connectionProvider =
         Provider.of<ConnectionProvider>(context, listen: false);
@@ -407,18 +185,28 @@ class _TribeDetailsPageState extends State<TribeDetailsPage> {
                                     style:
                                         TextStyle(fontWeight: FontWeight.bold)),
                                 onPressed: () async {
-                                  final success =
-                                      await _showInviteRoleSelectionDialog(
-                                          sheetContext, conn);
-                                  if (success && sheetContext.mounted) {
-                                    Navigator.of(sheetContext).pop();
+                                  try {
+                                    await tribeProvider.inviteUser(
+                                        widget.tribeId, conn['id'] as int);
+                                    if (sheetContext.mounted) {
+                                      Navigator.of(sheetContext).pop();
+                                      if (context.mounted) {
+                                        ScaffoldMessenger.of(context)
+                                            .showSnackBar(
+                                          SnackBar(
+                                              content: Text(
+                                                  "$name added to Mafia successfully!"),
+                                              backgroundColor: Colors.green),
+                                        );
+                                      }
+                                    }
+                                  } catch (e) {
                                     if (context.mounted) {
                                       ScaffoldMessenger.of(context)
                                           .showSnackBar(
                                         SnackBar(
                                             content: Text(
-                                                "$name added to Mafia successfully!"),
-                                            backgroundColor: Colors.green),
+                                                "Could not add $name: $e")),
                                       );
                                     }
                                   }
@@ -547,90 +335,6 @@ class _TribeDetailsPageState extends State<TribeDetailsPage> {
                       ),
               ),
             ],
-          ),
-        );
-      },
-    );
-  }
-
-  void _showMemberRolePicker(BuildContext context, Map<String, dynamic> member,
-      List<Map<String, dynamic>> roles) {
-    final tribeProvider = Provider.of<TribeProvider>(context, listen: false);
-    final profile = member['profile'] as Map<String, dynamic>? ?? {};
-    final name = profile['name'] ?? 'this member';
-
-    showDialog(
-      context: context,
-      builder: (context) {
-        return Dialog(
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          child: GlassmorphicContainer(
-            borderRadius: BorderRadius.circular(24),
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text("Assign Role to $name",
-                    style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16)),
-                const SizedBox(height: 12),
-                SizedBox(
-                  width: double.maxFinite,
-                  child: ListView.builder(
-                    shrinkWrap: true,
-                    itemCount: roles.length,
-                    itemBuilder: (context, index) {
-                      final role = roles[index];
-                      final roleColorStr =
-                          role['color']?.toString() ?? '#FFFFFF';
-                      final roleColor = Color(
-                          int.parse(roleColorStr.replaceAll('#', '0xFF')));
-                      return Material(
-                        color: Colors.transparent,
-                        child: ListTile(
-                          contentPadding:
-                              const EdgeInsets.symmetric(horizontal: 8),
-                          leading: const Icon(Icons.shield_rounded,
-                              size: 20, color: Colors.white70),
-                          title: Text(role['name'] ?? '',
-                              style: TextStyle(
-                                  color: roleColor,
-                                  fontWeight: FontWeight.bold)),
-                          onTap: () async {
-                            final navigator = Navigator.of(context);
-                            try {
-                              await tribeProvider.changeMemberRole(
-                                  widget.tribeId,
-                                  member['user_id'] as int,
-                                  role['id'] as String);
-                              navigator.pop();
-                            } catch (e) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                    content: Text("Could not change member role. Please try again.")),
-                              );
-                            }
-                          },
-                        ),
-                      );
-                    },
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: TextButton(
-                    child: const Text("Cancel",
-                        style: TextStyle(color: Colors.white70)),
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                )
-              ],
-            ),
           ),
         );
       },
@@ -875,6 +579,7 @@ class _TribeDetailsPageState extends State<TribeDetailsPage> {
         'max_members': null,
         'visibility': 'private',
         'requires_approval': _requiresApproval,
+        'members_can_invite': _membersCanInvite,
       };
       final tribeProvider = Provider.of<TribeProvider>(context, listen: false);
       await tribeProvider.editTribe(widget.tribeId, updates);
@@ -958,14 +663,12 @@ class _TribeDetailsPageState extends State<TribeDetailsPage> {
         members.where((m) => m['status'] == 'active').toList();
     final requestedMembers =
         members.where((m) => m['status'] == 'requested').toList();
-    final roles = tribeProvider.getRoles(widget.tribeId);
+    final creatorId = tribe['creator_id'];
 
     // Permission checks
     final canEdit = tribeProvider.hasPermission(widget.tribeId, 'edit_tribe');
     final canManageMembers =
         tribeProvider.hasPermission(widget.tribeId, 'manage_members');
-    final canManageRoles =
-        tribeProvider.hasPermission(widget.tribeId, 'manage_roles');
     final canDelete =
         tribeProvider.hasPermission(widget.tribeId, 'delete_tribe');
     final canInvite =
@@ -1136,14 +839,46 @@ class _TribeDetailsPageState extends State<TribeDetailsPage> {
                                   style: context.bodyText
                                       .copyWith(fontWeight: FontWeight.bold)),
                               subtitle: Text(
-                                  "New members must be approved by an Elder",
+                                  "New members must be approved by the Owner",
                                   style: context.captionText
                                       .copyWith(color: context.textMuted)),
                               value: _requiresApproval,
-                              activeColor: context.accentSecondary,
+                              activeThumbColor: context.accentSecondary,
                               onChanged: (val) {
                                 setState(() {
                                   _requiresApproval = val;
+                                });
+                              },
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: context.surfacePrimary,
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                                color:
+                                    context.borderMuted.withValues(alpha: 0.3)),
+                          ),
+                          child: Material(
+                            color: Colors.transparent,
+                            child: SwitchListTile(
+                              contentPadding: EdgeInsets.zero,
+                              title: Text("Allow Members to Invite",
+                                  style: context.bodyText
+                                      .copyWith(fontWeight: FontWeight.bold)),
+                              subtitle: Text(
+                                  "When turned on, any member can invite new people",
+                                  style: context.captionText
+                                      .copyWith(color: context.textMuted)),
+                              value: _membersCanInvite,
+                              activeThumbColor: context.accentSecondary,
+                              onChanged: (val) {
+                                setState(() {
+                                  _membersCanInvite = val;
                                 });
                               },
                             ),
@@ -1381,12 +1116,13 @@ class _TribeDetailsPageState extends State<TribeDetailsPage> {
                                             tribe['avatar_url']?.toString();
                                         _requiresApproval =
                                             tribe['requires_approval'] == true;
+                                        _membersCanInvite =
+                                            tribe['members_can_invite'] == true;
                                       });
                                     },
                                   ),
                                 ),
-                              if (canEdit &&
-                                  (canInvite || canManageRoles))
+                              if (canEdit && canInvite)
                                 const SizedBox(width: 12),
                               if (canInvite)
                                 Expanded(
@@ -1396,10 +1132,8 @@ class _TribeDetailsPageState extends State<TribeDetailsPage> {
                                     onTap: () => _showInviteUserSheet(context),
                                   ),
                                 ),
-                              if (canInvite &&
-                                  (inviteCode.isNotEmpty || canManageRoles))
+                              if (canInvite && inviteCode.isNotEmpty) ...[
                                 const SizedBox(width: 12),
-                              if (canInvite && inviteCode.isNotEmpty)
                                 Expanded(
                                   child: _buildActionButton(
                                     icon: Icons.qr_code_2_rounded,
@@ -1408,25 +1142,7 @@ class _TribeDetailsPageState extends State<TribeDetailsPage> {
                                         context, inviteCode),
                                   ),
                                 ),
-                              if (canInvite && inviteCode.isNotEmpty && canManageRoles)
-                                const SizedBox(width: 12),
-                              if (canManageRoles)
-                                Expanded(
-                                  child: _buildActionButton(
-                                    icon: Icons.shield_rounded,
-                                    label: "Roles",
-                                    onTap: () {
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (context) =>
-                                              TribeRoleBuilderPage(
-                                                  tribeId: widget.tribeId),
-                                        ),
-                                      ).then((_) => _fetchDetails());
-                                    },
-                                  ),
-                                ),
+                              ],
                             ],
                           ),
                         ],
@@ -1464,26 +1180,20 @@ class _TribeDetailsPageState extends State<TribeDetailsPage> {
                           itemCount: activeMembers.length,
                           itemBuilder: (context, index) {
                             final mem = activeMembers[index];
+                            final memUserId = mem['user_id'] as int;
                             final profile =
                                 mem['profile'] as Map<String, dynamic>? ?? {};
-                            final role =
-                                mem['role'] as Map<String, dynamic>? ?? {};
                             final profileName = profile['name'] ?? 'Unknown';
                             final profileAvatar =
                                 profile['avatar_url']?.toString() ??
                                     profile['avatarUrl']?.toString() ??
                                     '';
-                            final isMemMe = mem['user_id'] == myUserId;
+                            final isMemMe = memUserId == myUserId;
+                            final isMemOwner = memUserId == creatorId;
+                            final isViewOnly = mem['is_view_only'] == true;
 
                             return Container(
                               margin: const EdgeInsets.symmetric(vertical: 0),
-                              // decoration: BoxDecoration(
-                              //   color: context.surfacePrimary,
-                              //   borderRadius: BorderRadius.circular(16),
-                              //   border: Border.all(
-                              //       color: context.borderMuted
-                              //           .withValues(alpha: 0.3)),
-                              // ),
                               child: Material(
                                 color: Colors.transparent,
                                 child: ListTile(
@@ -1504,11 +1214,43 @@ class _TribeDetailsPageState extends State<TribeDetailsPage> {
                                   ),
                                   title: Row(
                                     children: [
-                                      Text(profileName,
+                                      Flexible(
+                                        child: Text(
+                                          profileName,
                                           style: const TextStyle(
                                               color: Colors.white,
-                                              fontWeight: FontWeight.bold)),
-                                      if (isMemMe) ...[
+                                              fontWeight: FontWeight.bold),
+                                          overflow: TextOverflow.ellipsis,
+                                          maxLines: 1,
+                                        ),
+                                      ),
+                                      if (isMemOwner) ...[
+                                        const SizedBox(width: 8),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 6, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFFFFD700)
+                                                .withValues(alpha: 0.15),
+                                            borderRadius:
+                                                BorderRadius.circular(6),
+                                            border: Border.all(
+                                              color: const Color(0xFFFFD700)
+                                                  .withValues(alpha: 0.4),
+                                            ),
+                                          ),
+                                          child: Text(
+                                            isMemMe
+                                                ? "OWNER (YOU)"
+                                                : "OWNER",
+                                            style: const TextStyle(
+                                              color: Color(0xFFFFD700),
+                                              fontSize: 9,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ),
+                                      ] else if (isMemMe) ...[
                                         const SizedBox(width: 8),
                                         Container(
                                           padding: const EdgeInsets.symmetric(
@@ -1522,121 +1264,179 @@ class _TribeDetailsPageState extends State<TribeDetailsPage> {
                                           child: const Text("YOU",
                                               style: TextStyle(
                                                   color: Colors.white,
-                                                  fontSize: 8,
-                                                  fontWeight: FontWeight.bold)),
+                                                  fontSize: 9,
+                                                  fontWeight:
+                                                      FontWeight.bold)),
+                                        ),
+                                      ],
+                                      if (isViewOnly) ...[
+                                        const SizedBox(width: 8),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 6, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: Colors.cyanAccent
+                                                .withValues(alpha: 0.15),
+                                            borderRadius:
+                                                BorderRadius.circular(6),
+                                            border: Border.all(
+                                              color: Colors.cyanAccent
+                                                  .withValues(alpha: 0.4),
+                                            ),
+                                          ),
+                                          child: const Text("VIEW ONLY",
+                                              style: TextStyle(
+                                                  color: Colors.cyanAccent,
+                                                  fontSize: 9,
+                                                  fontWeight:
+                                                      FontWeight.bold)),
                                         ),
                                       ],
                                     ],
                                   ),
-                                  subtitle: Row(
-                                    children: [
-                                      const Icon(Icons.shield_rounded,
-                                          size: 12, color: Colors.white70),
-                                      const SizedBox(width: 4),
-                                      Expanded(
-                                        child: Text(
-                                          role['name'] ?? 'Member',
-                                          style: TextStyle(
-                                            color: role['color'] != null
-                                                ? Color(int.parse(role['color']
-                                                    .replaceAll('#', '0xFF')))
-                                                : context.textMuted,
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                          overflow: TextOverflow.ellipsis,
-                                          maxLines: 1,
-                                        ),
-                                      ),
-                                    ],
+                                  subtitle: Text(
+                                    isViewOnly
+                                        ? "View-only (cannot post messages)"
+                                        : "Can chat & post",
+                                    style: TextStyle(
+                                      color: isViewOnly
+                                          ? Colors.cyanAccent
+                                              .withValues(alpha: 0.7)
+                                          : context.textMuted,
+                                      fontSize: 11,
+                                    ),
                                   ),
-                                  trailing: (isMemMe)
+                                  trailing: (isMemMe || isMemOwner)
                                       ? null
-                                      : Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            if (canManageRoles)
-                                              IconButton(
-                                                icon: const Icon(
-                                                    Icons
-                                                        .admin_panel_settings_rounded,
-                                                    size: 18,
-                                                    color: Colors.white),
-                                                onPressed: () =>
-                                                    _showMemberRolePicker(
-                                                        context, mem, roles),
-                                              ),
-                                            if (canManageMembers)
-                                              IconButton(
-                                                icon: const Icon(
-                                                    Icons
-                                                        .remove_circle_outline_rounded,
-                                                    size: 18,
-                                                    color: Colors.redAccent),
-                                                onPressed: () async {
-                                                  final confirmed =
-                                                      await showDialog<bool>(
-                                                    context: context,
-                                                    builder: (context) =>
-                                                        AlertDialog(
-                                                      backgroundColor: context
-                                                          .surfacePrimary,
-                                                      title: const Text(
-                                                          "Remove Member?",
-                                                          style: TextStyle(
-                                                              color: Colors
-                                                                  .white)),
-                                                      content: Text(
-                                                          "Are you sure you want to remove $profileName from this mafia?",
-                                                          style: const TextStyle(
-                                                              color: Colors
-                                                                  .white70)),
-                                                      actions: [
-                                                        TextButton(
-                                                          child: const Text(
-                                                              "Cancel"),
-                                                          onPressed: () =>
-                                                              Navigator.pop(
-                                                                  context,
-                                                                  false),
-                                                        ),
-                                                        TextButton(
-                                                          style: TextButton.styleFrom(
+                                      : (canManageMembers)
+                                          ? Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                IconButton(
+                                                  tooltip: isViewOnly
+                                                      ? "Allow $profileName to chat"
+                                                      : "Make $profileName view-only",
+                                                  icon: Icon(
+                                                    isViewOnly
+                                                        ? Icons
+                                                            .chat_bubble_outline_rounded
+                                                        : Icons
+                                                            .visibility_outlined,
+                                                    size: 20,
+                                                    color: isViewOnly
+                                                        ? context
+                                                            .accentSecondary
+                                                        : Colors.white70,
+                                                  ),
+                                                  onPressed: () async {
+                                                    try {
+                                                      await tribeProvider
+                                                          .toggleMemberViewOnly(
+                                                              widget.tribeId,
+                                                              memUserId,
+                                                              !isViewOnly);
+                                                      if (context.mounted) {
+                                                        ScaffoldMessenger.of(
+                                                                context)
+                                                            .showSnackBar(
+                                                          SnackBar(
+                                                            content: Text(!isViewOnly
+                                                                ? "$profileName is now set to View-Only."
+                                                                : "$profileName can now chat and post messages."),
+                                                            backgroundColor:
+                                                                Colors.black87,
+                                                          ),
+                                                        );
+                                                      }
+                                                    } catch (e) {
+                                                      if (context.mounted) {
+                                                        ScaffoldMessenger.of(
+                                                                context)
+                                                            .showSnackBar(
+                                                          SnackBar(
+                                                            content: Text(
+                                                                "Could not update member: $e"),
+                                                            backgroundColor:
+                                                                Colors
+                                                                    .redAccent,
+                                                          ),
+                                                        );
+                                                      }
+                                                    }
+                                                  },
+                                                ),
+                                                IconButton(
+                                                  icon: const Icon(
+                                                      Icons
+                                                          .remove_circle_outline_rounded,
+                                                      size: 18,
+                                                      color:
+                                                          Colors.redAccent),
+                                                  onPressed: () async {
+                                                    final confirmed =
+                                                        await showDialog<bool>(
+                                                      context: context,
+                                                      builder: (context) =>
+                                                          AlertDialog(
+                                                        backgroundColor: context
+                                                            .surfacePrimary,
+                                                        title: const Text(
+                                                            "Remove Member?",
+                                                            style: TextStyle(
+                                                                color: Colors
+                                                                    .white)),
+                                                        content: Text(
+                                                            "Are you sure you want to remove $profileName from this mafia?",
+                                                            style: const TextStyle(
+                                                                color: Colors
+                                                                    .white70)),
+                                                        actions: [
+                                                          TextButton(
+                                                            child: const Text(
+                                                                "Cancel"),
+                                                            onPressed: () =>
+                                                                Navigator.pop(
+                                                                    context,
+                                                                    false),
+                                                          ),
+                                                          TextButton(
+                                                            style: TextButton
+                                                                .styleFrom(
                                                               foregroundColor:
                                                                   Colors
                                                                       .redAccent),
-                                                          child: const Text(
-                                                              "Remove"),
-                                                          onPressed: () =>
-                                                              Navigator.pop(
-                                                                  context,
-                                                                  true),
-                                                        ),
-                                                      ],
-                                                    ),
-                                                  );
-                                                  if (confirmed == true &&
-                                                      mounted) {
-                                                    try {
-                                                      await tribeProvider
-                                                          .removeMember(
-                                                              widget.tribeId,
-                                                              mem['user_id']
-                                                                  as int);
-                                                    } catch (e) {
-                                                      ScaffoldMessenger.of(
-                                                              context)
-                                                          .showSnackBar(
-                                                        const SnackBar(
-                                                            content: Text(
-                                                                "Could not remove member. Please try again.")),
-                                                      );
+                                                            child: const Text(
+                                                                "Remove"),
+                                                            onPressed: () =>
+                                                                Navigator.pop(
+                                                                    context,
+                                                                    true),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                    );
+                                                    if (confirmed == true &&
+                                                        mounted) {
+                                                      try {
+                                                        await tribeProvider
+                                                            .removeMember(
+                                                                widget.tribeId,
+                                                                memUserId);
+                                                      } catch (e) {
+                                                        ScaffoldMessenger.of(
+                                                                context)
+                                                            .showSnackBar(
+                                                          const SnackBar(
+                                                              content: Text(
+                                                                  "Could not remove member. Please try again.")),
+                                                        );
+                                                      }
                                                     }
-                                                  }
-                                                },
-                                              ),
-                                          ],
-                                        ),
+                                                  },
+                                                ),
+                                              ],
+                                            )
+                                          : null,
                                 ),
                               ),
                             );

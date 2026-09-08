@@ -235,7 +235,7 @@ class ProfileProvider with ChangeNotifier {
       fieldAssignments.putIfAbsent(
         field,
         () {
-          if (field == 'name' || field == 'avatarUrl') {
+          if (field == 'name' || field == 'avatarUrl' || field == 'email') {
             return FieldCardAssignment(casual: true, professional: true);
           }
           return FieldCardAssignment(casual: false, professional: true);
@@ -252,7 +252,7 @@ class ProfileProvider with ChangeNotifier {
     final assignment = fieldAssignments[field];
     if (assignment == null) {
       if (card == ProfileCardType.casual) {
-        return field == 'name' || field == 'avatarUrl';
+        return field == 'name' || field == 'avatarUrl' || field == 'email';
       } else {
         return true;
       }
