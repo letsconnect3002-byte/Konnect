@@ -6,6 +6,9 @@ import 'package:connect/Pages/PlanDetailPage.dart';
 import 'package:connect/Pages/ThreadDetailPage.dart';
 import 'package:connect/Pages/Tribe/TribeChatPage.dart';
 import 'package:connect/Providers/connection_provider.dart';
+import 'package:connect/Providers/custom_network_provider.dart';
+import 'package:connect/Providers/feed_provider.dart';
+import 'package:connect/Models/custom_network.dart';
 import 'package:connect/Providers/notification_provider.dart';
 import 'package:connect/Providers/plans_provider.dart';
 import 'package:connect/Providers/tribe_provider.dart';
@@ -275,6 +278,8 @@ class _NotificationPageState extends State<NotificationPage> {
     String parentAuthorName = 'a post';
     bool isAnonymous = false;
     String? explicitActorName;
+    String networkId = '';
+    String networkName = '';
 
     final String? rawNote = notification['note'] as String?;
     if (rawNote != null && rawNote.startsWith('{')) {
@@ -296,6 +301,12 @@ class _NotificationPageState extends State<NotificationPage> {
         if (parsed['actor_name'] != null && parsed['actor_name'].toString().isNotEmpty) {
           explicitActorName = parsed['actor_name'].toString();
         }
+        if (parsed['network_id'] != null) {
+          networkId = parsed['network_id'].toString();
+        }
+        if (parsed['network_name'] != null) {
+          networkName = parsed['network_name'].toString();
+        }
       } catch (_) {}
     }
     if (rootPostId.isEmpty && targetPostId.isNotEmpty) {
@@ -313,16 +324,29 @@ class _NotificationPageState extends State<NotificationPage> {
     IconData iconData = Icons.chat_bubble_outline_rounded;
 
     if (realType == 'feed_reply_mention') {
-      actionText = 'replied to your post and mentioned you on their post.';
+      actionText = networkName.isNotEmpty
+          ? 'replied to your post and mentioned you in $networkName.'
+          : 'replied to your post and mentioned you on their post.';
       iconData = Icons.alternate_email_rounded;
+    } else if (realType == 'feed_reply') {
+      actionText = networkName.isNotEmpty
+          ? 'replied to your post in $networkName.'
+          : 'replied to your post.';
+      iconData = Icons.chat_bubble_outline_rounded;
     } else if (realType == 'feed_mention') {
-      actionText = 'mentioned you on their post.';
+      actionText = networkName.isNotEmpty
+          ? 'mentioned you in $networkName.'
+          : 'mentioned you on their post.';
       iconData = Icons.alternate_email_rounded;
     } else if (realType == 'feed_post') {
-      actionText = 'has uploaded a post, tap to see.';
+      actionText = networkName.isNotEmpty
+          ? 'has uploaded a post in $networkName, tap to see.'
+          : 'has uploaded a post, tap to see.';
       iconData = Icons.dynamic_feed_rounded;
     } else if (realType == 'feed_connection_reply') {
-      actionText = 'replied to $parentAuthorName, tap to join the conversation.';
+      actionText = networkName.isNotEmpty
+          ? 'replied to $parentAuthorName in $networkName, tap to join the conversation.'
+          : 'replied to $parentAuthorName, tap to join the conversation.';
       iconData = Icons.forum_outlined;
     }
 
@@ -341,6 +365,20 @@ class _NotificationPageState extends State<NotificationPage> {
           );
           if (isUnseen) {
             provider.markAsSeen(notification['id'].toString());
+          }
+          if (networkId.isNotEmpty) {
+            try {
+              final customNetProv =
+                  Provider.of<CustomNetworkProvider>(context, listen: false);
+              final feedProv = Provider.of<FeedProvider>(context, listen: false);
+              for (final net in customNetProv.myNetworks) {
+                if (net.id == networkId) {
+                  customNetProv.selectCustomNetwork(net);
+                  feedProv.selectCustomNetwork(net);
+                  break;
+                }
+              }
+            } catch (_) {}
           }
           if (rootPostId.isNotEmpty) {
             appShellKey.currentState?.setSelectedIndex(0);
@@ -372,37 +410,81 @@ class _NotificationPageState extends State<NotificationPage> {
           child: Row(
             children: [
               Stack(
+                clipBehavior: Clip.none,
                 children: [
                   isAnonymous
                       ? AnonymousAvatar(
-                          seed: (notification['other_user_id'] ?? otherUser['id'] ?? name).toString(),
+                          seed: (notification['other_user_id'] ??
+                                  otherUser['id'] ??
+                                  name)
+                              .toString(),
                           radius: 20,
                         )
-                      : CircleAvatar(
-                          radius: 20,
-                          backgroundColor: context.accentPrimary,
-                          backgroundImage: avatarUrl.isNotEmpty ? NetworkImage(avatarUrl) : null,
-                          child: avatarUrl.isEmpty
-                              ? Text(
-                                  _getInitials(name),
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 13,
+                      : Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: context.surfaceHighlight,
+                            border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.08),
+                              width: 1,
+                            ),
+                          ),
+                          child: ClipOval(
+                            child: avatarUrl.isNotEmpty
+                                ? Image.network(
+                                    avatarUrl,
+                                    width: 40,
+                                    height: 40,
+                                    fit: BoxFit.cover,
+                                    errorBuilder:
+                                        (context, error, stackTrace) => Center(
+                                      child: Text(
+                                        _getInitials(name),
+                                        style: TextStyle(
+                                          color: context.textPrimary,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 13,
+                                          fontFamily: 'Inter',
+                                        ),
+                                      ),
+                                    ),
+                                  )
+                                : Center(
+                                    child: Text(
+                                      _getInitials(name),
+                                      style: TextStyle(
+                                        color: context.textPrimary,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 13,
+                                        fontFamily: 'Inter',
+                                      ),
+                                    ),
                                   ),
-                                )
-                              : null,
+                          ),
                         ),
                   Positioned(
-                    right: 0,
-                    bottom: 0,
+                    right: -2,
+                    bottom: -2,
                     child: Container(
-                      padding: const EdgeInsets.all(2),
+                      width: 18,
+                      height: 18,
                       decoration: BoxDecoration(
-                        color: context.accentPrimary,
+                        color: Colors.white,
                         shape: BoxShape.circle,
+                        border: Border.all(
+                          color: context.surfaceSecondary,
+                          width: 2,
+                        ),
                       ),
-                      child: Icon(iconData, size: 10, color: Colors.white),
+                      child: Center(
+                        child: Icon(
+                          iconData,
+                          size: 9,
+                          color: Colors.black,
+                        ),
+                      ),
                     ),
                   ),
                 ],
@@ -481,6 +563,9 @@ class _NotificationPageState extends State<NotificationPage> {
         type == 'tribe_invite_declined' ||
         type == 'tribe_removed') {
       return _buildTribeNotificationItem(notification, provider);
+    }
+    if (type == 'custom_network_added') {
+      return _buildCustomNetworkNotificationItem(notification, provider);
     }
     final otherUser = notification['other_user'] as Map<String, dynamic>? ?? {};
     final String name = otherUser['name'] ?? 'Unknown User';
@@ -808,20 +893,14 @@ class _NotificationPageState extends State<NotificationPage> {
                                     )
                                   : Container(
                                       decoration: BoxDecoration(
-                                        gradient: LinearGradient(
-                                          colors: [
-                                            context.accentSecondary,
-                                            context.accentSecondary
-                                                .withValues(alpha: 0.7)
-                                          ],
-                                        ),
+                                        color: Colors.white,
                                         borderRadius:
                                             BorderRadius.circular(10),
                                       ),
                                       child: ElevatedButton(
                                         style: ElevatedButton.styleFrom(
                                           backgroundColor: Colors.transparent,
-                                          foregroundColor: Colors.white,
+                                          foregroundColor: Colors.black,
                                           shadowColor: Colors.transparent,
                                           padding: EdgeInsets.zero,
                                           shape: RoundedRectangleBorder(
@@ -860,6 +939,7 @@ class _NotificationPageState extends State<NotificationPage> {
                                             fontSize: 12,
                                             fontWeight: FontWeight.bold,
                                             fontFamily: 'Inter',
+                                            color: Colors.black,
                                           ),
                                         ),
                                       ),
@@ -962,19 +1042,13 @@ class _NotificationPageState extends State<NotificationPage> {
                                   if (!isRequestActioned) {
                                     return Container(
                                       decoration: BoxDecoration(
-                                        gradient: LinearGradient(
-                                          colors: [
-                                            context.accentSecondary,
-                                            context.accentSecondary
-                                                .withValues(alpha: 0.7)
-                                          ],
-                                        ),
+                                        color: Colors.white,
                                         borderRadius: BorderRadius.circular(10),
                                       ),
                                       child: ElevatedButton(
                                         style: ElevatedButton.styleFrom(
                                           backgroundColor: Colors.transparent,
-                                          foregroundColor: Colors.white,
+                                          foregroundColor: Colors.black,
                                           shadowColor: Colors.transparent,
                                           padding: EdgeInsets.zero,
                                           shape: RoundedRectangleBorder(
@@ -997,6 +1071,7 @@ class _NotificationPageState extends State<NotificationPage> {
                                             fontSize: 11,
                                             fontWeight: FontWeight.bold,
                                             fontFamily: 'Inter',
+                                            color: Colors.black,
                                           ),
                                         ),
                                       ),
@@ -1132,19 +1207,13 @@ class _NotificationPageState extends State<NotificationPage> {
                           } else {
                             return Container(
                               decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  colors: [
-                                    context.accentSecondary,
-                                    context.accentSecondary
-                                        .withValues(alpha: 0.7)
-                                  ],
-                                ),
+                                color: Colors.white,
                                 borderRadius: BorderRadius.circular(10),
                               ),
                               child: ElevatedButton(
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: Colors.transparent,
-                                  foregroundColor: Colors.white,
+                                  foregroundColor: Colors.black,
                                   shadowColor: Colors.transparent,
                                   padding: EdgeInsets.zero,
                                   shape: RoundedRectangleBorder(
@@ -1189,6 +1258,7 @@ class _NotificationPageState extends State<NotificationPage> {
                                     fontSize: 12,
                                     fontWeight: FontWeight.bold,
                                     fontFamily: 'Inter',
+                                    color: Colors.black,
                                   ),
                                 ),
                               ),
@@ -1198,29 +1268,13 @@ class _NotificationPageState extends State<NotificationPage> {
                           if (isUnseen) {
                             return Container(
                               decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  colors: isQr
-                                      ? [
-                                          const Color(0xFF00F2FE),
-                                          const Color(0xFF00B5FE)
-                                        ]
-                                      : (type == 'referral_connect'
-                                          ? [
-                                              context.accentSecondary,
-                                              context.accentSecondary
-                                                  .withValues(alpha: 0.7)
-                                            ]
-                                          : [
-                                              const Color(0xFF8B5CF6),
-                                              const Color(0xFF6D28D9)
-                                            ]),
-                                ),
+                                color: Colors.white,
                                 borderRadius: BorderRadius.circular(10),
                               ),
                               child: ElevatedButton(
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: Colors.transparent,
-                                  foregroundColor: Colors.white,
+                                  foregroundColor: Colors.black,
                                   shadowColor: Colors.transparent,
                                   padding: EdgeInsets.zero,
                                   shape: RoundedRectangleBorder(
@@ -1251,6 +1305,7 @@ class _NotificationPageState extends State<NotificationPage> {
                                     fontSize: 12,
                                     fontWeight: FontWeight.bold,
                                     fontFamily: 'Inter',
+                                    color: Colors.black,
                                   ),
                                 ),
                               ),
@@ -1511,23 +1566,15 @@ class _NotificationPageState extends State<NotificationPage> {
                                 height: 30,
                                 child: Container(
                                   decoration: BoxDecoration(
-                                    gradient: LinearGradient(
-                                      colors: isProcessing
-                                          ? [
-                                              const Color(0xFF8B5CF6).withValues(alpha: 0.5),
-                                              const Color(0xFF6D28D9).withValues(alpha: 0.5)
-                                            ]
-                                          : [
-                                              const Color(0xFF8B5CF6),
-                                              const Color(0xFF6D28D9)
-                                            ],
-                                    ),
+                                    color: isProcessing
+                                        ? Colors.white.withValues(alpha: 0.5)
+                                        : Colors.white,
                                     borderRadius: BorderRadius.circular(10),
                                   ),
                                   child: ElevatedButton(
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor: Colors.transparent,
-                                      foregroundColor: Colors.white,
+                                      foregroundColor: Colors.black,
                                       shadowColor: Colors.transparent,
                                       padding: EdgeInsets.zero,
                                       shape: RoundedRectangleBorder(
@@ -1581,7 +1628,7 @@ class _NotificationPageState extends State<NotificationPage> {
                                             child: CircularProgressIndicator(
                                               strokeWidth: 2,
                                               valueColor:
-                                                  AlwaysStoppedAnimation<Color>(Colors.white),
+                                                  AlwaysStoppedAnimation<Color>(Colors.black),
                                             ),
                                           )
                                         : const Text(
@@ -1590,6 +1637,7 @@ class _NotificationPageState extends State<NotificationPage> {
                                               fontSize: 11,
                                               fontWeight: FontWeight.bold,
                                               fontFamily: 'Inter',
+                                              color: Colors.black,
                                             ),
                                           ),
                                   ),
@@ -1688,6 +1736,216 @@ class _NotificationPageState extends State<NotificationPage> {
                           ),
                         ),
                       ],
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCustomNetworkNotificationItem(
+      Map<String, dynamic> notification, NotificationProvider provider) {
+    final otherUser =
+        notification['other_user'] as Map<String, dynamic>? ?? {};
+    final String name = otherUser['name'] ?? 'Someone';
+    final String avatarUrl =
+        otherUser['avatar_url'] ?? otherUser['avatarUrl'] ?? '';
+    final String timeStr =
+        _getRelativeTime(notification['created_at'] as String?);
+    final bool isUnseen = notification['is_seen'] == false;
+
+    String networkName = 'a Network';
+    String? networkId;
+    final String? rawNote = notification['note'] as String?;
+    if (rawNote != null && rawNote.startsWith('{')) {
+      try {
+        final parsed = jsonDecode(rawNote);
+        networkName = parsed['network_name']?.toString() ?? 'a Network';
+        networkId = parsed['network_id']?.toString();
+      } catch (_) {}
+    }
+
+    const Color accentColor = Color(0xFF8B5CF6);
+
+    return Dismissible(
+      key: Key(notification['id'].toString()),
+      direction: DismissDirection.endToStart,
+      background: Container(
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.only(right: 24),
+        decoration: BoxDecoration(
+          color: const Color(0xFFEF4444).withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: const Icon(
+          Icons.delete_outline_rounded,
+          color: Color(0xFFEF4444),
+          size: 24,
+        ),
+      ),
+      onDismissed: (direction) {
+        HapticFeedback.mediumImpact();
+        provider.deleteNotification(notification['id']);
+      },
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () async {
+            HapticFeedback.lightImpact();
+            provider.markAsSeen(notification['id']);
+            if (networkId != null && mounted) {
+              try {
+                final customNetProv = Provider.of<CustomNetworkProvider>(
+                    context,
+                    listen: false);
+                final feedProv =
+                    Provider.of<FeedProvider>(context, listen: false);
+                await customNetProv.fetchMyNetworks();
+                CustomNetwork? match;
+                for (final net in customNetProv.myNetworks) {
+                  if (net.id == networkId) {
+                    match = net;
+                    break;
+                  }
+                }
+                if (match != null) {
+                  customNetProv.selectCustomNetwork(match);
+                  feedProv.selectCustomNetwork(match);
+                  if (mounted && Navigator.canPop(context)) {
+                    Navigator.pop(context);
+                  }
+                }
+              } catch (e) {
+                debugPrint('Error opening custom network from notification: $e');
+              }
+            }
+          },
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(2),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: isUnseen
+                        ? Border.all(
+                            color: accentColor.withValues(alpha: 0.6),
+                            width: 2,
+                          )
+                        : null,
+                  ),
+                  child: Stack(
+                    children: [
+                      Container(
+                        width: 40,
+                        height: 40,
+                        decoration: const BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Color(0xFF1A1B2E),
+                        ),
+                        child: ClipOval(
+                          child: avatarUrl.startsWith('http')
+                              ? Image.network(
+                                  avatarUrl,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (context, error, stackTrace) =>
+                                      Center(
+                                    child: Text(
+                                      name.isNotEmpty
+                                          ? name[0].toUpperCase()
+                                          : '?',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                )
+                              : Center(
+                                  child: Text(
+                                    name.isNotEmpty
+                                        ? name[0].toUpperCase()
+                                        : '?',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                        ),
+                      ),
+                      Positioned(
+                        right: 0,
+                        bottom: 0,
+                        child: Container(
+                          width: 16,
+                          height: 16,
+                          decoration: BoxDecoration(
+                            color: accentColor,
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: const Color(0xFF0F101A),
+                              width: 1.5,
+                            ),
+                          ),
+                          child: const Icon(
+                            Icons.hub_rounded,
+                            color: Colors.white,
+                            size: 9,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      RichText(
+                        text: TextSpan(
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 13.5,
+                            fontFamily: 'Inter',
+                            height: 1.3,
+                          ),
+                          children: [
+                            TextSpan(
+                              text: name,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                            const TextSpan(
+                              text: " added you to ",
+                              style: TextStyle(color: Colors.white70),
+                            ),
+                            TextSpan(
+                              text: networkName,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                            if (timeStr.isNotEmpty)
+                              TextSpan(
+                                text: " \u2022 $timeStr",
+                                style: const TextStyle(
+                                  color: Color(0xFF5C5E78),
+                                  fontWeight: FontWeight.normal,
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -2000,18 +2258,13 @@ class _NotificationPageState extends State<NotificationPage> {
               if (!isAlreadyConnected)
                 Container(
                   decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        context.accentSecondary,
-                        context.accentSecondary.withValues(alpha: 0.7),
-                      ],
-                    ),
+                    color: Colors.white,
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: ElevatedButton(
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.transparent,
-                      foregroundColor: Colors.white,
+                      foregroundColor: Colors.black,
                       shadowColor: Colors.transparent,
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       shape: RoundedRectangleBorder(
@@ -2040,7 +2293,7 @@ class _NotificationPageState extends State<NotificationPage> {
                     child: const Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.person_add_rounded, size: 16, color: Colors.white),
+                        Icon(Icons.person_add_rounded, size: 16, color: Colors.black),
                         SizedBox(width: 8),
                         Text(
                           "Accept & Connect",
@@ -2048,7 +2301,7 @@ class _NotificationPageState extends State<NotificationPage> {
                             fontSize: 13,
                             fontWeight: FontWeight.bold,
                             fontFamily: 'Inter',
-                            color: Colors.white,
+                            color: Colors.black,
                           ),
                         ),
                       ],
@@ -2348,12 +2601,7 @@ class _NotificationPageState extends State<NotificationPage> {
                                   return Container(
                                     decoration: !isRequestActioned
                                         ? BoxDecoration(
-                                            gradient: LinearGradient(
-                                              colors: [
-                                                context.accentSecondary,
-                                                context.accentSecondary.withValues(alpha: 0.7)
-                                              ],
-                                            ),
+                                            color: Colors.white,
                                             borderRadius: BorderRadius.circular(12),
                                           )
                                         : null,
@@ -2364,7 +2612,7 @@ class _NotificationPageState extends State<NotificationPage> {
                                             : Colors.transparent,
                                         foregroundColor: isRequestActioned
                                             ? const Color(0xFF8B8C9E)
-                                            : Colors.white,
+                                            : Colors.black,
                                         shadowColor: Colors.transparent,
                                         shape: RoundedRectangleBorder(
                                           borderRadius: BorderRadius.circular(12),
@@ -2406,9 +2654,17 @@ class _NotificationPageState extends State<NotificationPage> {
                                                 });
                                               }
                                             },
-                                      child: Text(isRequestActioned
-                                          ? "Introduced"
-                                          : (showNoteInput ? "Send Intro" : "Introduce")),
+                                      child: Text(
+                                        isRequestActioned
+                                            ? "Introduced"
+                                            : (showNoteInput ? "Send Intro" : "Introduce"),
+                                        style: TextStyle(
+                                          color: isRequestActioned
+                                              ? const Color(0xFF8B8C9E)
+                                              : Colors.black,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
                                     ),
                                   );
                                 } else {
@@ -2449,19 +2705,13 @@ class _NotificationPageState extends State<NotificationPage> {
                                   } else {
                                     return Container(
                                       decoration: BoxDecoration(
-                                        gradient: LinearGradient(
-                                          colors: [
-                                            context.accentSecondary,
-                                            context.accentSecondary
-                                                .withValues(alpha: 0.7)
-                                          ],
-                                        ),
+                                        color: Colors.white,
                                         borderRadius: BorderRadius.circular(12),
                                       ),
                                       child: ElevatedButton(
                                         style: ElevatedButton.styleFrom(
                                           backgroundColor: Colors.transparent,
-                                          foregroundColor: Colors.white,
+                                          foregroundColor: Colors.black,
                                           shadowColor: Colors.transparent,
                                           shape: RoundedRectangleBorder(
                                             borderRadius: BorderRadius.circular(12),
@@ -2488,7 +2738,13 @@ class _NotificationPageState extends State<NotificationPage> {
                                             );
                                           });
                                         },
-                                        child: const Text("Connect"),
+                                        child: const Text(
+                                          "Connect",
+                                          style: TextStyle(
+                                            color: Colors.black,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
                                       ),
                                     );
                                   }

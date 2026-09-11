@@ -650,14 +650,14 @@ class _CreatePlanSheetState extends State<CreatePlanSheet> {
                                         height: 22,
                                         child: CircularProgressIndicator(
                                           strokeWidth: 2,
-                                          color: Colors.white,
+                                          color: Colors.black,
                                         ),
                                       )
                                     : Text(
                                         _isEditing ? 'Save Changes' : 'Create Plan',
                                         style: AppTypography.cardTitle.copyWith(
                                           color: isValid
-                                              ? Colors.white
+                                              ? Colors.black
                                               : AppColors.textMuted,
                                         ),
                                       ),

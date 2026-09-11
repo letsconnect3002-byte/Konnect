@@ -16,10 +16,14 @@ import 'package:connect/Widgets/dwell_detector.dart';
 import 'package:connect/Widgets/threaded_comment_tree.dart';
 import 'package:connect/Widgets/link_preview_card.dart';
 import 'package:connect/Widgets/pulse_row_widget.dart';
+import 'package:connect/Widgets/discord_network_rail_drawer.dart';
 import 'package:connect/Providers/pulse_provider.dart';
 import 'package:connect/Providers/notification_provider.dart';
 import 'package:connect/Pages/NotificationPage.dart';
 import 'package:connect/services/analytics_service.dart';
+import 'package:connect/Widgets/network_members_sheet.dart';
+import 'package:connect/Providers/custom_network_provider.dart';
+import 'package:connect/Models/custom_network.dart';
 
 class CircleFeedPage extends StatefulWidget {
   const CircleFeedPage({super.key});
@@ -71,7 +75,10 @@ class CircleFeedPage extends StatefulWidget {
     bool isPreviewDetached = false;
     String postVisibility = 'both'; // 'both', 'casual', 'professional'
     final feedProviderRef = Provider.of<FeedProvider>(context, listen: false);
+    final bool isCustomActive = feedProviderRef.isCustomNetworkActive;
+    final customNet = feedProviderRef.activeCustomNetwork;
     final bool isGlobalFeed = feedProviderRef.feedFilter == FeedFilter.global;
+    final bool allowAnonymous = isCustomActive ? customNet!.allowAnonymous : isGlobalFeed;
     bool isAnonymousPost = false;
 
     showModalBottomSheet(
@@ -245,8 +252,8 @@ class CircleFeedPage extends StatefulWidget {
                     ],
                   ),
                   const SizedBox(height: 6),
-                  if (isGlobalFeed) ...[
-                    // Global Feed Anonymity Selector
+                  if (allowAnonymous) ...[
+                    // Anonymity Selector (available in Global Feed or Custom Networks with allow_anonymous=true)
                     Container(
                       decoration: BoxDecoration(
                         color: context.surfaceSecondary,
@@ -337,7 +344,39 @@ class CircleFeedPage extends StatefulWidget {
                       ),
                     ),
                     const SizedBox(height: 14),
-                  ] else ...[
+                  ] else if (isCustomActive && !customNet!.allowAnonymous) ...[
+                    // Custom Network with anonymous posting disabled by creator
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: context.surfaceSecondary,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.05),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.shield_outlined,
+                              size: 18, color: context.textMuted),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              'Anonymous posting is disabled for "${customNet.name}". Posts show member profiles.',
+                              style: TextStyle(
+                                color: context.textMuted,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                  ],
+
+                  if (!isCustomActive && !isGlobalFeed) ...[
                     Text(
                       postVisibility == 'both'
                           ? "Visible to all connections across your network."
@@ -459,7 +498,7 @@ class CircleFeedPage extends StatefulWidget {
                               visualDensity: VisualDensity.compact,
                               leading: CircleAvatar(
                                 radius: 14,
-                                backgroundColor: context.accentPrimary,
+                                backgroundColor: context.surfaceSecondary,
                                 backgroundImage: avatarUrl.isNotEmpty
                                     ? NetworkImage(avatarUrl)
                                     : null,
@@ -584,6 +623,7 @@ class CircleFeedPage extends StatefulWidget {
                                   connections: connections,
                                   visibility: postVisibility,
                                   isAnonymous: isAnonymousPost,
+                                  networkId: isCustomActive ? customNet!.id : null,
                                 );
                                 AnalyticsService.logEvent(
                                   name: 'post_created',
@@ -598,11 +638,28 @@ class CircleFeedPage extends StatefulWidget {
                                         .allMatches(postContent)
                                         .length,
                                     'is_anonymous': isAnonymousPost ? 1 : 0,
+                                    if (isCustomActive)
+                                      'network_id': customNet!.id,
                                   },
                                 );
                                 if (ctx.mounted) Navigator.pop(ctx);
                               } catch (e) {
                                 setSheetState(() => isSubmitting = false);
+                                final msg = e.toString().replaceAll('Exception: ', '');
+                                if (ctx.mounted) {
+                                  ScaffoldMessenger.of(ctx).showSnackBar(
+                                    SnackBar(
+                                      content: Text(msg.isNotEmpty
+                                          ? msg
+                                          : "Failed to create post. Please try again."),
+                                      backgroundColor: Colors.redAccent,
+                                      behavior: SnackBarBehavior.floating,
+                                    ),
+                                  );
+                                  if (msg.contains("no longer a member")) {
+                                    Navigator.pop(ctx);
+                                  }
+                                }
                               }
                             }
                           : null,
@@ -620,10 +677,14 @@ class CircleFeedPage extends StatefulWidget {
                             )
                           : Text(
                               isAnonymousPost
-                                  ? "Post Anonymously"
-                                  : (isGlobalFeed
-                                      ? "Post to Global"
-                                      : "Post to Network"),
+                                  ? (isCustomActive
+                                      ? "Post Anonymously to ${customNet!.name}"
+                                      : "Post Anonymously")
+                                  : (isCustomActive
+                                      ? "Post to ${customNet!.name}"
+                                      : (isGlobalFeed
+                                          ? "Post to Global"
+                                          : "Post to Network")),
                               style: const TextStyle(
                                   color: Colors.black,
                                   fontWeight: FontWeight.bold,
@@ -642,8 +703,68 @@ class CircleFeedPage extends StatefulWidget {
 }
 
 class _CircleFeedPageState extends State<CircleFeedPage> {
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   final ScrollController _scrollController = ScrollController();
   RealtimeChannel? _feedChannel;
+  StreamSubscription<CustomNetwork>? _membershipLostSub;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _membershipLostSub?.cancel();
+    final customNetProvider =
+        Provider.of<CustomNetworkProvider>(context, listen: false);
+    _membershipLostSub = customNetProvider.onMembershipLost.listen((lostNet) {
+      if (!mounted) return;
+      _handleRemovedFromActiveNetwork(lostNet);
+    });
+  }
+
+  void _handleRemovedFromActiveNetwork(CustomNetwork lostNet) {
+    final feedProvider = Provider.of<FeedProvider>(context, listen: false);
+    final customNetProvider =
+        Provider.of<CustomNetworkProvider>(context, listen: false);
+
+    // 1. Reset FeedProvider & CustomNetworkProvider to default
+    feedProvider.selectCustomNetwork(null);
+    customNetProvider.selectCustomNetwork(null);
+
+    // 2. Dismiss any open bottom sheets or dialogs (e.g. NetworkMembersSheet or compose modal)
+    Navigator.of(context).popUntil((route) => route.isFirst);
+
+    // 3. Show a clear, polite floating SnackBar
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(Icons.info_outline_rounded,
+                color: Colors.amberAccent, size: 20),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'You are no longer a member of ${lostNet.name}.',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                  fontFamily: 'Inter',
+                  fontSize: 13,
+                ),
+              ),
+            ),
+          ],
+        ),
+        backgroundColor: const Color(0xFF1E202C),
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 4),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: BorderSide(
+            color: Colors.white.withValues(alpha: 0.1),
+          ),
+        ),
+      ),
+    );
+  }
 
   @override
   void initState() {
@@ -746,6 +867,20 @@ class _CircleFeedPageState extends State<CircleFeedPage> {
             if (mounted) setState(() {});
           },
         )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.delete,
+          schema: 'public',
+          table: 'posts',
+          callback: (payload) {
+            debugPrint(
+                '[REALTIME_SIGNAL: CIRCLE_FEED] posts DELETE received: ${payload.oldRecord}');
+            final feedProvider =
+                Provider.of<FeedProvider>(context, listen: false);
+            feedProvider.handlePostRealtimeDeletePayload(
+                Map<String, dynamic>.from(payload.oldRecord));
+            if (mounted) setState(() {});
+          },
+        )
         .subscribe((status, error) {
       debugPrint(
           '[REALTIME_SIGNAL: CIRCLE_FEED] Channel status: $status, error: $error');
@@ -754,6 +889,7 @@ class _CircleFeedPageState extends State<CircleFeedPage> {
 
   @override
   void dispose() {
+    _membershipLostSub?.cancel();
     _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
     if (_feedChannel != null) {
@@ -805,126 +941,13 @@ class _CircleFeedPageState extends State<CircleFeedPage> {
     );
   }
 
-  Widget _buildFeedFilterBar(BuildContext context, FeedProvider feedProvider) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-      child: Row(
-        children: [
-          _buildFilterTabItem(
-            context: context,
-            feedProvider: feedProvider,
-            filter: FeedFilter.global,
-            title: "Global Feed",
-            icon: Icons.language_rounded,
-          ),
-          const SizedBox(width: 8),
-          _buildFilterTabItem(
-            context: context,
-            feedProvider: feedProvider,
-            filter: FeedFilter.fullNetwork,
-            title: "Full Network",
-            icon: Icons.public_rounded,
-          ),
-          const SizedBox(width: 8),
-          _buildFilterTabItem(
-            context: context,
-            feedProvider: feedProvider,
-            filter: FeedFilter.innerCircle,
-            title: "Inner Circle",
-            icon: Icons.people_alt_rounded,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildFilterTabItem({
-    required BuildContext context,
-    required FeedProvider feedProvider,
-    required FeedFilter filter,
-    required String title,
-    required IconData icon,
-  }) {
-    final isSelected = feedProvider.feedFilter == filter;
-    return Expanded(
-      child: BounceTap(
-        scaleDown: 0.96,
-        onTap: () {
-          if (!isSelected) {
-            HapticFeedback.selectionClick();
-            feedProvider.setFilter(filter);
-            AnalyticsService.logEvent(
-              name: 'feed_filter_changed',
-              parameters: {'filter': filter.name},
-            );
-          }
-        },
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          curve: Curves.easeOutCubic,
-          padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
-          decoration: BoxDecoration(
-            color: isSelected
-                ? Colors.white
-                : context.surfacePrimary.withValues(alpha: 0.6),
-            borderRadius: BorderRadius.circular(99),
-            border: Border.all(
-              color: isSelected
-                  ? Colors.white
-                  : Colors.white.withValues(alpha: 0.08),
-              width: isSelected ? 1.2 : 1.0,
-            ),
-            boxShadow: isSelected
-                ? [
-                    BoxShadow(
-                      color: Colors.white.withValues(alpha: 0.15),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
-                    ),
-                  ]
-                : null,
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                icon,
-                size: 13,
-                color:
-                    isSelected ? Colors.black : context.textSecondary,
-              ),
-              const SizedBox(width: 5),
-              Flexible(
-                child: Text(
-                  title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: isSelected
-                        ? Colors.black
-                        : context.textSecondary,
-                    fontSize: 11,
-                    fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                    fontFamily: 'Inter',
-                    letterSpacing: -0.1,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
   Widget _buildEmpty1DegreeState(BuildContext context) {
-    final feedProvider = Provider.of<FeedProvider>(context);
+    final feedProvider = Provider.of<FeedProvider>(context, listen: false);
     return SingleChildScrollView(
       physics: const AlwaysScrollableScrollPhysics(),
       child: Column(
         children: [
           const PulseRowWidget(),
-          _buildFeedFilterBar(context, feedProvider),
           Container(
             height: MediaQuery.of(context).size.height * 0.52,
             alignment: Alignment.center,
@@ -1001,13 +1024,129 @@ class _CircleFeedPageState extends State<CircleFeedPage> {
     );
   }
 
+  Widget _buildEmptyCustomNetworkState(
+      BuildContext context, CustomNetwork? network) {
+    return SingleChildScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      child: Column(
+        children: [
+          const PulseRowWidget(),
+          Container(
+            height: MediaQuery.of(context).size.height * 0.52,
+            alignment: Alignment.center,
+            padding: const EdgeInsets.symmetric(horizontal: 32),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  width: 64,
+                  height: 64,
+                  decoration: BoxDecoration(
+                    color: context.accentPrimary.withValues(alpha: 0.12),
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: context.accentPrimary.withValues(alpha: 0.3),
+                      width: 1.5,
+                    ),
+                  ),
+                  child: Icon(
+                    Icons.groups_rounded,
+                    size: 32,
+                    color: context.accentPrimary,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  "No Posts in ${network?.name ?? 'Network'} Yet",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: context.textPrimary,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  "Be the first member to share something with this network!",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: context.textSecondary,
+                    fontSize: 13.5,
+                    height: 1.4,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                ElevatedButton.icon(
+                  onPressed: () => _openComposeSheet(context),
+                  icon: const Icon(Icons.add_rounded,
+                      color: Colors.black, size: 18),
+                  label: const Text(
+                    "Share First Post",
+                    style: TextStyle(
+                      color: Colors.black,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: context.accentPrimary,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 24, vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final feedProvider = Provider.of<FeedProvider>(context);
+    final customNetProvider = Provider.of<CustomNetworkProvider>(context);
     final List<FeedPost> displayedPosts = feedProvider.displayedPosts;
+    final activeCustomNet = feedProvider.activeCustomNetwork;
+
+    // Proactive check: if user is on a custom network feed but no longer a member, redirect
+    if (activeCustomNet != null &&
+        !customNetProvider.isLoading &&
+        customNetProvider.myNetworks.isNotEmpty &&
+        !customNetProvider.myNetworks.any((n) => n.id == activeCustomNet.id)) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted &&
+            feedProvider.activeCustomNetwork?.id == activeCustomNet.id) {
+          _handleRemovedFromActiveNetwork(activeCustomNet);
+        }
+      });
+    }
 
     return Scaffold(
+      key: _scaffoldKey,
       backgroundColor: context.canvasBackground,
+      drawer: DiscordNetworkRailDrawer(
+        currentFilter: feedProvider.feedFilter,
+        onSelectFilter: (filter) {
+          feedProvider.setFilter(filter);
+          AnalyticsService.logEvent(
+            name: 'feed_filter_changed',
+            parameters: {'filter': filter.name},
+          );
+        },
+        onSelectCustomNetwork: (customNet) {
+          feedProvider.selectCustomNetwork(customNet);
+          AnalyticsService.logEvent(
+            name: 'custom_network_selected',
+            parameters: {
+              'network_id': customNet.id,
+              'network_name': customNet.name
+            },
+          );
+        },
+      ),
       appBar: PreferredSize(
         preferredSize: const Size.fromHeight(56),
         child: SafeArea(
@@ -1018,39 +1157,148 @@ class _CircleFeedPageState extends State<CircleFeedPage> {
             child: Stack(
               alignment: Alignment.center,
               children: [
-                // Left: Jana + Unseen Badge
+                // Left: Network Squircle Button + Name (Jana or Custom Network Name) + Actions
                 Positioned(
                   left: 20,
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(
-                        "Jana",
-                        style: TextStyle(
-                          color: context.textPrimary,
-                          fontSize: 22,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      if (feedProvider.unseenCount > 0) ...[
-                        const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 3),
-                          decoration: BoxDecoration(
-                            color: context.accentPrimary,
-                            borderRadius: BorderRadius.circular(99),
-                          ),
-                          child: Text(
-                            "${feedProvider.unseenCount} new",
-                            style: const TextStyle(
-                              color: Colors.black,
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
+                      Builder(
+                        builder: (context) {
+                          final isCustomActive =
+                              feedProvider.isCustomNetworkActive;
+                          final customNet =
+                              feedProvider.activeCustomNetwork;
+                          final activeNetwork =
+                              DiscordNetworkRailDrawer.getNetworkData(
+                                  feedProvider.feedFilter);
+
+                          return BounceTap(
+                            scaleDown: 0.92,
+                            onTap: () {
+                              HapticFeedback.lightImpact();
+                              _scaffoldKey.currentState?.openDrawer();
+                            },
+                            child: Container(
+                              width: 34,
+                              height: 34,
+                              decoration: BoxDecoration(
+                                color: context.surfaceSecondary,
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(
+                                  color: Colors.white.withValues(alpha: 0.1),
+                                  width: 1,
+                                ),
+                              ),
+                              child: Center(
+                                child: isCustomActive
+                                    ? Text(
+                                        customNet!.iconEmoji,
+                                        style: const TextStyle(fontSize: 16),
+                                      )
+                                    : Icon(
+                                        activeNetwork.icon,
+                                        size: 18,
+                                        color: Colors.white,
+                                      ),
+                              ),
                             ),
-                          ),
-                        ),
-                      ],
+                          );
+                        },
+                      ),
+                      const SizedBox(width: 10),
+                      Builder(
+                        builder: (context) {
+                          final isCustomActive =
+                              feedProvider.isCustomNetworkActive;
+                          final customNet =
+                              feedProvider.activeCustomNetwork;
+
+                          return Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              ConstrainedBox(
+                                constraints:
+                                    const BoxConstraints(maxWidth: 160),
+                                child: Text(
+                                  isCustomActive ? customNet!.name : "Jana",
+                                  style: TextStyle(
+                                    color: context.textPrimary,
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              if (isCustomActive && customNet != null) ...[
+                                const SizedBox(width: 8),
+                                BounceTap(
+                                  scaleDown: 0.9,
+                                  onTap: () {
+                                    HapticFeedback.lightImpact();
+                                    NetworkMembersSheet.show(
+                                        context, customNet);
+                                  },
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 8, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: customNet.color
+                                          .withValues(alpha: 0.15),
+                                      borderRadius:
+                                          BorderRadius.circular(99),
+                                      border: Border.all(
+                                        color: customNet.color
+                                            .withValues(alpha: 0.3),
+                                        width: 1,
+                                      ),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(Icons.person_add_rounded,
+                                            size: 13,
+                                            color: customNet.color),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          '${customNet.memberCount}',
+                                          style: TextStyle(
+                                            color: customNet.color,
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ],
+                              if (!isCustomActive &&
+                                  feedProvider.unseenCount > 0) ...[
+                                const SizedBox(width: 8),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 8, vertical: 3),
+                                  decoration: BoxDecoration(
+                                    color: context.accentPrimary,
+                                    borderRadius:
+                                        BorderRadius.circular(99),
+                                  ),
+                                  child: Text(
+                                    "${feedProvider.unseenCount} new",
+                                    style: const TextStyle(
+                                      color: Colors.black,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          );
+                        },
+                      ),
                     ],
                   ),
                 ),
@@ -1151,7 +1399,6 @@ class _CircleFeedPageState extends State<CircleFeedPage> {
                     child: Column(
                       children: [
                         const PulseRowWidget(),
-                        _buildFeedFilterBar(context, feedProvider),
                         Container(
                           height: MediaQuery.of(context).size.height * 0.45,
                           alignment: Alignment.center,
@@ -1175,7 +1422,6 @@ class _CircleFeedPageState extends State<CircleFeedPage> {
                             child: Column(
                               children: [
                                 const PulseRowWidget(),
-                                _buildFeedFilterBar(context, feedProvider),
                                 Container(
                                   height:
                                       MediaQuery.of(context).size.height * 0.55,
@@ -1267,7 +1513,7 @@ class _CircleFeedPageState extends State<CircleFeedPage> {
                                                   hasNoConnections)
                                               ? Icons.person_add_rounded
                                               : Icons.add_rounded,
-                                          color: Colors.white,
+                                          color: Colors.black,
                                           size: 18,
                                         ),
                                         label: Text(
@@ -1277,13 +1523,14 @@ class _CircleFeedPageState extends State<CircleFeedPage> {
                                               ? "Connect with People"
                                               : "Share First Post",
                                           style: const TextStyle(
-                                            color: Colors.white,
+                                            color: Colors.black,
                                             fontWeight: FontWeight.bold,
                                           ),
                                         ),
                                         style: ElevatedButton.styleFrom(
                                           backgroundColor:
                                               context.accentPrimary,
+                                          foregroundColor: Colors.black,
                                           padding: const EdgeInsets.symmetric(
                                               horizontal: 24, vertical: 12),
                                           shape: RoundedRectangleBorder(
@@ -1301,21 +1548,17 @@ class _CircleFeedPageState extends State<CircleFeedPage> {
                         },
                       )
                     : displayedPosts.isEmpty
-                        ? _buildEmpty1DegreeState(context)
+                        ? (feedProvider.isCustomNetworkActive
+                            ? _buildEmptyCustomNetworkState(
+                                context, activeCustomNet)
+                            : _buildEmpty1DegreeState(context))
                         : ListView.builder(
                             controller: _scrollController,
                             physics: const AlwaysScrollableScrollPhysics(),
                             itemCount: displayedPosts.length + 2,
                             itemBuilder: (context, index) {
                               if (index == 0) {
-                                return Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    const PulseRowWidget(),
-                                    _buildFeedFilterBar(context, feedProvider),
-                                  ],
-                                );
+                                return const PulseRowWidget();
                               }
 
                               if (index == displayedPosts.length + 1) {
@@ -1417,7 +1660,7 @@ class _CircleFeedPageState extends State<CircleFeedPage> {
                           Text(
                             "New post",
                             style: TextStyle(
-                              color: Colors.white,
+                              color: Colors.black,
                               fontSize: 13,
                               fontWeight: FontWeight.bold,
                             ),
@@ -1425,7 +1668,7 @@ class _CircleFeedPageState extends State<CircleFeedPage> {
                           SizedBox(width: 6),
                           Icon(
                             Icons.arrow_upward_rounded,
-                            color: Colors.white,
+                            color: Colors.black,
                             size: 16,
                           ),
                         ],
@@ -1435,6 +1678,68 @@ class _CircleFeedPageState extends State<CircleFeedPage> {
                 ),
               ),
             ),
+          // Shiny indicator pointing to active network on the feed page when sidebar is collapsed
+          Consumer<FeedProvider>(
+            builder: (context, fp, _) {
+              final isCustom = fp.isCustomNetworkActive;
+
+              final double indicatorTop;
+              if (isCustom) {
+                indicatorTop = 200.0;
+              } else {
+                switch (fp.feedFilter) {
+                  case FeedFilter.global:
+                    indicatorTop = 26.0;
+                    break;
+                  case FeedFilter.fullNetwork:
+                    indicatorTop = 84.0;
+                    break;
+                  case FeedFilter.innerCircle:
+                    indicatorTop = 142.0;
+                    break;
+                }
+              }
+
+              return AnimatedPositioned(
+                duration: const Duration(milliseconds: 240),
+                curve: Curves.easeOutCubic,
+                left: 0,
+                top: indicatorTop,
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () {
+                    HapticFeedback.lightImpact();
+                    _scaffoldKey.currentState?.openDrawer();
+                  },
+                  child: Container(
+                    color: Colors.transparent,
+                    padding: const EdgeInsets.fromLTRB(0, 6, 24, 6),
+                    child: Container(
+                      width: 7,
+                      height: 38,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: const BorderRadius.horizontal(
+                          right: Radius.circular(4),
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.white.withValues(alpha: 0.35),
+                            blurRadius: 6,
+                          ),
+                          BoxShadow(
+                            color: Colors.white.withValues(alpha: 0.15),
+                            blurRadius: 8,
+                            spreadRadius: 0.5,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
         ],
       ),
       floatingActionButton: Padding(
@@ -1634,7 +1939,15 @@ class _FeedPostThreadItemState extends State<_FeedPostThreadItem> {
           (rootPostId == widget.post.id ||
               replyToPostId == widget.post.id ||
               (_treeNode != null &&
-                  _isPostIdInTree(_treeNode!, replyToPostId)))) {
+                  (_isPostIdInTree(_treeNode!, replyToPostId) ||
+                   (rootPostId != null && _isPostIdInTree(_treeNode!, rootPostId)))))) {
+        _loadThreadPreview(forceReload: true);
+        return;
+      }
+
+      if (eventType.toLowerCase() == 'delete' &&
+          (targetPostId == widget.post.id ||
+              (_treeNode != null && _isPostIdInTree(_treeNode!, targetPostId)))) {
         _loadThreadPreview(forceReload: true);
         return;
       }
@@ -1642,33 +1955,40 @@ class _FeedPostThreadItemState extends State<_FeedPostThreadItem> {
       if (targetPostId.isNotEmpty &&
           _treeNode != null &&
           _isPostIdInTree(_treeNode!, targetPostId)) {
+        final Map<String, int> serverCounts = {};
         if (newRecord['reaction_counts'] is Map &&
             (newRecord['reaction_counts'] as Map).isNotEmpty) {
-          final Map<String, int> serverCounts = {};
           (newRecord['reaction_counts'] as Map).forEach((k, v) {
             final c = v is int ? v : (int.tryParse(v?.toString() ?? '') ?? 0);
             if (c > 0) serverCounts[k.toString()] = c;
           });
+        }
 
-          CommentNode applyCountsUpdate(CommentNode node) {
-            if (node.id == targetPostId && node.post != null) {
-              final updatedPost = node.post!.copyWith(
-                reactionCounts: serverCounts,
-              );
-              return node.copyWith(
-                post: updatedPost,
-                replies: node.replies.map(applyCountsUpdate).toList(),
-              );
-            }
+        final int? replyCount = newRecord['reply_count'] is int
+            ? newRecord['reply_count'] as int
+            : int.tryParse(newRecord['reply_count']?.toString() ?? '');
+
+        CommentNode applyCountsUpdate(CommentNode node) {
+          if (node.id == targetPostId && node.post != null) {
+            final updatedPost = node.post!.copyWith(
+              reactionCounts: serverCounts.isNotEmpty ? serverCounts : node.post!.reactionCounts,
+              replyCount: replyCount ?? node.post!.replyCount,
+              activeReplyCount: replyCount ?? node.post!.activeReplyCount,
+            );
             return node.copyWith(
+              post: updatedPost,
+              replyCount: replyCount ?? node.replyCount,
               replies: node.replies.map(applyCountsUpdate).toList(),
             );
           }
-
-          setState(() {
-            _treeNode = applyCountsUpdate(_treeNode!);
-          });
+          return node.copyWith(
+            replies: node.replies.map(applyCountsUpdate).toList(),
+          );
         }
+
+        setState(() {
+          _treeNode = applyCountsUpdate(_treeNode!);
+        });
       }
     }
   }
@@ -1695,8 +2015,10 @@ class _FeedPostThreadItemState extends State<_FeedPostThreadItem> {
         CommentNode syncNodeWithLivePost(CommentNode node,
             {bool isRoot = false}) {
           final livePost = feedProvider.getPostById(node.id) ?? node.post;
-          final int effectiveCount = isRoot
-              ? (livePost != null ? livePost.activeReplyCount : node.replyCount)
+          final int effectiveCount = livePost != null
+              ? (livePost.activeReplyCount > 0
+                  ? livePost.activeReplyCount
+                  : (livePost.replyCount > 0 ? livePost.replyCount : node.replyCount))
               : node.replyCount;
           final updatedPost = livePost?.copyWith(
             replyCount: effectiveCount,
@@ -1956,6 +2278,7 @@ class _FeedPostThreadItemState extends State<_FeedPostThreadItem> {
     final livePost = feedProvider.getPostById(widget.post.id) ?? widget.post;
     final effectivePost = livePost.copyWith(
       replyCount: livePost.activeReplyCount,
+      networkId: livePost.networkId ?? widget.post.networkId,
     );
 
     if (_treeNode != null && _treeNode!.replies.isNotEmpty) {

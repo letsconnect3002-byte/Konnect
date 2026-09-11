@@ -110,6 +110,7 @@ class _ThreadDetailPageState extends State<ThreadDetailPage> {
   bool _isSubmitting = false;
   bool _isAnonymousReply = false;
   RealtimeChannel? _threadChannel;
+  StreamSubscription? _postUpdateSub;
 
   late String _currentRootPostId;
   String? _highlightedPostId;
@@ -215,6 +216,19 @@ class _ThreadDetailPageState extends State<ThreadDetailPage> {
           },
         )
         .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'posts',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'reply_to_post_id',
+            value: _currentRootPostId,
+          ),
+          callback: (payload) {
+            if (mounted) _loadThread();
+          },
+        )
+        .onPostgresChanges(
           event: PostgresChangeEvent.insert,
           schema: 'public',
           table: 'post_reactions',
@@ -251,11 +265,63 @@ class _ThreadDetailPageState extends State<ThreadDetailPage> {
           },
         )
         .subscribe();
+
+    _postUpdateSub?.cancel();
+    final feedProvider = Provider.of<FeedProvider>(context, listen: false);
+    _postUpdateSub = feedProvider.postUpdateStream.listen((payload) {
+      if (!mounted) return;
+      final table = payload['table']?.toString();
+      final eventType = payload['eventType']?.toString().toLowerCase() ?? '';
+      final newRecord = Map<String, dynamic>.from(payload['new'] ?? {});
+      final oldRecord = Map<String, dynamic>.from(payload['old'] ?? {});
+
+      if (table == 'posts') {
+        final targetId = (newRecord['id'] ?? oldRecord['id'])?.toString() ?? '';
+        final rootId = (newRecord['root_post_id'] ?? oldRecord['root_post_id'])?.toString();
+        final replyToId = (newRecord['reply_to_post_id'] ?? oldRecord['reply_to_post_id'])?.toString();
+
+        final bool isRelated = targetId == _currentRootPostId ||
+            rootId == _currentRootPostId ||
+            replyToId == _currentRootPostId ||
+            _threadPosts.any((p) => p.id == targetId || p.id == rootId || p.id == replyToId);
+
+        if (isRelated) {
+          if (eventType == 'insert' || eventType == 'delete') {
+            _loadThread();
+          } else if (eventType == 'update') {
+            final index = _threadPosts.indexWhere((p) => p.id == targetId);
+            if (index != -1) {
+              final int? replyCount = newRecord['reply_count'] is int
+                  ? newRecord['reply_count'] as int
+                  : int.tryParse(newRecord['reply_count']?.toString() ?? '');
+              final rawCounts = newRecord['reaction_counts'];
+              final Map<String, int> updatedCounts = {};
+              if (rawCounts is Map) {
+                rawCounts.forEach((k, v) {
+                  final c = (v is num) ? v.toInt() : (int.tryParse(v?.toString() ?? '') ?? 0);
+                  if (c > 0) updatedCounts[k.toString()] = c;
+                });
+              }
+              setState(() {
+                _threadPosts[index] = _threadPosts[index].copyWith(
+                  reactionCounts: updatedCounts.isNotEmpty ? updatedCounts : _threadPosts[index].reactionCounts,
+                  replyCount: replyCount ?? _threadPosts[index].replyCount,
+                  activeReplyCount: replyCount ?? _threadPosts[index].activeReplyCount,
+                );
+              });
+            } else {
+              _loadThread();
+            }
+          }
+        }
+      }
+    });
   }
 
   @override
   void dispose() {
     _highlightTimer?.cancel();
+    _postUpdateSub?.cancel();
     if (_threadChannel != null) {
       Supabase.instance.client.removeChannel(_threadChannel!);
     }
@@ -452,8 +518,9 @@ class _ThreadDetailPageState extends State<ThreadDetailPage> {
     final profileProvider = Provider.of<ProfileProvider>(context, listen: false);
     final feedProvider = Provider.of<FeedProvider>(context, listen: false);
     final connectionProvider = Provider.of<ConnectionProvider>(context, listen: false);
-
-    final bool useAnonymous = _isAnonymousReply;
+    final bool isAnonAllowed = !(feedProvider.isCustomNetworkActive &&
+        !feedProvider.activeCustomNetwork!.allowAnonymous);
+    final bool useAnonymous = isAnonAllowed && _isAnonymousReply;
     final String authorName = useAnonymous
         ? (profileProvider.anonName.isNotEmpty
             ? profileProvider.anonName
@@ -475,6 +542,7 @@ class _ThreadDetailPageState extends State<ThreadDetailPage> {
       replyToPostId: target.id,
       visibility: target.visibility,
       isAnonymous: useAnonymous,
+      networkId: target.networkId,
     );
 
     // Optimistic UI addition
@@ -492,6 +560,7 @@ class _ThreadDetailPageState extends State<ThreadDetailPage> {
         connections: connectionProvider.connections,
         visibility: target.visibility,
         isAnonymous: useAnonymous,
+        networkId: target.networkId,
       );
       AnalyticsService.logEvent(
         name: 'thread_reply_submitted',
@@ -944,10 +1013,12 @@ class _ThreadDetailPageState extends State<ThreadDetailPage> {
                             ],
                           ),
                         ),
-                      // Prominent Reply Identity Selector Bar
-                      Consumer<ProfileProvider>(
-                        builder: (context, profileProvider, _) {
-                          final currentName = _isAnonymousReply
+                      Consumer2<ProfileProvider, FeedProvider>(
+                        builder: (context, profileProvider, feedProvider, _) {
+                          final bool isAnonAllowed = !(feedProvider.isCustomNetworkActive &&
+                              !feedProvider.activeCustomNetwork!.allowAnonymous);
+                          final effectiveAnon = isAnonAllowed && _isAnonymousReply;
+                          final currentName = effectiveAnon
                               ? (profileProvider.anonName.isNotEmpty
                                   ? profileProvider.anonName
                                   : "Anonymous")
@@ -960,13 +1031,13 @@ class _ThreadDetailPageState extends State<ThreadDetailPage> {
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 10, vertical: 6),
                             decoration: BoxDecoration(
-                              color: _isAnonymousReply
+                              color: effectiveAnon
                                   ? context.accentPrimary
                                       .withValues(alpha: 0.12)
                                   : context.surfaceSecondary,
                               borderRadius: BorderRadius.circular(10),
                               border: Border.all(
-                                color: _isAnonymousReply
+                                color: effectiveAnon
                                     ? context.accentPrimary
                                         .withValues(alpha: 0.4)
                                     : Colors.white.withValues(alpha: 0.06),
@@ -975,7 +1046,7 @@ class _ThreadDetailPageState extends State<ThreadDetailPage> {
                             ),
                             child: Row(
                               children: [
-                                _isAnonymousReply
+                                effectiveAnon
                                     ? AnonymousAvatar(
                                         seed: (profileProvider.userId ?? 0)
                                             .toString(),
@@ -1017,18 +1088,18 @@ class _ThreadDetailPageState extends State<ThreadDetailPage> {
                                         TextSpan(
                                           text: currentName,
                                           style: TextStyle(
-                                            color: _isAnonymousReply
+                                            color: effectiveAnon
                                                 ? context.accentSecondary
                                                 : context.textPrimary,
                                             fontWeight: FontWeight.bold,
                                           ),
                                         ),
                                         TextSpan(
-                                          text: _isAnonymousReply
+                                          text: effectiveAnon
                                               ? " • Anonymous"
-                                              : " • Real Profile",
+                                              : (isAnonAllowed ? " • Real Profile" : " • Real Identity Only"),
                                           style: TextStyle(
-                                            color: _isAnonymousReply
+                                            color: effectiveAnon
                                                 ? context.accentSecondary
                                                     .withValues(alpha: 0.8)
                                                 : context.textMuted,
@@ -1039,61 +1110,62 @@ class _ThreadDetailPageState extends State<ThreadDetailPage> {
                                     ),
                                   ),
                                 ),
-                                InkWell(
-                                  onTap: () {
-                                    HapticFeedback.selectionClick();
-                                    setState(() {
-                                      _isAnonymousReply = !_isAnonymousReply;
-                                    });
-                                  },
-                                  borderRadius: BorderRadius.circular(8),
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 8, vertical: 4),
-                                    decoration: BoxDecoration(
-                                      color: _isAnonymousReply
-                                          ? context.accentPrimary
-                                              .withValues(alpha: 0.25)
-                                          : Colors.white.withValues(alpha: 0.08),
-                                      borderRadius: BorderRadius.circular(8),
-                                      border: Border.all(
-                                        color: _isAnonymousReply
+                                if (isAnonAllowed)
+                                  InkWell(
+                                    onTap: () {
+                                      HapticFeedback.selectionClick();
+                                      setState(() {
+                                        _isAnonymousReply = !_isAnonymousReply;
+                                      });
+                                    },
+                                    borderRadius: BorderRadius.circular(8),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 8, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: effectiveAnon
                                             ? context.accentPrimary
-                                                .withValues(alpha: 0.4)
-                                            : Colors.white
-                                                .withValues(alpha: 0.1),
-                                        width: 0.6,
-                                      ),
-                                    ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Icon(
-                                          _isAnonymousReply
-                                              ? Icons.visibility_off_rounded
-                                              : Icons.person_rounded,
-                                          size: 13,
-                                          color: _isAnonymousReply
-                                              ? context.accentSecondary
-                                              : context.textPrimary,
+                                                .withValues(alpha: 0.25)
+                                            : Colors.white.withValues(alpha: 0.08),
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(
+                                          color: effectiveAnon
+                                              ? context.accentPrimary
+                                                  .withValues(alpha: 0.4)
+                                              : Colors.white
+                                                  .withValues(alpha: 0.1),
+                                          width: 0.6,
                                         ),
-                                        const SizedBox(width: 4),
-                                        Text(
-                                          _isAnonymousReply
-                                              ? "Go Real Profile"
-                                              : "Go Anonymous",
-                                          style: TextStyle(
-                                            color: _isAnonymousReply
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(
+                                            effectiveAnon
+                                                ? Icons.visibility_off_rounded
+                                                : Icons.person_rounded,
+                                            size: 13,
+                                            color: effectiveAnon
                                                 ? context.accentSecondary
                                                 : context.textPrimary,
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.w600,
                                           ),
-                                        ),
-                                      ],
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            effectiveAnon
+                                                ? "Go Real Profile"
+                                                : "Go Anonymous",
+                                            style: TextStyle(
+                                              color: effectiveAnon
+                                                  ? context.accentSecondary
+                                                  : context.textPrimary,
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
                                     ),
                                   ),
-                                ),
                               ],
                             ),
                           );

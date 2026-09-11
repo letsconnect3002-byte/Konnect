@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:connect/Models/feed_post.dart';
+import 'package:connect/Models/custom_network.dart';
 import 'package:connect/Models/app_error.dart';
 import 'package:connect/Repositories/feed_repository.dart';
 import 'package:connect/Repositories/notification_repository.dart';
@@ -25,6 +26,23 @@ class FeedProvider with ChangeNotifier {
   FeedFilter get feedFilter => _feedFilter;
   String get currentScope => _feedFilter == FeedFilter.global ? 'global' : 'network';
 
+  CustomNetwork? _activeCustomNetwork;
+  CustomNetwork? get activeCustomNetwork => _activeCustomNetwork;
+  bool get isCustomNetworkActive => _activeCustomNetwork != null;
+
+  void selectCustomNetwork(CustomNetwork? network) {
+    if (_activeCustomNetwork?.id == network?.id) return;
+    _activeCustomNetwork = network;
+    _posts = [];
+    _currentBucket = network != null ? 'all' : 'unseen';
+    _hasReachedEnd = false;
+    _hasShownCaughtUpDivider = false;
+    _hasNewPosts = false;
+    ensureRealtimeSubscribed();
+    notifyListeners();
+    fetchInitialFeed();
+  }
+
   bool _hasUserExplicitlySelectedFilter = false;
   bool get hasUserExplicitlySelectedFilter => _hasUserExplicitlySelectedFilter;
 
@@ -35,10 +53,21 @@ class FeedProvider with ChangeNotifier {
   Timer? _initialLoadFallbackTimer;
 
   List<FeedPost> get displayedPosts {
-    if (_feedFilter == FeedFilter.innerCircle) {
-      return _posts.where((p) => p.degree == 1 || p.degree == 0).toList();
+    if (_activeCustomNetwork != null) {
+      return _posts
+          .where((p) => p.networkId == _activeCustomNetwork!.id)
+          .toList();
     }
-    return _posts;
+    if (_feedFilter == FeedFilter.innerCircle) {
+      return _posts
+          .where((p) =>
+              (p.degree == 1 || p.degree == 0) &&
+              (p.networkId == null || p.networkId!.isEmpty))
+          .toList();
+    }
+    return _posts
+        .where((p) => p.networkId == null || p.networkId!.isEmpty)
+        .toList();
   }
 
   List<FeedPost>? _savedNetworkPosts;
@@ -56,6 +85,17 @@ class FeedProvider with ChangeNotifier {
   Future<void> setFilter(FeedFilter filter, {bool isManual = true}) async {
     if (isManual) {
       _hasUserExplicitlySelectedFilter = true;
+    }
+    if (_activeCustomNetwork != null) {
+      _activeCustomNetwork = null;
+      _posts = [];
+      _currentBucket = 'unseen';
+      _hasReachedEnd = false;
+      _hasShownCaughtUpDivider = false;
+      _feedFilter = filter;
+      notifyListeners();
+      fetchInitialFeed();
+      return;
     }
     if (_feedFilter == filter) return;
 
@@ -158,12 +198,16 @@ class FeedProvider with ChangeNotifier {
   }
 
   void registerPost(FeedPost post) {
-    _postRegistry[post.id] = post;
+    final existing = _postRegistry[post.id];
+    final String? netId = post.networkId ?? existing?.networkId ?? _activeCustomNetwork?.id;
+    _postRegistry[post.id] = (netId != null && post.networkId != netId)
+        ? post.copyWith(networkId: netId)
+        : post;
   }
 
   void registerPosts(Iterable<FeedPost> posts) {
     for (final post in posts) {
-      _postRegistry[post.id] = post;
+      registerPost(post);
     }
   }
 
@@ -375,6 +419,21 @@ class FeedProvider with ChangeNotifier {
     }
 
     try {
+      if (_activeCustomNetwork != null) {
+        final fetched = await _repository.getCustomNetworkFeed(
+          networkId: _activeCustomNetwork!.id,
+          viewerId: vId,
+          limit: 20,
+        );
+        _posts = fetched;
+        _hasReachedEnd = fetched.length < 20;
+        _currentBucket = 'all';
+        _hasShownCaughtUpDivider = false;
+        _isLoading = false;
+        notifyListeners();
+        return;
+      }
+
       final fetched = await _repository.getFeed(
         viewerId: vId,
         bucket: 'unseen',
@@ -490,6 +549,24 @@ class FeedProvider with ChangeNotifier {
         cursorPostId = lastPost.id;
       }
 
+      if (_activeCustomNetwork != null) {
+        final fetched = await _repository.getCustomNetworkFeed(
+          networkId: _activeCustomNetwork!.id,
+          viewerId: vId,
+          cursorCreatedAt: cursorCreatedAt,
+          cursorPostId: cursorPostId,
+          limit: 20,
+        );
+        _posts.addAll(fetched);
+        registerPosts(fetched);
+        if (fetched.length < 20) {
+          _hasReachedEnd = true;
+        }
+        _isLoadingMore = false;
+        notifyListeners();
+        return;
+      }
+
       if (_currentBucket == 'unseen') {
         final fetched = await _repository.getFeed(
           viewerId: vId,
@@ -555,11 +632,36 @@ class FeedProvider with ChangeNotifier {
     List<Map<String, dynamic>>? connections,
     String visibility = 'both',
     bool isAnonymous = false,
+    String? networkId,
   }) async {
     final vId = _viewerId;
     if (vId == null || content.trim().isEmpty) {
       throw Exception("User not authenticated or content empty");
     }
+
+    final effectiveNetworkId = networkId ?? _activeCustomNetwork?.id;
+    if (effectiveNetworkId != null) {
+      try {
+        final membership = await Supabase.instance.client
+            .from('custom_network_members')
+            .select('id')
+            .eq('network_id', effectiveNetworkId)
+            .eq('user_id', vId)
+            .maybeSingle();
+
+        if (membership == null) {
+          throw Exception("You are no longer a member of this network");
+        }
+      } catch (e) {
+        if (e.toString().contains("no longer a member")) {
+          rethrow;
+        }
+      }
+    }
+
+    final bool effectiveAnonymous = (_activeCustomNetwork != null && !_activeCustomNetwork!.allowAnonymous)
+        ? false
+        : isAnonymous;
 
     final String tempId = 'temp_${DateTime.now().millisecondsSinceEpoch}';
     final tempPost = FeedPost(
@@ -573,10 +675,15 @@ class FeedProvider with ChangeNotifier {
       degree: 0,
       replyToPostId: replyToPostId,
       visibility: visibility,
-      isAnonymous: isAnonymous,
+      isAnonymous: effectiveAnonymous,
+      networkId: effectiveNetworkId,
     );
 
-    if (replyToPostId == null) {
+    final bool matchesCurrentView = (_activeCustomNetwork != null)
+        ? (effectiveNetworkId == _activeCustomNetwork!.id)
+        : (effectiveNetworkId == null || effectiveNetworkId.isEmpty);
+
+    if (replyToPostId == null && matchesCurrentView) {
       _posts.insert(0, tempPost);
       notifyListeners();
     }
@@ -587,14 +694,23 @@ class FeedProvider with ChangeNotifier {
         content: content.trim(),
         replyToPostId: replyToPostId,
         visibility: visibility,
-        isAnonymous: isAnonymous,
+        isAnonymous: effectiveAnonymous,
+        networkId: effectiveNetworkId,
       );
 
       if (replyToPostId == null) {
         final index = _posts.indexWhere((p) => p.id == tempId);
         if (index != -1) {
-          _posts[index] = realPost;
+          if (matchesCurrentView) {
+            _posts[index] = realPost;
+          } else {
+            _posts.removeAt(index);
+          }
           // Update snapshot so we don't flag our own post as "new"
+          _latestKnownPostId = realPost.id;
+          notifyListeners();
+        } else if (matchesCurrentView && !_posts.any((p) => p.id == realPost.id)) {
+          _posts.insert(0, realPost);
           _latestKnownPostId = realPost.id;
           notifyListeners();
         }
@@ -723,6 +839,38 @@ class FeedProvider with ChangeNotifier {
         }
       }
 
+      String? networkName = (_activeCustomNetwork?.id == createdPost.networkId)
+          ? _activeCustomNetwork?.name
+          : null;
+      if (createdPost.networkId != null && networkName == null) {
+        try {
+          final netRes = await Supabase.instance.client
+              .from('custom_networks')
+              .select('name')
+              .eq('id', createdPost.networkId!)
+              .maybeSingle();
+          networkName = netRes?['name']?.toString();
+        } catch (_) {}
+      }
+
+      if (createdPost.networkId != null && createdPost.networkId!.isNotEmpty) {
+        try {
+          final membersRes = await Supabase.instance.client
+              .from('custom_network_members')
+              .select('user_id')
+              .eq('network_id', createdPost.networkId!);
+          final validMemberIds = (membersRes as List)
+              .map((r) => r['user_id'] is int
+                  ? r['user_id'] as int
+                  : int.tryParse(r['user_id']?.toString() ?? ''))
+              .whereType<int>()
+              .toSet();
+          mentionedUserIds.removeWhere((id) => !validMemberIds.contains(id));
+        } catch (e) {
+          debugPrint("[FeedProvider] Error checking custom network member mentions: $e");
+        }
+      }
+
       // 3. Send Reply / Mention notifications
       if (parentAuthorId != null && parentAuthorId != authorId) {
         final isMentioned = mentionedUserIds.contains(parentAuthorId);
@@ -737,6 +885,8 @@ class FeedProvider with ChangeNotifier {
           isAnonymous: createdPost.isAnonymous,
           actorName: createdPost.authorName,
           replySnippet: createdPost.content,
+          networkId: createdPost.networkId,
+          networkName: networkName,
         );
 
         mentionedUserIds.remove(parentAuthorId);
@@ -752,37 +902,75 @@ class FeedProvider with ChangeNotifier {
           isAnonymous: createdPost.isAnonymous,
           actorName: createdPost.authorName,
           replySnippet: createdPost.content,
+          networkId: createdPost.networkId,
+          networkName: networkName,
         );
       }
 
-      // 4. Send New Post notification to connected users who have matching visibility reach
+      // 4. Send New Post notification
       if (replyToPostId == null) {
         final Set<int> notifiedUserIds = {authorId, ...mentionedUserIds};
         if (parentAuthorId != null) notifiedUserIds.add(parentAuthorId);
-        final postVis = createdPost.visibility;
 
-        for (final conn in targetConnections) {
-          final cId = conn['id'] is int
-              ? conn['id'] as int
-              : int.tryParse(conn['id']?.toString() ?? '');
+        if (createdPost.networkId != null && createdPost.networkId!.isNotEmpty) {
+          // Custom Network: Send push and in-app notifications ONLY to members of this network
+          try {
+            final membersRes = await Supabase.instance.client
+                .from('custom_network_members')
+                .select('user_id')
+                .eq('network_id', createdPost.networkId!);
 
-          if (cId != null && !notifiedUserIds.contains(cId)) {
-            final cardType = (conn['my_shared_card'] ?? conn['shared_card'] ?? 'both').toString();
-            final bool isReachable = postVis == 'both' ||
-                cardType == 'both' ||
-                cardType == postVis;
+            final List<dynamic> memberList = membersRes as List;
+            for (final row in memberList) {
+              final mId = row['user_id'] is int
+                  ? row['user_id'] as int
+                  : int.tryParse(row['user_id']?.toString() ?? '');
 
-            if (isReachable) {
-              notifiedUserIds.add(cId);
-              await notifRepo.sendFeedNotification(
-                recipientUserId: cId,
-                actorUserId: authorId,
-                type: 'feed_post',
-                postId: createdPost.id,
-                rootPostId: createdPost.id,
-                isAnonymous: createdPost.isAnonymous,
-                actorName: createdPost.authorName,
-              );
+              if (mId != null && !notifiedUserIds.contains(mId)) {
+                notifiedUserIds.add(mId);
+                await notifRepo.sendFeedNotification(
+                  recipientUserId: mId,
+                  actorUserId: authorId,
+                  type: 'feed_post',
+                  postId: createdPost.id,
+                  rootPostId: createdPost.id,
+                  isAnonymous: createdPost.isAnonymous,
+                  actorName: createdPost.authorName,
+                  networkId: createdPost.networkId,
+                  networkName: networkName,
+                );
+              }
+            }
+          } catch (e) {
+            debugPrint("[FeedProvider] Error notifying custom network members: $e");
+          }
+        } else {
+          // Built-in Networks: Send New Post notification to connected users who have matching visibility reach
+          final postVis = createdPost.visibility;
+
+          for (final conn in targetConnections) {
+            final cId = conn['id'] is int
+                ? conn['id'] as int
+                : int.tryParse(conn['id']?.toString() ?? '');
+
+            if (cId != null && !notifiedUserIds.contains(cId)) {
+              final cardType = (conn['my_shared_card'] ?? conn['shared_card'] ?? 'both').toString();
+              final bool isReachable = postVis == 'both' ||
+                  cardType == 'both' ||
+                  cardType == postVis;
+
+              if (isReachable) {
+                notifiedUserIds.add(cId);
+                await notifRepo.sendFeedNotification(
+                  recipientUserId: cId,
+                  actorUserId: authorId,
+                  type: 'feed_post',
+                  postId: createdPost.id,
+                  rootPostId: createdPost.id,
+                  isAnonymous: createdPost.isAnonymous,
+                  actorName: createdPost.authorName,
+                );
+              }
             }
           }
         }
@@ -864,8 +1052,11 @@ class FeedProvider with ChangeNotifier {
     _pendingReactionPostIds.add(postId);
 
     final index = _posts.indexWhere((p) => p.id == postId);
-    FeedPost? oldPost = _postRegistry[postId] ?? (index != -1 ? _posts[index] : null);
+    FeedPost? oldPost = (index != -1 ? _posts[index] : null) ?? _postRegistry[postId];
     if (oldPost != null) {
+      final String? effectiveNetworkId = oldPost.networkId ??
+          (index != -1 ? _posts[index].networkId : null) ??
+          _activeCustomNetwork?.id;
       final String? oldUserReaction = oldPost.userReaction;
       final Map<String, int> newCounts = Map<String, int>.from(oldPost.reactionCounts);
 
@@ -899,6 +1090,7 @@ class FeedProvider with ChangeNotifier {
         userReaction: newUserReaction,
         nullifyUserReaction: newUserReaction == null,
         reactionCounts: newCounts,
+        networkId: effectiveNetworkId,
       );
       _postRegistry[postId] = optimisticPost;
       if (index != -1) {
@@ -923,12 +1115,16 @@ class FeedProvider with ChangeNotifier {
         });
       }
 
-      final existing = _postRegistry[postId] ?? (index != -1 ? _posts[index] : null);
+      final existing = (index != -1 ? _posts[index] : null) ?? _postRegistry[postId];
       if (existing != null) {
+        final String? effectiveNetworkId = existing.networkId ??
+            (index != -1 ? _posts[index].networkId : null) ??
+            _activeCustomNetwork?.id;
         final serverUpdated = existing.copyWith(
           userReaction: serverUserReaction,
           nullifyUserReaction: serverUserReaction == null,
           reactionCounts: serverCounts,
+          networkId: effectiveNetworkId,
         );
         _postRegistry[postId] = serverUpdated;
         if (index != -1) {
@@ -1094,6 +1290,11 @@ class FeedProvider with ChangeNotifier {
       return;
     }
 
+    if (table == 'posts' && eventType.toLowerCase() == 'delete') {
+      _handlePostRealtimeDelete(payload);
+      return;
+    }
+
     // For other tables requiring viewerId:
     if (vId == null) {
       debugPrint(
@@ -1126,14 +1327,28 @@ class FeedProvider with ChangeNotifier {
           ? newRecord['author_id'] as int
           : int.tryParse(newRecord['author_id']?.toString() ?? '');
       final String? replyToPostId = newRecord['reply_to_post_id']?.toString();
+      final String? postNetworkId = newRecord['network_id']?.toString();
 
-      // A top-level post from someone else → verify reachability before flagging new posts
+      // A top-level post from someone else → verify network match before flagging new posts
       if (replyToPostId == null && authorId != null && authorId != vId) {
-        _checkForNewPosts();
-        fetchUnseenCount();
+        if (_activeCustomNetwork != null) {
+          if (postNetworkId == _activeCustomNetwork!.id) {
+            if (_posts.isEmpty) {
+              fetchInitialFeed();
+            } else {
+              _hasNewPosts = true;
+              notifyListeners();
+            }
+          }
+        } else {
+          if (postNetworkId == null || postNetworkId.isEmpty) {
+            _checkForNewPosts();
+            fetchUnseenCount();
+          }
+        }
       }
 
-      // A reply to a post in our feed → update reply count inline
+      // A reply to a post in our feed → update reply count inline for root post AND parent comment
       if (replyToPostId != null) {
         final String rootPostId = newRecord['root_post_id']?.toString() ?? '';
         final rootIndex = _posts.indexWhere((p) => p.id == rootPostId);
@@ -1142,8 +1357,27 @@ class FeedProvider with ChangeNotifier {
             replyCount: _posts[rootIndex].replyCount + 1,
             activeReplyCount: _posts[rootIndex].activeReplyCount + 1,
           );
-          notifyListeners();
         }
+
+        // Update root post in registry
+        if (_postRegistry.containsKey(rootPostId)) {
+          final old = _postRegistry[rootPostId]!;
+          _postRegistry[rootPostId] = old.copyWith(
+            replyCount: old.replyCount + 1,
+            activeReplyCount: old.activeReplyCount + 1,
+          );
+        }
+
+        // Update direct parent reply in registry
+        if (replyToPostId != rootPostId && _postRegistry.containsKey(replyToPostId)) {
+          final old = _postRegistry[replyToPostId]!;
+          _postRegistry[replyToPostId] = old.copyWith(
+            replyCount: old.replyCount + 1,
+            activeReplyCount: old.activeReplyCount + 1,
+          );
+        }
+
+        notifyListeners();
       }
     }
   }
@@ -1163,6 +1397,55 @@ class FeedProvider with ChangeNotifier {
 
   void handlePostRealtimePayload(Map<String, dynamic> newRecord) {
     _handlePostRealtimeUpdate({'new': newRecord});
+  }
+
+  void handlePostRealtimeDeletePayload(Map<String, dynamic> oldRecord) {
+    _handlePostRealtimeDelete({'old': oldRecord});
+  }
+
+  void _handlePostRealtimeDelete(Map<String, dynamic> payload) {
+    final oldRecord = Map<String, dynamic>.from(payload['old'] ?? {});
+    final newRecord = Map<String, dynamic>.from(payload['new'] ?? {});
+    final postId = (oldRecord['id'] ?? newRecord['id'])?.toString() ?? '';
+    if (postId.isEmpty) return;
+
+    _postRegistry.remove(postId);
+    final index = _posts.indexWhere((p) => p.id == postId);
+    if (index != -1) {
+      _posts.removeAt(index);
+      notifyListeners();
+    } else {
+      final String? rootPostId = (oldRecord['root_post_id'] ?? newRecord['root_post_id'])?.toString();
+      final String? replyToPostId = (oldRecord['reply_to_post_id'] ?? newRecord['reply_to_post_id'])?.toString();
+
+      if (rootPostId != null && rootPostId != postId) {
+        final rootIndex = _posts.indexWhere((p) => p.id == rootPostId);
+        if (rootIndex != -1) {
+          final currentActive = _posts[rootIndex].activeReplyCount;
+          _posts[rootIndex] = _posts[rootIndex].copyWith(
+            replyCount: _posts[rootIndex].replyCount > 0 ? _posts[rootIndex].replyCount - 1 : 0,
+            activeReplyCount: currentActive > 0 ? currentActive - 1 : 0,
+          );
+        }
+        if (_postRegistry.containsKey(rootPostId)) {
+          final old = _postRegistry[rootPostId]!;
+          _postRegistry[rootPostId] = old.copyWith(
+            replyCount: old.replyCount > 0 ? old.replyCount - 1 : 0,
+            activeReplyCount: old.activeReplyCount > 0 ? old.activeReplyCount - 1 : 0,
+          );
+        }
+      }
+
+      if (replyToPostId != null && replyToPostId != rootPostId && _postRegistry.containsKey(replyToPostId)) {
+        final old = _postRegistry[replyToPostId]!;
+        _postRegistry[replyToPostId] = old.copyWith(
+          replyCount: old.replyCount > 0 ? old.replyCount - 1 : 0,
+          activeReplyCount: old.activeReplyCount > 0 ? old.activeReplyCount - 1 : 0,
+        );
+      }
+
+      notifyListeners();
+    }
   }
 
   void _handlePostRealtimeUpdate(Map<String, dynamic> payload) {
@@ -1187,8 +1470,9 @@ class FeedProvider with ChangeNotifier {
         _posts.removeAt(index);
         notifyListeners();
       } else {
-        // A reply was soft-deleted → decrement root post's activeReplyCount
+        // A reply was soft-deleted → decrement root post's and parent reply's activeReplyCount
         final String? rootPostId = newRecord['root_post_id']?.toString();
+        final String? replyToPostId = newRecord['reply_to_post_id']?.toString();
         if (rootPostId != null && rootPostId != postId) {
           final rootIndex = _posts.indexWhere((p) => p.id == rootPostId);
           if (rootIndex != -1) {
@@ -1196,9 +1480,21 @@ class FeedProvider with ChangeNotifier {
             _posts[rootIndex] = _posts[rootIndex].copyWith(
               activeReplyCount: currentActive > 0 ? currentActive - 1 : 0,
             );
-            notifyListeners();
+          }
+          if (_postRegistry.containsKey(rootPostId)) {
+            final old = _postRegistry[rootPostId]!;
+            _postRegistry[rootPostId] = old.copyWith(
+              activeReplyCount: old.activeReplyCount > 0 ? old.activeReplyCount - 1 : 0,
+            );
           }
         }
+        if (replyToPostId != null && replyToPostId != rootPostId && _postRegistry.containsKey(replyToPostId)) {
+          final old = _postRegistry[replyToPostId]!;
+          _postRegistry[replyToPostId] = old.copyWith(
+            activeReplyCount: old.activeReplyCount > 0 ? old.activeReplyCount - 1 : 0,
+          );
+        }
+        notifyListeners();
       }
       return;
     }
@@ -1217,27 +1513,38 @@ class FeedProvider with ChangeNotifier {
         : int.tryParse(newRecord['reply_count']?.toString() ?? '');
 
     bool changed = false;
+    final index = _posts.indexWhere((p) => p.id == postId);
 
     // 1. Update in-memory registry (handles root posts and nested replies)
     if (_postRegistry.containsKey(postId)) {
       final old = _postRegistry[postId]!;
+      final String? postNetworkId = old.networkId ??
+          (index != -1 ? _posts[index].networkId : null) ??
+          newRecord['network_id']?.toString() ??
+          _activeCustomNetwork?.id;
       _postRegistry[postId] = old.copyWith(
-        reactionCounts: updatedCounts,
+        reactionCounts: updatedCounts.isNotEmpty ? updatedCounts : old.reactionCounts,
         replyCount: replyCount ?? old.replyCount,
+        activeReplyCount: replyCount ?? old.activeReplyCount,
+        networkId: postNetworkId,
       );
       changed = true;
-      debugPrint('[REALTIME_SIGNAL: PROVIDER] Updated _postRegistry[$postId] with reactionCounts: $updatedCounts');
+      debugPrint('[REALTIME_SIGNAL: PROVIDER] Updated _postRegistry[$postId] with reactionCounts: $updatedCounts, replyCount: $replyCount');
     }
 
     // 2. Update _posts list
-    final index = _posts.indexWhere((p) => p.id == postId);
     if (index != -1) {
+      final String? postNetworkId = _posts[index].networkId ??
+          newRecord['network_id']?.toString() ??
+          _activeCustomNetwork?.id;
       _posts[index] = _posts[index].copyWith(
-        reactionCounts: updatedCounts,
+        reactionCounts: updatedCounts.isNotEmpty ? updatedCounts : _posts[index].reactionCounts,
         replyCount: replyCount ?? _posts[index].replyCount,
+        activeReplyCount: replyCount ?? _posts[index].activeReplyCount,
+        networkId: postNetworkId,
       );
       changed = true;
-      debugPrint('[REALTIME_SIGNAL: PROVIDER] Updated _posts[$index] for post $postId with reactionCounts: $updatedCounts');
+      debugPrint('[REALTIME_SIGNAL: PROVIDER] Updated _posts[$index] for post $postId with reactionCounts: $updatedCounts, replyCount: $replyCount');
     }
 
     if (changed) {
@@ -1280,7 +1587,8 @@ class FeedProvider with ChangeNotifier {
     }
 
     // 1. Update Registry (handles root posts + nested replies)
-    final existingPost = _postRegistry[postId] ?? _posts.where((p) => p.id == postId).firstOrNull;
+    final postIndex = _posts.indexWhere((p) => p.id == postId);
+    final existingPost = (postIndex != -1 ? _posts[postIndex] : null) ?? _postRegistry[postId];
     if (existingPost != null) {
       final updatedPost = applyReactionDelta(
         existingPost,
@@ -1289,12 +1597,16 @@ class FeedProvider with ChangeNotifier {
         oldRecord: oldRecord,
         viewerId: viewerId,
       );
-      _postRegistry[postId] = updatedPost;
+      final String? effectiveNetworkId = updatedPost.networkId ??
+          existingPost.networkId ??
+          (postIndex != -1 ? _posts[postIndex].networkId : null) ??
+          _activeCustomNetwork?.id;
+      final safePost = updatedPost.copyWith(networkId: effectiveNetworkId);
+      _postRegistry[postId] = safePost;
 
       // 2. Update _posts list if it's a top-level post
-      final postIndex = _posts.indexWhere((p) => p.id == postId);
       if (postIndex != -1) {
-        _posts[postIndex] = updatedPost;
+        _posts[postIndex] = safePost;
       }
 
       notifyListeners();
@@ -1385,6 +1697,23 @@ class FeedProvider with ChangeNotifier {
     if (vId == null || _hasNewPosts || _isLoading) return;
 
     try {
+      if (_activeCustomNetwork != null) {
+        final topPosts = await _repository.getCustomNetworkFeed(
+          networkId: _activeCustomNetwork!.id,
+          viewerId: vId,
+          limit: 1,
+        );
+        if (topPosts.isNotEmpty) {
+          final newestId = topPosts.first.id;
+          if (_posts.isNotEmpty && _posts.first.id != newestId && !_posts.any((p) => p.id == newestId)) {
+            _hasNewPosts = true;
+            notifyListeners();
+            debugPrint("[FeedProvider] Poll detected new post in custom network: $newestId");
+          }
+        }
+        return;
+      }
+
       // Lightweight check: fetch just 1 post from the unseen bucket
       final topPosts = await _repository.getFeed(
         viewerId: vId,

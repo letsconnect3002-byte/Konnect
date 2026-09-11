@@ -280,15 +280,15 @@ class _ViewPulseSheetState extends State<ViewPulseSheet> {
                           child: ElevatedButton(
                             onPressed: () => _handleAction(context, widget.pulse.tag!.actionType!),
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: context.accentSecondary,
-                              foregroundColor: Colors.white,
+                              backgroundColor: Colors.white,
+                              foregroundColor: Colors.black,
                               elevation: 0,
                               padding: const EdgeInsets.symmetric(vertical: 13),
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                             ),
                             child: Text(
                               _getActionText(widget.pulse.tag!.actionType!),
-                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14.5),
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14.5, color: Colors.black),
                             ),
                           ),
                         ),

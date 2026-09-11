@@ -29,6 +29,15 @@ abstract class FeedRepository {
     String? replyToPostId,
     String visibility = 'both',
     bool isAnonymous = false,
+    String? networkId,
+  });
+
+  Future<List<FeedPost>> getCustomNetworkFeed({
+    required String networkId,
+    required int viewerId,
+    DateTime? cursorCreatedAt,
+    String? cursorPostId,
+    int limit = 20,
   });
 
   Future<void> deletePost({
@@ -161,6 +170,7 @@ class SupabaseFeedRepository implements FeedRepository {
                 degree: (viewerId != null && authorId == viewerId) ? 0 : -1,
                 isDeleted: row['is_deleted'] == true,
                 replyToPostId: row['reply_to_post_id']?.toString(),
+                networkId: row['network_id']?.toString(),
               ));
             }
           }
@@ -243,6 +253,7 @@ class SupabaseFeedRepository implements FeedRepository {
     String? replyToPostId,
     String visibility = 'both',
     bool isAnonymous = false,
+    String? networkId,
   }) async {
     String effectiveVisibility = visibility;
     final Map<String, dynamic> insertData = {
@@ -250,12 +261,15 @@ class SupabaseFeedRepository implements FeedRepository {
       'content': content,
       'is_anonymous': isAnonymous,
     };
+    if (networkId != null && networkId.isNotEmpty) {
+      insertData['network_id'] = networkId;
+    }
     if (replyToPostId != null && replyToPostId.isNotEmpty) {
       insertData['reply_to_post_id'] = replyToPostId;
       try {
         final parentRes = await _client
             .from('posts')
-            .select('root_post_id, visibility')
+            .select('root_post_id, visibility, network_id')
             .eq('id', replyToPostId)
             .maybeSingle();
         final String? parentRootId = parentRes?['root_post_id']?.toString();
@@ -264,6 +278,9 @@ class SupabaseFeedRepository implements FeedRepository {
             : replyToPostId;
         if (parentRes?['visibility'] != null) {
           effectiveVisibility = parentRes!['visibility'].toString();
+        }
+        if (parentRes?['network_id'] != null && insertData['network_id'] == null) {
+          insertData['network_id'] = parentRes!['network_id'].toString();
         }
       } catch (_) {
         insertData['root_post_id'] = replyToPostId;
@@ -303,7 +320,78 @@ class SupabaseFeedRepository implements FeedRepository {
       replyToPostId: row['reply_to_post_id']?.toString(),
       visibility: row['visibility']?.toString() ?? effectiveVisibility,
       isAnonymous: anon,
+      networkId: row['network_id']?.toString() ?? networkId,
     );
+  }
+
+  @override
+  Future<List<FeedPost>> getCustomNetworkFeed({
+    required String networkId,
+    required int viewerId,
+    DateTime? cursorCreatedAt,
+    String? cursorPostId,
+    int limit = 20,
+  }) async {
+    try {
+      var query = _client
+          .from('posts')
+          .select('*, profiles:author_id(name, avatar_url, anon_name)')
+          .eq('network_id', networkId)
+          .isFilter('reply_to_post_id', null)
+          .eq('is_deleted', false);
+
+      if (cursorCreatedAt != null) {
+        query = query.lt('created_at', cursorCreatedAt.toUtc().toIso8601String());
+      }
+
+      final response = await query.order('created_at', ascending: false).limit(limit);
+      final List list = response as List;
+
+      final List<FeedPost> posts = [];
+      for (final item in list) {
+        final row = Map<String, dynamic>.from(item);
+        final profile = row['profiles'] as Map<String, dynamic>?;
+        final bool anon = row['is_anonymous'] == true;
+        final String authorName = anon
+            ? (profile?['anon_name']?.toString() ?? 'Anonymous')
+            : (profile?['name']?.toString() ?? 'User');
+        final String authorAvatarUrl = anon ? '' : (profile?['avatar_url']?.toString() ?? '');
+
+        // Fetch user reaction if exists
+        final userReactionRes = await _client
+            .from('post_reactions')
+            .select('reaction_type')
+            .eq('post_id', row['id'])
+            .eq('user_id', viewerId)
+            .maybeSingle();
+
+        posts.add(FeedPost(
+          id: row['id'].toString(),
+          authorId: int.tryParse(row['author_id']?.toString() ?? '0') ?? 0,
+          authorName: authorName,
+          authorAvatarUrl: authorAvatarUrl,
+          content: row['content']?.toString() ?? '',
+          createdAt: row['created_at'] != null
+              ? DateTime.parse(row['created_at'].toString()).toLocal()
+              : DateTime.now(),
+          replyCount: int.tryParse(row['reply_count']?.toString() ?? '0') ?? 0,
+          degree: row['author_id'] == viewerId ? 0 : 1,
+          isDeleted: row['is_deleted'] == true,
+          replyToPostId: row['reply_to_post_id']?.toString(),
+          userReaction: userReactionRes?['reaction_type']?.toString(),
+          reactionCounts: Map<String, int>.from(
+            (row['reaction_counts'] as Map?)?.map((k, v) => MapEntry(k.toString(), int.tryParse(v.toString()) ?? 0)) ?? {},
+          ),
+          visibility: row['visibility']?.toString() ?? 'both',
+          isAnonymous: anon,
+          networkId: row['network_id']?.toString() ?? networkId,
+        ));
+      }
+      return posts;
+    } catch (e) {
+      debugPrint('[FeedRepository] Error fetching custom network feed: $e');
+      return [];
+    }
   }
 
   @override

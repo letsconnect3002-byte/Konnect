@@ -36,6 +36,8 @@ abstract class NotificationRepository {
     String? replySnippet,
     bool isAnonymous = false,
     String? actorName,
+    String? networkId,
+    String? networkName,
   });
   Future<void> sendBatchFeedNotifications({
     required List<int> recipientUserIds,
@@ -47,6 +49,8 @@ abstract class NotificationRepository {
     String? replySnippet,
     bool isAnonymous = false,
     String? actorName,
+    String? networkId,
+    String? networkName,
   });
   Future<Set<int>> getRecentNotifiedUserIdsForThread({
     required String rootPostId,
@@ -270,6 +274,8 @@ class SupabaseNotificationRepository implements NotificationRepository {
     String? replySnippet,
     bool isAnonymous = false,
     String? actorName,
+    String? networkId,
+    String? networkName,
   }) async {
     if (recipientUserId == actorUserId) return;
 
@@ -278,6 +284,12 @@ class SupabaseNotificationRepository implements NotificationRepository {
       'post_id': postId,
       'root_post_id': rootPostId,
     };
+    if (networkId != null && networkId.isNotEmpty) {
+      noteMap['network_id'] = networkId;
+    }
+    if (networkName != null && networkName.isNotEmpty) {
+      noteMap['network_name'] = networkName;
+    }
     if (isAnonymous) {
       noteMap['is_anonymous'] = true;
       if (actorName != null && actorName.isNotEmpty) {
@@ -313,6 +325,8 @@ class SupabaseNotificationRepository implements NotificationRepository {
     String? replySnippet,
     bool isAnonymous = false,
     String? actorName,
+    String? networkId,
+    String? networkName,
   }) async {
     if (recipientUserIds.isEmpty) return;
 
@@ -321,6 +335,12 @@ class SupabaseNotificationRepository implements NotificationRepository {
       'post_id': postId,
       'root_post_id': rootPostId,
     };
+    if (networkId != null && networkId.isNotEmpty) {
+      noteMap['network_id'] = networkId;
+    }
+    if (networkName != null && networkName.isNotEmpty) {
+      noteMap['network_name'] = networkName;
+    }
     if (isAnonymous) {
       noteMap['is_anonymous'] = true;
       if (actorName != null && actorName.isNotEmpty) {

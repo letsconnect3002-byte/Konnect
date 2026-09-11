@@ -1515,12 +1515,7 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
                   Expanded(
                     child: Container(
                       decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [
-                            context.accentPrimary,
-                            context.accentPrimary.withValues(alpha: 0.7),
-                          ],
-                        ),
+                        color: Colors.white,
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: ElevatedButton.icon(
@@ -1530,14 +1525,15 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
                           if (sheetContext.mounted) Navigator.pop(sheetContext);
                         },
                         icon: const Icon(Icons.open_in_new_rounded,
-                            color: Colors.white, size: 18),
+                            color: Colors.black, size: 18),
                         label: const Text(
                           "Open Account",
                           style: TextStyle(
-                              color: Colors.white, fontWeight: FontWeight.bold),
+                              color: Colors.black, fontWeight: FontWeight.bold),
                         ),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.transparent,
+                          foregroundColor: Colors.black,
                           shadowColor: Colors.transparent,
                           padding: const EdgeInsets.symmetric(vertical: 14),
                           shape: RoundedRectangleBorder(

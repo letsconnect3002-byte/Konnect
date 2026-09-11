@@ -297,8 +297,8 @@ class _CropImagePageState extends State<CropImagePage> {
                         child: ElevatedButton(
                           onPressed: _cropAndFinish,
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF8B5CF6),
-                            foregroundColor: Colors.white,
+                            backgroundColor: Colors.white,
+                            foregroundColor: Colors.black,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(14),
                             ),
@@ -310,6 +310,7 @@ class _CropImagePageState extends State<CropImagePage> {
                               fontWeight: FontWeight.bold,
                               fontSize: 14,
                               fontFamily: 'Inter',
+                              color: Colors.black,
                             ),
                           ),
                         ),

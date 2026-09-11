@@ -228,12 +228,12 @@ class _CreatePulsePageState extends State<CreatePulsePage> with SingleTickerProv
                             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                             decoration: BoxDecoration(
                               color: isSelected
-                                  ? context.accentSecondary.withValues(alpha: 0.15)
+                                  ? Colors.white
                                   : context.surfaceSecondary,
                               borderRadius: BorderRadius.circular(20),
                               border: Border.all(
                                 color: isSelected
-                                    ? context.accentSecondary
+                                    ? Colors.white
                                     : context.surfaceSecondary,
                                 width: 1.5,
                               ),
@@ -248,7 +248,7 @@ class _CreatePulsePageState extends State<CreatePulsePage> with SingleTickerProv
                                 Text(
                                   tag.name,
                                   style: TextStyle(
-                                    color: isSelected ? Colors.white : context.textPrimary,
+                                    color: isSelected ? Colors.black : context.textPrimary,
                                     fontSize: 13,
                                     fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                                   ),
@@ -472,8 +472,8 @@ class _CreatePulsePageState extends State<CreatePulsePage> with SingleTickerProv
                               ? null
                               : () => _handlePublish(context, pulseProvider),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: context.accentSecondary,
-                            foregroundColor: Colors.white,
+                            backgroundColor: Colors.white,
+                            foregroundColor: Colors.black,
                             disabledBackgroundColor: context.surfaceSecondary,
                             disabledForegroundColor: context.textMuted,
                             elevation: 0,
@@ -488,7 +488,7 @@ class _CreatePulsePageState extends State<CreatePulsePage> with SingleTickerProv
                                   height: 20,
                                   child: CircularProgressIndicator(
                                     strokeWidth: 2,
-                                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                    valueColor: AlwaysStoppedAnimation<Color>(Colors.black),
                                   ),
                                 )
                               : Text(
@@ -496,7 +496,7 @@ class _CreatePulsePageState extends State<CreatePulsePage> with SingleTickerProv
                                   style: TextStyle(
                                     fontSize: 15,
                                     fontWeight: FontWeight.bold,
-                                    color: _selectedTag == null ? context.textMuted : Colors.white,
+                                    color: _selectedTag == null ? context.textMuted : Colors.black,
                                   ),
                                 ),
                         );
@@ -717,13 +717,13 @@ class _CreatePulsePageState extends State<CreatePulsePage> with SingleTickerProv
           curve: Curves.easeOutCubic,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(9),
-            color: isSelected ? context.accentSecondary : Colors.transparent,
+            color: isSelected ? Colors.white : Colors.transparent,
           ),
           alignment: Alignment.center,
           child: Text(
             title,
             style: TextStyle(
-              color: isSelected ? Colors.white : context.textSecondary,
+              color: isSelected ? Colors.black : context.textSecondary,
               fontWeight: FontWeight.bold,
               fontSize: 13,
             ),
@@ -781,7 +781,7 @@ class _CreatePulsePageState extends State<CreatePulsePage> with SingleTickerProv
     return Icon(
       iconData,
       size: 15,
-      color: isSelected ? Colors.white : context.accentSecondary,
+      color: isSelected ? Colors.black : context.accentSecondary,
     );
   }
 
@@ -816,12 +816,12 @@ class _CreatePulsePageState extends State<CreatePulsePage> with SingleTickerProv
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
           color: isSelected
-              ? context.accentSecondary.withValues(alpha: 0.15)
+              ? Colors.white
               : context.surfaceSecondary,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: isSelected
-                ? context.accentSecondary
+                ? Colors.white
                 : context.surfaceSecondary,
             width: 1.5,
           ),
@@ -829,7 +829,7 @@ class _CreatePulsePageState extends State<CreatePulsePage> with SingleTickerProv
         child: Text(
           _getDurationLabel(hours),
           style: TextStyle(
-            color: isSelected ? Colors.white : context.textPrimary,
+            color: isSelected ? Colors.black : context.textPrimary,
             fontSize: 12.5,
             fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
           ),

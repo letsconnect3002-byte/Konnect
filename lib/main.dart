@@ -40,6 +40,8 @@ import 'package:connect/Providers/feed_provider.dart';
 import 'package:connect/services/linkrunner_service.dart';
 import 'package:connect/Widgets/referral_connection_modal.dart';
 import 'package:connect/Repositories/feed_repository.dart';
+import 'package:connect/Providers/custom_network_provider.dart';
+import 'package:connect/Repositories/custom_network_repository.dart';
 import 'package:connect/services/share_receiver_service.dart';
 import 'package:timezone/data/latest.dart' as tz_latest;
 import 'package:timezone/timezone.dart' as tz;
@@ -298,7 +300,8 @@ Future<void> showConnectionLocalNotification({
   final bool isTribeRequest = type == 'tribe_request';
   final bool isInformational = type == 'tribe_removed' ||
       type == 'tribe_approved' ||
-      type == 'tribe_added';
+      type == 'tribe_added' ||
+      type == 'custom_network_added';
 
   if (isTribeInvite) {
     androidActions = [
@@ -523,6 +526,15 @@ void handleLocalNotificationClickPayload(String payload) {
           ),
         );
       }
+      return;
+    }
+    if (action == 'custom_network_added' ||
+        data['real_type'] == 'custom_network_added') {
+      navigatorKey.currentState?.push(
+        MaterialPageRoute(
+          builder: (routeContext) => const NotificationPage(),
+        ),
+      );
       return;
     }
     if (action == 'connection_notification') {
@@ -1920,7 +1932,8 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
               type == "tribe_request" ||
               type == "tribe_approved" ||
               type == "tribe_message" ||
-              type == "tribe_removed") {
+              type == "tribe_removed" ||
+              type == "custom_network_added") {
             String planId = note ?? '';
             List<String> changedFields = [];
             if (note != null && note.startsWith('{')) {
@@ -2022,6 +2035,17 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
               }
               title = "Added to $tribeName";
               body = "$actorName added you to \"$tribeName\"";
+            } else if (type == "custom_network_added") {
+              String networkName = "a Network";
+              if (note != null && note.startsWith('{')) {
+                try {
+                  final parsed = jsonDecode(note);
+                  networkName =
+                      parsed['network_name']?.toString() ?? "a Network";
+                } catch (_) {}
+              }
+              title = "Added to $networkName";
+              body = "$actorName added you to \"$networkName\"";
             } else if (type == "tribe_invite") {
               String tribeName = "a Mafia";
               if (note != null && note.startsWith('{')) {
@@ -2210,6 +2234,9 @@ void main() async {
                 data['real_type'] == 'tribe_added') {
               targetTribeChatId = data['tribe_id']?.toString();
               targetTribeName = data['tribe_name']?.toString() ?? 'Mafia';
+            } else if (action == 'custom_network_added' ||
+                data['real_type'] == 'custom_network_added') {
+              targetOpenNotificationsPage = true;
             } else if (action == 'connection_notification') {
               targetOpenNotificationsPage = true;
             } else {
@@ -2252,6 +2279,9 @@ void main() async {
               data['real_type'] == 'tribe_added') {
             targetTribeChatId = data['tribe_id']?.toString();
             targetTribeName = data['tribe_name']?.toString() ?? 'Mafia';
+          } else if (action == 'custom_network_added' ||
+              data['real_type'] == 'custom_network_added') {
+            targetOpenNotificationsPage = true;
           } else if (action == 'connection_notification') {
             targetOpenNotificationsPage = true;
           } else {
@@ -2275,6 +2305,9 @@ void main() async {
           data['real_type'] == 'tribe_added') {
         targetTribeChatId = data['tribe_id']?.toString();
         targetTribeName = data['tribe_name']?.toString() ?? 'Mafia';
+      } else if (action == 'custom_network_added' ||
+          data['real_type'] == 'custom_network_added') {
+        targetOpenNotificationsPage = true;
       } else if (action == 'connection_notification') {
         targetOpenNotificationsPage = true;
       } else {
@@ -2384,6 +2417,15 @@ class MyApp extends StatelessWidget {
               connectionProvider.connections,
             );
             return pulseProvider;
+          },
+        ),
+        ChangeNotifierProxyProvider<ProfileProvider, CustomNetworkProvider>(
+          create: (_) => CustomNetworkProvider(
+            repository: SupabaseCustomNetworkRepository(),
+          ),
+          update: (_, profileProvider, customNetworkProvider) {
+            customNetworkProvider!.updateUserId(profileProvider.userId);
+            return customNetworkProvider;
           },
         ),
         ChangeNotifierProxyProvider2<ProfileProvider, ConnectionProvider,
@@ -3019,7 +3061,8 @@ class _AppShellGateState extends State<AppShellGate> {
                       type == "tribe_request" ||
                       type == "tribe_approved" ||
                       type == "tribe_message" ||
-                      type == "tribe_removed") {
+                      type == "tribe_removed" ||
+                      type == "custom_network_added") {
                     String planId = note ?? '';
                     List<String> changedFields = [];
                     if (note != null && note.startsWith('{')) {
@@ -3128,6 +3171,17 @@ class _AppShellGateState extends State<AppShellGate> {
                       }
                       title = "Added to $tribeName";
                       body = "$actorName added you to \"$tribeName\"";
+                    } else if (type == "custom_network_added") {
+                      String networkName = "a Network";
+                      if (note != null && note.startsWith('{')) {
+                        try {
+                          final parsed = jsonDecode(note);
+                          networkName =
+                              parsed['network_name']?.toString() ?? "a Network";
+                        } catch (_) {}
+                      }
+                      title = "Added to $networkName";
+                      body = "$actorName added you to \"$networkName\"";
                     } else if (type == "tribe_invite") {
                       String tribeName = "a Mafia";
                       if (note != null && note.startsWith('{')) {

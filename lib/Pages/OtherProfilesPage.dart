@@ -1585,8 +1585,8 @@ class _ReferBottomSheetState extends State<_ReferBottomSheet> {
                         }
                       },
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: context.accentSecondary,
-                  foregroundColor: Colors.white,
+                  backgroundColor: Colors.white,
+                  foregroundColor: Colors.black,
                   disabledBackgroundColor:
                       context.surfaceSecondary.withValues(alpha: 0.5),
                   disabledForegroundColor: context.textMuted,
@@ -1603,7 +1603,7 @@ class _ReferBottomSheetState extends State<_ReferBottomSheet> {
                     fontWeight: FontWeight.bold,
                     color: selectedConnectionId == null
                         ? context.textMuted
-                        : Colors.white,
+                        : Colors.black,
                   ),
                 ),
               ),

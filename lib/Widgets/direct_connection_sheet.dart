@@ -394,8 +394,8 @@ class _DirectConnectionSheetState extends State<DirectConnectionSheet> {
               ElevatedButton(
                 onPressed: _isSending ? null : _sendRequest,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: context.accentSecondary,
-                  foregroundColor: Colors.white,
+                  backgroundColor: Colors.white,
+                  foregroundColor: Colors.black,
                   disabledBackgroundColor:
                       context.surfaceSecondary.withValues(alpha: 0.5),
                   shape: RoundedRectangleBorder(
@@ -412,19 +412,19 @@ class _DirectConnectionSheetState extends State<DirectConnectionSheet> {
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
                           valueColor:
-                              AlwaysStoppedAnimation<Color>(Colors.white),
+                              AlwaysStoppedAnimation<Color>(Colors.black),
                         ),
                       )
                     : Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          const Icon(Icons.send_rounded, size: 16, color: Colors.white),
+                          const Icon(Icons.send_rounded, size: 16, color: Colors.black),
                           const SizedBox(width: 8),
                           Text(
                             "Send Connection Request",
                             style: context.bodyText.copyWith(
                               fontWeight: FontWeight.bold,
-                              color: Colors.white,
+                              color: Colors.black,
                             ),
                           ),
                         ],

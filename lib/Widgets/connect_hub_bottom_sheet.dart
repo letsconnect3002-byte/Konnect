@@ -903,9 +903,13 @@ class _ConnectHubBottomSheetState extends State<ConnectHubBottomSheet>
                   ),
                   child: TabBar(
                     controller: _tabController,
-                    indicatorColor: Colors.transparent,
+                    indicator: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    indicatorSize: TabBarIndicatorSize.tab,
                     dividerColor: Colors.transparent,
-                    labelColor: Colors.white,
+                    labelColor: Colors.black,
                     unselectedLabelColor: context.textMuted,
                     labelStyle: const TextStyle(
                       fontFamily: 'Inter',

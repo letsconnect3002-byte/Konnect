@@ -1040,32 +1040,12 @@ class _ProfileCardState extends State<ProfileCard> {
                   height: 52,
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(16),
-                    gradient: _isAlreadyConnected
-                        ? null
-                        : LinearGradient(
-                            colors: _shareBackType == 'casual'
-                                ? [
-                                    context.accentSecondary,
-                                    context.accentSecondary
-                                        .withValues(alpha: 0.8)
-                                  ]
-                                : [
-                                    context.accentPrimary,
-                                    context.accentPrimary.withValues(alpha: 0.8)
-                                  ],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                    color:
-                        _isAlreadyConnected ? context.surfaceSecondary : null,
+                    color: _isAlreadyConnected ? context.surfaceSecondary : Colors.white,
                     boxShadow: _isAlreadyConnected
                         ? null
                         : [
                             BoxShadow(
-                              color: (_shareBackType == 'casual'
-                                      ? context.accentSecondary
-                                      : context.accentPrimary)
-                                  .withValues(alpha: 0.2),
+                              color: Colors.white.withValues(alpha: 0.2),
                               blurRadius: 16,
                               offset: const Offset(0, 4),
                             ),
@@ -1075,6 +1055,7 @@ class _ProfileCardState extends State<ProfileCard> {
                     onPressed: _isAlreadyConnected ? null : saveProfile,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.transparent,
+                      foregroundColor: Colors.black,
                       shadowColor: Colors.transparent,
                       disabledBackgroundColor: Colors.transparent,
                       shape: RoundedRectangleBorder(
@@ -1090,9 +1071,7 @@ class _ProfileCardState extends State<ProfileCard> {
                       style: TextStyle(
                         color: _isAlreadyConnected
                             ? context.textMuted
-                            : (_shareBackType == 'casual'
-                                ? Colors.white
-                                : Colors.white),
+                            : Colors.black,
                         fontWeight: FontWeight.bold,
                         fontSize: 15,
                         fontFamily: 'Inter',

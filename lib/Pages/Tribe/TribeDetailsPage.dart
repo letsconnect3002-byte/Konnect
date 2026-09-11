@@ -416,8 +416,8 @@ class _TribeDetailsPageState extends State<TribeDetailsPage> {
                     );
                   },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: context.accentSecondary,
-                    foregroundColor: Colors.white,
+                    backgroundColor: Colors.white,
+                    foregroundColor: Colors.black,
                     minimumSize: const Size(double.infinity, 44),
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12)),
@@ -913,8 +913,8 @@ class _TribeDetailsPageState extends State<TribeDetailsPage> {
                               child: ElevatedButton(
                                 onPressed: _saveDetails,
                                 style: ElevatedButton.styleFrom(
-                                  backgroundColor: context.accentSecondary,
-                                  foregroundColor: Colors.white,
+                                  backgroundColor: Colors.white,
+                                  foregroundColor: Colors.black,
                                   minimumSize: const Size(double.infinity, 50),
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(16),
@@ -923,6 +923,7 @@ class _TribeDetailsPageState extends State<TribeDetailsPage> {
                                 ),
                                 child: const Text("Save",
                                     style: TextStyle(
+                                        color: Colors.black,
                                         fontWeight: FontWeight.bold,
                                         fontSize: 15)),
                               ),

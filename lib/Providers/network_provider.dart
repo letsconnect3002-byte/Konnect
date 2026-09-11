@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:connect/Repositories/network_repository.dart';
 import 'package:flutter/material.dart';
 
@@ -13,7 +14,12 @@ class NetworkProvider with ChangeNotifier {
 
   List<Map<String, dynamic>> _networkList = [];
 
+  /// True only for the very first load (empty list → spinner).
   bool _isLoading = false;
+
+  /// True when we are refreshing / searching but already have data to show.
+  bool _isRefreshing = false;
+
   bool _isLoadingMore = false;
   bool _hasMore = true;
 
@@ -28,6 +34,9 @@ class NetworkProvider with ChangeNotifier {
   int? _trackedUserId;
   int _lastConnectionCount = -1;
   int _activeLoadSession = 0;
+
+  // Debounce timer for search input
+  Timer? _searchDebounce;
 
   /// Called by the ProxyProvider whenever ConnectionProvider notifies.
   /// Only triggers a network refresh when the connection count genuinely
@@ -95,6 +104,7 @@ class NetworkProvider with ChangeNotifier {
   List<Map<String, dynamic>> get networkList => _networkList;
 
   bool get isLoading => _isLoading;
+  bool get isRefreshing => _isRefreshing;
   bool get isLoadingMore => _isLoadingMore;
   bool get hasMore => _hasMore;
 
@@ -118,9 +128,15 @@ class NetworkProvider with ChangeNotifier {
     if (reset) {
       _activeLoadSession++;
       _currentPage = 1;
-      _networkList = [];
       _hasMore = true;
-      _isLoading = true;
+
+      // Only show full-page spinner when there is NO existing data.
+      // Otherwise keep old data visible and show inline refresh indicator.
+      if (_networkList.isEmpty) {
+        _isLoading = true;
+      } else {
+        _isRefreshing = true;
+      }
       notifyListeners();
     } else {
       if (!_hasMore || _isLoadingMore) return;
@@ -144,7 +160,12 @@ class NetworkProvider with ChangeNotifier {
         return;
       }
 
-      _networkList.addAll(results);
+      if (reset) {
+        // Replace old list with fresh results
+        _networkList = List<Map<String, dynamic>>.from(results);
+      } else {
+        _networkList.addAll(results);
+      }
       _hasMore = results.length >= _pageLimit;
       _currentPage++;
     } catch (e) {
@@ -152,19 +173,54 @@ class NetworkProvider with ChangeNotifier {
     } finally {
       if (currentSession == _activeLoadSession) {
         _isLoading = false;
+        _isRefreshing = false;
         _isLoadingMore = false;
         notifyListeners();
       }
     }
   }
 
-  Future<void> search(int userId, String query) async {
+  /// Debounced search — waits 400ms after the last keystroke before firing.
+  void search(int userId, String query) {
     _currentSearch = query;
-    await loadNetwork(userId, reset: true);
+
+    // Cancel any pending search request
+    _searchDebounce?.cancel();
+
+    // If the query is cleared, reload immediately
+    if (query.isEmpty) {
+      loadNetwork(userId, reset: true);
+      return;
+    }
+
+    _searchDebounce = Timer(const Duration(milliseconds: 400), () {
+      loadNetwork(userId, reset: true);
+    });
+  }
+
+  /// Optimistically remove a user from the "People You Can Reach" list
+  /// (e.g. after connecting with them or when they become a 1st-degree contact).
+  void removeUserFromList(int targetUserId) {
+    final before = _networkList.length;
+    _networkList.removeWhere((item) {
+      final id = item["id"] is int
+          ? item["id"] as int
+          : (int.tryParse(item["id"]?.toString() ?? '') ?? 0);
+      return id == targetUserId;
+    });
+    if (_networkList.length != before) {
+      notifyListeners();
+    }
   }
 
   Future<void> setSort(int userId, String sort) async {
     _currentSort = sort;
     await loadNetwork(userId, reset: true);
+  }
+
+  @override
+  void dispose() {
+    _searchDebounce?.cancel();
+    super.dispose();
   }
 }

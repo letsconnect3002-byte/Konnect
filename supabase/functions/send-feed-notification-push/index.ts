@@ -36,6 +36,8 @@ serve(async (req) => {
     let parentAuthorName = "a post"
     let isAnonymous = false
     let explicitActorName = ""
+    let networkId = ""
+    let networkName = ""
 
     if (note && note.startsWith("{")) {
       try {
@@ -46,6 +48,8 @@ serve(async (req) => {
         if (parsed.parent_author_name) parentAuthorName = String(parsed.parent_author_name)
         if (parsed.is_anonymous === true || parsed.is_anonymous === "true") isAnonymous = true
         if (parsed.actor_name) explicitActorName = String(parsed.actor_name)
+        if (parsed.network_id) networkId = String(parsed.network_id)
+        if (parsed.network_name) networkName = String(parsed.network_name)
       } catch (e) {
         console.error("Error parsing feed notification note JSON:", e)
       }
@@ -60,19 +64,25 @@ serve(async (req) => {
     // 1. Initialize Supabase Client with Service Role Key
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-    // Double check post anonymity from DB if not already marked
-    if (!isAnonymous && postId) {
+    // Double check post anonymity & custom network from DB if not already marked
+    if (postId) {
       try {
         const { data: postData } = await supabase
           .from("posts")
-          .select("is_anonymous")
+          .select("is_anonymous, network_id, custom_networks:network_id(name)")
           .eq("id", postId)
           .single()
         if (postData?.is_anonymous) {
           isAnonymous = true
         }
+        if (!networkId && postData?.network_id) {
+          networkId = String(postData.network_id)
+          if ((postData.custom_networks as any)?.name) {
+            networkName = String((postData.custom_networks as any).name)
+          }
+        }
       } catch (e) {
-        console.error("Error checking post anonymity from DB:", e)
+        console.error("Error checking post metadata from DB:", e)
       }
     }
 
@@ -95,18 +105,31 @@ serve(async (req) => {
     let title = isAnonymous ? "Anonymous Feed Update" : "Network Feed Update"
     let bodyText = `${actorName} updated the network feed.`
 
+    if (networkName) {
+      title = isAnonymous ? `Anonymous in ${networkName}` : networkName
+      bodyText = `${actorName} posted in ${networkName}, tap to see.`
+    }
+
     if (realType === "feed_reply_mention") {
-      title = isAnonymous ? "New Anonymous Reply & Mention" : "New Reply & Mention"
-      bodyText = `${actorName} replied to your post and mentioned you on their post.`
+      title = isAnonymous ? "New Anonymous Reply & Mention" : (networkName || "New Reply & Mention")
+      bodyText = networkName
+        ? `${actorName} replied to your post and mentioned you in ${networkName}.`
+        : `${actorName} replied to your post and mentioned you on their post.`
     } else if (realType === "feed_reply") {
-      title = isAnonymous ? "New Anonymous Reply" : "New Reply"
-      bodyText = `${actorName} replied to your post.`
+      title = isAnonymous ? "New Anonymous Reply" : (networkName || "New Reply")
+      bodyText = networkName
+        ? `${actorName} replied to your post in ${networkName}.`
+        : `${actorName} replied to your post.`
     } else if (realType === "feed_mention") {
-      title = isAnonymous ? "New Anonymous Mention" : "New Mention"
-      bodyText = `${actorName} mentioned you on their post.`
+      title = isAnonymous ? "New Anonymous Mention" : (networkName || "New Mention")
+      bodyText = networkName
+        ? `${actorName} mentioned you in ${networkName}.`
+        : `${actorName} mentioned you on their post.`
     } else if (realType === "feed_post") {
-      title = isAnonymous ? "New Anonymous Post" : "New Post"
-      bodyText = `${actorName} has uploaded a post, tap to see`
+      title = isAnonymous ? "New Anonymous Post" : (networkName || "New Post")
+      bodyText = networkName
+        ? `${actorName} has uploaded a post in ${networkName}, tap to see.`
+        : `${actorName} has uploaded a post, tap to see`
     } else if (realType == "feed_connection_reply") {
       if (postId) {
         try {
@@ -129,8 +152,10 @@ serve(async (req) => {
           console.error("Error double-checking parent post anonymity for feed_connection_reply:", e)
         }
       }
-      title = `${actorName} joined a conversation`
-      bodyText = `${actorName} replied to ${parentAuthorName}, tap to join the conversation.`
+      title = networkName ? networkName : `${actorName} joined a conversation`
+      bodyText = networkName
+        ? `${actorName} replied to ${parentAuthorName} in ${networkName}, tap to join the conversation.`
+        : `${actorName} replied to ${parentAuthorName}, tap to join the conversation.`
     }
 
     // 4. Fetch recipient FCM tokens
@@ -175,6 +200,8 @@ serve(async (req) => {
             is_anonymous: isAnonymous ? "true" : "false",
             post_id: postId,
             root_post_id: rootPostId,
+            network_id: networkId,
+            network_name: networkName,
             title: title,
             body: bodyText,
           },

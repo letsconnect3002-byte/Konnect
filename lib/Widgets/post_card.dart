@@ -256,7 +256,9 @@ class PostCard extends StatelessWidget {
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-                backgroundColor: context.accentPrimary),
+              backgroundColor: context.accentPrimary,
+              foregroundColor: Colors.black,
+            ),
             onPressed: () async {
               Navigator.pop(dialogCtx);
               try {
@@ -281,7 +283,7 @@ class PostCard extends StatelessWidget {
             },
             child: const Text("Submit",
                 style: TextStyle(
-                    color: Colors.white, fontWeight: FontWeight.bold)),
+                    color: Colors.black, fontWeight: FontWeight.bold)),
           ),
         ],
       ),

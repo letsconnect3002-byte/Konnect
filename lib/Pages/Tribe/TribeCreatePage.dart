@@ -306,14 +306,14 @@ class _TribeCreatePageState extends State<TribeCreatePage> {
                   ElevatedButton(
                     onPressed: _submit,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: context.accentSecondary,
-                      foregroundColor: Colors.white,
+                      backgroundColor: Colors.white,
+                      foregroundColor: Colors.black,
                       minimumSize: const Size(double.infinity, 48),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
                     ),
-                    child: const Text("Create Mafia", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                    child: const Text("Create Mafia", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.black)),
                   ),
                 ],
               ),

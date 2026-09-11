@@ -690,10 +690,13 @@ class _YourNetworkPageState extends State<YourNetworkPage> {
                                             AnalyticsService.logEvent(
                                               name: 'network_search_performed',
                                               parameters: {
-                                                'query_length': val.trim().length,
+                                                'query_length':
+                                                    val.trim().length,
                                               },
                                             );
                                           }
+                                          // Trigger rebuild to show/hide clear button
+                                          setState(() {});
                                         },
                                         style: TextStyle(
                                             color: context.textPrimary,
@@ -717,6 +720,7 @@ class _YourNetworkPageState extends State<YourNetworkPage> {
                                           if (userId != null) {
                                             networkProvider.search(userId, '');
                                           }
+                                          setState(() {});
                                         },
                                         child: Icon(Icons.close_rounded,
                                             size: 16, color: context.textMuted),
@@ -822,45 +826,70 @@ class _YourNetworkPageState extends State<YourNetworkPage> {
 
                             const SizedBox(height: 16),
 
+                            // Inline refresh indicator (shown during search / connection-change refresh)
+                            if (networkProvider.isRefreshing)
+                              Padding(
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 26),
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(2),
+                                  child: const LinearProgressIndicator(
+                                    minHeight: 2,
+                                    backgroundColor: Colors.transparent,
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                        Color(0xFF7C3AED)),
+                                  ),
+                                ),
+                              ),
+
                             // People List / Empty State
-                            if (networkList.isEmpty)
+                            if (networkList.isEmpty &&
+                                !networkProvider.isRefreshing)
                               Padding(
                                 padding:
                                     const EdgeInsets.symmetric(vertical: 40),
                                 child: Center(
                                   child: Text(
-                                    "No reachable connections found.",
+                                    _searchController.text.isNotEmpty
+                                        ? "No results for \"${_searchController.text}\""
+                                        : "No reachable connections found.",
                                     style: context.bodyText
                                         .copyWith(color: context.textMuted),
                                   ),
                                 ),
                               )
                             else
-                              Padding(
-                                padding:
-                                    const EdgeInsets.symmetric(horizontal: 26),
-                                child: Column(
-                                  children: [
-                                    for (var item in networkList)
-                                      _buildConnectionCard(context, item),
-                                    if (networkProvider.isLoadingMore)
-                                      const Padding(
-                                        padding:
-                                            EdgeInsets.symmetric(vertical: 16),
-                                        child: Center(
-                                          child: SizedBox(
-                                            width: 24,
-                                            height: 24,
-                                            child: CircularProgressIndicator(
-                                              strokeWidth: 2.0,
-                                              valueColor:
-                                                  AlwaysStoppedAnimation<Color>(
-                                                      Color(0xFF7C3AED)),
+                              AnimatedOpacity(
+                                opacity:
+                                    networkProvider.isRefreshing ? 0.5 : 1.0,
+                                duration: const Duration(milliseconds: 200),
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 26),
+                                  child: Column(
+                                    children: [
+                                      for (var item in networkList)
+                                        _buildConnectionCard(context, item),
+                                      if (networkProvider.isLoadingMore)
+                                        const Padding(
+                                          padding: EdgeInsets.symmetric(
+                                              vertical: 16),
+                                          child: Center(
+                                            child: SizedBox(
+                                              width: 24,
+                                              height: 24,
+                                              child: CircularProgressIndicator(
+                                                strokeWidth: 2.0,
+                                                valueColor:
+                                                    AlwaysStoppedAnimation<
+                                                            Color>(
+                                                        Color(0xFF7C3AED)),
+                                              ),
                                             ),
                                           ),
                                         ),
-                                      ),
-                                  ],
+                                    ],
+                                  ),
                                 ),
                               ),
 
@@ -1865,8 +1894,8 @@ class _ReferBottomSheetState extends State<_ReferBottomSheet> {
                           }
                         : null,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: context.accentSecondary,
-                      foregroundColor: Colors.white,
+                      backgroundColor: Colors.white,
+                      foregroundColor: Colors.black,
                       disabledBackgroundColor:
                           context.surfaceSecondary.withValues(alpha: 0.5),
                       disabledForegroundColor: context.textMuted,
@@ -1884,7 +1913,7 @@ class _ReferBottomSheetState extends State<_ReferBottomSheet> {
                       style: context.bodyText.copyWith(
                         fontWeight: FontWeight.bold,
                         color:
-                            !isButtonEnabled ? context.textMuted : Colors.white,
+                            !isButtonEnabled ? context.textMuted : Colors.black,
                       ),
                     ),
                   );

@@ -16,6 +16,7 @@ class FeedPost {
   final Map<String, int> reactionCounts;
   final String visibility; // 'casual', 'professional', 'both'
   final bool isAnonymous;
+  final String? networkId;
 
   FeedPost({
     required this.id,
@@ -33,6 +34,7 @@ class FeedPost {
     this.reactionCounts = const {},
     this.visibility = 'both',
     this.isAnonymous = false,
+    this.networkId,
   }) : activeReplyCount = activeReplyCount ?? replyCount;
 
 
@@ -105,6 +107,7 @@ class FeedPost {
       reactionCounts: parsedReactionCounts,
       visibility: json['visibility']?.toString() ?? 'both',
       isAnonymous: json['is_anonymous'] == true,
+      networkId: json['network_id']?.toString(),
     );
   }
 
@@ -148,6 +151,7 @@ class FeedPost {
       reactionCounts: parsedReactionCounts,
       visibility: json['visibility']?.toString() ?? 'both',
       isAnonymous: json['is_anonymous'] == true,
+      networkId: json['network_id']?.toString(),
     );
   }
 
@@ -168,6 +172,7 @@ class FeedPost {
     Map<String, int>? reactionCounts,
     String? visibility,
     bool? isAnonymous,
+    String? networkId,
   }) {
     final int newReplyCount = replyCount ?? this.replyCount;
     final int newActiveReplyCount = activeReplyCount ??
@@ -188,6 +193,7 @@ class FeedPost {
       reactionCounts: reactionCounts ?? this.reactionCounts,
       visibility: visibility ?? this.visibility,
       isAnonymous: isAnonymous ?? this.isAnonymous,
+      networkId: networkId ?? this.networkId,
     );
   }
 

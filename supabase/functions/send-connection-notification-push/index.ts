@@ -43,7 +43,7 @@ serve(async (req) => {
       try {
         const parsed = JSON.parse(note)
         if (parsed.real_type) checkRealType = parsed.real_type
-      } catch (_) {}
+      } catch (_) { }
     }
     const feedTypes = ["feed_reply", "feed_mention", "feed_reply_mention", "feed_post", "feed_connection_reply"]
     if (feedTypes.includes(type) || feedTypes.includes(checkRealType)) {
@@ -84,6 +84,8 @@ serve(async (req) => {
     let tribeName = "a Mafia"
     let tribeMessage = ""
     let roleName = ""
+    let networkName = "a Network"
+    let networkId = ""
     if (note && note.startsWith("{")) {
       try {
         const parsed = JSON.parse(note)
@@ -92,6 +94,12 @@ serve(async (req) => {
         }
         if (parsed.tribe_name) {
           tribeName = parsed.tribe_name
+        }
+        if (parsed.network_name) {
+          networkName = parsed.network_name
+        }
+        if (parsed.network_id) {
+          networkId = parsed.network_id
         }
         if (parsed.message) {
           tribeMessage = parsed.message
@@ -107,6 +115,9 @@ serve(async (req) => {
     if (realType === "tribe_added") {
       title = `Added to ${tribeName}`
       bodyText = `${actorName} added you to "${tribeName}"`
+    } else if (realType === "custom_network_added") {
+      title = `Added to ${networkName}`
+      bodyText = `${actorName} added you to "${networkName}"`
     } else if (realType === "tribe_invite") {
       title = "Mafia Invitation"
       bodyText = `${actorName} invited you to join "${tribeName}"`
@@ -144,7 +155,7 @@ serve(async (req) => {
         try {
           const parsed = JSON.parse(note)
           if (parsed.message) msg = parsed.message
-        } catch (_) {}
+        } catch (_) { }
       } else if (note) {
         msg = note
       }
@@ -224,6 +235,9 @@ serve(async (req) => {
             action: "connection_notification",
             notification_id: String(notificationId),
             type: String(type),
+            real_type: String(realType),
+            network_id: networkId ? String(networkId) : "",
+            network_name: networkName ? String(networkName) : "",
             actor_id: String(actorId),
             actor_name: actorName,
             actor_avatar: actorAvatar,

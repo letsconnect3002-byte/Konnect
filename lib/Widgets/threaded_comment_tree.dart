@@ -543,8 +543,17 @@ class _ThreadNodeWidgetState extends State<_ThreadNodeWidget>
 
               // Text
               Builder(builder: (context) {
-                final int countToShow = (widget.comment.replyCount > 0)
-                    ? widget.comment.replyCount
+                final feedProvider = Provider.of<FeedProvider>(context);
+                final livePost = feedProvider.getPostById(widget.comment.id);
+                final int effectiveCount = livePost != null
+                    ? (livePost.activeReplyCount > 0
+                        ? livePost.activeReplyCount
+                        : (livePost.replyCount > 0
+                            ? livePost.replyCount
+                            : widget.comment.replyCount))
+                    : widget.comment.replyCount;
+                final int countToShow = (effectiveCount > 0)
+                    ? effectiveCount
                     : widget.comment.replies.length;
                 return Text(
                   countToShow > 1
@@ -731,15 +740,16 @@ class _ThreadNodeWidgetState extends State<_ThreadNodeWidget>
       final bool isHighlighted = (widget.initialExpandPostId == node.id);
       final feedProvider = Provider.of<FeedProvider>(context);
       final livePost = feedProvider.getPostById(node.id) ?? node.post!;
-      final int effectiveReplyCount = (node.replyCount > 0)
-          ? node.replyCount
-          : (node.replies.isNotEmpty
-              ? node.replies.where((r) => !r.isDeleted).length
-              : (node.post?.activeReplyCount ??
-                  (node.post?.replyCount ??
-                      (livePost.activeReplyCount > 0
-                          ? livePost.activeReplyCount
-                          : livePost.replyCount))));
+      final int effectiveReplyCount = (livePost.activeReplyCount > 0)
+          ? livePost.activeReplyCount
+          : (livePost.replyCount > 0
+              ? livePost.replyCount
+              : (node.replyCount > 0
+                  ? node.replyCount
+                  : (node.replies.isNotEmpty
+                      ? node.replies.where((r) => !r.isDeleted).length
+                      : (node.post?.activeReplyCount ??
+                          (node.post?.replyCount ?? 0)))));
       final effectivePost = livePost.copyWith(
         replyCount: effectiveReplyCount,
         activeReplyCount: effectiveReplyCount,

@@ -913,17 +913,17 @@ class _PlanDetailPageState extends State<PlanDetailPage> {
                             ? const SizedBox(
                                 width: 18,
                                 height: 18,
-                                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black),
                               )
                             : Row(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  const Icon(Icons.check_circle_rounded, size: 16, color: Colors.white),
+                                  const Icon(Icons.check_circle_rounded, size: 16, color: Colors.black),
                                   const SizedBox(width: 6),
                                   Text(
                                     "Accept",
                                     style: AppTypography.captionText.copyWith(
-                                      color: Colors.white,
+                                      color: Colors.black,
                                       fontWeight: FontWeight.bold,
                                       fontSize: 13,
                                     ),

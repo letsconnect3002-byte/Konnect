@@ -542,13 +542,13 @@ class _TribeRoleBuilderPageState extends State<TribeRoleBuilderPage> {
                           const SizedBox(width: 12),
                           ElevatedButton(
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: context.accentSecondary,
-                              foregroundColor: Colors.white,
+                              backgroundColor: Colors.white,
+                              foregroundColor: Colors.black,
                               shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(10)),
                             ),
                             child: const Text("Save",
-                                style: TextStyle(fontWeight: FontWeight.bold)),
+                                style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black)),
                             onPressed: () async {
                               final provider = Provider.of<TribeProvider>(
                                   context,

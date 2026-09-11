@@ -1353,11 +1353,11 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
                           builder: (context) => const ConnectHubBottomSheet(),
                         );
                       },
-                      icon: const Icon(Icons.qr_code_scanner_rounded, size: 18),
-                      label: const Text("Open Connect Hub"),
+                      icon: const Icon(Icons.qr_code_scanner_rounded, size: 18, color: Colors.black),
+                      label: const Text("Open Connect Hub", style: TextStyle(color: Colors.black)),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: context.accentSecondary,
-                        foregroundColor: Colors.white,
+                        backgroundColor: Colors.white,
+                        foregroundColor: Colors.black,
                         padding: const EdgeInsets.symmetric(vertical: 14),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(
@@ -1447,10 +1447,16 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
                         );
                       },
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: context.accentSecondary,
-                        foregroundColor: Colors.white,
+                        backgroundColor: Colors.white,
+                        foregroundColor: Colors.black,
                       ),
-                      child: const Text("Create a Mafia"),
+                      child: const Text(
+                        "Create a Mafia",
+                        style: TextStyle(
+                          color: Colors.black,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ),
                   ],
                 ),
@@ -1684,13 +1690,13 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
                     const SizedBox(width: 12),
                     ElevatedButton(
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: context.accentSecondary,
-                        foregroundColor: Colors.white,
+                        backgroundColor: Colors.white,
+                        foregroundColor: Colors.black,
                         shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(10)),
                       ),
                       child: const Text("Join",
-                          style: TextStyle(fontWeight: FontWeight.bold)),
+                          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black)),
                       onPressed: () async {
                         final navigator = Navigator.of(context);
                         final code = codeController.text.trim();
