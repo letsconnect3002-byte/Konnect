@@ -875,17 +875,39 @@ class _TribeChatPageState extends State<TribeChatPage> {
                       ),
                     ),
                     const SizedBox(width: 8),
-                    GestureDetector(
-                      onTap: _sendMessage,
-                      child: Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: context.accentSecondary,
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(Icons.send_rounded,
-                            size: 18, color: Colors.white),
-                      ),
+                    ValueListenableBuilder<TextEditingValue>(
+                      valueListenable: _messageController,
+                      builder: (context, value, _) {
+                        final hasText = value.text.trim().isNotEmpty;
+                        return GestureDetector(
+                          onTap: _sendMessage,
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 150),
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: hasText
+                                  ? context.accentPrimary
+                                  : context.accentSecondary,
+                              shape: BoxShape.circle,
+                              boxShadow: hasText
+                                  ? [
+                                      BoxShadow(
+                                        color: context.accentPrimary
+                                            .withValues(alpha: 0.25),
+                                        blurRadius: 8,
+                                        spreadRadius: 1,
+                                      ),
+                                    ]
+                                  : null,
+                            ),
+                            child: Icon(
+                              Icons.send_rounded,
+                              size: 18,
+                              color: hasText ? Colors.black : Colors.white,
+                            ),
+                          ),
+                        );
+                      },
                     ),
                   ],
                 ),

@@ -1276,29 +1276,40 @@ class _IndividualChatPageState extends State<IndividualChatPage>
               ),
             ),
             const SizedBox(width: 10),
-            GestureDetector(
-              onTap: _sendMessage,
-              child: Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: context
-                      .accentPrimary, // sharp circular neon asset powered by AppTheme.accentPrimary
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: context.accentPrimary.withValues(alpha: 0.3),
-                      blurRadius: 8,
-                      spreadRadius: 1,
+            ValueListenableBuilder<TextEditingValue>(
+              valueListenable: _messageController,
+              builder: (context, value, _) {
+                final hasText = value.text.trim().isNotEmpty;
+                return GestureDetector(
+                  onTap: _sendMessage,
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 150),
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: hasText
+                          ? context.accentPrimary
+                          : context.accentSecondary,
+                      shape: BoxShape.circle,
+                      boxShadow: hasText
+                          ? [
+                              BoxShadow(
+                                color: context.accentPrimary
+                                    .withValues(alpha: 0.25),
+                                blurRadius: 8,
+                                spreadRadius: 1,
+                              ),
+                            ]
+                          : null,
                     ),
-                  ],
-                ),
-                child: const Icon(
-                  Icons.send_rounded,
-                  color: Colors.white, // contrasting black icon label
-                  size: 18,
-                ),
-              ),
+                    child: Icon(
+                      Icons.send_rounded,
+                      color: hasText ? Colors.black : Colors.white,
+                      size: 18,
+                    ),
+                  ),
+                );
+              },
             ),
           ],
         ),
