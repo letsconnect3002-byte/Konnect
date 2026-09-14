@@ -1760,6 +1760,9 @@ class _FeedPostThreadItem extends StatefulWidget {
 
 class _FeedPostThreadItemState extends State<_FeedPostThreadItem> {
   CommentNode? _treeNode;
+  int _remainingRepliesCount = 0;
+  List<String> _otherAvatarUrls = [];
+  List<String> _otherAuthorNames = [];
   bool _isLoadingThread = false;
   String? _lastFetchedPostId;
   StreamSubscription<Map<String, dynamic>>? _postUpdateSub;
@@ -1963,10 +1966,19 @@ class _FeedPostThreadItemState extends State<_FeedPostThreadItem> {
       _loadThreadPreview();
     }
 
+    // If activeReplyCount changed while preview is shown, reload to keep top reply & count fresh
+    if (widget.post.activeReplyCount != oldWidget.post.activeReplyCount &&
+        widget.post.activeReplyCount > 0) {
+      _loadThreadPreview(forceReload: true);
+    }
+
     // If activeReplyCount went to 0 — clear the tree
     if (widget.post.activeReplyCount == 0 && _treeNode != null) {
       setState(() {
         _treeNode = null;
+        _remainingRepliesCount = 0;
+        _otherAvatarUrls = [];
+        _otherAuthorNames = [];
       });
     }
   }
@@ -2000,7 +2012,8 @@ class _FeedPostThreadItemState extends State<_FeedPostThreadItem> {
             childrenMap.putIfAbsent(parentId, () => []).add(p);
           }
 
-          final rootChildren = childrenMap[rootPost.id] ?? replyPosts;
+          final rootChildren =
+              List<FeedPost>.from(childrenMap[rootPost.id] ?? replyPosts);
 
           int countSubtreeReplies(FeedPost p) {
             final children = childrenMap[p.id] ?? [];
@@ -2013,8 +2026,46 @@ class _FeedPostThreadItemState extends State<_FeedPostThreadItem> {
             return total;
           }
 
+          // Priority sorting:
+          // 1. Most replies (nested conversation depth)
+          // 2. Most liked / reacted
+          // 3. Earliest
+          rootChildren.sort((a, b) {
+            final int countA = countSubtreeReplies(a);
+            final int countB = countSubtreeReplies(b);
+            if (countB != countA) {
+              return countB.compareTo(countA);
+            }
+
+            final int reactA = a.totalReactions;
+            final int reactB = b.totalReactions;
+            if (reactB != reactA) {
+              return reactB.compareTo(reactA);
+            }
+
+            return a.createdAt.compareTo(b.createdAt);
+          });
+
+          final topReply = rootChildren.first;
+          final int totalReplies = widget.post.activeReplyCount > replyPosts.length
+              ? widget.post.activeReplyCount
+              : replyPosts.length;
+          final int remainingCount = totalReplies - 1;
+
+          final otherReplies =
+              replyPosts.where((p) => p.id != topReply.id).toList();
+          final List<String> otherAvatars = otherReplies
+              .where((p) => !p.isAnonymous && p.authorAvatarUrl.isNotEmpty)
+              .map((p) => p.authorAvatarUrl)
+              .toSet()
+              .take(3)
+              .toList();
+          final List<String> otherNames = otherReplies
+              .map((p) => p.isAnonymous ? 'Anonymous' : p.authorName)
+              .take(3)
+              .toList();
+
           CommentNode buildNode(FeedPost p) {
-            final children = childrenMap[p.id] ?? [];
             final totalSubtree = countSubtreeReplies(p);
             final effectiveReplyCount = totalSubtree;
             final updatedChildPost = p.copyWith(
@@ -2033,7 +2084,7 @@ class _FeedPostThreadItemState extends State<_FeedPostThreadItem> {
               isDeleted: p.isDeleted,
               isAnonymous: p.isAnonymous,
               post: updatedChildPost,
-              replies: children.map<CommentNode>(buildNode).toList(),
+              replies: const [], // Show only the top reply on feed preview without expanding subtrees
             );
           }
 
@@ -2059,17 +2110,23 @@ class _FeedPostThreadItemState extends State<_FeedPostThreadItem> {
             isDeleted: rootPost.isDeleted,
             isAnonymous: rootPost.isAnonymous,
             post: updatedRootPost,
-            replies: rootChildren.map<CommentNode>(buildNode).toList(),
+            replies: [buildNode(topReply)],
           );
 
           setState(() {
             _treeNode = rootNode;
+            _remainingRepliesCount = remainingCount > 0 ? remainingCount : 0;
+            _otherAvatarUrls = otherAvatars;
+            _otherAuthorNames = otherNames;
             _isLoadingThread = false;
           });
           return;
         } else {
           setState(() {
             _treeNode = null;
+            _remainingRepliesCount = 0;
+            _otherAvatarUrls = [];
+            _otherAuthorNames = [];
             _isLoadingThread = false;
           });
           return;
@@ -2190,6 +2247,104 @@ class _FeedPostThreadItemState extends State<_FeedPostThreadItem> {
     });
   }
 
+  Widget _buildShowRepliesFooter(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 48.0 + 14.0, top: 4.0, bottom: 8.0),
+      child: InkWell(
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => ThreadDetailPage(
+                rootPostId: widget.post.id,
+              ),
+            ),
+          );
+        },
+        borderRadius: BorderRadius.circular(16.0),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              if (_otherAvatarUrls.isNotEmpty) ...[
+                SizedBox(
+                  width: (_otherAvatarUrls.length - 1) * 12.0 + 19.0,
+                  height: 22.0,
+                  child: Stack(
+                    children: List.generate(_otherAvatarUrls.length, (i) {
+                      final url = _otherAvatarUrls[i];
+                      final name = i < _otherAuthorNames.length
+                          ? _otherAuthorNames[i]
+                          : '?';
+                      return Positioned(
+                        left: i * 12.0,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: Theme.of(context).canvasColor,
+                              width: 1.5,
+                            ),
+                          ),
+                          child: CircleAvatar(
+                            radius: 9.5,
+                            backgroundColor: Theme.of(context)
+                                .colorScheme
+                                .primary
+                                .withValues(alpha: 0.3),
+                            backgroundImage:
+                                url.isNotEmpty ? NetworkImage(url) : null,
+                            child: url.isEmpty
+                                ? Text(
+                                    name.isNotEmpty
+                                        ? name[0].toUpperCase()
+                                        : '?',
+                                    style: const TextStyle(
+                                      fontSize: 9.0,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white,
+                                    ),
+                                  )
+                                : null,
+                          ),
+                        ),
+                      );
+                    }),
+                  ),
+                ),
+                const SizedBox(width: 8.0),
+              ],
+              Icon(
+                Icons.south_west_rounded,
+                size: 13.0,
+                color: Theme.of(context)
+                    .colorScheme
+                    .onSurface
+                    .withValues(alpha: 0.6),
+              ),
+              const SizedBox(width: 5.0),
+              Text(
+                _remainingRepliesCount > 1
+                    ? "Show $_remainingRepliesCount more replies"
+                    : "Show 1 more reply",
+                style: TextStyle(
+                  color: Theme.of(context)
+                      .colorScheme
+                      .onSurface
+                      .withValues(alpha: 0.65),
+                  fontSize: 13.0,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     // Always resolve the latest post instance dynamically from FeedProvider
@@ -2217,6 +2372,10 @@ class _FeedPostThreadItemState extends State<_FeedPostThreadItem> {
         strokeWidth: 1.8,
         curveRadius: 12.0,
         allowNestedExpansion: false,
+        showHideReplies: false,
+        footer: _remainingRepliesCount > 0
+            ? _buildShowRepliesFooter(context)
+            : null,
         onReactionToggle: _handleReactionToggle,
         onReplyTap: (node) {
           Navigator.push(

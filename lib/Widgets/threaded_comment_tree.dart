@@ -208,6 +208,9 @@ class ThreadedCommentTree extends StatelessWidget {
   final void Function(CommentNode node)? onCommentTap;
   final Function(String postId, String reactionKey)? onReactionToggle;
 
+  final bool showHideReplies;
+  final Widget? footer;
+
   const ThreadedCommentTree({
     super.key,
     required this.comment,
@@ -224,6 +227,8 @@ class ThreadedCommentTree extends StatelessWidget {
     this.onReplyTap,
     this.onCommentTap,
     this.onReactionToggle,
+    this.showHideReplies = true,
+    this.footer,
   });
 
   @override
@@ -245,6 +250,8 @@ class ThreadedCommentTree extends StatelessWidget {
       onReactionToggle: onReactionToggle,
       isRootNode: true,
       isLastChildChain: true,
+      showHideReplies: showHideReplies,
+      footer: footer,
     );
   }
 }
@@ -268,6 +275,8 @@ class _ThreadNodeWidget extends StatefulWidget {
   final VoidCallback? onExpansionChanged;
   final bool isRootNode;
   final bool isLastChildChain;
+  final bool showHideReplies;
+  final Widget? footer;
 
   const _ThreadNodeWidget({
     super.key,
@@ -289,6 +298,8 @@ class _ThreadNodeWidget extends StatefulWidget {
     this.onExpansionChanged,
     required this.isRootNode,
     required this.isLastChildChain,
+    this.showHideReplies = true,
+    this.footer,
   });
 
   @override
@@ -321,16 +332,11 @@ class _ThreadNodeWidgetState extends State<_ThreadNodeWidget>
   @override
   void initState() {
     super.initState();
+    _isExpanded = widget.isRootNode;
     if (widget.initialExpandPostId != null) {
-      final bool containsTarget =
-          _hasDescendantWithId(widget.comment, widget.initialExpandPostId);
-      if (containsTarget) {
-        // Always auto-expand any ancestor node leading down to the highlighted reply
+      if (_hasDescendantWithId(widget.comment, widget.initialExpandPostId) ||
+          widget.comment.id == widget.initialExpandPostId) {
         _isExpanded = true;
-      } else if (widget.isRootNode || widget.allowNestedExpansion) {
-        if (widget.comment.id == widget.initialExpandPostId) {
-          _isExpanded = true;
-        }
       }
     }
     _updateKeys();
@@ -671,54 +677,59 @@ class _ThreadNodeWidgetState extends State<_ThreadNodeWidget>
                                   },
                                   isRootNode: false,
                                   isLastChildChain: isLast,
+                                  showHideReplies: widget.showHideReplies,
+                                  footer: null,
                                 );
                               }),
                             ),
                           ),
                         ),
-                        Padding(
-                          padding: EdgeInsets.only(
-                            left: widget.isRootNode
-                                ? widget.parentLeftPadding + 14.0
-                                : widget.indentationWidth + 14.0,
-                            top: 2.0,
-                            bottom: 8.0,
-                          ),
-                          child: InkWell(
-                            onTap: () {
-                              setState(() {
-                                _isExpanded = false;
-                              });
-                              _startAnimationFrameSync();
-                            },
-                            borderRadius: BorderRadius.circular(12.0),
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 8.0, vertical: 4.0),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(
-                                    Icons.keyboard_arrow_up_rounded,
-                                    size: 14.0,
-                                    color:
-                                        Theme.of(context).colorScheme.primary,
-                                  ),
-                                  const SizedBox(width: 4.0),
-                                  Text(
-                                    "Hide replies",
-                                    style: TextStyle(
+                        if (widget.footer != null)
+                          widget.footer!,
+                        if (widget.showHideReplies)
+                          Padding(
+                            padding: EdgeInsets.only(
+                              left: widget.isRootNode
+                                  ? widget.parentLeftPadding + 14.0
+                                  : widget.indentationWidth + 14.0,
+                              top: 2.0,
+                              bottom: 8.0,
+                            ),
+                            child: InkWell(
+                              onTap: () {
+                                setState(() {
+                                  _isExpanded = false;
+                                });
+                                _startAnimationFrameSync();
+                              },
+                              borderRadius: BorderRadius.circular(12.0),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8.0, vertical: 4.0),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      Icons.keyboard_arrow_up_rounded,
+                                      size: 14.0,
                                       color:
                                           Theme.of(context).colorScheme.primary,
-                                      fontSize: 12.0,
-                                      fontWeight: FontWeight.w600,
                                     ),
-                                  ),
-                                ],
+                                    const SizedBox(width: 4.0),
+                                    Text(
+                                      "Hide replies",
+                                      style: TextStyle(
+                                        color:
+                                            Theme.of(context).colorScheme.primary,
+                                        fontSize: 12.0,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
                           ),
-                        ),
                       ],
                     ),
             ),
