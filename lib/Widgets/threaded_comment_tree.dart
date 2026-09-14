@@ -322,9 +322,13 @@ class _ThreadNodeWidgetState extends State<_ThreadNodeWidget>
   void initState() {
     super.initState();
     if (widget.initialExpandPostId != null) {
-      if (widget.isRootNode || widget.allowNestedExpansion) {
-        if (widget.comment.id == widget.initialExpandPostId ||
-            _hasDescendantWithId(widget.comment, widget.initialExpandPostId)) {
+      final bool containsTarget =
+          _hasDescendantWithId(widget.comment, widget.initialExpandPostId);
+      if (containsTarget) {
+        // Always auto-expand any ancestor node leading down to the highlighted reply
+        _isExpanded = true;
+      } else if (widget.isRootNode || widget.allowNestedExpansion) {
+        if (widget.comment.id == widget.initialExpandPostId) {
           _isExpanded = true;
         }
       }

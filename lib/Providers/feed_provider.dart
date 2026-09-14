@@ -24,7 +24,16 @@ class FeedProvider with ChangeNotifier {
 
   FeedFilter _feedFilter = FeedFilter.fullNetwork;
   FeedFilter get feedFilter => _feedFilter;
-  String get currentScope => _feedFilter == FeedFilter.global ? 'global' : 'network';
+  String get currentScope {
+    switch (_feedFilter) {
+      case FeedFilter.global:
+        return 'global';
+      case FeedFilter.innerCircle:
+        return 'inner_circle';
+      case FeedFilter.fullNetwork:
+        return 'network';
+    }
+  }
 
   CustomNetwork? _activeCustomNetwork;
   CustomNetwork? get activeCustomNetwork => _activeCustomNetwork;
@@ -62,11 +71,23 @@ class FeedProvider with ChangeNotifier {
       return _posts
           .where((p) =>
               (p.degree == 1 || p.degree == 0) &&
-              (p.networkId == null || p.networkId!.isEmpty))
+              (p.networkId == null || p.networkId!.isEmpty) &&
+              p.feedScope == 'inner_circle' &&
+              !p.isAnonymous)
+          .toList();
+    }
+    if (_feedFilter == FeedFilter.fullNetwork) {
+      return _posts
+          .where((p) =>
+              (p.networkId == null || p.networkId!.isEmpty) &&
+              (p.feedScope == 'network' || (p.feedScope == null && !p.isAnonymous)) &&
+              !p.isAnonymous)
           .toList();
     }
     return _posts
-        .where((p) => p.networkId == null || p.networkId!.isEmpty)
+        .where((p) =>
+            (p.networkId == null || p.networkId!.isEmpty) &&
+            (p.feedScope == 'global' || (p.feedScope == null && p.isAnonymous)))
         .toList();
   }
 
@@ -76,11 +97,86 @@ class FeedProvider with ChangeNotifier {
   bool? _savedNetworkShownCaughtUp;
   String? _savedNetworkLatestId;
 
+  List<FeedPost>? _savedInnerCirclePosts;
+  String? _savedInnerCircleBucket;
+  bool? _savedInnerCircleReachedEnd;
+  bool? _savedInnerCircleShownCaughtUp;
+  String? _savedInnerCircleLatestId;
+
   List<FeedPost>? _savedGlobalPosts;
   String? _savedGlobalBucket;
   bool? _savedGlobalReachedEnd;
   bool? _savedGlobalShownCaughtUp;
   String? _savedGlobalLatestId;
+
+  void _saveFilterState(FeedFilter filter) {
+    switch (filter) {
+      case FeedFilter.global:
+        _savedGlobalPosts = List.from(_posts);
+        _savedGlobalBucket = _currentBucket;
+        _savedGlobalReachedEnd = _hasReachedEnd;
+        _savedGlobalShownCaughtUp = _hasShownCaughtUpDivider;
+        _savedGlobalLatestId = _latestKnownPostId;
+        break;
+      case FeedFilter.innerCircle:
+        _savedInnerCirclePosts = List.from(_posts);
+        _savedInnerCircleBucket = _currentBucket;
+        _savedInnerCircleReachedEnd = _hasReachedEnd;
+        _savedInnerCircleShownCaughtUp = _hasShownCaughtUpDivider;
+        _savedInnerCircleLatestId = _latestKnownPostId;
+        break;
+      case FeedFilter.fullNetwork:
+        _savedNetworkPosts = List.from(_posts);
+        _savedNetworkBucket = _currentBucket;
+        _savedNetworkReachedEnd = _hasReachedEnd;
+        _savedNetworkShownCaughtUp = _hasShownCaughtUpDivider;
+        _savedNetworkLatestId = _latestKnownPostId;
+        break;
+    }
+  }
+
+  bool _hasCachedFilterState(FeedFilter filter) {
+    switch (filter) {
+      case FeedFilter.global:
+        return _savedGlobalPosts != null && _savedGlobalPosts!.isNotEmpty;
+      case FeedFilter.innerCircle:
+        return _savedInnerCirclePosts != null && _savedInnerCirclePosts!.isNotEmpty;
+      case FeedFilter.fullNetwork:
+        return _savedNetworkPosts != null && _savedNetworkPosts!.isNotEmpty;
+    }
+  }
+
+  void _restoreFilterState(FeedFilter filter) {
+    switch (filter) {
+      case FeedFilter.global:
+        _posts = List.from(_savedGlobalPosts!);
+        _currentBucket = _savedGlobalBucket ?? 'unseen';
+        _hasReachedEnd = _savedGlobalReachedEnd ?? false;
+        _hasShownCaughtUpDivider = _savedGlobalShownCaughtUp ?? false;
+        _latestKnownPostId = _savedGlobalLatestId;
+        break;
+      case FeedFilter.innerCircle:
+        _posts = List.from(_savedInnerCirclePosts!);
+        _currentBucket = _savedInnerCircleBucket ?? 'unseen';
+        _hasReachedEnd = _savedInnerCircleReachedEnd ?? false;
+        _hasShownCaughtUpDivider = _savedInnerCircleShownCaughtUp ?? false;
+        _latestKnownPostId = _savedInnerCircleLatestId;
+        break;
+      case FeedFilter.fullNetwork:
+        _posts = List.from(_savedNetworkPosts!);
+        _currentBucket = _savedNetworkBucket ?? 'unseen';
+        _hasReachedEnd = _savedNetworkReachedEnd ?? false;
+        _hasShownCaughtUpDivider = _savedNetworkShownCaughtUp ?? false;
+        _latestKnownPostId = _savedNetworkLatestId;
+        break;
+    }
+  }
+
+  void _clearCachedFilterStates() {
+    _savedNetworkPosts = null;
+    _savedInnerCirclePosts = null;
+    _savedGlobalPosts = null;
+  }
 
   Future<void> setFilter(FeedFilter filter, {bool isManual = true}) async {
     if (isManual) {
@@ -99,61 +195,28 @@ class FeedProvider with ChangeNotifier {
     }
     if (_feedFilter == filter) return;
 
-    final wasGlobal = _feedFilter == FeedFilter.global;
-    final isGlobal = filter == FeedFilter.global;
+    final oldFilter = _feedFilter;
     _feedFilter = filter;
 
-    if (wasGlobal != isGlobal) {
-      // Save state of outgoing filter
-      if (wasGlobal) {
-        _savedGlobalPosts = List.from(_posts);
-        _savedGlobalBucket = _currentBucket;
-        _savedGlobalReachedEnd = _hasReachedEnd;
-        _savedGlobalShownCaughtUp = _hasShownCaughtUpDivider;
-        _savedGlobalLatestId = _latestKnownPostId;
-      } else {
-        _savedNetworkPosts = List.from(_posts);
-        _savedNetworkBucket = _currentBucket;
-        _savedNetworkReachedEnd = _hasReachedEnd;
-        _savedNetworkShownCaughtUp = _hasShownCaughtUpDivider;
-        _savedNetworkLatestId = _latestKnownPostId;
-      }
+    // Save state of outgoing filter
+    _saveFilterState(oldFilter);
 
-      // Check if we already have cached posts for incoming filter
-      final hasCached = isGlobal
-          ? (_savedGlobalPosts != null && _savedGlobalPosts!.isNotEmpty)
-          : (_savedNetworkPosts != null && _savedNetworkPosts!.isNotEmpty);
-
-      if (hasCached) {
-        if (isGlobal) {
-          _posts = List.from(_savedGlobalPosts!);
-          _currentBucket = _savedGlobalBucket ?? 'unseen';
-          _hasReachedEnd = _savedGlobalReachedEnd ?? false;
-          _hasShownCaughtUpDivider = _savedGlobalShownCaughtUp ?? false;
-          _latestKnownPostId = _savedGlobalLatestId;
-        } else {
-          _posts = List.from(_savedNetworkPosts!);
-          _currentBucket = _savedNetworkBucket ?? 'unseen';
-          _hasReachedEnd = _savedNetworkReachedEnd ?? false;
-          _hasShownCaughtUpDivider = _savedNetworkShownCaughtUp ?? false;
-          _latestKnownPostId = _savedNetworkLatestId;
-        }
-        notifyListeners();
-        // Silently refresh in background without clearing posts or blocking UI
-        fetchInitialFeed(silent: true);
-        fetchUnseenCount();
-      } else {
-        _posts = [];
-        _currentBucket = 'unseen';
-        _hasReachedEnd = false;
-        _hasShownCaughtUpDivider = false;
-        _latestKnownPostId = null;
-        notifyListeners();
-        await fetchInitialFeed();
-        await fetchUnseenCount();
-      }
-    } else {
+    // Check if we already have cached posts for incoming filter
+    if (_hasCachedFilterState(filter)) {
+      _restoreFilterState(filter);
       notifyListeners();
+      // Silently refresh in background without clearing posts or blocking UI
+      fetchInitialFeed(silent: true);
+      fetchUnseenCount();
+    } else {
+      _posts = [];
+      _currentBucket = 'unseen';
+      _hasReachedEnd = false;
+      _hasShownCaughtUpDivider = false;
+      _latestKnownPostId = null;
+      notifyListeners();
+      await fetchInitialFeed();
+      await fetchUnseenCount();
     }
   }
 
@@ -223,6 +286,14 @@ class FeedProvider with ChangeNotifier {
   int _unseenCount = 0;
   int get unseenCount => _unseenCount;
 
+  Map<String, int> _unseenCountsByScope = {
+    'global': 0,
+    'network': 0,
+    'inner_circle': 0,
+  };
+  Map<String, int> get unseenCountsByScope => _unseenCountsByScope;
+  int getUnseenCountForScope(String scope) => _unseenCountsByScope[scope] ?? 0;
+
   AppError? _error;
   AppError? get error => _error;
 
@@ -251,8 +322,7 @@ class FeedProvider with ChangeNotifier {
         _unsubscribeRealtime();
         _stopNewPostPollTimer();
         _posts = [];
-        _savedNetworkPosts = null;
-        _savedGlobalPosts = null;
+        _clearCachedFilterStates();
         _unseenCount = 0;
         _hasNewPosts = false;
         _latestKnownPostId = null;
@@ -268,8 +338,7 @@ class FeedProvider with ChangeNotifier {
       _initialLoadFallbackTimer?.cancel();
       _initialLoadFallbackTimer = null;
       _posts = [];
-      _savedNetworkPosts = null;
-      _savedGlobalPosts = null;
+      _clearCachedFilterStates();
       _unseenCount = 0;
       _hasNewPosts = false;
       _latestKnownPostId = null;
@@ -386,16 +455,29 @@ class FeedProvider with ChangeNotifier {
   // -------------------------------------------------------
 
   Future<void> fetchUnseenCount() async {
+    await fetchAllUnseenCounts();
+  }
+
+  Future<void> fetchAllUnseenCounts() async {
     final vId = _viewerId;
     if (vId == null) return;
     try {
-      _unseenCount = await _repository.getUnseenCount(
-        viewerId: vId,
-        scope: currentScope,
-      );
+      final results = await Future.wait([
+        _repository.getUnseenCount(viewerId: vId, scope: 'global'),
+        _repository.getUnseenCount(viewerId: vId, scope: 'network'),
+        _repository.getUnseenCount(viewerId: vId, scope: 'inner_circle'),
+      ]);
+      _unseenCountsByScope = {
+        'global': results[0],
+        'network': results[1],
+        'inner_circle': results[2],
+      };
+      if (_activeCustomNetwork == null) {
+        _unseenCount = _unseenCountsByScope[currentScope] ?? 0;
+      }
       notifyListeners();
     } catch (e) {
-      debugPrint("[FeedProvider] Error fetching unseen count: $e");
+      debugPrint("[FeedProvider] Error fetching unseen counts: $e");
     }
   }
 
@@ -524,6 +606,7 @@ class FeedProvider with ChangeNotifier {
         _isLoading = false;
       }
       _unseenCount = 0; // Clear badge immediately in the UI
+      _unseenCountsByScope[currentScope] = 0;
       notifyListeners();
     }
   }
@@ -633,6 +716,7 @@ class FeedProvider with ChangeNotifier {
     String visibility = 'both',
     bool isAnonymous = false,
     String? networkId,
+    String? feedScope,
   }) async {
     final vId = _viewerId;
     if (vId == null || content.trim().isEmpty) {
@@ -663,6 +747,10 @@ class FeedProvider with ChangeNotifier {
         ? false
         : isAnonymous;
 
+    final String? effectiveScope = effectiveNetworkId != null
+        ? null
+        : (feedScope ?? currentScope);
+
     final String tempId = 'temp_${DateTime.now().millisecondsSinceEpoch}';
     final tempPost = FeedPost(
       id: tempId,
@@ -677,11 +765,13 @@ class FeedProvider with ChangeNotifier {
       visibility: visibility,
       isAnonymous: effectiveAnonymous,
       networkId: effectiveNetworkId,
+      feedScope: effectiveScope,
     );
 
     final bool matchesCurrentView = (_activeCustomNetwork != null)
         ? (effectiveNetworkId == _activeCustomNetwork!.id)
-        : (effectiveNetworkId == null || effectiveNetworkId.isEmpty);
+        : ((effectiveNetworkId == null || effectiveNetworkId.isEmpty) &&
+            effectiveScope == currentScope);
 
     if (replyToPostId == null && matchesCurrentView) {
       _posts.insert(0, tempPost);
@@ -696,6 +786,7 @@ class FeedProvider with ChangeNotifier {
         visibility: visibility,
         isAnonymous: effectiveAnonymous,
         networkId: effectiveNetworkId,
+        feedScope: effectiveScope,
       );
 
       if (replyToPostId == null) {
@@ -1341,7 +1432,9 @@ class FeedProvider with ChangeNotifier {
             }
           }
         } else {
-          if (postNetworkId == null || postNetworkId.isEmpty) {
+          final String? postScope = newRecord['feed_scope']?.toString();
+          if ((postNetworkId == null || postNetworkId.isEmpty) &&
+              (postScope == null || postScope == currentScope)) {
             _checkForNewPosts();
             fetchUnseenCount();
           }

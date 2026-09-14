@@ -44,13 +44,13 @@ class DiscordNetworkRailDrawer extends StatelessWidget {
   static const List<NetworkItemData> existingNetworks = [
     NetworkItemData(
       filter: FeedFilter.global,
-      name: 'Global Feed',
+      name: 'Global',
       subtitle: 'Public posts from everyone',
       icon: Icons.language_rounded,
     ),
     NetworkItemData(
       filter: FeedFilter.fullNetwork,
-      name: 'Full Network',
+      name: 'Network',
       subtitle: '1st & 2nd degree connections',
       icon: Icons.public_rounded,
     ),
@@ -318,12 +318,11 @@ class DiscordNetworkRailDrawer extends StatelessWidget {
                   width: 46,
                   height: 46,
                   decoration: BoxDecoration(
-                    color: isSelected ? Colors.white : AppColors.surfaceSecondary,
+                    color:
+                        isSelected ? Colors.white : AppColors.surfaceSecondary,
                     borderRadius: BorderRadius.circular(isSelected ? 14 : 23),
                     border: Border.all(
-                      color: isSelected
-                          ? Colors.white
-                          : AppColors.borderSubtle,
+                      color: isSelected ? Colors.white : AppColors.borderSubtle,
                       width: isSelected ? 1.4 : 1.0,
                     ),
                     boxShadow: isSelected

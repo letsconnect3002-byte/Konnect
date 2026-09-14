@@ -482,8 +482,23 @@ int? targetChatSenderId;
 bool targetOpenNotificationsPage = false;
 String? targetTribeChatId;
 String? targetTribeName;
+String? targetFeedRootPostId;
+String? targetFeedHighlightPostId;
+
+DateTime? _lastNotificationClickTime;
+String? _lastNotificationClickPayload;
 
 void handleLocalNotificationClickPayload(String payload) {
+  final now = DateTime.now();
+  if (_lastNotificationClickPayload == payload &&
+      _lastNotificationClickTime != null &&
+      now.difference(_lastNotificationClickTime!).inMilliseconds < 1000) {
+    print("PushNotifications: Ignoring duplicate notification click within 1000ms");
+    return;
+  }
+  _lastNotificationClickTime = now;
+  _lastNotificationClickPayload = payload;
+
   try {
     final data = jsonDecode(payload);
     final action = data['action'] as String?;
@@ -2239,6 +2254,11 @@ void main() async {
               targetOpenNotificationsPage = true;
             } else if (action == 'connection_notification') {
               targetOpenNotificationsPage = true;
+            } else if (action == 'feed_notification') {
+              targetFeedRootPostId =
+                  data['root_post_id']?.toString() ?? data['post_id']?.toString();
+              targetFeedHighlightPostId =
+                  data['post_id']?.toString() ?? targetFeedRootPostId;
             } else {
               final senderIdStr = data['sender_id'] as String?;
               if (senderIdStr != null) {
@@ -2284,6 +2304,11 @@ void main() async {
             targetOpenNotificationsPage = true;
           } else if (action == 'connection_notification') {
             targetOpenNotificationsPage = true;
+          } else if (action == 'feed_notification') {
+            targetFeedRootPostId =
+                data['root_post_id']?.toString() ?? data['post_id']?.toString();
+            targetFeedHighlightPostId =
+                data['post_id']?.toString() ?? targetFeedRootPostId;
           } else {
             final senderIdStr = data['sender_id'] as String?;
             if (senderIdStr != null) {
@@ -2310,6 +2335,11 @@ void main() async {
         targetOpenNotificationsPage = true;
       } else if (action == 'connection_notification') {
         targetOpenNotificationsPage = true;
+      } else if (action == 'feed_notification') {
+        targetFeedRootPostId =
+            data['root_post_id']?.toString() ?? data['post_id']?.toString();
+        targetFeedHighlightPostId =
+            data['post_id']?.toString() ?? targetFeedRootPostId;
       } else {
         final senderIdStr = data['sender_id'] as String?;
         if (senderIdStr != null) {
@@ -2663,6 +2693,29 @@ class _AppShellGateState extends State<AppShellGate> {
             reverseTransitionDuration: Duration.zero,
           ),
         );
+      } else if (targetFeedRootPostId != null &&
+          targetFeedRootPostId!.isNotEmpty) {
+        final rootId = targetFeedRootPostId!;
+        final highlightId = targetFeedHighlightPostId ?? rootId;
+        targetFeedRootPostId = null;
+        targetFeedHighlightPostId = null;
+        pendingNotificationPayload = null;
+
+        appShellKey.currentState?.setSelectedIndex(0);
+        navigatorKey.currentState?.push(
+          PageRouteBuilder(
+            pageBuilder: (context, anim, secAnim) => ThreadDetailPage(
+              rootPostId: rootId,
+              highlightPostId: highlightId,
+            ),
+            transitionDuration: Duration.zero,
+            reverseTransitionDuration: Duration.zero,
+          ),
+        );
+      } else if (pendingNotificationPayload != null) {
+        final payload = pendingNotificationPayload!;
+        pendingNotificationPayload = null;
+        handleLocalNotificationClickPayload(payload);
       }
 
       // Step 3 (background): Load chat + notifications without blocking the UI.

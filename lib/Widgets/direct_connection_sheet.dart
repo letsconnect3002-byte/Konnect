@@ -290,7 +290,7 @@ class _DirectConnectionSheetState extends State<DirectConnectionSheet> {
                         Text(
                           widget.targetUserProfession.isNotEmpty
                               ? widget.targetUserProfession
-                              : "Member on Konnect",
+                              : "Member of Jana",
                           style: context.bodyText.copyWith(
                             color: context.textSecondary,
                             fontSize: 12.5,
@@ -457,15 +457,24 @@ class _DirectConnectionSheetState extends State<DirectConnectionSheet> {
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           color: isSelected
-              ? context.accentSecondary.withValues(alpha: 0.08)
+              ? Colors.white.withValues(alpha: 0.06)
               : context.surfaceSecondary,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: isSelected
-                ? context.accentSecondary
+                ? Colors.white
                 : context.surfaceSecondary,
             width: 1.5,
           ),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: Colors.white.withValues(alpha: 0.08),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+              : null,
         ),
         child: Row(
           children: [
@@ -475,14 +484,14 @@ class _DirectConnectionSheetState extends State<DirectConnectionSheet> {
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: isSelected
-                    ? context.accentSecondary.withValues(alpha: 0.15)
+                    ? Colors.white.withValues(alpha: 0.15)
                     : context.surfacePrimary,
               ),
               child: Icon(
                 icon,
                 size: 18,
                 color: isSelected
-                    ? context.accentSecondary
+                    ? Colors.white
                     : context.textSecondary,
               ),
             ),
@@ -495,7 +504,7 @@ class _DirectConnectionSheetState extends State<DirectConnectionSheet> {
                     title,
                     style: TextStyle(
                       color: isSelected
-                          ? context.accentSecondary
+                          ? Colors.white
                           : context.textPrimary,
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
@@ -505,7 +514,9 @@ class _DirectConnectionSheetState extends State<DirectConnectionSheet> {
                   Text(
                     description,
                     style: TextStyle(
-                      color: context.textSecondary,
+                      color: isSelected
+                          ? context.textPrimary.withValues(alpha: 0.8)
+                          : context.textSecondary,
                       fontSize: 11.5,
                     ),
                   ),
@@ -519,7 +530,7 @@ class _DirectConnectionSheetState extends State<DirectConnectionSheet> {
                 shape: BoxShape.circle,
                 border: Border.all(
                   color: isSelected
-                      ? context.accentSecondary
+                      ? Colors.white
                       : context.textMuted.withValues(alpha: 0.4),
                   width: 2,
                 ),
@@ -529,9 +540,9 @@ class _DirectConnectionSheetState extends State<DirectConnectionSheet> {
                       child: Container(
                         width: 10,
                         height: 10,
-                        decoration: BoxDecoration(
+                        decoration: const BoxDecoration(
                           shape: BoxShape.circle,
-                          color: context.accentSecondary,
+                          color: Colors.white,
                         ),
                       ),
                     )

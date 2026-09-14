@@ -17,6 +17,7 @@ class FeedPost {
   final String visibility; // 'casual', 'professional', 'both'
   final bool isAnonymous;
   final String? networkId;
+  final String? feedScope; // 'global', 'network', 'inner_circle'
 
   FeedPost({
     required this.id,
@@ -35,6 +36,7 @@ class FeedPost {
     this.visibility = 'both',
     this.isAnonymous = false,
     this.networkId,
+    this.feedScope,
   }) : activeReplyCount = activeReplyCount ?? replyCount;
 
 
@@ -108,6 +110,7 @@ class FeedPost {
       visibility: json['visibility']?.toString() ?? 'both',
       isAnonymous: json['is_anonymous'] == true,
       networkId: json['network_id']?.toString(),
+      feedScope: json['feed_scope']?.toString(),
     );
   }
 
@@ -152,6 +155,7 @@ class FeedPost {
       visibility: json['visibility']?.toString() ?? 'both',
       isAnonymous: json['is_anonymous'] == true,
       networkId: json['network_id']?.toString(),
+      feedScope: json['feed_scope']?.toString(),
     );
   }
 
@@ -173,6 +177,7 @@ class FeedPost {
     String? visibility,
     bool? isAnonymous,
     String? networkId,
+    String? feedScope,
   }) {
     final int newReplyCount = replyCount ?? this.replyCount;
     final int newActiveReplyCount = activeReplyCount ??
@@ -194,6 +199,7 @@ class FeedPost {
       visibility: visibility ?? this.visibility,
       isAnonymous: isAnonymous ?? this.isAnonymous,
       networkId: networkId ?? this.networkId,
+      feedScope: feedScope ?? this.feedScope,
     );
   }
 

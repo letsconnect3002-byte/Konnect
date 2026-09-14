@@ -21,9 +21,9 @@ import 'package:connect/Providers/pulse_provider.dart';
 import 'package:connect/Providers/notification_provider.dart';
 import 'package:connect/Pages/NotificationPage.dart';
 import 'package:connect/services/analytics_service.dart';
-import 'package:connect/Widgets/network_members_sheet.dart';
 import 'package:connect/Providers/custom_network_provider.dart';
 import 'package:connect/Models/custom_network.dart';
+import 'package:connect/Widgets/feed_title_dropdown.dart';
 
 class CircleFeedPage extends StatefulWidget {
   const CircleFeedPage({super.key});
@@ -78,7 +78,15 @@ class CircleFeedPage extends StatefulWidget {
     final bool isCustomActive = feedProviderRef.isCustomNetworkActive;
     final customNet = feedProviderRef.activeCustomNetwork;
     final bool isGlobalFeed = feedProviderRef.feedFilter == FeedFilter.global;
-    final bool allowAnonymous = isCustomActive ? customNet!.allowAnonymous : isGlobalFeed;
+    final bool isInnerCircleFeed =
+        feedProviderRef.feedFilter == FeedFilter.innerCircle;
+    final String? currentFeedScope = isCustomActive
+        ? null
+        : (isGlobalFeed
+            ? 'global'
+            : (isInnerCircleFeed ? 'inner_circle' : 'network'));
+    final bool allowAnonymous =
+        isCustomActive ? customNet!.allowAnonymous : isGlobalFeed;
     bool isAnonymousPost = false;
 
     showModalBottomSheet(
@@ -238,6 +246,32 @@ class CircleFeedPage extends StatefulWidget {
                           fontWeight: FontWeight.bold,
                         ),
                       ),
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.1),
+                          ),
+                        ),
+                        child: Text(
+                          isCustomActive
+                              ? customNet!.name
+                              : (isGlobalFeed
+                                  ? "Global"
+                                  : (isInnerCircleFeed
+                                      ? "Inner Circle"
+                                      : "Network")),
+                          style: TextStyle(
+                            color: context.textSecondary,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
                       const Spacer(),
                       Text(
                         "$charCount / 500",
@@ -379,7 +413,9 @@ class CircleFeedPage extends StatefulWidget {
                   if (!isCustomActive && !isGlobalFeed) ...[
                     Text(
                       postVisibility == 'both'
-                          ? "Visible to all connections across your network."
+                          ? (isInnerCircleFeed
+                              ? "Visible only to your direct connections in Inner Circle."
+                              : "Visible to all connections across your network.")
                           : postVisibility == 'professional'
                               ? "Visible only to your professional network."
                               : "Visible only to your casual / personal network.",
@@ -624,6 +660,7 @@ class CircleFeedPage extends StatefulWidget {
                                   visibility: postVisibility,
                                   isAnonymous: isAnonymousPost,
                                   networkId: isCustomActive ? customNet!.id : null,
+                                  feedScope: currentFeedScope,
                                 );
                                 AnalyticsService.logEvent(
                                   name: 'post_created',
@@ -638,6 +675,7 @@ class CircleFeedPage extends StatefulWidget {
                                         .allMatches(postContent)
                                         .length,
                                     'is_anonymous': isAnonymousPost ? 1 : 0,
+                                    'feed_scope': currentFeedScope ?? 'custom',
                                     if (isCustomActive)
                                       'network_id': customNet!.id,
                                   },
@@ -785,6 +823,7 @@ class _CircleFeedPageState extends State<CircleFeedPage> {
                   connectionProvider.state is UserConnectionError,
         );
       }
+      feedProvider.fetchAllUnseenCounts();
       _subscribeToFeedRealtime();
     });
   }
@@ -984,7 +1023,7 @@ class _CircleFeedPageState extends State<CircleFeedPage> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  "None of your direct 1st-degree connections have posted yet. Switch to Full Network to see posts from your extended network.",
+                  "None of your direct 1st-degree connections have posted yet. Switch to Network to see posts from your extended network.",
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     color: context.textSecondary,
@@ -1001,7 +1040,7 @@ class _CircleFeedPageState extends State<CircleFeedPage> {
                   icon: const Icon(Icons.public_rounded,
                       color: Colors.black, size: 18),
                   label: const Text(
-                    "View Full Network",
+                    "View Network",
                     style: TextStyle(
                       color: Colors.black,
                       fontWeight: FontWeight.bold,
@@ -1157,149 +1196,29 @@ class _CircleFeedPageState extends State<CircleFeedPage> {
             child: Stack(
               alignment: Alignment.center,
               children: [
-                // Left: Network Squircle Button + Name (Jana or Custom Network Name) + Actions
+                // Left: Tappable Title Dropdown (WhatsApp Communities-style)
                 Positioned(
-                  left: 20,
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Builder(
-                        builder: (context) {
-                          final isCustomActive =
-                              feedProvider.isCustomNetworkActive;
-                          final customNet =
-                              feedProvider.activeCustomNetwork;
-                          final activeNetwork =
-                              DiscordNetworkRailDrawer.getNetworkData(
-                                  feedProvider.feedFilter);
-
-                          return BounceTap(
-                            scaleDown: 0.92,
-                            onTap: () {
-                              HapticFeedback.lightImpact();
-                              _scaffoldKey.currentState?.openDrawer();
-                            },
-                            child: Container(
-                              width: 34,
-                              height: 34,
-                              decoration: BoxDecoration(
-                                color: context.surfaceSecondary,
-                                borderRadius: BorderRadius.circular(10),
-                                border: Border.all(
-                                  color: Colors.white.withValues(alpha: 0.1),
-                                  width: 1,
-                                ),
-                              ),
-                              child: Center(
-                                child: isCustomActive
-                                    ? Text(
-                                        customNet!.iconEmoji,
-                                        style: const TextStyle(fontSize: 16),
-                                      )
-                                    : Icon(
-                                        activeNetwork.icon,
-                                        size: 18,
-                                        color: Colors.white,
-                                      ),
-                              ),
-                            ),
-                          );
+                  left: 16,
+                  child: FeedTitleDropdown(
+                    currentFilter: feedProvider.feedFilter,
+                    activeCustomNetwork: feedProvider.activeCustomNetwork,
+                    onSelectFilter: (filter) {
+                      feedProvider.setFilter(filter);
+                      AnalyticsService.logEvent(
+                        name: 'feed_filter_changed',
+                        parameters: {'filter': filter.name},
+                      );
+                    },
+                    onSelectCustomNetwork: (customNet) {
+                      feedProvider.selectCustomNetwork(customNet);
+                      AnalyticsService.logEvent(
+                        name: 'custom_network_selected',
+                        parameters: {
+                          'network_id': customNet.id,
+                          'network_name': customNet.name
                         },
-                      ),
-                      const SizedBox(width: 10),
-                      Builder(
-                        builder: (context) {
-                          final isCustomActive =
-                              feedProvider.isCustomNetworkActive;
-                          final customNet =
-                              feedProvider.activeCustomNetwork;
-
-                          return Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              ConstrainedBox(
-                                constraints:
-                                    const BoxConstraints(maxWidth: 160),
-                                child: Text(
-                                  isCustomActive ? customNet!.name : "Jana",
-                                  style: TextStyle(
-                                    color: context.textPrimary,
-                                    fontSize: 20,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                              if (isCustomActive && customNet != null) ...[
-                                const SizedBox(width: 8),
-                                BounceTap(
-                                  scaleDown: 0.9,
-                                  onTap: () {
-                                    HapticFeedback.lightImpact();
-                                    NetworkMembersSheet.show(
-                                        context, customNet);
-                                  },
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 8, vertical: 4),
-                                    decoration: BoxDecoration(
-                                      color: customNet.color
-                                          .withValues(alpha: 0.15),
-                                      borderRadius:
-                                          BorderRadius.circular(99),
-                                      border: Border.all(
-                                        color: customNet.color
-                                            .withValues(alpha: 0.3),
-                                        width: 1,
-                                      ),
-                                    ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Icon(Icons.person_add_rounded,
-                                            size: 13,
-                                            color: customNet.color),
-                                        const SizedBox(width: 4),
-                                        Text(
-                                          '${customNet.memberCount}',
-                                          style: TextStyle(
-                                            color: customNet.color,
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ],
-                              if (!isCustomActive &&
-                                  feedProvider.unseenCount > 0) ...[
-                                const SizedBox(width: 8),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 8, vertical: 3),
-                                  decoration: BoxDecoration(
-                                    color: context.accentPrimary,
-                                    borderRadius:
-                                        BorderRadius.circular(99),
-                                  ),
-                                  child: Text(
-                                    "${feedProvider.unseenCount} new",
-                                    style: const TextStyle(
-                                      color: Colors.black,
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ],
-                          );
-                        },
-                      ),
-                    ],
+                      );
+                    },
                   ),
                 ),
                 // Right: Notification Icon Button

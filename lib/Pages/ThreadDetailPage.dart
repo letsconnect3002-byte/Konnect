@@ -334,27 +334,8 @@ class _ThreadDetailPageState extends State<ThreadDetailPage> {
     final currentRequestId = ++_loadRequestId;
     final feedProvider = Provider.of<FeedProvider>(context, listen: false);
     try {
-      var posts = await feedProvider.fetchThread(_currentRootPostId);
+      final posts = await feedProvider.fetchThread(_currentRootPostId);
 
-      // If a nested reply was highlighted, resolve its immediate parent as the sub-thread root
-      if (widget.highlightPostId != null &&
-          widget.highlightPostId!.isNotEmpty &&
-          widget.highlightPostId != _currentRootPostId) {
-        final targetPost =
-            posts.where((p) => p.id == widget.highlightPostId).firstOrNull;
-
-        if (targetPost != null &&
-            targetPost.replyToPostId != null &&
-            targetPost.replyToPostId!.isNotEmpty &&
-            targetPost.replyToPostId != _currentRootPostId) {
-          final parentId = targetPost.replyToPostId!;
-          final subPosts = await feedProvider.fetchThread(parentId);
-          if (subPosts.isNotEmpty) {
-            posts = subPosts;
-            _currentRootPostId = parentId;
-          }
-        }
-      }
 
       if (mounted && currentRequestId == _loadRequestId) {
         setState(() {
@@ -543,6 +524,7 @@ class _ThreadDetailPageState extends State<ThreadDetailPage> {
       visibility: target.visibility,
       isAnonymous: useAnonymous,
       networkId: target.networkId,
+      feedScope: target.feedScope,
     );
 
     // Optimistic UI addition
@@ -561,6 +543,7 @@ class _ThreadDetailPageState extends State<ThreadDetailPage> {
         visibility: target.visibility,
         isAnonymous: useAnonymous,
         networkId: target.networkId,
+        feedScope: target.feedScope,
       );
       AnalyticsService.logEvent(
         name: 'thread_reply_submitted',

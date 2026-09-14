@@ -30,6 +30,7 @@ abstract class FeedRepository {
     String visibility = 'both',
     bool isAnonymous = false,
     String? networkId,
+    String? feedScope,
   });
 
   Future<List<FeedPost>> getCustomNetworkFeed({
@@ -254,6 +255,7 @@ class SupabaseFeedRepository implements FeedRepository {
     String visibility = 'both',
     bool isAnonymous = false,
     String? networkId,
+    String? feedScope,
   }) async {
     String effectiveVisibility = visibility;
     final Map<String, dynamic> insertData = {
@@ -263,13 +265,15 @@ class SupabaseFeedRepository implements FeedRepository {
     };
     if (networkId != null && networkId.isNotEmpty) {
       insertData['network_id'] = networkId;
+    } else if (feedScope != null && feedScope.isNotEmpty) {
+      insertData['feed_scope'] = feedScope;
     }
     if (replyToPostId != null && replyToPostId.isNotEmpty) {
       insertData['reply_to_post_id'] = replyToPostId;
       try {
         final parentRes = await _client
             .from('posts')
-            .select('root_post_id, visibility, network_id')
+            .select('root_post_id, visibility, network_id, feed_scope')
             .eq('id', replyToPostId)
             .maybeSingle();
         final String? parentRootId = parentRes?['root_post_id']?.toString();
@@ -281,6 +285,9 @@ class SupabaseFeedRepository implements FeedRepository {
         }
         if (parentRes?['network_id'] != null && insertData['network_id'] == null) {
           insertData['network_id'] = parentRes!['network_id'].toString();
+        }
+        if (parentRes?['feed_scope'] != null && insertData['feed_scope'] == null) {
+          insertData['feed_scope'] = parentRes!['feed_scope'].toString();
         }
       } catch (_) {
         insertData['root_post_id'] = replyToPostId;
@@ -321,6 +328,7 @@ class SupabaseFeedRepository implements FeedRepository {
       visibility: row['visibility']?.toString() ?? effectiveVisibility,
       isAnonymous: anon,
       networkId: row['network_id']?.toString() ?? networkId,
+      feedScope: row['feed_scope']?.toString() ?? feedScope,
     );
   }
 
@@ -714,6 +722,8 @@ class SupabaseFeedRepository implements FeedRepository {
         replyToPostId: response['reply_to_post_id']?.toString(),
         reactionCounts: reactionCounts,
         isAnonymous: isAnon,
+        networkId: response['network_id']?.toString(),
+        feedScope: response['feed_scope']?.toString(),
       );
     } catch (e) {
       return null;
