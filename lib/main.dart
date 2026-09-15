@@ -485,7 +485,7 @@ String? targetTribeName;
 String? targetFeedRootPostId;
 String? targetFeedHighlightPostId;
 
-DateTime? _lastNotificationClickTime;
+DateTime? _lastNotificationClickTime; 
 String? _lastNotificationClickPayload;
 
 void handleLocalNotificationClickPayload(String payload) {
