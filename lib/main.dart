@@ -485,7 +485,7 @@ String? targetTribeName;
 String? targetFeedRootPostId;
 String? targetFeedHighlightPostId;
 
-DateTime? _lastNotificationClickTime; 
+DateTime? _lastNotificationClickTime;
 String? _lastNotificationClickPayload;
 
 void handleLocalNotificationClickPayload(String payload) {
@@ -493,7 +493,8 @@ void handleLocalNotificationClickPayload(String payload) {
   if (_lastNotificationClickPayload == payload &&
       _lastNotificationClickTime != null &&
       now.difference(_lastNotificationClickTime!).inMilliseconds < 1000) {
-    print("PushNotifications: Ignoring duplicate notification click within 1000ms");
+    print(
+        "PushNotifications: Ignoring duplicate notification click within 1000ms");
     return;
   }
   _lastNotificationClickTime = now;
@@ -2255,8 +2256,8 @@ void main() async {
             } else if (action == 'connection_notification') {
               targetOpenNotificationsPage = true;
             } else if (action == 'feed_notification') {
-              targetFeedRootPostId =
-                  data['root_post_id']?.toString() ?? data['post_id']?.toString();
+              targetFeedRootPostId = data['root_post_id']?.toString() ??
+                  data['post_id']?.toString();
               targetFeedHighlightPostId =
                   data['post_id']?.toString() ?? targetFeedRootPostId;
             } else {

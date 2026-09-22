@@ -89,11 +89,15 @@ class ThreadDetailPage extends StatefulWidget {
   /// instead of the root post.
   final String? focusReplyToPostId;
 
+  /// If provided, isolates this post as the head of an independent sub-thread.
+  final String? independentPostId;
+
   const ThreadDetailPage({
     super.key,
     required this.rootPostId,
     this.highlightPostId,
     this.focusReplyToPostId,
+    this.independentPostId,
   });
 
   @override
@@ -334,8 +338,84 @@ class _ThreadDetailPageState extends State<ThreadDetailPage> {
     final currentRequestId = ++_loadRequestId;
     final feedProvider = Provider.of<FeedProvider>(context, listen: false);
     try {
-      final posts = await feedProvider.fetchThread(_currentRootPostId);
+      final rawPosts = await feedProvider.fetchThread(widget.rootPostId);
+      List<FeedPost> posts = rawPosts;
 
+      // 1. Explicit independent sub-thread requested (e.g. tapped a reply or its comment icon)
+      if (widget.independentPostId != null &&
+          widget.independentPostId!.isNotEmpty &&
+          rawPosts.isNotEmpty) {
+        final targetPost =
+            rawPosts.where((p) => p.id == widget.independentPostId).firstOrNull;
+
+        if (targetPost != null) {
+          final Set<String> subThreadIds = {targetPost.id};
+          bool addedMore = true;
+          while (addedMore) {
+            addedMore = false;
+            for (final p in rawPosts) {
+              if (p.replyToPostId != null &&
+                  subThreadIds.contains(p.replyToPostId) &&
+                  !subThreadIds.contains(p.id)) {
+                subThreadIds.add(p.id);
+                addedMore = true;
+              }
+            }
+          }
+
+          final List<FeedPost> subPosts = [targetPost];
+          for (final p in rawPosts) {
+            if (p.id != targetPost.id && subThreadIds.contains(p.id)) {
+              subPosts.add(p);
+            }
+          }
+          posts = subPosts;
+          _currentRootPostId = targetPost.id;
+        }
+      }
+      // 2. Notification routing: If a nested reply was highlighted, isolate it as an independent thread
+      // rooted at its immediate parent post so it displays cleanly at full width
+      else if (widget.highlightPostId != null &&
+          widget.highlightPostId!.isNotEmpty &&
+          widget.highlightPostId != widget.rootPostId &&
+          rawPosts.isNotEmpty) {
+        final targetPost =
+            rawPosts.where((p) => p.id == widget.highlightPostId).firstOrNull;
+
+        if (targetPost != null &&
+            targetPost.replyToPostId != null &&
+            targetPost.replyToPostId!.isNotEmpty &&
+            targetPost.replyToPostId != rawPosts.first.id) {
+          final parentId = targetPost.replyToPostId!;
+          final anchorPost =
+              rawPosts.where((p) => p.id == parentId).firstOrNull;
+
+          if (anchorPost != null) {
+            final Set<String> subThreadIds = {parentId};
+            bool addedMore = true;
+            while (addedMore) {
+              addedMore = false;
+              for (final p in rawPosts) {
+                if (p.replyToPostId != null &&
+                    subThreadIds.contains(p.replyToPostId) &&
+                    !subThreadIds.contains(p.id)) {
+                  subThreadIds.add(p.id);
+                  addedMore = true;
+                }
+              }
+            }
+
+            final List<FeedPost> subPosts = [anchorPost];
+            for (final p in rawPosts) {
+              if (p.id != anchorPost.id && subThreadIds.contains(p.id)) {
+                subPosts.add(p);
+              }
+            }
+            posts = subPosts;
+            _currentRootPostId = anchorPost.id;
+          }
+        }
+      }
 
       if (mounted && currentRequestId == _loadRequestId) {
         setState(() {
@@ -764,13 +844,11 @@ class _ThreadDetailPageState extends State<ThreadDetailPage> {
                                   setState(() {
                                     _replyingToTarget = rootPost;
                                   });
-                                  _replyFocusNode.requestFocus();
                                 },
                                 onCommentTap: () {
                                   setState(() {
                                     _replyingToTarget = rootPost;
                                   });
-                                  _replyFocusNode.requestFocus();
                                 },
                               ),
                             );
@@ -803,7 +881,7 @@ class _ThreadDetailPageState extends State<ThreadDetailPage> {
                                   comment: treeNode,
                                   parentAvatarRadius: 18.0,
                                   childAvatarRadius: 14.0,
-                                  indentationWidth: 48.0,
+                                  indentationWidth: 32.0,
                                   parentLeftPadding: 16.0,
                                   lineColor: const Color(0xFF3E414D),
                                   strokeWidth: 1.8,
@@ -813,68 +891,28 @@ class _ThreadDetailPageState extends State<ThreadDetailPage> {
                                   allowNestedExpansion: false,
                                   onReactionToggle: _handleReactionToggle,
                                   onReplyTap: (node) {
-                                    if (node.replyCount > 0 || node.replies.isNotEmpty) {
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (context) => ThreadDetailPage(
-                                            rootPostId: node.id,
-                                            highlightPostId: node.id,
-                                            focusReplyToPostId: node.id,
-                                          ),
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => ThreadDetailPage(
+                                          rootPostId: widget.rootPostId,
+                                          independentPostId: node.id,
+                                          focusReplyToPostId: node.id,
                                         ),
-                                      );
-                                    } else {
-                                      final targetPost = node.post ?? _threadPosts.firstWhere(
-                                        (p) => p.id == node.id,
-                                        orElse: () => FeedPost(
-                                          id: node.id,
-                                          authorId: node.authorId,
-                                          authorName: node.authorName,
-                                          authorAvatarUrl: node.authorAvatarUrl,
-                                          content: node.content,
-                                          createdAt: DateTime.now(),
-                                          replyCount: node.replyCount,
-                                          degree: node.degree,
-                                        ),
-                                      );
-                                      setState(() {
-                                        _replyingToTarget = targetPost;
-                                      });
-                                      _replyFocusNode.requestFocus();
-                                    }
+                                      ),
+                                    );
                                   },
                                   onCommentTap: (node) {
-                                    if (node.replyCount > 0 || node.replies.isNotEmpty) {
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (context) => ThreadDetailPage(
-                                            rootPostId: node.id,
-                                            highlightPostId: node.id,
-                                            focusReplyToPostId: node.id,
-                                          ),
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => ThreadDetailPage(
+                                          rootPostId: widget.rootPostId,
+                                          independentPostId: node.id,
+                                          focusReplyToPostId: node.id,
                                         ),
-                                      );
-                                    } else {
-                                      final targetPost = node.post ?? _threadPosts.firstWhere(
-                                        (p) => p.id == node.id,
-                                        orElse: () => FeedPost(
-                                          id: node.id,
-                                          authorId: node.authorId,
-                                          authorName: node.authorName,
-                                          authorAvatarUrl: node.authorAvatarUrl,
-                                          content: node.content,
-                                          createdAt: DateTime.now(),
-                                          replyCount: node.replyCount,
-                                          degree: node.degree,
-                                        ),
-                                      );
-                                      setState(() {
-                                        _replyingToTarget = targetPost;
-                                      });
-                                      _replyFocusNode.requestFocus();
-                                    }
+                                      ),
+                                    );
                                   },
                                 ),
                               );

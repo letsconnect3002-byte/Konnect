@@ -2383,7 +2383,7 @@ class _FeedPostThreadItemState extends State<_FeedPostThreadItem> {
             MaterialPageRoute(
               builder: (context) => ThreadDetailPage(
                 rootPostId: widget.post.id,
-                highlightPostId: node.id,
+                independentPostId: node.id,
                 focusReplyToPostId: node.id,
               ),
             ),
@@ -2395,7 +2395,7 @@ class _FeedPostThreadItemState extends State<_FeedPostThreadItem> {
             MaterialPageRoute(
               builder: (context) => ThreadDetailPage(
                 rootPostId: widget.post.id,
-                highlightPostId: node.id,
+                independentPostId: node.id,
                 focusReplyToPostId: node.id,
               ),
             ),
