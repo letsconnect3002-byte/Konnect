@@ -43,6 +43,8 @@ import 'package:connect/Repositories/feed_repository.dart';
 import 'package:connect/Providers/custom_network_provider.dart';
 import 'package:connect/Repositories/custom_network_repository.dart';
 import 'package:connect/services/share_receiver_service.dart';
+import 'package:connect/Providers/vouch_provider.dart';
+import 'package:connect/Repositories/vouch_repository.dart';
 import 'package:timezone/data/latest.dart' as tz_latest;
 import 'package:timezone/timezone.dart' as tz;
 import 'package:audio_session/audio_session.dart' as session;
@@ -2474,6 +2476,12 @@ class MyApp extends StatelessWidget {
             );
             return feedProvider;
           },
+        ),
+        ChangeNotifierProvider<VouchProvider>(
+          create: (_) => VouchProvider(
+            vouchRepository: SupabaseVouchRepository(),
+            notificationRepository: SupabaseNotificationRepository(),
+          ),
         ),
       ],
       child: MaterialApp(

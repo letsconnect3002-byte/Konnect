@@ -50,6 +50,13 @@ class ConnectionProvider with ChangeNotifier {
   Set<int> get blockedUserIds => _blockedUserIds;
   Set<int> get blockedByUserIds => _blockedByUserIds;
   bool isUserBlocked(int? id) => id != null && _blockedUserIds.contains(id);
+  bool isConnected(int? id) {
+    if (id == null) return false;
+    return connections.any((c) {
+      final cId = c['id'] ?? c['connection_profile_id'] ?? c['profile_id'];
+      return cId != null && (cId == id || cId.toString() == id.toString());
+    });
+  }
 
   AppError? get lastError => _state is UserConnectionError
       ? (_state as UserConnectionError).error

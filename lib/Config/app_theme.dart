@@ -171,11 +171,27 @@ class AppTheme {
         backgroundColor: Colors.white,
         foregroundColor: Colors.black,
       ),
+      snackBarTheme: SnackBarThemeData(
+        backgroundColor: Colors.white,
+        contentTextStyle: GoogleFonts.inter(
+          color: Colors.black,
+          fontSize: 13.5,
+          fontWeight: FontWeight.w600,
+        ),
+        actionTextColor: Colors.black,
+        closeIconColor: Colors.black,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+      ),
       colorScheme: const ColorScheme.dark(
         primary: AppColors.accentPrimary,
         secondary: AppColors.accentSecondary,
         surface: AppColors.surfacePrimary,
         onSurface: AppColors.textPrimary,
+        inverseSurface: Colors.white,
+        onInverseSurface: Colors.black,
         error: Colors.redAccent,
       ),
       textTheme: const TextTheme().copyWith(

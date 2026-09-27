@@ -18,6 +18,7 @@ import 'package:connect/Pages/crop_image_page.dart';
 import 'package:connect/Models/resume_models.dart';
 import 'package:connect/Widgets/resume_sections_widget.dart';
 import 'package:connect/Widgets/resume_edit_sheets.dart';
+import 'package:connect/Widgets/vouches_list_widget.dart';
 
 class YetToBeBuiltProfilePage extends StatefulWidget {
   final bool isEditingMode;
@@ -1230,6 +1231,14 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                   ),
                   const SizedBox(height: 32),
                   _buildProfileDetailsSection(),
+                ],
+                if (provider.userId != null) ...[
+                  const SizedBox(height: 28),
+                  VouchesListWidget(
+                    userId: provider.userId!,
+                    userName: provider.name,
+                    isOwnProfile: true,
+                  ),
                 ],
               ],
             ),

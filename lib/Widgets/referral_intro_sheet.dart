@@ -206,16 +206,16 @@ class _ReferralIntroSheetState extends State<ReferralIntroSheet> {
           SnackBar(
             content: Row(
               children: [
-                const Icon(Icons.check_circle_rounded, color: Colors.white),
+                const Icon(Icons.check_circle_rounded, color: Colors.black),
                 const SizedBox(width: 8),
-                Text(
+                const Text(
                   "Introduction requests sent!",
                   style: TextStyle(
-                      fontWeight: FontWeight.bold, color: context.textPrimary),
+                      fontWeight: FontWeight.bold, color: Colors.black),
                 ),
               ],
             ),
-            backgroundColor: context.accentPrimary,
+            backgroundColor: Colors.white,
             behavior: SnackBarBehavior.floating,
           ),
         );

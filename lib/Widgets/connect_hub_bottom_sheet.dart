@@ -74,11 +74,16 @@ class _ConnectHubBottomSheetState extends State<ConnectHubBottomSheet>
   }
 
   void _onCodeChanged() {
-    if (_redeemErrorMessage != null && mounted) {
+    if (mounted) {
       setState(() {
         _redeemErrorMessage = null;
       });
     }
+  }
+
+  bool get _isCodeValid {
+    final code = _codeController.text.trim();
+    return RegExp(r'^MNDL-[A-Za-z0-9]{2,}$', caseSensitive: false).hasMatch(code);
   }
 
   Future<void> _loadExistingActiveKey() async {
@@ -1046,11 +1051,11 @@ class _ConnectHubBottomSheetState extends State<ConnectHubBottomSheet>
                   child: ElevatedButton.icon(
                     onPressed: _openCameraScanner,
                     icon: const Icon(Icons.camera_alt_rounded,
-                        color: Colors.white, size: 18),
+                        color: Colors.black, size: 18),
                     label: const Text(
                       "Open Camera Scanner",
                       style: TextStyle(
-                        color: Colors.white,
+                        color: Colors.black,
                         fontWeight: FontWeight.bold,
                         fontFamily: 'Inter',
                         fontSize: 14,
@@ -1120,12 +1125,13 @@ class _ConnectHubBottomSheetState extends State<ConnectHubBottomSheet>
               const SizedBox(width: 12),
               // Submit manual button
               GestureDetector(
-                onTap: _isRedeeming ? null : _redeemInviteCode,
-                child: Container(
+                onTap: (_isCodeValid && !_isRedeeming) ? _redeemInviteCode : null,
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
                   height: 48,
                   padding: const EdgeInsets.symmetric(horizontal: 20),
                   decoration: BoxDecoration(
-                    color: context.accentSecondary,
+                    color: _isCodeValid ? Colors.white : context.surfaceSecondary,
                     borderRadius: BorderRadius.circular(14),
                   ),
                   child: Center(
@@ -1136,13 +1142,15 @@ class _ConnectHubBottomSheetState extends State<ConnectHubBottomSheet>
                             child: CircularProgressIndicator(
                               strokeWidth: 2.5,
                               valueColor:
-                                  AlwaysStoppedAnimation<Color>(Colors.white),
+                                  AlwaysStoppedAnimation<Color>(Colors.black),
                             ),
                           )
-                        : const Text(
+                        : Text(
                             "Connect",
                             style: TextStyle(
-                              color: Colors.white,
+                              color: _isCodeValid
+                                  ? Colors.black
+                                  : context.textMuted,
                               fontWeight: FontWeight.bold,
                               fontFamily: 'Inter',
                               fontSize: 13,

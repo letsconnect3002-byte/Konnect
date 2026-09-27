@@ -15,6 +15,8 @@ import 'package:connect/Widgets/link_preview_card.dart';
 import 'package:connect/services/analytics_service.dart';
 import 'package:connect/Providers/notification_provider.dart';
 import 'package:connect/Widgets/anonymous_avatar.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:connect/Widgets/vouched_user_card.dart';
 
 class PostCard extends StatelessWidget {
   final FeedPost post;
@@ -696,6 +698,13 @@ class PostCard extends StatelessWidget {
                           )
                         else ...[
                           _FormattedPostContent(content: post.content),
+                          if (post.content.startsWith('⭐ Vouched for') ||
+                              post.content.startsWith('Vouched for')) ...[
+                            VouchedUserCard(
+                              postId: post.id,
+                              postContent: post.content,
+                            ),
+                          ],
                           const SizedBox(height: 6),
                           Row(
                             children: [
@@ -847,6 +856,13 @@ class PostCard extends StatelessWidget {
                     )
                   else ...[
                     _FormattedPostContent(content: post.content),
+                    if (post.content.startsWith('⭐ Vouched for') ||
+                        post.content.startsWith('Vouched for')) ...[
+                      VouchedUserCard(
+                        postId: post.id,
+                        postContent: post.content,
+                      ),
+                    ],
                     const SizedBox(height: 8),
                     Row(
                       children: [
@@ -921,6 +937,15 @@ class _FormattedPostContent extends StatelessWidget {
       }
     } catch (_) {}
 
+    final vouchMatch =
+        RegExp(r'(?:⭐\s*)?Vouched for @([^\n\r]+)').firstMatch(content);
+    if (vouchMatch != null) {
+      final vouchedName = vouchMatch.group(1)?.trim();
+      if (vouchedName != null && vouchedName.isNotEmpty) {
+        candidateNames.add(vouchedName);
+      }
+    }
+
     final List<String> connectionNames = candidateNames.toList();
 
     // Sort longest names first so "Santosh patil" is matched before "Santosh"
@@ -938,8 +963,15 @@ class _FormattedPostContent extends StatelessWidget {
     final String? detectedUrl = urlMatch?.group(0);
 
     // Strip raw URL strings from text display so only commentary and rich preview card are shown
-    final String displayContent =
+    String displayContent =
         detectedUrl != null ? content.replaceAll(urlRegex, '').trim() : content;
+
+    // Keep vouch posts simple without emoji like star
+    if (displayContent.startsWith('⭐ Vouched for')) {
+      displayContent = displayContent.replaceFirst('⭐ ', '');
+    } else if (displayContent.startsWith('⭐')) {
+      displayContent = displayContent.replaceFirst(RegExp(r'^⭐\s*'), '');
+    }
 
     final List<InlineSpan> spans = [];
     if (displayContent.isNotEmpty) {
@@ -973,7 +1005,7 @@ class _FormattedPostContent extends StatelessWidget {
               fontWeight: FontWeight.bold,
             ),
             recognizer: TapGestureRecognizer()
-              ..onTap = () {
+              ..onTap = () async {
                 HapticFeedback.lightImpact();
                 final matches = connections.where((c) {
                   final name = (c['name'] ?? '').toString().toLowerCase();
@@ -994,6 +1026,26 @@ class _FormattedPostContent extends StatelessWidget {
                           ConnectionProfilePage(profileData: matches.first),
                     ),
                   );
+                } else {
+                  try {
+                    final profile = await Supabase.instance.client
+                        .from('profiles')
+                        .select()
+                        .ilike('name', rawName)
+                        .limit(1)
+                        .maybeSingle();
+                    if (profile != null && context.mounted) {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) =>
+                              ConnectionProfilePage(profileData: profile),
+                        ),
+                      );
+                    }
+                  } catch (e) {
+                    debugPrint('Error finding profile for mention: $e');
+                  }
                 }
               },
           ),

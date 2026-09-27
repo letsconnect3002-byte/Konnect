@@ -13,6 +13,11 @@ import 'package:connect/Config/app_theme.dart';
 import 'package:connect/services/analytics_service.dart';
 import 'package:connect/Models/resume_models.dart';
 import 'package:connect/Widgets/resume_sections_widget.dart';
+import 'package:connect/Providers/vouch_provider.dart';
+import 'package:connect/Widgets/vouch_bottom_sheet.dart';
+import 'package:connect/Widgets/vouches_list_widget.dart';
+import 'package:connect/Widgets/direct_connection_sheet.dart';
+import 'package:connect/Providers/notification_provider.dart';
 
 class ConnectionProfilePage extends StatefulWidget {
   final Map<String, dynamic> profileData;
@@ -66,6 +71,14 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
   String _sharedCardPermission = 'casual'; // what they share with me
   String _mySharedCardToThem = 'casual'; // what I share with them
 
+  int get _targetUserId {
+    final idVal = widget.profileData['id'] ??
+        widget.profileData['connection_profile_id'] ??
+        widget.profileData['user_id'];
+    if (idVal is int) return idVal;
+    return int.tryParse(idVal?.toString() ?? '0') ?? 0;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -73,6 +86,18 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
     connectionProvider =
         Provider.of<ConnectionProvider>(context, listen: false);
     _loadProfileData();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        final myUserId = profileProvider.userId;
+        if (myUserId != null && _targetUserId != 0) {
+          Provider.of<VouchProvider>(context, listen: false).checkHasVouched(
+            voucherId: myUserId,
+            voucheeId: _targetUserId,
+          );
+        }
+      }
+    });
   }
 
   Future<void> _loadProfileData() async {
@@ -1826,39 +1851,138 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
                                     ),
                                   ),
                                   const SizedBox(height: 8),
-                                  if (_vibeTag.isNotEmpty)
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 10, vertical: 4),
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFF00F2FE)
-                                            .withValues(alpha: 0.1),
-                                        borderRadius: BorderRadius.circular(16),
-                                        border: Border.all(
-                                          color: const Color(0xFF00F2FE)
-                                              .withValues(alpha: 0.25),
-                                          width: 1.0,
-                                        ),
-                                      ),
-                                      child: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          const Icon(Icons.flash_on_rounded,
-                                              color: Color(0xFF00F2FE),
-                                              size: 10),
-                                          const SizedBox(width: 4),
-                                          Text(
-                                            _vibeTag,
-                                            style: const TextStyle(
-                                              color: Color(0xFF00F2FE),
-                                              fontSize: 10,
-                                              fontWeight: FontWeight.bold,
-                                              fontFamily: 'Inter',
+                                  Row(
+                                    children: [
+                                      if (_vibeTag.isNotEmpty) ...[
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 10, vertical: 4),
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFF00F2FE)
+                                                .withValues(alpha: 0.1),
+                                            borderRadius: BorderRadius.circular(16),
+                                            border: Border.all(
+                                              color: const Color(0xFF00F2FE)
+                                                  .withValues(alpha: 0.25),
+                                              width: 1.0,
                                             ),
                                           ),
-                                        ],
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              const Icon(Icons.flash_on_rounded,
+                                                  color: Color(0xFF00F2FE),
+                                                  size: 10),
+                                              const SizedBox(width: 4),
+                                              Text(
+                                                _vibeTag,
+                                                style: const TextStyle(
+                                                  color: Color(0xFF00F2FE),
+                                                  fontSize: 10,
+                                                  fontWeight: FontWeight.bold,
+                                                  fontFamily: 'Inter',
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                      ],
+                                      // Vouch Button / Badge
+                                      Consumer2<ProfileProvider, VouchProvider>(
+                                        builder: (context, pProvider, vProvider, _) {
+                                          final myId = pProvider.userId;
+                                          if (myId == null || _targetUserId == 0 || myId == _targetUserId) {
+                                            return const SizedBox.shrink();
+                                          }
+                                          final hasVouched = vProvider.hasVouchedFor(myId, _targetUserId);
+                                          if (hasVouched) {
+                                            return Container(
+                                              padding: const EdgeInsets.symmetric(
+                                                  horizontal: 10, vertical: 4),
+                                              decoration: BoxDecoration(
+                                                color: const Color(0xFF10B981)
+                                                    .withValues(alpha: 0.12),
+                                                borderRadius: BorderRadius.circular(16),
+                                                border: Border.all(
+                                                  color: const Color(0xFF10B981)
+                                                      .withValues(alpha: 0.3),
+                                                  width: 1.0,
+                                                ),
+                                              ),
+                                              child: const Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  Icon(Icons.verified_rounded,
+                                                      color: Color(0xFF10B981),
+                                                      size: 11),
+                                                  SizedBox(width: 4),
+                                                  Text(
+                                                    "Vouched",
+                                                    style: TextStyle(
+                                                      color: Color(0xFF10B981),
+                                                      fontSize: 10,
+                                                      fontWeight: FontWeight.bold,
+                                                      fontFamily: 'Inter',
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            );
+                                          }
+
+                                          return InkWell(
+                                            onTap: () {
+                                              HapticFeedback.lightImpact();
+                                              VouchBottomSheet.show(
+                                                context: context,
+                                                targetUserId: _targetUserId,
+                                                targetUserName: _name,
+                                                targetUserAvatar: _avatarUrl,
+                                                targetUserProfession: _profession,
+                                                onVouched: () {
+                                                  setState(() {});
+                                                },
+                                              );
+                                            },
+                                            borderRadius: BorderRadius.circular(16),
+                                            child: Container(
+                                              padding: const EdgeInsets.symmetric(
+                                                  horizontal: 10, vertical: 4),
+                                              decoration: BoxDecoration(
+                                                color: const Color(0xFFF59E0B)
+                                                    .withValues(alpha: 0.15),
+                                                borderRadius: BorderRadius.circular(16),
+                                                border: Border.all(
+                                                  color: const Color(0xFFF59E0B)
+                                                      .withValues(alpha: 0.4),
+                                                  width: 1.0,
+                                                ),
+                                              ),
+                                              child: const Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  Icon(Icons.shield_rounded,
+                                                      color: Color(0xFFF59E0B),
+                                                      size: 11),
+                                                  SizedBox(width: 4),
+                                                  Text(
+                                                    "Vouch",
+                                                    style: TextStyle(
+                                                      color: Color(0xFFF59E0B),
+                                                      fontSize: 10,
+                                                      fontWeight: FontWeight.bold,
+                                                      fontFamily: 'Inter',
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          );
+                                        },
                                       ),
-                                    ),
+                                    ],
+                                  ),
                                 ],
                               ),
                             ),
@@ -1868,6 +1992,15 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
                       const SizedBox(height: 24),
                       _buildAccessControlSection(),
                       const SizedBox(height: 24),
+
+                      // VOUCHES SECTION
+                      if (_targetUserId != 0) ...[
+                        VouchesListWidget(
+                          userId: _targetUserId,
+                          userName: _name,
+                          isOwnProfile: false,
+                        ),
+                      ],
 
                       // Section: My Story (Bio)
                       if ((_previewFields['bio'] ?? '').trim().isNotEmpty) ...[
@@ -1981,56 +2114,114 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
               ),
             ),
           ),
-          child: Row(
-            children: [
-              Expanded(
-                child: GlassmorphicButton(
-                  onPressed: () {
-                    _showDeleteConfirmation(
-                        context, widget.profileData, connectionProvider);
-                  },
-                  borderRadius: BorderRadius.circular(99),
-                  padding: const EdgeInsets.symmetric(vertical: 16.0),
-                  child: Text(
-                    "Remove Connection",
-                    style: context.bodyText.copyWith(
-                      color: context.textSecondary,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12.0),
-              Expanded(
-                child: ElevatedButton(
-                  onPressed: () {
-                    HapticFeedback.mediumImpact();
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => IndividualChatPage(
-                          connectionData: widget.profileData,
+          child: Builder(
+            builder: (context) {
+              final connProvider = Provider.of<ConnectionProvider>(context);
+              final notifProvider = Provider.of<NotificationProvider>(context);
+              final myUserId = profileProvider.userId;
+              final targetId = _targetUserId;
+              final isConnected = connProvider.isConnected(targetId);
+              final isOwnProfile = myUserId != null && myUserId == targetId;
+
+              if (isOwnProfile) {
+                return const SizedBox.shrink();
+              }
+
+              if (!isConnected) {
+                final hasSent = notifProvider.hasSentDirectRequest(targetId);
+                return Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: hasSent
+                            ? null
+                            : () {
+                                HapticFeedback.mediumImpact();
+                                DirectConnectionSheet.show(
+                                  context: context,
+                                  targetUserId: targetId,
+                                  targetUserName: _name,
+                                  targetUserAvatar: _avatarUrl,
+                                  targetUserProfession: _profession,
+                                );
+                              },
+                        icon: Icon(
+                          hasSent ? Icons.check_circle_outline : Icons.person_add_rounded,
+                          color: hasSent ? context.textSecondary : Colors.black,
+                          size: 20,
+                        ),
+                        label: Text(
+                          hasSent ? "Request Sent" : "Send Connection Request",
+                          style: context.bodyText.copyWith(
+                            color: hasSent ? context.textSecondary : Colors.black,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: hasSent ? context.surfaceSecondary : context.accentPrimary,
+                          foregroundColor: hasSent ? context.textSecondary : Colors.black,
+                          shape: const StadiumBorder(),
+                          padding: const EdgeInsets.symmetric(vertical: 16.0),
+                          elevation: 0,
                         ),
                       ),
-                    );
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: context.accentPrimary,
-                    foregroundColor: Colors.black,
-                    shape: const StadiumBorder(),
-                    padding: const EdgeInsets.symmetric(vertical: 16.0),
-                    elevation: 0,
-                  ),
-                  child: Text(
-                    "Message",
-                    style: context.bodyText.copyWith(
-                      color: Colors.black,
-                      fontWeight: FontWeight.bold,
+                    ),
+                  ],
+                );
+              }
+
+              return Row(
+                children: [
+                  Expanded(
+                    child: GlassmorphicButton(
+                      onPressed: () {
+                        _showDeleteConfirmation(
+                            context, widget.profileData, connectionProvider);
+                      },
+                      borderRadius: BorderRadius.circular(99),
+                      padding: const EdgeInsets.symmetric(vertical: 16.0),
+                      child: Text(
+                        "Remove Connection",
+                        style: context.bodyText.copyWith(
+                          color: context.textSecondary,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ),
                   ),
-                ),
-              ),
-            ],
+                  const SizedBox(width: 12.0),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () {
+                        HapticFeedback.mediumImpact();
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => IndividualChatPage(
+                              connectionData: widget.profileData,
+                            ),
+                          ),
+                        );
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: context.accentPrimary,
+                        foregroundColor: Colors.black,
+                        shape: const StadiumBorder(),
+                        padding: const EdgeInsets.symmetric(vertical: 16.0),
+                        elevation: 0,
+                      ),
+                      child: Text(
+                        "Message",
+                        style: context.bodyText.copyWith(
+                          color: Colors.black,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            },
           ),
         ),
       ),
@@ -2185,9 +2376,14 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content:
-              Text("Sharing settings updated to ${accessType.toUpperCase()}"),
-          backgroundColor: context.textPrimary,
+          content: Text(
+            "Sharing settings updated to ${accessType.toUpperCase()}",
+            style: const TextStyle(
+              color: Colors.black,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          backgroundColor: Colors.white,
           duration: const Duration(milliseconds: 1500),
         ),
       );
