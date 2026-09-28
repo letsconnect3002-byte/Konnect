@@ -1,8 +1,18 @@
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:connect/Models/feed_post.dart';
+import 'package:connect/Models/custom_network.dart';
 
 abstract class FeedRepository {
+  Future<void> updatePinnedPost({
+    required String networkId,
+    required String? postId,
+  });
+
+  Future<CustomNetwork?> getCustomNetworkById({
+    required String networkId,
+    int? currentUserId,
+  });
   Future<List<FeedPost>> getFeed({
     required int viewerId,
     String bucket = 'unseen',
@@ -607,12 +617,64 @@ class SupabaseFeedRepository implements FeedRepository {
           });
         },
       )
+      // 7. Custom networks (for pinned post updates)
+      .onPostgresChanges(
+        event: PostgresChangeEvent.all,
+        schema: 'public',
+        table: 'custom_networks',
+        callback: (payload) {
+          debugPrint('[RAW REALTIME] custom_networks event: ${payload.eventType.name}');
+          onChange({
+            'table': 'custom_networks',
+            'eventType': payload.eventType.name,
+            'new': payload.newRecord,
+            'old': payload.oldRecord,
+          });
+        },
+      )
       .subscribe((status, error) {
         debugPrint('[RAW REALTIME] Channel status changed: $status, error: $error');
         onStatusChange?.call(status, error);
       });
 
     return channel;
+  }
+
+  @override
+  Future<void> updatePinnedPost({
+    required String networkId,
+    required String? postId,
+  }) async {
+    try {
+      await _client.from('custom_networks').update({
+        'pinned_post_id': postId,
+      }).eq('id', networkId);
+    } catch (e) {
+      debugPrint('[FeedRepository] Error updating pinned post: $e');
+      rethrow;
+    }
+  }
+
+  @override
+  Future<CustomNetwork?> getCustomNetworkById({
+    required String networkId,
+    int? currentUserId,
+  }) async {
+    try {
+      final res = await _client
+          .from('custom_networks')
+          .select()
+          .eq('id', networkId)
+          .maybeSingle();
+      if (res == null) return null;
+      return CustomNetwork.fromJson(
+        Map<String, dynamic>.from(res),
+        currentUserId: currentUserId,
+      );
+    } catch (e) {
+      debugPrint('[FeedRepository] Error getting custom network by id: $e');
+      return null;
+    }
   }
 
   @override

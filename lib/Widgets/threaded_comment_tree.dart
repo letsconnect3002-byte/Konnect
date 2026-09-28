@@ -6,6 +6,7 @@ import 'package:connect/Providers/profile_provider.dart';
 import 'package:connect/Providers/feed_provider.dart';
 import 'package:connect/Widgets/post_card.dart';
 import 'package:connect/Widgets/anonymous_avatar.dart';
+import 'package:connect/Widgets/user_profile_modal.dart';
 
 /// Data model representing a single comment node within a thread hierarchy.
 class CommentNode {
@@ -800,33 +801,46 @@ class _ThreadNodeWidgetState extends State<_ThreadNodeWidget>
           // Profile Avatar wrapped with activeKey for RenderBox tracking
           KeyedSubtree(
             key: activeKey,
-            child: node.isAnonymous
-                ? AnonymousAvatar(
-                    seed: node.authorId != 0
-                        ? node.authorId.toString()
-                        : node.authorName,
-                    radius: avatarRadius,
-                  )
-                : CircleAvatar(
-                    radius: avatarRadius,
-                    backgroundColor:
-                        Theme.of(context).primaryColor.withValues(alpha: 0.2),
-                    backgroundImage: node.authorAvatarUrl.isNotEmpty
-                        ? NetworkImage(node.authorAvatarUrl)
-                        : null,
-                    child: node.authorAvatarUrl.isEmpty
-                        ? Text(
-                            node.authorName.isNotEmpty
-                                ? node.authorName[0].toUpperCase()
-                                : '?',
-                            style: TextStyle(
-                              color: Theme.of(context).colorScheme.onSurface,
-                              fontWeight: FontWeight.bold,
-                              fontSize: avatarRadius * 0.75,
-                            ),
-                          )
-                        : null,
-                  ),
+            child: GestureDetector(
+              onTap: () {
+                if (node.isDeleted || node.isAnonymous) return;
+                UserProfileModal.show(
+                  context,
+                  userId: node.authorId,
+                  userName: node.authorName,
+                  avatarUrl: node.authorAvatarUrl,
+                  degree: node.degree,
+                  scope: node.post?.feedScope,
+                );
+              },
+              child: node.isAnonymous
+                  ? AnonymousAvatar(
+                      seed: node.authorId != 0
+                          ? node.authorId.toString()
+                          : node.authorName,
+                      radius: avatarRadius,
+                    )
+                  : CircleAvatar(
+                      radius: avatarRadius,
+                      backgroundColor:
+                          Theme.of(context).primaryColor.withValues(alpha: 0.2),
+                      backgroundImage: node.authorAvatarUrl.isNotEmpty
+                          ? NetworkImage(node.authorAvatarUrl)
+                          : null,
+                      child: node.authorAvatarUrl.isEmpty
+                          ? Text(
+                              node.authorName.isNotEmpty
+                                  ? node.authorName[0].toUpperCase()
+                                  : '?',
+                              style: TextStyle(
+                                color: Theme.of(context).colorScheme.onSurface,
+                                fontWeight: FontWeight.bold,
+                                fontSize: avatarRadius * 0.75,
+                              ),
+                            )
+                          : null,
+                    ),
+            ),
           ),
           const SizedBox(width: 10.0),
 
@@ -889,12 +903,25 @@ class _ThreadNodeWidgetState extends State<_ThreadNodeWidget>
                 // Header (Author Name + Timestamp + Options)
                 Row(
                   children: [
-                    Text(
-                      node.authorName,
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.onSurface,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14.0,
+                    GestureDetector(
+                      onTap: () {
+                        if (node.isDeleted || node.isAnonymous) return;
+                        UserProfileModal.show(
+                          context,
+                          userId: node.authorId,
+                          userName: node.authorName,
+                          avatarUrl: node.authorAvatarUrl,
+                          degree: node.degree,
+                          scope: node.post?.feedScope,
+                        );
+                      },
+                      child: Text(
+                        node.authorName,
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onSurface,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14.0,
+                        ),
                       ),
                     ),
                     const SizedBox(width: 6.0),

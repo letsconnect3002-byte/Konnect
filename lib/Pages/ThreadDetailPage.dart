@@ -107,8 +107,12 @@ class ThreadDetailPage extends StatefulWidget {
 class _ThreadDetailPageState extends State<ThreadDetailPage> {
   late final _MentionTextEditingController _replyController;
   final FocusNode _replyFocusNode = FocusNode();
+  final ScrollController _scrollController = ScrollController();
+  final GlobalKey _focusedPostKey = GlobalKey();
+  bool _hasScrolledToFocusedPost = false;
   bool _isLoading = true;
   List<FeedPost> _threadPosts = [];
+  List<FeedPost> _parentPosts = [];
   FeedPost? _replyingToTarget;
   bool _hasSetInitialReplyTarget = false;
   bool _isSubmitting = false;
@@ -189,6 +193,23 @@ class _ThreadDetailPageState extends State<ThreadDetailPage> {
         setState(() {
           _threadPosts[index] = updatedPost;
         });
+      } else {
+        final pIndex = _parentPosts.indexWhere((p) => p.id == targetPostId);
+        if (pIndex != -1) {
+          final feedProvider = Provider.of<FeedProvider>(context, listen: false);
+          final vId = feedProvider.viewerId;
+          final updatedPost = applyReactionDelta(
+            _parentPosts[pIndex],
+            eventType: eventType,
+            newRecord: newRecord,
+            oldRecord: oldRecord,
+            viewerId: vId,
+          );
+          feedProvider.registerPost(updatedPost);
+          setState(() {
+            _parentPosts[pIndex] = updatedPost;
+          });
+        }
       }
     }
 
@@ -287,14 +308,16 @@ class _ThreadDetailPageState extends State<ThreadDetailPage> {
         final bool isRelated = targetId == _currentRootPostId ||
             rootId == _currentRootPostId ||
             replyToId == _currentRootPostId ||
-            _threadPosts.any((p) => p.id == targetId || p.id == rootId || p.id == replyToId);
+            _threadPosts.any((p) => p.id == targetId || p.id == rootId || p.id == replyToId) ||
+            _parentPosts.any((p) => p.id == targetId);
 
         if (isRelated) {
           if (eventType == 'insert' || eventType == 'delete') {
             _loadThread();
           } else if (eventType == 'update') {
             final index = _threadPosts.indexWhere((p) => p.id == targetId);
-            if (index != -1) {
+            final pIndex = _parentPosts.indexWhere((p) => p.id == targetId);
+            if (index != -1 || pIndex != -1) {
               final int? replyCount = newRecord['reply_count'] is int
                   ? newRecord['reply_count'] as int
                   : int.tryParse(newRecord['reply_count']?.toString() ?? '');
@@ -307,11 +330,20 @@ class _ThreadDetailPageState extends State<ThreadDetailPage> {
                 });
               }
               setState(() {
-                _threadPosts[index] = _threadPosts[index].copyWith(
-                  reactionCounts: updatedCounts.isNotEmpty ? updatedCounts : _threadPosts[index].reactionCounts,
-                  replyCount: replyCount ?? _threadPosts[index].replyCount,
-                  activeReplyCount: replyCount ?? _threadPosts[index].activeReplyCount,
-                );
+                if (index != -1) {
+                  _threadPosts[index] = _threadPosts[index].copyWith(
+                    reactionCounts: updatedCounts.isNotEmpty ? updatedCounts : _threadPosts[index].reactionCounts,
+                    replyCount: replyCount ?? _threadPosts[index].replyCount,
+                    activeReplyCount: replyCount ?? _threadPosts[index].activeReplyCount,
+                  );
+                }
+                if (pIndex != -1) {
+                  _parentPosts[pIndex] = _parentPosts[pIndex].copyWith(
+                    reactionCounts: updatedCounts.isNotEmpty ? updatedCounts : _parentPosts[pIndex].reactionCounts,
+                    replyCount: replyCount ?? _parentPosts[pIndex].replyCount,
+                    activeReplyCount: replyCount ?? _parentPosts[pIndex].activeReplyCount,
+                  );
+                }
               });
             } else {
               _loadThread();
@@ -331,6 +363,7 @@ class _ThreadDetailPageState extends State<ThreadDetailPage> {
     }
     _replyFocusNode.dispose();
     _replyController.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -340,79 +373,94 @@ class _ThreadDetailPageState extends State<ThreadDetailPage> {
     try {
       final rawPosts = await feedProvider.fetchThread(widget.rootPostId);
       List<FeedPost> posts = rawPosts;
+      List<FeedPost> parents = [];
 
-      // 1. Explicit independent sub-thread requested (e.g. tapped a reply or its comment icon)
+      // Determine what is the focused target post
+      FeedPost? targetPost;
       if (widget.independentPostId != null &&
           widget.independentPostId!.isNotEmpty &&
           rawPosts.isNotEmpty) {
-        final targetPost =
+        targetPost =
             rawPosts.where((p) => p.id == widget.independentPostId).firstOrNull;
-
-        if (targetPost != null) {
-          final Set<String> subThreadIds = {targetPost.id};
-          bool addedMore = true;
-          while (addedMore) {
-            addedMore = false;
-            for (final p in rawPosts) {
-              if (p.replyToPostId != null &&
-                  subThreadIds.contains(p.replyToPostId) &&
-                  !subThreadIds.contains(p.id)) {
-                subThreadIds.add(p.id);
-                addedMore = true;
-              }
-            }
-          }
-
-          final List<FeedPost> subPosts = [targetPost];
-          for (final p in rawPosts) {
-            if (p.id != targetPost.id && subThreadIds.contains(p.id)) {
-              subPosts.add(p);
-            }
-          }
-          posts = subPosts;
-          _currentRootPostId = targetPost.id;
-        }
-      }
-      // 2. Notification routing: If a nested reply was highlighted, isolate it as an independent thread
-      // rooted at its immediate parent post so it displays cleanly at full width
-      else if (widget.highlightPostId != null &&
+      } else if (widget.highlightPostId != null &&
           widget.highlightPostId!.isNotEmpty &&
           widget.highlightPostId != widget.rootPostId &&
           rawPosts.isNotEmpty) {
-        final targetPost =
+        final hlPost =
             rawPosts.where((p) => p.id == widget.highlightPostId).firstOrNull;
+        if (hlPost != null &&
+            hlPost.replyToPostId != null &&
+            hlPost.replyToPostId!.isNotEmpty &&
+            hlPost.replyToPostId != rawPosts.first.id) {
+          targetPost = rawPosts.where((p) => p.id == hlPost.replyToPostId).firstOrNull;
+        }
+      }
 
-        if (targetPost != null &&
-            targetPost.replyToPostId != null &&
-            targetPost.replyToPostId!.isNotEmpty &&
-            targetPost.replyToPostId != rawPosts.first.id) {
-          final parentId = targetPost.replyToPostId!;
-          final anchorPost =
-              rawPosts.where((p) => p.id == parentId).firstOrNull;
+      // 1. Explicit or highlighted independent sub-thread requested
+      if (targetPost != null) {
+        // Trace ancestor parents of targetPost up to root
+        String? curParentId = targetPost.replyToPostId;
+        final Set<String> visitedParentIds = {targetPost.id};
+        while (curParentId != null && curParentId.isNotEmpty && !visitedParentIds.contains(curParentId)) {
+          visitedParentIds.add(curParentId);
+          FeedPost? parent = rawPosts.where((p) => p.id == curParentId).firstOrNull;
+          parent ??= feedProvider.getPostById(curParentId);
+          if (parent == null) {
+            try {
+              parent = await feedProvider.fetchPostById(curParentId);
+            } catch (_) {}
+          }
+          if (parent != null) {
+            parents.insert(0, parent); // Root at index 0, immediate parent at the end
+            curParentId = parent.replyToPostId;
+          } else {
+            break;
+          }
+        }
 
-          if (anchorPost != null) {
-            final Set<String> subThreadIds = {parentId};
-            bool addedMore = true;
-            while (addedMore) {
-              addedMore = false;
-              for (final p in rawPosts) {
-                if (p.replyToPostId != null &&
-                    subThreadIds.contains(p.replyToPostId) &&
-                    !subThreadIds.contains(p.id)) {
-                  subThreadIds.add(p.id);
-                  addedMore = true;
-                }
-              }
+        final Set<String> subThreadIds = {targetPost.id};
+        bool addedMore = true;
+        while (addedMore) {
+          addedMore = false;
+          for (final p in rawPosts) {
+            if (p.replyToPostId != null &&
+                subThreadIds.contains(p.replyToPostId) &&
+                !subThreadIds.contains(p.id)) {
+              subThreadIds.add(p.id);
+              addedMore = true;
             }
+          }
+        }
 
-            final List<FeedPost> subPosts = [anchorPost];
-            for (final p in rawPosts) {
-              if (p.id != anchorPost.id && subThreadIds.contains(p.id)) {
-                subPosts.add(p);
-              }
-            }
-            posts = subPosts;
-            _currentRootPostId = anchorPost.id;
+        final List<FeedPost> subPosts = [targetPost];
+        for (final p in rawPosts) {
+          if (p.id != targetPost.id && subThreadIds.contains(p.id)) {
+            subPosts.add(p);
+          }
+        }
+        posts = subPosts;
+        _currentRootPostId = targetPost.id;
+      } else if (rawPosts.isNotEmpty &&
+          rawPosts.first.replyToPostId != null &&
+          rawPosts.first.replyToPostId!.isNotEmpty) {
+        // The root post itself is a reply to an external parent post!
+        final root = rawPosts.first;
+        String? curParentId = root.replyToPostId;
+        final Set<String> visitedParentIds = {root.id};
+        while (curParentId != null && curParentId.isNotEmpty && !visitedParentIds.contains(curParentId)) {
+          visitedParentIds.add(curParentId);
+          FeedPost? parent = rawPosts.where((p) => p.id == curParentId).firstOrNull;
+          parent ??= feedProvider.getPostById(curParentId);
+          if (parent == null) {
+            try {
+              parent = await feedProvider.fetchPostById(curParentId);
+            } catch (_) {}
+          }
+          if (parent != null) {
+            parents.insert(0, parent);
+            curParentId = parent.replyToPostId;
+          } else {
+            break;
           }
         }
       }
@@ -420,6 +468,7 @@ class _ThreadDetailPageState extends State<ThreadDetailPage> {
       if (mounted && currentRequestId == _loadRequestId) {
         setState(() {
           _threadPosts = posts;
+          _parentPosts = parents;
           _isLoading = false;
           if (!_hasSetInitialReplyTarget && _threadPosts.isNotEmpty) {
             _hasSetInitialReplyTarget = true;
@@ -451,8 +500,17 @@ class _ThreadDetailPageState extends State<ThreadDetailPage> {
             }
           });
 
+          if (targetId != _threadPosts.first.id) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              _scrollToHighlightedPost(targetId);
+            });
+          }
+        }
+
+        // Align focused reply post at the top so parent posts are revealed when pulling down / scrolling up
+        if (!_hasScrolledToFocusedPost && _parentPosts.isNotEmpty && (_highlightedPostId == null || _highlightedPostId == _threadPosts.first.id)) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
-            _scrollToHighlightedPost(targetId);
+            _scrollToFocusedPost();
           });
         }
       }
@@ -462,6 +520,29 @@ class _ThreadDetailPageState extends State<ThreadDetailPage> {
           _isLoading = false;
         });
       }
+    }
+  }
+
+  void _scrollToFocusedPost({int retryCount = 0}) {
+    if (!mounted || _hasScrolledToFocusedPost) return;
+    if (_parentPosts.isEmpty) {
+      _hasScrolledToFocusedPost = true;
+      return;
+    }
+    final ctx = _focusedPostKey.currentContext;
+    if (ctx != null) {
+      Scrollable.ensureVisible(
+        ctx,
+        duration: Duration.zero,
+        alignment: 0.0,
+      );
+      _hasScrolledToFocusedPost = true;
+    } else if (retryCount < 10) {
+      Future.delayed(const Duration(milliseconds: 30), () {
+        if (mounted && !_hasScrolledToFocusedPost) {
+          _scrollToFocusedPost(retryCount: retryCount + 1);
+        }
+      });
     }
   }
 
@@ -484,43 +565,51 @@ class _ThreadDetailPageState extends State<ThreadDetailPage> {
   }
 
   void _handleReactionToggle(String postId, String selectedKey) {
+    FeedPost updateReactions(FeedPost oldPost) {
+      final String? oldUserReaction = oldPost.userReaction;
+      final Map<String, int> newCounts =
+          Map<String, int>.from(oldPost.reactionCounts);
+
+      String? newUserReaction;
+      if (oldUserReaction == selectedKey) {
+        newUserReaction = null;
+        if (newCounts.containsKey(selectedKey)) {
+          final c = newCounts[selectedKey]!;
+          if (c <= 1) {
+            newCounts.remove(selectedKey);
+          } else {
+            newCounts[selectedKey] = c - 1;
+          }
+        }
+      } else {
+        if (oldUserReaction != null && newCounts.containsKey(oldUserReaction)) {
+          final c = newCounts[oldUserReaction]!;
+          if (c <= 1) {
+            newCounts.remove(oldUserReaction);
+          } else {
+            newCounts[oldUserReaction] = c - 1;
+          }
+        }
+        newUserReaction = selectedKey;
+        newCounts[selectedKey] = (newCounts[selectedKey] ?? 0) + 1;
+      }
+
+      return oldPost.copyWith(
+        userReaction: newUserReaction,
+        nullifyUserReaction: newUserReaction == null,
+        reactionCounts: newCounts,
+      );
+    }
+
     setState(() {
       final idx = _threadPosts.indexWhere((p) => p.id == postId);
       if (idx != -1) {
-        final oldPost = _threadPosts[idx];
-        final String? oldUserReaction = oldPost.userReaction;
-        final Map<String, int> newCounts =
-            Map<String, int>.from(oldPost.reactionCounts);
-
-        String? newUserReaction;
-        if (oldUserReaction == selectedKey) {
-          newUserReaction = null;
-          if (newCounts.containsKey(selectedKey)) {
-            final c = newCounts[selectedKey]!;
-            if (c <= 1) {
-              newCounts.remove(selectedKey);
-            } else {
-              newCounts[selectedKey] = c - 1;
-            }
-          }
-        } else {
-          if (oldUserReaction != null && newCounts.containsKey(oldUserReaction)) {
-            final c = newCounts[oldUserReaction]!;
-            if (c <= 1) {
-              newCounts.remove(oldUserReaction);
-            } else {
-              newCounts[oldUserReaction] = c - 1;
-            }
-          }
-          newUserReaction = selectedKey;
-          newCounts[selectedKey] = (newCounts[selectedKey] ?? 0) + 1;
+        _threadPosts[idx] = updateReactions(_threadPosts[idx]);
+      } else {
+        final pIdx = _parentPosts.indexWhere((p) => p.id == postId);
+        if (pIdx != -1) {
+          _parentPosts[pIdx] = updateReactions(_parentPosts[pIdx]);
         }
-
-        _threadPosts[idx] = oldPost.copyWith(
-          userReaction: newUserReaction,
-          nullifyUserReaction: newUserReaction == null,
-          reactionCounts: newCounts,
-        );
       }
     });
 
@@ -528,16 +617,26 @@ class _ThreadDetailPageState extends State<ThreadDetailPage> {
     feedProvider.toggleReaction(postId, reactionType: selectedKey).then((res) {
       if (res != null && mounted) {
         setState(() {
+          final serverReaction = res['user_reaction']?.toString();
+          final Map<String, int> serverCounts =
+              Map<String, int>.from(res['reaction_counts'] as Map? ?? {});
+
           final idx = _threadPosts.indexWhere((p) => p.id == postId);
           if (idx != -1) {
-            final serverReaction = res['user_reaction']?.toString();
-            final Map<String, int> serverCounts =
-                Map<String, int>.from(res['reaction_counts'] as Map? ?? {});
             _threadPosts[idx] = _threadPosts[idx].copyWith(
               userReaction: serverReaction,
               nullifyUserReaction: serverReaction == null,
               reactionCounts: serverCounts,
             );
+          } else {
+            final pIdx = _parentPosts.indexWhere((p) => p.id == postId);
+            if (pIdx != -1) {
+              _parentPosts[pIdx] = _parentPosts[pIdx].copyWith(
+                userReaction: serverReaction,
+                nullifyUserReaction: serverReaction == null,
+                reactionCounts: serverCounts,
+              );
+            }
           }
         });
       }
@@ -660,20 +759,10 @@ class _ThreadDetailPageState extends State<ThreadDetailPage> {
 
   String? _resolveParentAuthorName(String? parentId) {
     if (parentId == null || parentId.isEmpty) return null;
-    final parent = _threadPosts.firstWhere(
-      (p) => p.id == parentId,
-      orElse: () => FeedPost(
-        id: '',
-        authorId: 0,
-        authorName: '',
-        authorAvatarUrl: '',
-        content: '',
-        createdAt: DateTime.now(),
-        replyCount: 0,
-        degree: 0,
-      ),
-    );
-    return parent.id.isNotEmpty ? parent.authorName : null;
+    final parentInChain = _parentPosts.where((p) => p.id == parentId).firstOrNull;
+    if (parentInChain != null) return parentInChain.authorName;
+    final parent = _threadPosts.where((p) => p.id == parentId).firstOrNull;
+    return parent?.authorName;
   }
 
   int _countTotalActiveDescendants(FeedPost post, Map<String, List<FeedPost>> childrenMap) {
@@ -807,10 +896,56 @@ class _ThreadDetailPageState extends State<ThreadDetailPage> {
               children: [
                 Expanded(
                   child: SingleChildScrollView(
+                    controller: _scrollController,
+                    physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // 1. Standalone Top Main Post
+                        // 1. Ancestor Parent Posts connected with thread lines (Twitter/X style)
+                        if (_parentPosts.isNotEmpty) ...[
+                          ..._parentPosts.asMap().entries.map((entry) {
+                            final int idx = entry.key;
+                            final FeedPost parent = entry.value;
+                            final bool showTop = (idx > 0);
+                            final String? repName = _resolveParentAuthorName(parent.replyToPostId);
+
+                            return Container(
+                              key: _itemKeys.putIfAbsent(parent.id, () => GlobalKey()),
+                              child: PostCard(
+                                post: parent,
+                                isThreadView: true,
+                                showTopConnector: showTop,
+                                showBottomConnector: true,
+                                replyToName: repName,
+                                onReactionToggle: _handleReactionToggle,
+                                onTap: () {
+                                  if (parent.id == widget.rootPostId && widget.independentPostId != null) {
+                                    Navigator.pop(context);
+                                  } else {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => ThreadDetailPage(
+                                          rootPostId: widget.rootPostId,
+                                          independentPostId: parent.id == widget.rootPostId ? null : parent.id,
+                                          focusReplyToPostId: parent.id,
+                                        ),
+                                      ),
+                                    );
+                                  }
+                                },
+                                onCommentTap: () {
+                                  setState(() {
+                                    _replyingToTarget = parent;
+                                  });
+                                  _replyFocusNode.requestFocus();
+                                },
+                              ),
+                            );
+                          }),
+                        ],
+
+                        // 2. Focused Main Post
                         if (_threadPosts.isNotEmpty) ...[
                           Builder(builder: (context) {
                             final rootPost = _threadPosts.first;
@@ -832,13 +967,19 @@ class _ThreadDetailPageState extends State<ThreadDetailPage> {
                               reactionCounts: rootPost.reactionCounts,
                             );
 
+                            final bool hasParents = _parentPosts.isNotEmpty;
+                            _itemKeys[rootPost.id] = _focusedPostKey;
+
                             return Container(
-                              key: _itemKeys.putIfAbsent(rootPost.id, () => GlobalKey()),
+                              key: _focusedPostKey,
                               child: PostCard(
                                 post: rootPostWithActiveCount,
-                                isThreadView: false,
+                                isThreadView: hasParents,
+                                showTopConnector: hasParents,
+                                showBottomConnector: false,
                                 isSelectedTarget: isSelected,
                                 isHighlighted: isHighlighted,
+                                replyToName: null,
                                 onReactionToggle: _handleReactionToggle,
                                 onTap: () {
                                   setState(() {
@@ -849,6 +990,7 @@ class _ThreadDetailPageState extends State<ThreadDetailPage> {
                                   setState(() {
                                     _replyingToTarget = rootPost;
                                   });
+                                  _replyFocusNode.requestFocus();
                                 },
                               ),
                             );

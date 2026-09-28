@@ -13,6 +13,7 @@ class CustomNetwork {
   final int memberCount;
   final bool isMember;
   final bool isCreator;
+  final String? pinnedPostId;
 
   const CustomNetwork({
     required this.id,
@@ -27,6 +28,7 @@ class CustomNetwork {
     this.memberCount = 1,
     this.isMember = true,
     this.isCreator = false,
+    this.pinnedPostId,
   });
 
   Color get color {
@@ -60,6 +62,7 @@ class CustomNetwork {
       memberCount: int.tryParse(json['member_count']?.toString() ?? '1') ?? 1,
       isMember: json['is_member'] == true || isCreator,
       isCreator: isCreator,
+      pinnedPostId: json['pinned_post_id']?.toString(),
     );
   }
 
@@ -74,6 +77,7 @@ class CustomNetwork {
       'is_private': isPrivate,
       'allow_anonymous': allowAnonymous,
       'created_at': createdAt.toIso8601String(),
+      'pinned_post_id': pinnedPostId,
     };
   }
 
@@ -90,6 +94,8 @@ class CustomNetwork {
     int? memberCount,
     bool? isMember,
     bool? isCreator,
+    String? pinnedPostId,
+    bool nullifyPinnedPostId = false,
   }) {
     return CustomNetwork(
       id: id ?? this.id,
@@ -104,6 +110,7 @@ class CustomNetwork {
       memberCount: memberCount ?? this.memberCount,
       isMember: isMember ?? this.isMember,
       isCreator: isCreator ?? this.isCreator,
+      pinnedPostId: nullifyPinnedPostId ? null : (pinnedPostId ?? this.pinnedPostId),
     );
   }
 }

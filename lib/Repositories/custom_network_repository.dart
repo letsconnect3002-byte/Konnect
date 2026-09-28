@@ -39,6 +39,16 @@ abstract class CustomNetworkRepository {
     required int userId,
   });
 
+  Future<void> updatePinnedPost({
+    required String networkId,
+    required String? postId,
+  });
+
+  Future<CustomNetwork?> getNetworkById(
+    String networkId, {
+    int? currentUserId,
+  });
+
   RealtimeChannel subscribeToNetworks({
     required int userId,
     required VoidCallback onNetworkChanged,
@@ -354,6 +364,43 @@ class SupabaseCustomNetworkRepository implements CustomNetworkRepository {
   }
 
   @override
+  Future<void> updatePinnedPost({
+    required String networkId,
+    required String? postId,
+  }) async {
+    try {
+      await _client.from('custom_networks').update({
+        'pinned_post_id': postId,
+      }).eq('id', networkId);
+    } catch (e) {
+      debugPrint('[CustomNetworkRepository] Error updating pinned post: $e');
+      rethrow;
+    }
+  }
+
+  @override
+  Future<CustomNetwork?> getNetworkById(
+    String networkId, {
+    int? currentUserId,
+  }) async {
+    try {
+      final res = await _client
+          .from('custom_networks')
+          .select()
+          .eq('id', networkId)
+          .maybeSingle();
+      if (res == null) return null;
+      return CustomNetwork.fromJson(
+        Map<String, dynamic>.from(res),
+        currentUserId: currentUserId,
+      );
+    } catch (e) {
+      debugPrint('[CustomNetworkRepository] Error getting network by id: $e');
+      return null;
+    }
+  }
+
+  @override
   RealtimeChannel subscribeToNetworks({
     required int userId,
     required VoidCallback onNetworkChanged,
@@ -366,6 +413,14 @@ class SupabaseCustomNetworkRepository implements CustomNetworkRepository {
           event: PostgresChangeEvent.all,
           schema: 'public',
           table: 'custom_network_members',
+          callback: (payload) {
+            onNetworkChanged();
+          },
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'custom_networks',
           callback: (payload) {
             onNetworkChanged();
           },

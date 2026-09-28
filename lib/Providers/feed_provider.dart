@@ -40,7 +40,10 @@ class FeedProvider with ChangeNotifier {
   bool get isCustomNetworkActive => _activeCustomNetwork != null;
 
   void selectCustomNetwork(CustomNetwork? network) {
-    if (_activeCustomNetwork?.id == network?.id) return;
+    if (_activeCustomNetwork?.id == network?.id &&
+        _activeCustomNetwork?.pinnedPostId == network?.pinnedPostId) {
+      return;
+    }
     _activeCustomNetwork = network;
     _posts = [];
     _currentBucket = network != null ? 'all' : 'unseen';
@@ -63,9 +66,19 @@ class FeedProvider with ChangeNotifier {
 
   List<FeedPost> get displayedPosts {
     if (_activeCustomNetwork != null) {
-      return _posts
+      final list = _posts
           .where((p) => p.networkId == _activeCustomNetwork!.id)
           .toList();
+      list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      final pinnedId = _activeCustomNetwork!.pinnedPostId;
+      if (pinnedId != null && pinnedId.isNotEmpty) {
+        final pinnedIndex = list.indexWhere((p) => p.id == pinnedId);
+        if (pinnedIndex > 0) {
+          final pinnedPost = list.removeAt(pinnedIndex);
+          list.insert(0, pinnedPost);
+        }
+      }
+      return list;
     }
     if (_feedFilter == FeedFilter.innerCircle) {
       return _posts
@@ -272,6 +285,16 @@ class FeedProvider with ChangeNotifier {
     for (final post in posts) {
       registerPost(post);
     }
+  }
+
+  Future<FeedPost?> fetchPostById(String postId) async {
+    final vId = _viewerId;
+    if (vId == null) return null;
+    final post = await _repository.getPostById(postId: postId, viewerId: vId);
+    if (post != null) {
+      registerPost(post);
+    }
+    return post;
   }
 
   bool _isLoadingMore = false;
@@ -502,12 +525,44 @@ class FeedProvider with ChangeNotifier {
 
     try {
       if (_activeCustomNetwork != null) {
+        try {
+          final freshNet = await _repository.getCustomNetworkById(
+            networkId: _activeCustomNetwork!.id,
+            currentUserId: vId,
+          );
+          if (freshNet != null) {
+            _activeCustomNetwork = freshNet.copyWith(
+              memberCount: _activeCustomNetwork!.memberCount,
+              isMember: _activeCustomNetwork!.isMember,
+              isCreator: _activeCustomNetwork!.isCreator || freshNet.creatorId == vId,
+            );
+          }
+        } catch (_) {}
+
         final fetched = await _repository.getCustomNetworkFeed(
           networkId: _activeCustomNetwork!.id,
           viewerId: vId,
           limit: 20,
         );
+
+        final pinnedId = _activeCustomNetwork?.pinnedPostId;
+        if (pinnedId != null && pinnedId.isNotEmpty) {
+          final hasPinned = fetched.any((p) => p.id == pinnedId);
+          if (!hasPinned) {
+            try {
+              final pinnedPost = await _repository.getPostById(
+                postId: pinnedId,
+                viewerId: vId,
+              );
+              if (pinnedPost != null && !pinnedPost.isDeleted) {
+                fetched.insert(0, pinnedPost);
+              }
+            } catch (_) {}
+          }
+        }
+
         _posts = fetched;
+        registerPosts(fetched);
         _hasReachedEnd = fetched.length < 20;
         _currentBucket = 'all';
         _hasShownCaughtUpDivider = false;
@@ -640,7 +695,12 @@ class FeedProvider with ChangeNotifier {
           cursorPostId: cursorPostId,
           limit: 20,
         );
-        _posts.addAll(fetched);
+        final existingIds = _posts.map((p) => p.id).toSet();
+        for (final p in fetched) {
+          if (!existingIds.contains(p.id)) {
+            _posts.add(p);
+          }
+        }
         registerPosts(fetched);
         if (fetched.length < 20) {
           _hasReachedEnd = true;
@@ -1103,6 +1163,41 @@ class FeedProvider with ChangeNotifier {
   }
 
   // -------------------------------------------------------
+  //  Pinning (Custom Network Creator only)
+  // -------------------------------------------------------
+
+  Future<void> setPinnedPost(String networkId, String? postId) async {
+    try {
+      await _repository.updatePinnedPost(networkId: networkId, postId: postId);
+      if (_activeCustomNetwork != null && _activeCustomNetwork!.id == networkId) {
+        _activeCustomNetwork = _activeCustomNetwork!.copyWith(
+          pinnedPostId: postId,
+          nullifyPinnedPostId: postId == null,
+        );
+      }
+      if (postId != null && _viewerId != null) {
+        final exists = _posts.any((p) => p.id == postId);
+        if (!exists) {
+          try {
+            final post = await _repository.getPostById(
+              postId: postId,
+              viewerId: _viewerId!,
+            );
+            if (post != null && !post.isDeleted) {
+              _posts.insert(0, post);
+              registerPost(post);
+            }
+          } catch (_) {}
+        }
+      }
+      notifyListeners();
+    } catch (e) {
+      debugPrint("[FeedProvider] Error updating pinned post: $e");
+      rethrow;
+    }
+  }
+
+  // -------------------------------------------------------
   //  Reporting
   // -------------------------------------------------------
 
@@ -1383,6 +1478,31 @@ class FeedProvider with ChangeNotifier {
 
     if (table == 'posts' && eventType.toLowerCase() == 'delete') {
       _handlePostRealtimeDelete(payload);
+      return;
+    }
+
+    if (table == 'custom_networks') {
+      final netId = newRecord['id']?.toString() ?? oldRecord['id']?.toString();
+      if (_activeCustomNetwork != null && _activeCustomNetwork!.id == netId) {
+        final pinnedPostId = newRecord['pinned_post_id']?.toString();
+        _activeCustomNetwork = _activeCustomNetwork!.copyWith(
+          pinnedPostId: pinnedPostId,
+          nullifyPinnedPostId: pinnedPostId == null,
+        );
+        if (pinnedPostId != null && vId != null) {
+          final exists = _posts.any((p) => p.id == pinnedPostId);
+          if (!exists) {
+            _repository.getPostById(postId: pinnedPostId, viewerId: vId).then((p) {
+              if (p != null && !p.isDeleted) {
+                _posts.insert(0, p);
+                registerPost(p);
+                notifyListeners();
+              }
+            }).catchError((_) {});
+          }
+        }
+        notifyListeners();
+      }
       return;
     }
 

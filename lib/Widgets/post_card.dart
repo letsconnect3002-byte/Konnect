@@ -17,6 +17,9 @@ import 'package:connect/Providers/notification_provider.dart';
 import 'package:connect/Widgets/anonymous_avatar.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:connect/Widgets/vouched_user_card.dart';
+import 'package:connect/Widgets/user_profile_modal.dart';
+import 'package:connect/Models/custom_network.dart';
+import 'package:connect/Providers/custom_network_provider.dart';
 
 class PostCard extends StatelessWidget {
   final FeedPost post;
@@ -30,6 +33,7 @@ class PostCard extends StatelessWidget {
   final String? replyToName;
   final Key? avatarKey;
   final bool showBottomBorder;
+  final bool isPinned;
   final Function(String postId, String reactionKey)? onReactionToggle;
 
   const PostCard({
@@ -45,8 +49,21 @@ class PostCard extends StatelessWidget {
     this.replyToName,
     this.avatarKey,
     this.showBottomBorder = true,
+    this.isPinned = false,
     this.onReactionToggle,
   });
+
+  void _openUserProfile(BuildContext context) {
+    if (post.isDeleted || post.isAnonymous) return;
+    UserProfileModal.show(
+      context,
+      userId: post.authorId,
+      userName: post.authorName,
+      avatarUrl: post.authorAvatarUrl,
+      degree: post.degree,
+      scope: post.feedScope,
+    );
+  }
 
   String _formatTimeAgo(DateTime dateTime) {
     final diff = DateTime.now().difference(dateTime);
@@ -60,8 +77,34 @@ class PostCard extends StatelessWidget {
   void _showOptions(BuildContext context, int myUserId) {
     final isMe = (post.authorId == myUserId);
     final feedProvider = Provider.of<FeedProvider>(context, listen: false);
+    final customNetProvider =
+        Provider.of<CustomNetworkProvider>(context, listen: false);
     final connectionProvider =
         Provider.of<ConnectionProvider>(context, listen: false);
+
+    // Resolve custom network
+    CustomNetwork? targetNetwork;
+    if (feedProvider.isCustomNetworkActive &&
+        (post.networkId == null ||
+            post.networkId!.isEmpty ||
+            post.networkId == feedProvider.activeCustomNetwork?.id)) {
+      targetNetwork = feedProvider.activeCustomNetwork;
+    } else if (post.networkId != null && post.networkId!.isNotEmpty) {
+      targetNetwork = customNetProvider.myNetworks
+          .where((n) => n.id == post.networkId)
+          .firstOrNull;
+      if (targetNetwork == null &&
+          feedProvider.activeCustomNetwork?.id == post.networkId) {
+        targetNetwork = feedProvider.activeCustomNetwork;
+      }
+    }
+
+    final bool isCustomNetworkCreator = targetNetwork != null &&
+        (targetNetwork.isCreator || targetNetwork.creatorId == myUserId);
+    final bool isRootPost =
+        post.replyToPostId == null || post.replyToPostId!.isEmpty;
+    final bool isCurrentlyPinned =
+        targetNetwork != null && targetNetwork.pinnedPostId == post.id;
 
     showModalBottomSheet(
       context: context,
@@ -85,6 +128,74 @@ class PostCard extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 16),
+            if (targetNetwork != null && isCustomNetworkCreator && isRootPost) ...[
+              () {
+                final CustomNetwork net = targetNetwork!;
+                return Material(
+                  color: Colors.transparent,
+                  child: ListTile(
+                    leading: Icon(
+                      isCurrentlyPinned
+                          ? Icons.push_pin_rounded
+                          : Icons.push_pin_outlined,
+                      color: context.accentPrimary,
+                    ),
+                    title: Text(
+                      isCurrentlyPinned ? "Unpin from Circle" : "Pin to Circle",
+                      style: TextStyle(
+                        color: context.textPrimary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    subtitle: Text(
+                      isCurrentlyPinned
+                          ? "Remove this post from the top of ${net.name}"
+                          : "Pin this post to the top of ${net.name}",
+                      style: TextStyle(
+                        color: context.textMuted,
+                        fontSize: 12,
+                      ),
+                    ),
+                    onTap: () async {
+                      Navigator.pop(ctx);
+                      final String targetNetId = net.id;
+                      final String targetNetName = net.name;
+                      final String? newPinnedId =
+                          isCurrentlyPinned ? null : post.id;
+                      try {
+                        await feedProvider.setPinnedPost(
+                            targetNetId, newPinnedId);
+                        customNetProvider.updatePinnedPostLocally(
+                            targetNetId, newPinnedId);
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(isCurrentlyPinned
+                                  ? "Post unpinned from $targetNetName"
+                                  : "Post pinned to $targetNetName"),
+                            ),
+                          );
+                        }
+                      } catch (e) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                  "Failed to ${isCurrentlyPinned ? 'unpin' : 'pin'} post"),
+                              backgroundColor: Colors.redAccent,
+                            ),
+                          );
+                        }
+                      }
+                    },
+                  ),
+                );
+              }(),
+              Divider(
+                color: Colors.white.withValues(alpha: 0.08),
+                height: 1,
+              ),
+            ],
             if (isMe)
               Material(
                 color: Colors.transparent,
@@ -416,34 +527,6 @@ class PostCard extends StatelessWidget {
       }
     }
 
-    if (isThread) {
-      return BounceTap(
-        onTap: handleConnectTap,
-        child: Container(
-          padding: const EdgeInsets.all(5),
-          decoration: BoxDecoration(
-            color: isRequestSent
-                ? Colors.white.withValues(alpha: 0.06)
-                : context.accentPrimary.withValues(alpha: 0.12),
-            shape: BoxShape.circle,
-            border: Border.all(
-              color: isRequestSent
-                  ? Colors.white.withValues(alpha: 0.25)
-                  : context.accentPrimary.withValues(alpha: 0.4),
-              width: 0.8,
-            ),
-          ),
-          child: Icon(
-            isRequestSent
-                ? Icons.done_rounded
-                : (isDirectRequest ? Icons.send_rounded : Icons.person_add_rounded),
-            size: 13,
-            color: isRequestSent ? Colors.white70 : context.accentSecondary,
-          ),
-        ),
-      );
-    }
-
     return BounceTap(
       onTap: handleConnectTap,
       child: Container(
@@ -509,6 +592,12 @@ class PostCard extends StatelessWidget {
             postName.isNotEmpty &&
             myName == postName);
 
+    final bool effectivePinned = isPinned ||
+        (!isThreadView &&
+            feedProvider.isCustomNetworkActive &&
+            feedProvider.activeCustomNetwork?.pinnedPostId == post.id &&
+            (post.replyToPostId == null || post.replyToPostId!.isEmpty));
+
     final Widget rawAvatar;
     if (post.isAnonymous) {
       rawAvatar = AnonymousAvatar(
@@ -559,14 +648,14 @@ class PostCard extends StatelessWidget {
                 : (isSelectedTarget
                     ? context.accentPrimary.withValues(alpha: 0.05)
                     : Colors.transparent),
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(isHighlighted ? 16 : 0),
             border: isHighlighted
                 ? Border.all(
                     color: context.accentPrimary.withValues(alpha: 0.28),
                     width: 1.0)
-                : Border.all(color: Colors.transparent, width: 1.5),
+                : null,
           ),
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 0),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
           child: IntrinsicHeight(
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -578,12 +667,15 @@ class PostCard extends StatelessWidget {
                     children: [
                       Container(
                         width: 2,
-                        height: 8,
+                        height: showTopConnector ? 16 : 0,
                         color: showTopConnector
                             ? const Color(0xFF3E414D)
                             : Colors.transparent,
                       ),
-                      avatarWidget,
+                      GestureDetector(
+                        onTap: () => _openUserProfile(context),
+                        child: avatarWidget,
+                      ),
                       Expanded(
                         child: Container(
                           width: 2,
@@ -600,7 +692,10 @@ class PostCard extends StatelessWidget {
                 // Right Column: Post Header & Content
                 Expanded(
                   child: Padding(
-                    padding: const EdgeInsets.only(top: 6, bottom: 8),
+                    padding: EdgeInsets.only(
+                      top: showTopConnector ? 16 : 4,
+                      bottom: 8,
+                    ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -648,16 +743,19 @@ class PostCard extends StatelessWidget {
                                 spacing: 6,
                                 runSpacing: 2,
                                 children: [
-                                  Text(
-                                    post.isDeleted
-                                        ? "Deleted User"
-                                        : post.authorName,
-                                    style: TextStyle(
-                                      color: post.isDeleted
-                                          ? context.textMuted
-                                          : context.textPrimary,
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.bold,
+                                  GestureDetector(
+                                    onTap: () => _openUserProfile(context),
+                                    child: Text(
+                                      post.isDeleted
+                                          ? "Deleted User"
+                                          : post.authorName,
+                                      style: TextStyle(
+                                        color: post.isDeleted
+                                            ? context.textMuted
+                                            : context.textPrimary,
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.bold,
+                                      ),
                                     ),
                                   ),
                                   if (!post.isDeleted)
@@ -755,11 +853,43 @@ class PostCard extends StatelessWidget {
                 width: 1.0,
               ),
             ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            avatarWidget,
-            const SizedBox(width: 10),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (effectivePinned) ...[
+                  Padding(
+                    padding: const EdgeInsets.only(left: 46.0, bottom: 8.0),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.push_pin_rounded,
+                          size: 13,
+                          color: context.textMuted,
+                        ),
+                        const SizedBox(width: 5),
+                        Text(
+                          "Pinned post",
+                          style: TextStyle(
+                            color: context.textMuted,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: 0.2,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    GestureDetector(
+                      onTap: () => _openUserProfile(context),
+                      child: avatarWidget,
+                    ),
+                    const SizedBox(width: 10),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -808,14 +938,17 @@ class PostCard extends StatelessWidget {
                           spacing: 6,
                           runSpacing: 2,
                           children: [
-                            Text(
-                              post.isDeleted ? "Deleted User" : post.authorName,
-                              style: TextStyle(
-                                color: post.isDeleted
-                                    ? context.textMuted
-                                    : context.textPrimary,
-                                fontSize: 14,
-                                fontWeight: FontWeight.bold,
+                            GestureDetector(
+                              onTap: () => _openUserProfile(context),
+                              child: Text(
+                                post.isDeleted ? "Deleted User" : post.authorName,
+                                style: TextStyle(
+                                  color: post.isDeleted
+                                      ? context.textMuted
+                                      : context.textPrimary,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                             ),
                             if (!post.isDeleted)
@@ -884,8 +1017,10 @@ class PostCard extends StatelessWidget {
             ),
           ],
         ),
-      ),
+      ],
     ),
+  ),
+),
     if (showBottomBorder && !isHighlighted)
       Container(
         height: 1,

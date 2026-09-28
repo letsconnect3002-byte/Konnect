@@ -260,6 +260,35 @@ class CustomNetworkProvider with ChangeNotifier {
     }
   }
 
+  /// Pin or unpin a post in a custom network (creator only)
+  Future<void> pinPost(String networkId, String? postId) async {
+    try {
+      await _repository.updatePinnedPost(networkId: networkId, postId: postId);
+      updatePinnedPostLocally(networkId, postId);
+    } catch (e) {
+      debugPrint('[CustomNetworkProvider] Error pinning post: $e');
+      rethrow;
+    }
+  }
+
+  /// Update pinned post in local state optimistically
+  void updatePinnedPostLocally(String networkId, String? postId) {
+    if (_activeCustomNetwork != null && _activeCustomNetwork!.id == networkId) {
+      _activeCustomNetwork = _activeCustomNetwork!.copyWith(
+        pinnedPostId: postId,
+        nullifyPinnedPostId: postId == null,
+      );
+    }
+    final index = _myNetworks.indexWhere((n) => n.id == networkId);
+    if (index != -1) {
+      _myNetworks[index] = _myNetworks[index].copyWith(
+        pinnedPostId: postId,
+        nullifyPinnedPostId: postId == null,
+      );
+    }
+    notifyListeners();
+  }
+
   @override
   void dispose() {
     _cleanupSubscription();
