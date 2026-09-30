@@ -216,51 +216,10 @@ class _SettingsPageState extends State<SettingsPage> {
     }
   }
 
-  Widget _buildCardOption({
-    required String label,
-    required String value,
-    required String activeValue,
-    required VoidCallback onTap,
-  }) {
-    final isActive = value == activeValue;
-    return Expanded(
-      child: GestureDetector(
-        onTap: () {
-          HapticFeedback.lightImpact();
-          onTap();
-        },
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
-          decoration: BoxDecoration(
-            color: isActive
-                ? context.accentPrimary.withValues(alpha: 0.15)
-                : context.surfaceSecondary,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: isActive
-                  ? context.accentPrimary
-                  : context.textMuted.withValues(alpha: 0.15),
-              width: 1.5,
-            ),
-          ),
-          alignment: Alignment.center,
-          child: Text(
-            label,
-            style: context.bodyText.copyWith(
-              color: isActive ? Colors.white : context.textSecondary,
-              fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
-              fontSize: 13,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
     final chatProvider = Provider.of<ChatProvider>(context);
-    final profileProvider = Provider.of<ProfileProvider>(context);
 
     return Scaffold(
       backgroundColor: context.canvasBackground,
@@ -359,69 +318,7 @@ class _SettingsPageState extends State<SettingsPage> {
                     ),
                   ),
                   
-                  const SizedBox(height: 16),
 
-                  // ── DEFAULT VISIBILITY SECTION ──
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: context.surfacePrimary,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                        color: context.textMuted.withValues(alpha: 0.1),
-                        width: 1.0,
-                      ),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          "DEFAULT CARD VISIBILITY",
-                          style: context.captionText.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: context.accentPrimary,
-                            letterSpacing: 0.8,
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          "Select which side of your digital card is shared by default when there is no manual choice, such as sharing via VIP code.",
-                          style: context.captionText.copyWith(
-                            color: context.textSecondary,
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        Row(
-                          children: [
-                            _buildCardOption(
-                              label: "Casual",
-                              value: "casual",
-                              activeValue: profileProvider.defaultCardVisibility,
-                              onTap: () => profileProvider
-                                  .setDefaultCardVisibility("casual"),
-                            ),
-                            const SizedBox(width: 8),
-                            _buildCardOption(
-                              label: "Professional",
-                              value: "professional",
-                              activeValue: profileProvider.defaultCardVisibility,
-                              onTap: () => profileProvider
-                                  .setDefaultCardVisibility("professional"),
-                            ),
-
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          "* Note: This preference does not apply to QR code scans, where you always select what to share manually.",
-                          style: context.captionText.copyWith(
-                            color: context.textMuted,
-                            fontStyle: FontStyle.italic,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
 
                   const SizedBox(height: 24),
 

@@ -11,8 +11,12 @@ abstract class VouchRepository {
     required String statement,
     required String feedScope,
     String? announcementPostId,
+    String? relationshipType,
+    List<String>? privateIntents,
+    String? optionalNote,
   });
   Future<int> getVouchCount(int voucheeId);
+  Future<List<String>> getMutualIntents({required int userId1, required int userId2});
 }
 
 class SupabaseVouchRepository implements VouchRepository {
@@ -62,6 +66,9 @@ class SupabaseVouchRepository implements VouchRepository {
     required String statement,
     required String feedScope,
     String? announcementPostId,
+    String? relationshipType,
+    List<String>? privateIntents,
+    String? optionalNote,
   }) async {
     final Map<String, dynamic> insertData = {
       'voucher_id': voucherId,
@@ -69,6 +76,9 @@ class SupabaseVouchRepository implements VouchRepository {
       'statement': statement,
       'feed_scope': feedScope,
       if (announcementPostId != null) 'announcement_post_id': announcementPostId,
+      if (relationshipType != null) 'relationship_type': relationshipType,
+      if (privateIntents != null && privateIntents.isNotEmpty) 'private_intents': privateIntents,
+      if (optionalNote != null) 'optional_note': optionalNote,
     };
 
     final response = await _client
@@ -92,6 +102,23 @@ class SupabaseVouchRepository implements VouchRepository {
     } catch (e) {
       debugPrint("Error getting vouch count for user $voucheeId: $e");
       return 0;
+    }
+  }
+
+  @override
+  Future<List<String>> getMutualIntents({required int userId1, required int userId2}) async {
+    try {
+      final response = await _client.rpc('get_mutual_intents', params: {
+        'p_user_a': userId1,
+        'p_user_b': userId2,
+      });
+      if (response is List) {
+        return response.map((e) => e.toString()).toList();
+      }
+      return [];
+    } catch (e) {
+      debugPrint("Error fetching mutual intents: $e");
+      return [];
     }
   }
 }

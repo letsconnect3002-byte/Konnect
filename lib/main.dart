@@ -12,12 +12,9 @@ import 'package:connect/Pages/DirectMessagesHubPage.dart';
 import 'package:connect/Pages/OtherProfilesPage.dart';
 import 'package:connect/Pages/yet_to_be_built_profile_page.dart';
 import 'package:connect/Pages/IndividualChatPage.dart';
-import 'package:connect/Pages/Tribe/TribeChatPage.dart';
 import 'package:connect/Providers/profile_provider.dart';
 import 'package:connect/Providers/connection_provider.dart';
 import 'package:connect/Providers/chat_provider.dart';
-import 'package:connect/Providers/tribe_provider.dart';
-import 'package:connect/Repositories/tribe_repository.dart';
 import 'package:connect/Widgets/in_app_notification_banner.dart';
 import 'package:connect/Widgets/profile_nudge_banner.dart';
 import 'package:connect/Pages/YourNetworkPage.dart';
@@ -29,8 +26,6 @@ import 'package:connect/Repositories/chat_repository.dart';
 import 'package:connect/Providers/notification_provider.dart';
 import 'package:connect/services/analytics_service.dart';
 import 'package:connect/Repositories/notification_repository.dart';
-import 'package:connect/Providers/plans_provider.dart';
-import 'package:connect/Repositories/plans_repository.dart';
 import 'package:connect/Providers/network_provider.dart';
 import 'package:connect/Repositories/network_repository.dart';
 import 'package:connect/Repositories/pulse_repository.dart';
@@ -298,55 +293,10 @@ Future<void> showConnectionLocalNotification({
       type == 'plan_update' ||
       type == 'plan_reminder_30' ||
       type == 'plan_reminder_start';
-  final bool isTribeInvite = type == 'tribe_invite';
-  final bool isTribeRequest = type == 'tribe_request';
-  final bool isInformational = type == 'tribe_removed' ||
-      type == 'tribe_approved' ||
-      type == 'tribe_added' ||
-      type == 'custom_network_added';
+  final bool isInformational =
+      type == 'custom_network_added' || type.startsWith('tribe_');
 
-  if (isTribeInvite) {
-    androidActions = [
-      const AndroidNotificationAction(
-        'action_tribe_accept',
-        'Accept',
-      ),
-      const AndroidNotificationAction(
-        'action_tribe_decline',
-        'Decline',
-      ),
-    ];
-    iosCategory = 'tribe_invite_category';
-  } else if (isTribeRequest) {
-    androidActions = [
-      const AndroidNotificationAction(
-        'action_tribe_accept',
-        'Accept',
-      ),
-      const AndroidNotificationAction(
-        'action_tribe_decline',
-        'Decline',
-      ),
-    ];
-    iosCategory = 'tribe_request_category';
-  } else if (type == 'plan_invite') {
-    androidActions = [
-      const AndroidNotificationAction(
-        'action_plan_accept',
-        'Accept',
-      ),
-      const AndroidNotificationAction(
-        'action_plan_decline',
-        'Decline',
-        inputs: [
-          AndroidNotificationActionInput(
-            label: 'Reason for declining...',
-          ),
-        ],
-      ),
-    ];
-    iosCategory = 'plan_invite_category';
-  } else if (isConnectionConfirmation || isPlanNotif || isInformational) {
+  if (isConnectionConfirmation || isPlanNotif || isInformational) {
     androidActions = [];
     iosCategory = 'default_category';
   } else if (isReferralRequest) {
@@ -482,8 +432,6 @@ Future<void> showConnectionLocalNotification({
 String? pendingNotificationPayload;
 int? targetChatSenderId;
 bool targetOpenNotificationsPage = false;
-String? targetTribeChatId;
-String? targetTribeName;
 String? targetFeedRootPostId;
 String? targetFeedHighlightPostId;
 
@@ -526,21 +474,6 @@ void handleLocalNotificationClickPayload(String payload) {
               rootPostId: rootPostId,
               highlightPostId: postId.isNotEmpty ? postId : rootPostId,
             ),
-          ),
-        );
-      }
-      return;
-    }
-    if (action == 'tribe_message' ||
-        action == 'tribe_added' ||
-        data['real_type'] == 'tribe_added') {
-      final tribeId = data['tribe_id'] as String?;
-      final tribeName = data['tribe_name'] as String? ?? 'Mafia';
-      if (tribeId != null) {
-        navigatorKey.currentState?.push(
-          MaterialPageRoute(
-            builder: (routeContext) =>
-                TribeChatPage(tribeId: tribeId, tribeName: tribeName),
           ),
         );
       }
@@ -600,145 +533,6 @@ Future<void> onNotificationActionReceived(NotificationResponse response) async {
     );
     final client =
         SupabaseClient(SupabaseConfig.url, SupabaseConfig.serviceRoleKey);
-
-    final isTribeMessage = data['action'] == 'tribe_message';
-    if (isTribeMessage) {
-      if (actionId == 'action_tribe_reply') {
-        final String? replyText = response.input;
-        print(
-            "PushNotificationsAction: Tribe Direct Reply triggered. Text: $replyText");
-        if (replyText != null && replyText.trim().isNotEmpty) {
-          final String? tribeId = data['tribe_id']?.toString();
-          final senderIdStr = data['sender_id']?.toString();
-          if (tribeId != null && senderIdStr != null) {
-            final ownerId =
-                await LocalDatabaseHelper.instance.getActiveUserId();
-            if (ownerId != null) {
-              final String newMessageId = const Uuid().v4();
-              final String createdAt = DateTime.now().toUtc().toIso8601String();
-
-              try {
-                await client.from('tribe_messages').insert({
-                  'id': newMessageId,
-                  'tribe_id': tribeId,
-                  'sender_id': ownerId,
-                  'content': replyText.trim(),
-                  'message_type': 'text',
-                  'created_at': createdAt,
-                  'updated_at': createdAt,
-                });
-                print(
-                    "PushNotificationsAction: Tribe message sent to Supabase successfully");
-              } catch (supabaseError) {
-                print(
-                    "PushNotificationsAction: Supabase insert error for tribe message: $supabaseError");
-              }
-
-              int count = 1;
-              List<String> lines = [];
-              try {
-                final prefs = await SharedPreferences.getInstance();
-                final key = 'unread_tribe_messages_$tribeId';
-                lines = prefs.getStringList(key) ?? [];
-                lines.add("You: ${replyText.trim()}");
-                await prefs.setStringList(key, lines);
-                count = lines.length;
-              } catch (e) {
-                print(
-                    "PushNotificationsAction: Error updating SharedPreferences on reply: $e");
-              }
-
-              try {
-                final tribeName = data['tribe_name']?.toString() ?? 'Mafia';
-                const AndroidNotificationChannel tribeChannel =
-                    AndroidNotificationChannel(
-                  'tribe_messages_channel',
-                  'Mafia Messages',
-                  description: 'Notifications for Mafia group chat messages',
-                  importance: Importance.max,
-                );
-
-                await flutterLocalNotificationsPlugin
-                    .resolvePlatformSpecificImplementation<
-                        AndroidFlutterLocalNotificationsPlugin>()
-                    ?.createNotificationChannel(tribeChannel);
-
-                final androidDetails = AndroidNotificationDetails(
-                  tribeChannel.id,
-                  tribeChannel.name,
-                  channelDescription: tribeChannel.description,
-                  importance: Importance.max,
-                  priority: Priority.high,
-                  showWhen: true,
-                  number: count,
-                  category: AndroidNotificationCategory.message,
-                  styleInformation: count > 1
-                      ? InboxStyleInformation(
-                          lines,
-                          contentTitle: "New Messages in $tribeName",
-                          summaryText: '$count messages',
-                        )
-                      : null,
-                  actions: [
-                    const AndroidNotificationAction(
-                      'action_tribe_reply',
-                      'Reply',
-                      inputs: [
-                        AndroidNotificationActionInput(
-                          label: 'Type message...',
-                        ),
-                      ],
-                      allowGeneratedReplies: true,
-                    ),
-                  ],
-                );
-
-                final iosDetails = DarwinNotificationDetails(
-                  presentAlert: true,
-                  presentBadge: true,
-                  presentSound: true,
-                  threadIdentifier: tribeId,
-                  categoryIdentifier: 'tribe_message_category',
-                );
-
-                final details = NotificationDetails(
-                  android: androidDetails,
-                  iOS: iosDetails,
-                );
-
-                final Map<String, dynamic> fullPayload = {
-                  'action': 'tribe_message',
-                  'message_id': newMessageId,
-                  'tribe_id': tribeId,
-                  'tribe_name': tribeName,
-                  'sender_id': senderIdStr,
-                  'sender_name': data['sender_name'] ?? 'New Message',
-                  'payload': replyText.trim(),
-                  'is_connection_notification': false,
-                };
-
-                final notifId = getNotificationId(tribeId);
-                await flutterLocalNotificationsPlugin.show(
-                  id: notifId,
-                  title: count > 1
-                      ? "New Messages in $tribeName"
-                      : "New Message in $tribeName",
-                  body: count > 1 ? lines.last : "You: ${replyText.trim()}",
-                  notificationDetails: details,
-                  payload: jsonEncode(fullPayload),
-                );
-                print(
-                    "PushNotificationsAction: Updated local notification with reply. ID: $notifId");
-              } catch (e) {
-                print(
-                    "PushNotificationsAction: Error updating local notification tray on reply: $e");
-              }
-            }
-          }
-        }
-      }
-      return;
-    }
 
     final isConnectionNotif = data['is_connection_notification'] == true;
 
@@ -950,227 +744,6 @@ Future<void> onNotificationActionReceived(NotificationResponse response) async {
               'note': actionedNote.isNotEmpty
                   ? actionedNote
                   : '[REFERRAL_REQUEST_ACTIONED]',
-              'is_seen': true,
-            }).eq('id', notificationId);
-          }
-        } else if (actionId == 'action_plan_accept') {
-          print("PushNotificationsAction: Plan Accept action triggered");
-          final myUserId = await LocalDatabaseHelper.instance.getActiveUserId();
-          final planId =
-              data['plan_id']?.toString() ?? data['note']?.toString();
-          print(
-              "PushNotificationsAction: myUserId: $myUserId, planId: $planId");
-          if (myUserId != null && planId != null) {
-            final inviteRes = await client
-                .from('plan_invites')
-                .select('id')
-                .eq('plan_id', planId)
-                .eq('invitee_id', myUserId)
-                .maybeSingle();
-
-            if (inviteRes != null && inviteRes['id'] != null) {
-              final inviteId = inviteRes['id'] as String;
-              await client.from('plan_invites').update({
-                'status': 'accepted',
-                'responded_at': DateTime.now().toUtc().toIso8601String(),
-              }).eq('id', inviteId);
-            }
-
-            await client
-                .from('connection_notifications')
-                .update({'is_seen': true}).eq('id', notificationId);
-          }
-        } else if (actionId == 'action_plan_decline') {
-          final String? declineReason = response.input?.trim();
-          print(
-              "PushNotificationsAction: Plan Decline action triggered. Reason: $declineReason");
-          final myUserId = await LocalDatabaseHelper.instance.getActiveUserId();
-          final planId =
-              data['plan_id']?.toString() ?? data['note']?.toString();
-          print(
-              "PushNotificationsAction: myUserId: $myUserId, planId: $planId");
-          if (myUserId != null && planId != null) {
-            final inviteRes = await client
-                .from('plan_invites')
-                .select('id')
-                .eq('plan_id', planId)
-                .eq('invitee_id', myUserId)
-                .maybeSingle();
-
-            if (inviteRes != null && inviteRes['id'] != null) {
-              final inviteId = inviteRes['id'] as String;
-              await client.from('plan_invites').update({
-                'status': 'declined',
-                'decline_reason': declineReason,
-                'responded_at': DateTime.now().toUtc().toIso8601String(),
-              }).eq('id', inviteId);
-            }
-
-            await client
-                .from('connection_notifications')
-                .update({'is_seen': true}).eq('id', notificationId);
-          }
-        } else if (actionId == 'action_tribe_accept') {
-          print("PushNotificationsAction: Tribe Accept action triggered");
-          final myUserId = await LocalDatabaseHelper.instance.getActiveUserId();
-
-          String? tribeId;
-          String? realType;
-          final noteStr = data['note']?.toString();
-          if (noteStr != null && noteStr.startsWith('{')) {
-            try {
-              final parsed = jsonDecode(noteStr);
-              tribeId = parsed['tribe_id']?.toString();
-              realType = parsed['real_type']?.toString();
-            } catch (_) {}
-          }
-
-          print(
-              "PushNotificationsAction: myUserId: $myUserId, tribeId: $tribeId, realType: $realType");
-
-          if (myUserId != null && tribeId != null) {
-            final nowStr = DateTime.now().toUtc().toIso8601String();
-
-            if (realType == 'tribe_request') {
-              final requesterIdStr = data['actor_id']?.toString() ??
-                  data['other_user_id']?.toString();
-              final requesterId =
-                  requesterIdStr != null ? int.tryParse(requesterIdStr) : null;
-              if (requesterId != null) {
-                final existingReq = await client
-                    .from('tribe_members')
-                    .select('status')
-                    .eq('tribe_id', tribeId)
-                    .eq('user_id', requesterId)
-                    .maybeSingle();
-
-                if (existingReq == null || existingReq['status'] != 'active') {
-                  final rolesRes = await client
-                      .from('tribe_roles')
-                      .select('id')
-                      .eq('tribe_id', tribeId)
-                      .eq('is_default', true)
-                      .maybeSingle();
-                  final defaultRoleId =
-                      rolesRes != null ? rolesRes['id'] as String? : null;
-                  if (defaultRoleId != null) {
-                    await client
-                        .from('tribe_members')
-                        .update({
-                          'status': 'active',
-                          'role_id': defaultRoleId,
-                          'joined_at': nowStr,
-                          'updated_at': nowStr,
-                        })
-                        .eq('tribe_id', tribeId)
-                        .eq('user_id', requesterId);
-
-                    await client.from('tribe_activity_log').insert({
-                      'tribe_id': tribeId,
-                      'actor_id': requesterId,
-                      'action_type': 'joined',
-                      'created_at': nowStr,
-                    });
-
-                    final tribeRes = await client
-                        .from('tribes')
-                        .select('name')
-                        .eq('id', tribeId)
-                        .maybeSingle();
-                    final tribeName = tribeRes != null
-                        ? tribeRes['name']?.toString() ?? 'Tribe'
-                        : 'Tribe';
-                    await client.from('connection_notifications').insert({
-                      'user_id': requesterId,
-                      'other_user_id': myUserId,
-                      'type': 'referral',
-                      'note': jsonEncode({
-                        'tribe_id': tribeId,
-                        'tribe_name': tribeName,
-                        'real_type': 'tribe_approved'
-                      }),
-                      'is_seen': false,
-                    });
-                  }
-                }
-              }
-            } else {
-              final existingMem = await client
-                  .from('tribe_members')
-                  .select('status')
-                  .eq('tribe_id', tribeId)
-                  .eq('user_id', myUserId)
-                  .maybeSingle();
-
-              if (existingMem == null || existingMem['status'] != 'active') {
-                await client
-                    .from('tribe_members')
-                    .update({
-                      'status': 'active',
-                      'joined_at': nowStr,
-                      'updated_at': nowStr,
-                    })
-                    .eq('tribe_id', tribeId)
-                    .eq('user_id', myUserId);
-
-                await client.from('tribe_activity_log').insert({
-                  'tribe_id': tribeId,
-                  'actor_id': myUserId,
-                  'action_type': 'joined',
-                  'created_at': nowStr,
-                });
-              }
-            }
-
-            await client.from('connection_notifications').update({
-              'is_seen': true,
-            }).eq('id', notificationId);
-          }
-        } else if (actionId == 'action_tribe_decline') {
-          print("PushNotificationsAction: Tribe Decline action triggered");
-          final myUserId = await LocalDatabaseHelper.instance.getActiveUserId();
-
-          String? tribeId;
-          String? realType;
-          final noteStr = data['note']?.toString();
-          if (noteStr != null && noteStr.startsWith('{')) {
-            try {
-              final parsed = jsonDecode(noteStr);
-              tribeId = parsed['tribe_id']?.toString();
-              realType = parsed['real_type']?.toString();
-            } catch (_) {}
-          }
-
-          print(
-              "PushNotificationsAction: myUserId: $myUserId, tribeId: $tribeId, realType: $realType");
-
-          if (myUserId != null && tribeId != null) {
-            final nowStr = DateTime.now().toUtc().toIso8601String();
-
-            final targetId = realType == 'tribe_request'
-                ? (int.tryParse(data['actor_id']?.toString() ??
-                        data['other_user_id']?.toString() ??
-                        '') ??
-                    myUserId)
-                : myUserId;
-
-            await client
-                .from('tribe_members')
-                .update({
-                  'status': 'declined',
-                  'updated_at': nowStr,
-                })
-                .eq('tribe_id', tribeId)
-                .eq('user_id', targetId);
-
-            await client.from('tribe_activity_log').insert({
-              'tribe_id': tribeId,
-              'actor_id': myUserId,
-              'action_type': 'declined_invite',
-              'created_at': nowStr,
-            });
-
-            await client.from('connection_notifications').update({
               'is_seen': true,
             }).eq('id', notificationId);
           }
@@ -1471,44 +1044,6 @@ List<DarwinNotificationCategory> buildDarwinNotificationCategories() {
       },
     ),
     DarwinNotificationCategory(
-      'tribe_invite_category',
-      actions: <DarwinNotificationAction>[
-        DarwinNotificationAction.plain(
-          'action_tribe_accept',
-          'Accept',
-        ),
-        DarwinNotificationAction.plain(
-          'action_tribe_decline',
-          'Decline',
-          options: <DarwinNotificationActionOption>{
-            DarwinNotificationActionOption.destructive,
-          },
-        ),
-      ],
-      options: <DarwinNotificationCategoryOption>{
-        DarwinNotificationCategoryOption.hiddenPreviewShowTitle,
-      },
-    ),
-    DarwinNotificationCategory(
-      'tribe_request_category',
-      actions: <DarwinNotificationAction>[
-        DarwinNotificationAction.plain(
-          'action_tribe_accept',
-          'Accept',
-        ),
-        DarwinNotificationAction.plain(
-          'action_tribe_decline',
-          'Decline',
-          options: <DarwinNotificationActionOption>{
-            DarwinNotificationActionOption.destructive,
-          },
-        ),
-      ],
-      options: <DarwinNotificationCategoryOption>{
-        DarwinNotificationCategoryOption.hiddenPreviewShowTitle,
-      },
-    ),
-    DarwinNotificationCategory(
       'direct_connection_request_category',
       actions: <DarwinNotificationAction>[
         DarwinNotificationAction.plain(
@@ -1735,124 +1270,6 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
             "PushNotifications: Error handling background message delete: $e");
       }
     }
-  } else if (action == 'tribe_message') {
-    final tribeId = data['tribe_id']?.toString();
-    final senderIdStr = data['sender_id']?.toString();
-    final payload = data['payload']?.toString();
-    final tribeName = data['tribe_name']?.toString() ?? 'Mafia';
-    final senderName = data['sender_name']?.toString() ?? 'New Message';
-
-    if (messageId != null &&
-        tribeId != null &&
-        senderIdStr != null &&
-        payload != null) {
-      final senderId = int.tryParse(senderIdStr);
-      if (senderId != null) {
-        try {
-          final activeUserId =
-              await LocalDatabaseHelper.instance.getActiveUserId();
-          if (activeUserId != null && senderId == activeUserId) {
-            print(
-                "PushNotifications: Received own Mafia message in background. Ignoring.");
-            return;
-          }
-
-          // Use tribeId for generating a stable notification ID
-          final int notifId = getNotificationId(tribeId);
-
-          // Track unread messages in SharedPreferences
-          final prefs = await SharedPreferences.getInstance();
-          final key = 'unread_tribe_messages_$tribeId';
-          List<String> lines = prefs.getStringList(key) ?? [];
-          lines.add("$senderName: $payload");
-          await prefs.setStringList(key, lines);
-
-          final count = lines.length;
-
-          const AndroidNotificationChannel tribeChannel =
-              AndroidNotificationChannel(
-            'tribe_messages_channel',
-            'Mafia Messages',
-            description: 'Notifications for Mafia group chat messages',
-            importance: Importance.max,
-          );
-
-          await flutterLocalNotificationsPlugin
-              .resolvePlatformSpecificImplementation<
-                  AndroidFlutterLocalNotificationsPlugin>()
-              ?.createNotificationChannel(tribeChannel);
-
-          final androidDetails = AndroidNotificationDetails(
-            tribeChannel.id,
-            tribeChannel.name,
-            channelDescription: tribeChannel.description,
-            importance: Importance.max,
-            priority: Priority.high,
-            showWhen: true,
-            number: count,
-            category: AndroidNotificationCategory.message,
-            styleInformation: count > 1
-                ? InboxStyleInformation(
-                    lines,
-                    contentTitle: "New Messages in $tribeName",
-                    summaryText: '$count messages',
-                  )
-                : null,
-            actions: [
-              const AndroidNotificationAction(
-                'action_tribe_reply',
-                'Reply',
-                inputs: [
-                  AndroidNotificationActionInput(
-                    label: 'Type message...',
-                  ),
-                ],
-                allowGeneratedReplies: true,
-              ),
-            ],
-          );
-
-          final iosDetails = DarwinNotificationDetails(
-            presentAlert: true,
-            presentBadge: true,
-            presentSound: true,
-            threadIdentifier: tribeId,
-            categoryIdentifier: 'tribe_message_category',
-          );
-
-          final details = NotificationDetails(
-            android: androidDetails,
-            iOS: iosDetails,
-          );
-
-          final Map<String, dynamic> fullPayload = {
-            'action': 'tribe_message',
-            'message_id': messageId,
-            'tribe_id': tribeId,
-            'tribe_name': tribeName,
-            'sender_id': senderIdStr,
-            'sender_name': senderName,
-            'payload': payload,
-            'is_connection_notification': false,
-          };
-
-          await flutterLocalNotificationsPlugin.show(
-            id: notifId,
-            title: count > 1
-                ? "New Messages in $tribeName"
-                : "New Message in $tribeName",
-            body: count > 1 ? lines.last : "$senderName: $payload",
-            notificationDetails: details,
-            payload: jsonEncode(fullPayload),
-          );
-          print(
-              "PushNotifications: Mafia message background notification displayed. ID: $notifId");
-        } catch (e) {
-          print(
-              "PushNotifications: Error showing local Mafia notification in background: $e");
-        }
-      }
-    }
   } else if (action == 'feed_notification') {
     if (message.notification != null) {
       print(
@@ -1945,12 +1362,6 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
               type == "plan_update" ||
               type == "plan_reminder_30" ||
               type == "plan_reminder_start" ||
-              type == "tribe_added" ||
-              type == "tribe_invite" ||
-              type == "tribe_request" ||
-              type == "tribe_approved" ||
-              type == "tribe_message" ||
-              type == "tribe_removed" ||
               type == "custom_network_added") {
             String planId = note ?? '';
             List<String> changedFields = [];
@@ -2043,16 +1454,6 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
             } else if (type == "plan_reminder_start") {
               title = "Plan Starting Now";
               body = "\"$planTitle\" is starting now!";
-            } else if (type == "tribe_added") {
-              String tribeName = "a Mafia";
-              if (note != null && note.startsWith('{')) {
-                try {
-                  final parsed = jsonDecode(note);
-                  tribeName = parsed['tribe_name']?.toString() ?? "a Mafia";
-                } catch (_) {}
-              }
-              title = "Added to $tribeName";
-              body = "$actorName added you to \"$tribeName\"";
             } else if (type == "custom_network_added") {
               String networkName = "a Network";
               if (note != null && note.startsWith('{')) {
@@ -2064,58 +1465,6 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
               }
               title = "Added to $networkName";
               body = "$actorName added you to \"$networkName\"";
-            } else if (type == "tribe_invite") {
-              String tribeName = "a Mafia";
-              if (note != null && note.startsWith('{')) {
-                try {
-                  final parsed = jsonDecode(note);
-                  tribeName = parsed['tribe_name']?.toString() ?? "a Mafia";
-                } catch (_) {}
-              }
-              title = "Mafia Invitation";
-              body = "$actorName invited you to join \"$tribeName\"";
-            } else if (type == "tribe_request") {
-              String tribeName = "a Mafia";
-              if (note != null && note.startsWith('{')) {
-                try {
-                  final parsed = jsonDecode(note);
-                  tribeName = parsed['tribe_name']?.toString() ?? "a Mafia";
-                } catch (_) {}
-              }
-              title = "Mafia Request";
-              body = "$actorName requested to join \"$tribeName\"";
-            } else if (type == "tribe_approved") {
-              String tribeName = "a Mafia";
-              if (note != null && note.startsWith('{')) {
-                try {
-                  final parsed = jsonDecode(note);
-                  tribeName = parsed['tribe_name']?.toString() ?? "a Mafia";
-                } catch (_) {}
-              }
-              title = "Mafia Approved";
-              body = "Your request to join \"$tribeName\" was approved";
-            } else if (type == "tribe_message") {
-              String tribeName = "Mafia";
-              String message = "";
-              if (note != null && note.startsWith('{')) {
-                try {
-                  final parsed = jsonDecode(note);
-                  tribeName = parsed['tribe_name']?.toString() ?? "Mafia";
-                  message = parsed['message']?.toString() ?? "";
-                } catch (_) {}
-              }
-              title = "New Message in $tribeName";
-              body = "$actorName: $message";
-            } else if (type == "tribe_removed") {
-              String tribeName = "a Mafia";
-              if (note != null && note.startsWith('{')) {
-                try {
-                  final parsed = jsonDecode(note);
-                  tribeName = parsed['tribe_name']?.toString() ?? "a Mafia";
-                } catch (_) {}
-              }
-              title = "Removed from Mafia";
-              body = "You were removed from \"$tribeName\"";
             } else if (type == "feed_reply_mention") {
               title = isAnonymous
                   ? "New Anonymous Reply & Mention"
@@ -2247,12 +1596,7 @@ void main() async {
           try {
             final data = jsonDecode(payload);
             final action = data['action'] as String?;
-            if (action == 'tribe_message' ||
-                action == 'tribe_added' ||
-                data['real_type'] == 'tribe_added') {
-              targetTribeChatId = data['tribe_id']?.toString();
-              targetTribeName = data['tribe_name']?.toString() ?? 'Mafia';
-            } else if (action == 'custom_network_added' ||
+            if (action == 'custom_network_added' ||
                 data['real_type'] == 'custom_network_added') {
               targetOpenNotificationsPage = true;
             } else if (action == 'connection_notification') {
@@ -2297,12 +1641,7 @@ void main() async {
         try {
           final data = jsonDecode(localPayload);
           final action = data['action'] as String?;
-          if (action == 'tribe_message' ||
-              action == 'tribe_added' ||
-              data['real_type'] == 'tribe_added') {
-            targetTribeChatId = data['tribe_id']?.toString();
-            targetTribeName = data['tribe_name']?.toString() ?? 'Mafia';
-          } else if (action == 'custom_network_added' ||
+          if (action == 'custom_network_added' ||
               data['real_type'] == 'custom_network_added') {
             targetOpenNotificationsPage = true;
           } else if (action == 'connection_notification') {
@@ -2328,12 +1667,7 @@ void main() async {
     if (fcmMessage != null) {
       final data = fcmMessage.data;
       final action = data['action'] as String?;
-      if (action == 'tribe_message' ||
-          action == 'tribe_added' ||
-          data['real_type'] == 'tribe_added') {
-        targetTribeChatId = data['tribe_id']?.toString();
-        targetTribeName = data['tribe_name']?.toString() ?? 'Mafia';
-      } else if (action == 'custom_network_added' ||
+      if (action == 'custom_network_added' ||
           data['real_type'] == 'custom_network_added') {
         targetOpenNotificationsPage = true;
       } else if (action == 'connection_notification') {
@@ -2372,15 +1706,6 @@ class MyApp extends StatelessWidget {
           )
             ..loadBackgroundBlurPref()
             ..loadDefaultCardVisibilityPref(),
-        ),
-        ChangeNotifierProxyProvider<ProfileProvider, PlansProvider>(
-          create: (_) => PlansProvider(
-            plansRepository: SupabasePlansRepository(),
-          ),
-          update: (_, profileProvider, plansProvider) {
-            plansProvider!.updateUserId(profileProvider.userId);
-            return plansProvider;
-          },
         ),
         ChangeNotifierProxyProvider<ProfileProvider, ConnectionProvider>(
           create: (_) => ConnectionProvider(
@@ -2429,16 +1754,6 @@ class MyApp extends StatelessWidget {
             return networkProvider;
           },
         ),
-        ChangeNotifierProxyProvider<ProfileProvider, TribeProvider>(
-          create: (_) => TribeProvider(
-            tribeRepository: SupabaseTribeRepository(),
-            notificationRepository: SupabaseNotificationRepository(),
-          ),
-          update: (_, profileProvider, tribeProvider) {
-            tribeProvider!.updateUserId(profileProvider.userId);
-            return tribeProvider;
-          },
-        ),
         ChangeNotifierProxyProvider2<ProfileProvider, ConnectionProvider,
             PulseProvider>(
           create: (_) => PulseProvider(
@@ -2473,6 +1788,7 @@ class MyApp extends StatelessWidget {
               isConnectionsLoaded:
                   connectionProvider.state is UserConnectionLoaded ||
                       connectionProvider.state is UserConnectionError,
+              isChatView: profileProvider.isChatView,
             );
             return feedProvider;
           },
@@ -2670,21 +1986,6 @@ class _AppShellGateState extends State<AppShellGate> {
         navigatorKey.currentState?.push(
           PageRouteBuilder(
             pageBuilder: (context, anim, secAnim) => const NotificationPage(),
-            transitionDuration: Duration.zero,
-            reverseTransitionDuration: Duration.zero,
-          ),
-        );
-      } else if (targetTribeChatId != null) {
-        final tribeId = targetTribeChatId!;
-        final tribeName = targetTribeName ?? 'Mafia';
-        targetTribeChatId = null;
-        targetTribeName = null;
-        pendingNotificationPayload = null;
-
-        navigatorKey.currentState?.push(
-          PageRouteBuilder(
-            pageBuilder: (context, anim, secAnim) =>
-                TribeChatPage(tribeId: tribeId, tribeName: tribeName),
             transitionDuration: Duration.zero,
             reverseTransitionDuration: Duration.zero,
           ),
@@ -2970,399 +2271,6 @@ class _AppShellGateState extends State<AppShellGate> {
                     "PushNotifications: Error updating providers after delete: $e");
               }
             }
-          } else if (action == 'tribe_message') {
-            final tribeId = data['tribe_id']?.toString();
-            final senderIdStr = data['sender_id']?.toString();
-            final payload = data['payload']?.toString();
-            final tribeName = data['tribe_name']?.toString() ?? 'Mafia';
-            final senderName = data['sender_name']?.toString() ?? 'New Message';
-            final senderAvatar = data['sender_avatar']?.toString() ?? '';
-
-            if (messageId != null &&
-                tribeId != null &&
-                senderIdStr != null &&
-                payload != null) {
-              final senderId = int.tryParse(senderIdStr);
-              if (senderId != null) {
-                if (!mounted) return;
-                final tribeProvider =
-                    Provider.of<TribeProvider>(context, listen: false);
-                final isCurrentTribe = tribeProvider.activeTribeId == tribeId;
-
-                if (!isCurrentTribe) {
-                  try {
-                    final activeUserId =
-                        await LocalDatabaseHelper.instance.getActiveUserId();
-                    if (activeUserId != null && senderId == activeUserId) {
-                      print(
-                          "PushNotifications: Foreground received own Mafia message. Skipping banner.");
-                      return;
-                    }
-
-                    final overlayState = navigatorKey.currentState?.overlay;
-                    if (overlayState != null) {
-                      InAppNotificationBanner.show(
-                        overlayState: overlayState,
-                        senderId: senderId,
-                        senderName: "New Message in $tribeName",
-                        avatarUrl: senderAvatar,
-                        message: "$senderName: $payload",
-                        onTap: () {
-                          navigatorKey.currentState?.push(
-                            MaterialPageRoute(
-                              builder: (routeContext) => TribeChatPage(
-                                  tribeId: tribeId, tribeName: tribeName),
-                            ),
-                          );
-                        },
-                      );
-                      print(
-                          "PushNotifications: Foreground in-app Mafia notification banner displayed.");
-                    }
-                  } catch (e) {
-                    print(
-                        "PushNotifications: Error showing in-app Mafia banner: $e");
-                  }
-                }
-              }
-            }
-          } else if (action == 'connection_notification') {
-            final notificationId =
-                data['notification_id']?.toString() ?? data['id']?.toString();
-            if (notificationId != null) {
-              try {
-                final client = SupabaseClient(
-                    SupabaseConfig.url, SupabaseConfig.serviceRoleKey);
-                final notifRow = await client
-                    .from('connection_notifications')
-                    .select(
-                        '*, other_user:profiles!other_user_id(id, name, avatar_url, profession, anon_name), referred_user:profiles!referred_user_id(id, name, avatar_url, profession)')
-                    .eq('id', notificationId)
-                    .maybeSingle();
-
-                if (notifRow != null) {
-                  var type = notifRow['type']?.toString() ?? 'referral';
-                  final note = notifRow['note']?.toString();
-                  bool isAnonymous = false;
-                  String? explicitActorName;
-                  if (note != null && note.startsWith('{')) {
-                    try {
-                      final parsed = jsonDecode(note);
-                      if (parsed['real_type'] != null) {
-                        type = parsed['real_type'].toString();
-                      }
-                      if (parsed['is_anonymous'] == true ||
-                          parsed['is_anonymous']?.toString() == 'true') {
-                        isAnonymous = true;
-                      }
-                      if (parsed['actor_name'] != null) {
-                        explicitActorName = parsed['actor_name']?.toString();
-                      }
-                    } catch (_) {}
-                  }
-
-                  final actor =
-                      notifRow['other_user'] as Map<String, dynamic>? ?? {};
-                  var actorName = actor['name']?.toString() ?? 'Someone';
-                  var actorAvatar = actor['avatar_url']?.toString() ?? '';
-                  if (isAnonymous) {
-                    actorName = explicitActorName ??
-                        actor['anon_name']?.toString() ??
-                        'Anonymous';
-                    actorAvatar = '';
-                  }
-                  final actorId = actor['id'] as int? ?? 0;
-                  final referred =
-                      notifRow['referred_user'] as Map<String, dynamic>? ?? {};
-                  final referredName =
-                      referred['name']?.toString() ?? 'Someone';
-
-                  String title = "New Connection";
-                  String body = "You have a new update.";
-
-                  if (type == "vip_pass_key") {
-                    title = "New Connection";
-                    body = "$actorName connected via Private Key";
-                  } else if (type == "referral_connect") {
-                    title = "New Connection";
-                    body = "$actorName connected via Referral";
-                  } else if (type == "direct_connection_request") {
-                    title = "Connection Request";
-                    String msg = "";
-                    if (note != null && note.startsWith('{')) {
-                      try {
-                        final parsed = jsonDecode(note);
-                        if (parsed['message'] != null) {
-                          msg = parsed['message'].toString();
-                        }
-                      } catch (_) {}
-                    } else if (note != null) {
-                      msg = note;
-                    }
-                    body = msg.trim().isNotEmpty
-                        ? "$actorName: ${msg.trim()}"
-                        : "$actorName sent you a direct connection request";
-                  } else if (type == "referral") {
-                    final isRequest = note != null &&
-                        (note.startsWith("[REFERRAL_REQUEST]") ||
-                            note.startsWith("[REFERRAL_REQUEST_ACTIONED]"));
-                    if (isRequest) {
-                      title = "Introduction Request";
-                      body =
-                          "$actorName asked to be introduced to $referredName";
-                    } else {
-                      title = "New Referral";
-                      body = "$actorName referred $referredName to you";
-                    }
-                  } else if (type == "plan_invite" ||
-                      type == "plan_update" ||
-                      type == "plan_reminder_30" ||
-                      type == "plan_reminder_start" ||
-                      type == "tribe_added" ||
-                      type == "tribe_invite" ||
-                      type == "tribe_request" ||
-                      type == "tribe_approved" ||
-                      type == "tribe_message" ||
-                      type == "tribe_removed" ||
-                      type == "custom_network_added") {
-                    String planId = note ?? '';
-                    List<String> changedFields = [];
-                    if (note != null && note.startsWith('{')) {
-                      try {
-                        final parsed = jsonDecode(note);
-                        planId = parsed['plan_id']?.toString() ?? '';
-                        if (parsed['changed_fields'] is List) {
-                          changedFields =
-                              List<String>.from(parsed['changed_fields']);
-                        }
-                      } catch (e) {
-                        print("Error parsing note JSON in foreground push: $e");
-                      }
-                    }
-
-                    String planTitle = "Plan";
-                    String startsAtText = "";
-                    if (planId.isNotEmpty) {
-                      try {
-                        final planRow = await client
-                            .from('plans')
-                            .select('title, starts_at')
-                            .eq('id', planId)
-                            .maybeSingle();
-                        if (planRow != null) {
-                          if (planRow['title'] != null) {
-                            planTitle = planRow['title'].toString();
-                          }
-                          final startsAtStr = planRow['starts_at'] as String?;
-                          if (startsAtStr != null) {
-                            try {
-                              final dt = DateTime.parse(startsAtStr);
-                              final diff = dt.difference(DateTime.now());
-                              if (diff.isNegative) {
-                                startsAtText = "now";
-                              } else {
-                                final days = diff.inDays;
-                                final hours = diff.inHours % 24;
-                                final minutes = diff.inMinutes % 60;
-                                final seconds = diff.inSeconds % 60;
-
-                                String pad(int n) =>
-                                    n.toString().padLeft(2, '0');
-
-                                if (days > 0) {
-                                  startsAtText =
-                                      "in ${days}d:${pad(hours)}h:${pad(minutes)}m:${pad(seconds)}s";
-                                } else if (hours > 0) {
-                                  startsAtText =
-                                      "in ${pad(hours)}h:${pad(minutes)}m:${pad(seconds)}s";
-                                } else {
-                                  startsAtText =
-                                      "in ${pad(minutes)}m:${pad(seconds)}s";
-                                }
-                              }
-                            } catch (e) {
-                              print("Error formatting starts_at: $e");
-                            }
-                          }
-                        }
-                      } catch (e) {
-                        print("Error fetching plan details for push: $e");
-                      }
-                    }
-                    if (type == "plan_invite") {
-                      title = "New Plan Invitation";
-                      body = "$actorName invited you to join \"$planTitle\"";
-                    } else if (type == "plan_update") {
-                      title = "Plan Updated";
-                      String changeDesc = "";
-                      if (changedFields.isNotEmpty) {
-                        final labelsMap = {
-                          'starts_at': 'time',
-                          'location': 'location',
-                          'title': 'title',
-                          'description': 'description',
-                          'category': 'category',
-                          'plan_type': 'type',
-                          'is_online': 'online status',
-                          'meeting_link': 'meeting link',
-                        };
-                        final labels = changedFields
-                            .map((f) => labelsMap[f] ?? f)
-                            .toList();
-                        changeDesc = " (changed: ${labels.join(', ')})";
-                      }
-                      body =
-                          "$actorName updated the plan \"$planTitle\"$changeDesc";
-                    } else if (type == "plan_reminder_30") {
-                      title = "Upcoming Plan Reminder";
-                      final timeSuffix = startsAtText.isNotEmpty
-                          ? " $startsAtText"
-                          : " in 30 minutes";
-                      body = "\"$planTitle\" starts$timeSuffix";
-                    } else if (type == "plan_reminder_start") {
-                      title = "Plan Starting Now";
-                      body = "\"$planTitle\" is starting now!";
-                    } else if (type == "tribe_added") {
-                      String tribeName = "a Mafia";
-                      if (note != null && note.startsWith('{')) {
-                        try {
-                          final parsed = jsonDecode(note);
-                          tribeName =
-                              parsed['tribe_name']?.toString() ?? "a Mafia";
-                        } catch (_) {}
-                      }
-                      title = "Added to $tribeName";
-                      body = "$actorName added you to \"$tribeName\"";
-                    } else if (type == "custom_network_added") {
-                      String networkName = "a Network";
-                      if (note != null && note.startsWith('{')) {
-                        try {
-                          final parsed = jsonDecode(note);
-                          networkName =
-                              parsed['network_name']?.toString() ?? "a Network";
-                        } catch (_) {}
-                      }
-                      title = "Added to $networkName";
-                      body = "$actorName added you to \"$networkName\"";
-                    } else if (type == "tribe_invite") {
-                      String tribeName = "a Mafia";
-                      if (note != null && note.startsWith('{')) {
-                        try {
-                          final parsed = jsonDecode(note);
-                          tribeName =
-                              parsed['tribe_name']?.toString() ?? "a Mafia";
-                        } catch (_) {}
-                      }
-                      title = "Mafia Invitation";
-                      body = "$actorName invited you to join \"$tribeName\"";
-                    } else if (type == "tribe_message") {
-                      String tribeName = "Mafia";
-                      String message = "";
-                      if (note != null && note.startsWith('{')) {
-                        try {
-                          final parsed = jsonDecode(note);
-                          tribeName =
-                              parsed['tribe_name']?.toString() ?? "Mafia";
-                          message = parsed['message']?.toString() ?? "";
-                        } catch (_) {}
-                      }
-                      title = "New Message in $tribeName";
-                      body = "$actorName: $message";
-                    } else if (type == "tribe_removed") {
-                      String tribeName = "a Mafia";
-                      if (note != null && note.startsWith('{')) {
-                        try {
-                          final parsed = jsonDecode(note);
-                          tribeName =
-                              parsed['tribe_name']?.toString() ?? "a Mafia";
-                        } catch (_) {}
-                      }
-                      title = "Removed from Mafia";
-                      body = "You were removed from \"$tribeName\"";
-                    } else if (type == "tribe_request") {
-                      String tribeName = "a Mafia";
-                      if (note != null && note.startsWith('{')) {
-                        try {
-                          final parsed = jsonDecode(note);
-                          tribeName =
-                              parsed['tribe_name']?.toString() ?? "a Mafia";
-                        } catch (_) {}
-                      }
-                      title = "Mafia Request";
-                      body = "$actorName requested to join \"$tribeName\"";
-                    } else if (type == "tribe_approved") {
-                      String tribeName = "a Mafia";
-                      if (note != null && note.startsWith('{')) {
-                        try {
-                          final parsed = jsonDecode(note);
-                          tribeName =
-                              parsed['tribe_name']?.toString() ?? "a Mafia";
-                        } catch (_) {}
-                      }
-                      title = "Mafia Approved";
-                      body = "Your request to join \"$tribeName\" was approved";
-                    } else if (type == "feed_reply_mention") {
-                      title = isAnonymous
-                          ? "New Anonymous Reply & Mention"
-                          : "New Reply & Mention";
-                      body =
-                          "$actorName replied to your post and mentioned you on their post.";
-                    } else if (type == "feed_reply") {
-                      title = isAnonymous ? "New Anonymous Reply" : "New Reply";
-                      body = "$actorName replied to your post.";
-                    } else if (type == "feed_mention") {
-                      title =
-                          isAnonymous ? "New Anonymous Mention" : "New Mention";
-                      body = "$actorName mentioned you on their post.";
-                    } else if (type == "feed_post") {
-                      title = isAnonymous ? "New Anonymous Post" : "New Post";
-                      body = "$actorName shared a new post with your network.";
-                    } else if (type == "feed_connection_reply") {
-                      String parentAuthorName = "a post";
-                      if (note != null && note.startsWith('{')) {
-                        try {
-                          final parsed = jsonDecode(note);
-                          parentAuthorName =
-                              parsed['parent_author_name']?.toString() ??
-                                  "a post";
-                        } catch (_) {}
-                      }
-                      title = "$actorName joined a conversation";
-                      body =
-                          "$actorName replied to $parentAuthorName, tap to join the conversation.";
-                    }
-                  } else {
-                    title = "New Connection";
-                    body = "$actorName connected with you";
-                  }
-
-                  final overlayState = navigatorKey.currentState?.overlay;
-                  if (overlayState != null) {
-                    InAppNotificationBanner.show(
-                      overlayState: overlayState,
-                      senderId: actorId,
-                      senderName: title,
-                      avatarUrl: actorAvatar,
-                      isAnonymous: isAnonymous,
-                      anonSeed: actorName,
-                      message: body,
-                      onTap: () {
-                        navigatorKey.currentState?.push(
-                          MaterialPageRoute(
-                            builder: (routeContext) => const NotificationPage(),
-                          ),
-                        );
-                      },
-                    );
-                    print(
-                        "PushNotifications: Foreground connection notification banner displayed.");
-                  }
-                }
-              } catch (e) {
-                print(
-                    "PushNotifications: Error showing foreground connection_notification: $e");
-              }
-            }
           } else if (action == 'feed_notification') {
             final isAnonymous =
                 data['is_anonymous'] == 'true' || data['is_anonymous'] == true;
@@ -3459,7 +2367,7 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
       const DirectMessagesHubPage(), // index 1 — Message (Chats)
       const OtherProfilesPage(), // index 2 — Mandal / Connections
       const YourNetworkPage(), // index 3 — Your Network
-      const YetToBeBuiltProfilePage(), // index 4 — My Card
+      const YetToBeBuiltProfilePage(), // index 4 — Profile
     ];
     _setupNotificationTapListeners();
     _initShareReceiver();

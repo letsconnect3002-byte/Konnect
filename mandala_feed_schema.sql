@@ -379,6 +379,7 @@ returns table (
   author_id bigint,
   author_name text,
   author_avatar_url text,
+  author_profession text,
   content text,
   created_at timestamptz,
   reply_count int,
@@ -400,8 +401,18 @@ begin
   select
     p.id,
     p.author_id,
-    pr.name,
-    pr.avatar_url,
+    case
+      when p.is_anonymous then coalesce(pr.anon_name, 'Anonymous')
+      else pr.name
+    end as author_name,
+    case
+      when p.is_anonymous then ''
+      else pr.avatar_url
+    end as author_avatar_url,
+    case
+      when p.is_anonymous then ''
+      else coalesce(pr.profession, '')
+    end as author_profession,
     p.content,
     p.created_at,
     p.reply_count,

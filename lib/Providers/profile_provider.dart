@@ -30,6 +30,22 @@ class ProfileProvider with ChangeNotifier {
   bool _blurBackground = true;
   bool get blurBackground => _blurBackground;
 
+  bool _isChatView = false;
+  bool get isChatView => _isChatView;
+
+  Future<void> setIsChatView(bool val) async {
+    if (_isChatView == val) return;
+    _isChatView = val;
+    notifyListeners();
+
+    final myUserId = userId;
+    if (myUserId != null) {
+      try {
+        await _repository.updateProfileField(myUserId, 'is_chat_view', val);
+      } catch (_) {}
+    }
+  }
+
   ProfileProvider({ProfileRepository? profileRepository})
       : _repository = profileRepository ?? SupabaseProfileRepository();
 
@@ -106,6 +122,21 @@ class ProfileProvider with ChangeNotifier {
   List<String> interestTags = [];
   bool quickSetupComplete = false;
   bool showSignUpNext = false;
+
+  /// Returns company dynamically mapped to the Experience list item where
+  /// the date is marked as `<Date> - Present` (or isCurrent == true).
+  String get currentCompany {
+    for (final exp in experience) {
+      if (exp.isCurrent ||
+          exp.endDate.trim().toLowerCase() == 'present' ||
+          exp.endDate.toLowerCase().contains('present')) {
+        if (exp.company.trim().isNotEmpty) {
+          return exp.company.trim();
+        }
+      }
+    }
+    return company.trim();
+  }
 
   String? _ownerId;
   int? _lastKnownUserId;
@@ -244,35 +275,25 @@ class ProfileProvider with ChangeNotifier {
     }
   }
 
-  bool isFieldOnCard(String field, ProfileCardType card) {
+  bool isFieldOnCard(String field, [ProfileCardType? card]) {
     _ensureDefaultFieldAssignments();
-    if (field == 'vibeTag' || field == 'interestTags') {
-      return card == ProfileCardType.casual;
-    }
     final assignment = fieldAssignments[field];
-    if (assignment == null) {
-      if (card == ProfileCardType.casual) {
-        return field == 'name' || field == 'avatarUrl' || field == 'email';
-      } else {
-        return true;
-      }
+    if (assignment != null && assignment.isPrivate) {
+      return false;
     }
-    return card == ProfileCardType.casual
-        ? assignment.casual
-        : assignment.professional;
+    return true;
   }
 
-  Future<void> toggleFieldOnCard(String field, ProfileCardType card) async {
+  Future<void> toggleFieldOnCard(String field, [ProfileCardType? card]) async {
     _ensureDefaultFieldAssignments();
     fieldAssignments.putIfAbsent(
-        field, () => FieldCardAssignment(casual: false, professional: true));
+        field, () => FieldCardAssignment(casual: true, professional: true, isPrivate: false));
     final current = fieldAssignments[field]!;
-    if (card == ProfileCardType.casual) {
-      fieldAssignments[field] = current.copyWith(casual: !current.casual);
-    } else {
-      fieldAssignments[field] =
-          current.copyWith(professional: !current.professional);
-    }
+    fieldAssignments[field] = current.copyWith(
+      isPrivate: !current.isPrivate,
+      casual: true,
+      professional: true,
+    );
     notifyListeners();
     final currentUserId = userId;
     if (currentUserId != null) {
@@ -292,13 +313,13 @@ class ProfileProvider with ChangeNotifier {
       String field, ProfileCardType card, bool enabled) async {
     _ensureDefaultFieldAssignments();
     fieldAssignments.putIfAbsent(
-        field, () => FieldCardAssignment(casual: false, professional: true));
+        field, () => FieldCardAssignment(casual: true, professional: true, isPrivate: false));
     final current = fieldAssignments[field]!;
-    if (card == ProfileCardType.casual) {
-      fieldAssignments[field] = current.copyWith(casual: enabled);
-    } else {
-      fieldAssignments[field] = current.copyWith(professional: enabled);
-    }
+    fieldAssignments[field] = current.copyWith(
+      isPrivate: !enabled,
+      casual: true,
+      professional: true,
+    );
     notifyListeners();
     final currentUserId = userId;
     if (currentUserId != null) {
@@ -404,16 +425,27 @@ class ProfileProvider with ChangeNotifier {
       notifyListeners();
 
       final list = await _repository.checkMyProfileExists(ownerId);
+      final metadata = session.user.userMetadata ?? {};
+      final String? metaAvatar = metadata['avatar_url']?.toString() ??
+          metadata['picture']?.toString();
+      final String? metaName = metadata['full_name']?.toString() ??
+          metadata['name']?.toString();
+
       if (list.isEmpty) {
         clearFields();
-        name = session.user.email?.split('@')[0] ?? 'User';
+        name = (metaName != null && metaName.trim().isNotEmpty)
+            ? metaName.trim()
+            : (session.user.email?.split('@')[0] ?? 'User');
         email = session.user.email ?? '';
+        avatarUrl = (metaAvatar != null && metaAvatar.trim().isNotEmpty)
+            ? metaAvatar.trim()
+            : '';
         profession = 'Professional';
-        gender = session.user.userMetadata?['gender'] as String? ?? '';
+        gender = metadata['gender'] as String? ?? '';
         
         _setLoadedState(0, false);
         await saveProfileData(isMyProfile: true);
-        print("Default profile created for owner ID: $ownerId");
+        print("Default profile created for owner ID: $ownerId with avatar: $avatarUrl");
       } else {
         final existingId = list.first['id'] as int;
         _setLoadedState(existingId, true);
@@ -557,6 +589,9 @@ class ProfileProvider with ChangeNotifier {
   // Experience CRUD
   Future<void> addExperience(ExperienceItem item) async {
     experience.add(item);
+    if (currentCompany.isNotEmpty) {
+      company = currentCompany;
+    }
     notifyListeners();
     await saveOrUpdateProfile();
   }
@@ -565,6 +600,9 @@ class ProfileProvider with ChangeNotifier {
     final idx = experience.indexWhere((e) => e.id == item.id);
     if (idx != -1) {
       experience[idx] = item;
+      if (currentCompany.isNotEmpty) {
+        company = currentCompany;
+      }
       notifyListeners();
       await saveOrUpdateProfile();
     }
@@ -572,6 +610,7 @@ class ProfileProvider with ChangeNotifier {
 
   Future<void> deleteExperience(String id) async {
     experience.removeWhere((e) => e.id == id);
+    company = currentCompany;
     notifyListeners();
     await saveOrUpdateProfile();
   }
@@ -735,10 +774,38 @@ class ProfileProvider with ChangeNotifier {
         bio = response['bio'] ?? '';
         professionalBio = response['professional_bio'] ?? '';
         avatarUrl = response['avatar_url'] ?? '';
+
+        // Auto-backfill avatar and name from Google/OAuth metadata if not yet set
+        final session = Supabase.instance.client.auth.currentSession;
+        if (session != null && session.user.id == _ownerId) {
+          final metadata = session.user.userMetadata ?? {};
+          final String? metaAvatar = metadata['avatar_url']?.toString() ??
+              metadata['picture']?.toString();
+          if (avatarUrl.trim().isEmpty && metaAvatar != null && metaAvatar.trim().isNotEmpty) {
+            avatarUrl = metaAvatar.trim();
+            profileData['avatarUrl'] = avatarUrl;
+            _repository.updateProfileField(id, 'avatar_url', avatarUrl).catchError((e) {
+              debugPrint("Error auto-updating avatar from OAuth metadata: $e");
+            });
+          }
+          final String? metaName = metadata['full_name']?.toString() ??
+              metadata['name']?.toString();
+          if ((name.trim().isEmpty || name == 'User' || name == email.split('@')[0]) &&
+              metaName != null &&
+              metaName.trim().isNotEmpty) {
+            name = metaName.trim();
+            profileData['name'] = name;
+            _repository.updateProfileField(id, 'name', name).catchError((e) {
+              debugPrint("Error auto-updating name from OAuth metadata: $e");
+            });
+          }
+        }
         anonName = response['anon_name']?.toString() ?? '';
         gender = response['gender'] ?? '';
         showProfileToConnections =
             response['show_profile_to_connections'] == true;
+        _isChatView = response['is_chat_view'] == true;
+        profileData['is_chat_view'] = _isChatView;
 
         if (response['profile_nudge_dismissed_at'] != null) {
           _profileNudgeDismissedAt =
@@ -785,6 +852,9 @@ class ProfileProvider with ChangeNotifier {
                 ? jsonDecode(response['experience'] as String) as List<dynamic>
                 : response['experience'] as List<dynamic>;
             experience = decoded.map((item) => ExperienceItem.fromJson(item as Map<String, dynamic>)).toList();
+            if (currentCompany.isNotEmpty) {
+              company = currentCompany;
+            }
           } catch (e) {
             print("Error parsing experience: $e");
           }
@@ -895,7 +965,7 @@ class ProfileProvider with ChangeNotifier {
           'twitter': twitter,
           'spotify': spotify,
           'is_my_profile': isMyProfile,
-          'company': company,
+          'company': currentCompany.isNotEmpty ? currentCompany : company,
           'bio': bio,
           'professional_bio': professionalBio,
           'avatar_url': avatarUrl,
@@ -938,7 +1008,7 @@ class ProfileProvider with ChangeNotifier {
       'linkedin': linkedin,
       'twitter': twitter,
       'spotify': spotify,
-      'company': company,
+      'company': currentCompany.isNotEmpty ? currentCompany : company,
       'bio': bio,
       'professional_bio': professionalBio,
       'avatar_url': avatarUrl,

@@ -2,16 +2,12 @@ import 'dart:convert';
 import 'package:connect/Config/app_theme.dart';
 import 'package:connect/Pages/ConnectionProfilePage.dart';
 import 'package:connect/Pages/IndividualChatPage.dart';
-import 'package:connect/Pages/PlanDetailPage.dart';
 import 'package:connect/Pages/ThreadDetailPage.dart';
-import 'package:connect/Pages/Tribe/TribeChatPage.dart';
 import 'package:connect/Providers/connection_provider.dart';
 import 'package:connect/Providers/custom_network_provider.dart';
 import 'package:connect/Providers/feed_provider.dart';
 import 'package:connect/Models/custom_network.dart';
 import 'package:connect/Providers/notification_provider.dart';
-import 'package:connect/Providers/plans_provider.dart';
-import 'package:connect/Providers/tribe_provider.dart';
 import 'package:connect/main.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -177,8 +173,7 @@ class _NotificationPageState extends State<NotificationPage> {
                 type == 'plan_update' ||
                 type == 'plan_reminder_30' ||
                 type == 'plan_reminder_start';
-            if (isPlanNotif && n['plan_loaded'] == true && n['plan'] == null) {
-              // Skip notifications for deleted plans
+            if (isPlanNotif) {
               continue;
             }
 
@@ -544,7 +539,7 @@ class _NotificationPageState extends State<NotificationPage> {
         type == 'plan_update' ||
         type == 'plan_reminder_30' ||
         type == 'plan_reminder_start') {
-      return PlanNotificationCard(notification: notification, provider: provider);
+      return const SizedBox.shrink();
     }
     if (type == 'feed_reply' ||
         type == 'feed_mention' ||
@@ -553,16 +548,8 @@ class _NotificationPageState extends State<NotificationPage> {
         type == 'feed_connection_reply') {
       return _buildFeedNotificationItem(notification, provider);
     }
-    if (type == 'tribe_invite' ||
-        type == 'tribe_request' ||
-        type == 'tribe_approved' ||
-        type == 'tribe_added' ||
-        type == 'tribe_invite_accepted' ||
-        type == 'tribe_request_approved' ||
-        type == 'tribe_request_declined' ||
-        type == 'tribe_invite_declined' ||
-        type == 'tribe_removed') {
-      return _buildTribeNotificationItem(notification, provider);
+    if (type.startsWith('tribe_')) {
+      return const SizedBox.shrink();
     }
     if (type == 'custom_network_added') {
       return _buildCustomNetworkNotificationItem(notification, provider);
@@ -599,13 +586,11 @@ class _NotificationPageState extends State<NotificationPage> {
         referredUser['avatar_url'] ?? referredUser['avatarUrl'] ?? '';
     final String referredProfession = referredUser['profession'] ?? '';
 
-    String? directRequestCard;
     String? directRequestMessage;
     if (isDirectRequest && rawNote != null && rawNote.isNotEmpty) {
       try {
         final parsed = jsonDecode(rawNote);
         if (parsed is Map) {
-          directRequestCard = parsed['card']?.toString();
           directRequestMessage = parsed['message']?.toString();
         }
       } catch (_) {
@@ -668,7 +653,7 @@ class _NotificationPageState extends State<NotificationPage> {
                 senderName: name,
                 senderAvatar: avatarUrl,
                 senderProfession: profession,
-                cardType: directRequestCard ?? 'casual',
+                cardType: 'both',
                 noteMessage: directRequestMessage ?? '',
                 isAlreadyConnected: isAlreadyConnected,
               );
@@ -914,7 +899,7 @@ class _NotificationPageState extends State<NotificationPage> {
                                               ScaffoldMessenger.of(context);
                                           final targetId = otherUser['id'];
                                           final sharedCard =
-                                              directRequestCard ?? 'casual';
+                                              'both';
                                           connectionProvider
                                               .connectUsers(
                                             provider.userId!,
@@ -953,7 +938,7 @@ class _NotificationPageState extends State<NotificationPage> {
                                 senderName: name,
                                 senderAvatar: avatarUrl,
                                 senderProfession: profession,
-                                cardType: directRequestCard ?? 'casual',
+                                cardType: 'both',
                                 noteMessage: directRequestMessage ?? '',
                                 isAlreadyConnected: isAlreadyConnected,
                               ),
@@ -1227,12 +1212,7 @@ class _NotificationPageState extends State<NotificationPage> {
                                   final targetId = isReferral
                                       ? referredUser['id']
                                       : otherUser['id'];
-                                  final sharedCard = isReferral
-                                      ? (referredUser[
-                                                  'default_card_visibility']
-                                              ?.toString() ??
-                                          'casual')
-                                      : (directRequestCard ?? 'casual');
+                                  final sharedCard = 'both';
                                   connectionProvider
                                       .connectUsers(
                                     provider.userId!,
@@ -1357,388 +1337,6 @@ class _NotificationPageState extends State<NotificationPage> {
                     ),
                   ),
                 ],
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTribeNotificationItem(
-      Map<String, dynamic> notification, NotificationProvider provider) {
-    final String type = notification['type'] ?? 'tribe_invite';
-    final otherUser = notification['other_user'] as Map<String, dynamic>? ?? {};
-    final String name = otherUser['name'] ?? 'Unknown User';
-    final String avatarUrl =
-        otherUser['avatar_url'] ?? otherUser['avatarUrl'] ?? '';
-    final String timeStr =
-        _getRelativeTime(notification['created_at'] as String?);
-    final bool isUnseen = notification['is_seen'] == false;
-
-    final String? rawNote = notification['note'] as String?;
-    String tribeName = 'a Mafia';
-    String? tribeId;
-    if (rawNote != null && rawNote.startsWith('{')) {
-      try {
-        final parsed = jsonDecode(rawNote);
-        tribeName = parsed['tribe_name']?.toString() ?? 'a Mafia';
-        tribeId = parsed['tribe_id']?.toString();
-      } catch (_) {}
-    }
-
-    const Color accentColor = Color(0xFF8B5CF6);
-
-    String actionText;
-    IconData actionIcon;
-    if (type == 'tribe_added') {
-      actionText = " added you to ";
-      actionIcon = Icons.group_add_rounded;
-    } else if (type == 'tribe_invite' || type == 'tribe_invite_accepted') {
-      actionText = " invited you to join ";
-      actionIcon = type == 'tribe_invite_accepted'
-          ? Icons.check_circle_rounded
-          : Icons.mail_rounded;
-    } else if (type == 'tribe_request') {
-      actionText = " requested to join ";
-      actionIcon = Icons.person_add_rounded;
-    } else if (type == 'tribe_request_approved') {
-      actionText = "'s request to join ";
-      actionIcon = Icons.check_circle_rounded;
-    } else if (type == 'tribe_request_declined') {
-      actionText = "'s request to join ";
-      actionIcon = Icons.cancel_rounded;
-    } else if (type == 'tribe_invite_declined') {
-      actionText = " declined invite to ";
-      actionIcon = Icons.cancel_rounded;
-    } else if (type == 'tribe_removed') {
-      actionText = " removed you from ";
-      actionIcon = Icons.remove_circle_rounded;
-    } else {
-      actionText = " approved your request to join ";
-      actionIcon = Icons.check_circle_rounded;
-    }
-
-    // Determine if this notification has already been actioned
-    final bool isActioned = type == 'tribe_request_approved' ||
-        type == 'tribe_request_declined' ||
-        type == 'tribe_invite_declined' ||
-        type == 'tribe_invite_accepted' ||
-        type == 'tribe_approved' ||
-        type == 'tribe_removed';
-
-    return Dismissible(
-      key: Key(notification['id'].toString()),
-      direction: DismissDirection.endToStart,
-      background: Container(
-        alignment: Alignment.centerRight,
-        padding: const EdgeInsets.only(right: 24),
-        decoration: BoxDecoration(
-          color: const Color(0xFFEF4444).withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: const Icon(
-          Icons.delete_outline_rounded,
-          color: Color(0xFFEF4444),
-          size: 24,
-        ),
-      ),
-      onDismissed: (direction) {
-        HapticFeedback.mediumImpact();
-        provider.deleteNotification(notification['id']);
-      },
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: () {
-            HapticFeedback.lightImpact();
-            provider.markAsSeen(notification['id']);
-            if (tribeId != null) {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) =>
-                      TribeChatPage(tribeId: tribeId!, tribeName: tribeName),
-                ),
-              );
-            }
-          },
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(2),
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: isUnseen
-                        ? Border.all(
-                            color: accentColor.withValues(alpha: 0.6),
-                            width: 2,
-                          )
-                        : null,
-                  ),
-                  child: Container(
-                    width: 40,
-                    height: 40,
-                    decoration: const BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: Color(0xFF1A1B2E),
-                    ),
-                    child: ClipOval(
-                      child: avatarUrl.startsWith('http')
-                          ? Image.network(
-                              avatarUrl,
-                              fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) =>
-                                  Center(
-                                child: Icon(
-                                  actionIcon,
-                                  color:
-                                      isUnseen ? accentColor : Colors.white60,
-                                  size: 18,
-                                ),
-                              ),
-                            )
-                          : Center(
-                              child: Icon(
-                                actionIcon,
-                                color: isUnseen ? accentColor : Colors.white60,
-                                size: 18,
-                              ),
-                            ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      RichText(
-                        text: TextSpan(
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 13.5,
-                            fontFamily: 'Inter',
-                            height: 1.3,
-                          ),
-                          children: [
-                            TextSpan(
-                              text: name,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                              ),
-                            ),
-                            TextSpan(
-                              text: actionText,
-                              style: const TextStyle(color: Colors.white70),
-                            ),
-                            TextSpan(
-                              text: tribeName,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                              ),
-                            ),
-                            if (timeStr.isNotEmpty)
-                              TextSpan(
-                                text: " \u2022 $timeStr",
-                                style: const TextStyle(
-                                  color: Color(0xFF5C5E78),
-                                  fontWeight: FontWeight.normal,
-                                ),
-                              ),
-                          ],
-                        ),
-                      ),
-                      if ((type == 'tribe_invite' || type == 'tribe_request') && tribeId != null && !isActioned) ...[
-                        const SizedBox(height: 8),
-                        () {
-                          final notifId = notification['id']?.toString() ?? '';
-                          final isProcessing = _processingActionNotificationIds.contains(notifId);
-
-                          return Row(
-                            children: [
-                              SizedBox(
-                                width: 76,
-                                height: 30,
-                                child: Container(
-                                  decoration: BoxDecoration(
-                                    color: isProcessing
-                                        ? Colors.white.withValues(alpha: 0.5)
-                                        : Colors.white,
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                  child: ElevatedButton(
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.transparent,
-                                      foregroundColor: Colors.black,
-                                      shadowColor: Colors.transparent,
-                                      padding: EdgeInsets.zero,
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(10),
-                                      ),
-                                    ),
-                                    onPressed: isProcessing
-                                        ? null
-                                        : () async {
-                                            HapticFeedback.lightImpact();
-                                            if (notifId.isNotEmpty) {
-                                              setState(() {
-                                                _processingActionNotificationIds.add(notifId);
-                                              });
-                                            }
-                                            final tribeProvider =
-                                                Provider.of<TribeProvider>(context,
-                                                    listen: false);
-                                            try {
-                                              if (type == 'tribe_invite') {
-                                                await tribeProvider
-                                                    .joinTribeDirectly(tribeId!);
-                                              } else {
-                                                final requesterId = (otherUser['id'] as num?)?.toInt();
-                                                if (requesterId == null) throw Exception("Invalid requester.");
-                                                await tribeProvider
-                                                    .approveRequest(tribeId!, requesterId);
-                                              }
-                                              await provider.fetchNotifications();
-                                            } catch (e) {
-                                              if (mounted) {
-                                                ScaffoldMessenger.of(context)
-                                                    .showSnackBar(
-                                                  const SnackBar(
-                                                      content: Text(
-                                                          "Could not approve request. Please try again.")),
-                                                );
-                                              }
-                                            } finally {
-                                              if (mounted && notifId.isNotEmpty) {
-                                                setState(() {
-                                                  _processingActionNotificationIds.remove(notifId);
-                                                });
-                                              }
-                                            }
-                                          },
-                                    child: isProcessing
-                                        ? const SizedBox(
-                                            width: 14,
-                                            height: 14,
-                                            child: CircularProgressIndicator(
-                                              strokeWidth: 2,
-                                              valueColor:
-                                                  AlwaysStoppedAnimation<Color>(Colors.black),
-                                            ),
-                                          )
-                                        : const Text(
-                                            "Accept",
-                                            style: TextStyle(
-                                              fontSize: 11,
-                                              fontWeight: FontWeight.bold,
-                                              fontFamily: 'Inter',
-                                              color: Colors.black,
-                                            ),
-                                          ),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              SizedBox(
-                                width: 76,
-                                height: 30,
-                                child: ElevatedButton(
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: const Color(0xFF1F2030),
-                                    foregroundColor: const Color(0xFF8B8C9E),
-                                    shadowColor: Colors.transparent,
-                                    padding: EdgeInsets.zero,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(10),
-                                      side: BorderSide(
-                                        color: Colors.white
-                                            .withValues(alpha: 0.03),
-                                        width: 1,
-                                      ),
-                                    ),
-                                  ),
-                                  onPressed: isProcessing
-                                      ? null
-                                      : () async {
-                                          HapticFeedback.lightImpact();
-                                          if (notifId.isNotEmpty) {
-                                            setState(() {
-                                              _processingActionNotificationIds.add(notifId);
-                                            });
-                                          }
-                                          final tribeProvider =
-                                              Provider.of<TribeProvider>(context,
-                                                  listen: false);
-                                          try {
-                                            final targetId = type == 'tribe_invite'
-                                                ? provider.userId!
-                                                : (otherUser['id'] as num?)?.toInt();
-                                            if (targetId == null) throw Exception("Invalid target user.");
-                                            await tribeProvider
-                                                .declineRequestOrInvite(
-                                                    tribeId!, targetId);
-                                            await provider.fetchNotifications();
-                                          } catch (e) {
-                                            if (mounted) {
-                                              ScaffoldMessenger.of(context)
-                                                  .showSnackBar(
-                                                const SnackBar(
-                                                    content: Text(
-                                                        "Could not decline request. Please try again.")),
-                                              );
-                                            }
-                                          } finally {
-                                            if (mounted && notifId.isNotEmpty) {
-                                              setState(() {
-                                                _processingActionNotificationIds.remove(notifId);
-                                              });
-                                            }
-                                          }
-                                        },
-                                  child: const Text(
-                                    "Decline",
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w600,
-                                      fontFamily: 'Inter',
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          );
-                        }(),
-                      ],
-                      if (isActioned) ...[
-                        const SizedBox(height: 6),
-                        Text(
-                          type == 'tribe_request_approved'
-                              ? "Approved"
-                              : (type == 'tribe_approved' || type == 'tribe_invite_accepted')
-                                  ? "Joined"
-                                  : type == 'tribe_removed'
-                                      ? "Removed"
-                                      : "Declined",
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                            fontFamily: 'Inter',
-                            color: (type == 'tribe_request_approved' ||
-                                    type == 'tribe_approved' ||
-                                    type == 'tribe_invite_accepted')
-                                ? Colors.green.withValues(alpha: 0.7)
-                                : Colors.redAccent.withValues(alpha: 0.7),
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
               ],
             ),
           ),
@@ -2280,7 +1878,7 @@ class _NotificationPageState extends State<NotificationPage> {
                       connectionProvider.connectUsers(
                         notificationProvider.userId!,
                         senderId,
-                        sharedCardByPresenter: cardType,
+                        sharedCardByPresenter: 'both',
                         connectionType: 'direct_connect',
                       ).then((_) {
                         notificationProvider.markAsSeen(notification['id']);
@@ -2724,7 +2322,7 @@ class _NotificationPageState extends State<NotificationPage> {
                                           connectionProvider.connectUsers(
                                             notificationProvider.userId!,
                                             referredUser['id'],
-                                            sharedCardByPresenter: referredUser['default_card_visibility']?.toString(),
+                                            sharedCardByPresenter: 'both',
                                             connectionType: 'referral_connect',
                                           ).then((_) {
                                             notificationProvider
@@ -2850,519 +2448,5 @@ class _NotificationPageState extends State<NotificationPage> {
         ),
       ],
     );
-  }
-}
-
-class PlanNotificationCard extends StatefulWidget {
-  final Map<String, dynamic> notification;
-  final NotificationProvider provider;
-
-  const PlanNotificationCard({
-    super.key,
-    required this.notification,
-    required this.provider,
-  });
-
-  @override
-  State<PlanNotificationCard> createState() => _PlanNotificationCardState();
-}
-
-class _PlanNotificationCardState extends State<PlanNotificationCard> {
-  Map<String, dynamic>? _plan;
-  bool _loading = true;
-  bool _submitting = false;
-  bool _showDeclineReason = false;
-  final _reasonController = TextEditingController();
-
-  @override
-  void initState() {
-    super.initState();
-    _loadPlan();
-  }
-
-  @override
-  void dispose() {
-    _reasonController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _loadPlan() async {
-    if (widget.notification['plan_loaded'] == true) {
-      if (mounted) {
-        setState(() {
-          _plan = widget.notification['plan'] as Map<String, dynamic>?;
-          _loading = false;
-        });
-      }
-      return;
-    }
-    final planId = widget.notification['note'] as String?;
-    if (planId != null) {
-      final plansProvider = Provider.of<PlansProvider>(context, listen: false);
-      final plan = await plansProvider.getPlanById(planId);
-      if (mounted) {
-        setState(() {
-          _plan = plan;
-          _loading = false;
-        });
-      }
-    } else {
-      if (mounted) {
-        setState(() {
-          _loading = false;
-        });
-      }
-    }
-  }
-
-  Future<void> _respond(String status, {String? reason}) async {
-    final planId = widget.notification['note'] as String?;
-    if (planId == null) return;
-
-    setState(() => _submitting = true);
-    final plansProvider = Provider.of<PlansProvider>(context, listen: false);
-    await plansProvider.respondToPlanInviteByPlanId(
-      planId: planId,
-      status: status,
-      declineReason: reason,
-    );
-    // Mark notification as seen
-    await widget.provider.markAsSeen(widget.notification['id']);
-    if (mounted) {
-      setState(() {
-        widget.notification['invite_status'] = status;
-        _submitting = false;
-        _showDeclineReason = false;
-      });
-      _loadPlan();
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (_loading) {
-      return const SizedBox(
-        height: 60,
-        child: Center(
-          child: SizedBox(
-            width: 16,
-            height: 16,
-            child: CircularProgressIndicator(strokeWidth: 2),
-          ),
-        ),
-      );
-    }
-
-    if (_plan == null) {
-      // Plan was probably deleted or not found
-      return const SizedBox.shrink();
-    }
-
-    final otherUser = widget.notification['other_user'] as Map<String, dynamic>? ?? {};
-    final String inviterName = otherUser['name'] ?? 'Someone';
-    final String avatarUrl = otherUser['avatar_url'] ?? otherUser['avatarUrl'] ?? '';
-    final String timeStr = _getRelativeTime(widget.notification['created_at'] as String?);
-    final bool isUnseen = widget.notification['is_seen'] == false;
-
-    final title = _plan!['title'] as String? ?? 'Untitled Plan';
-    final category = _plan!['category'] as String? ?? 'other';
-    final startsAtStr = _plan!['starts_at'] as String?;
-    final startsAt = startsAtStr != null ? DateTime.tryParse(startsAtStr)?.toLocal() : null;
-    final location = _plan!['location'] as String?;
-    final isOnline = _plan!['is_online'] == true;
-    final type = widget.notification['type'] ?? 'plan_invite';
-
-    // Find my status in invites
-    final plansProvider = Provider.of<PlansProvider>(context);
-    
-    // We can also fetch the status from our plans list if we have it loaded
-    final matchingPlan = plansProvider.plans.firstWhere(
-      (p) => p['id'] == _plan!['id'],
-      orElse: () => <String, dynamic>{},
-    );
-    final myStatus = widget.notification['invite_status'] as String? ??
-        matchingPlan['my_status'] as String? ?? 'pending';
-
-    final startsAtText = startsAt != null ? _formatDateTime(startsAt) : 'Time not set';
-
-    String timeLabel = "in 30 minutes";
-    if (startsAt != null) {
-      try {
-        final diff = startsAt.difference(DateTime.now());
-        if (diff.isNegative) {
-          timeLabel = "now";
-        } else {
-          final days = diff.inDays;
-          final hours = diff.inHours % 24;
-          final minutes = diff.inMinutes % 60;
-          final seconds = diff.inSeconds % 60;
-
-          final pad = (int n) => n.toString().padLeft(2, '0');
-
-          if (days > 0) {
-            timeLabel = "in ${days}d:${pad(hours)}h:${pad(minutes)}m:${pad(seconds)}s";
-          } else if (hours > 0) {
-            timeLabel = "in ${pad(hours)}h:${pad(minutes)}m:${pad(seconds)}s";
-          } else {
-            timeLabel = "in ${pad(minutes)}m:${pad(seconds)}s";
-          }
-        }
-      } catch (e) {
-        print("Error formatting starts_at countdown in card: $e");
-      }
-    }
-
-    return Dismissible(
-      key: Key(widget.notification['id'].toString()),
-      direction: DismissDirection.endToStart,
-      background: Container(
-        alignment: Alignment.centerRight,
-        padding: const EdgeInsets.only(right: 24),
-        decoration: BoxDecoration(
-          color: const Color(0xFFEF4444).withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: const Icon(
-          Icons.delete_outline_rounded,
-          color: Color(0xFFEF4444),
-          size: 24,
-        ),
-      ),
-      onDismissed: (direction) {
-        HapticFeedback.mediumImpact();
-        widget.provider.deleteNotification(widget.notification['id']);
-      },
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: () {
-            HapticFeedback.lightImpact();
-            widget.provider.markAsSeen(widget.notification['id']);
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => PlanDetailPage(planId: _plan!['id'] as String),
-              ),
-            );
-          },
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Inviter avatar
-                Container(
-                  padding: const EdgeInsets.all(2),
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: isUnseen
-                        ? Border.all(
-                            color: AppColors.accentPrimary.withValues(alpha: 0.6),
-                            width: 2,
-                          )
-                        : null,
-                  ),
-                  child: Container(
-                    width: 40,
-                    height: 40,
-                    decoration: const BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: Color(0xFF1A1B2E),
-                    ),
-                    child: ClipOval(
-                      child: avatarUrl.startsWith('http')
-                          ? Image.network(
-                              avatarUrl,
-                              fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) =>
-                                  Center(child: Text(_getInitials(inviterName))),
-                            )
-                          : Center(child: Text(_getInitials(inviterName))),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Message text
-                      RichText(
-                        text: TextSpan(
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 13.5,
-                            fontFamily: 'Inter',
-                            height: 1.3,
-                          ),
-                          children: [
-                            if (type == 'plan_reminder_30' ||
-                                type == 'plan_reminder_start') ...[
-                              const TextSpan(
-                                text: "Reminder: ",
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white,
-                                ),
-                              ),
-                              TextSpan(
-                                text: '${categoryEmoji(category)} $title',
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white,
-                                ),
-                              ),
-                              TextSpan(
-                                text: type == 'plan_reminder_30'
-                                    ? " starts $timeLabel"
-                                    : " is starting now!",
-                                style: const TextStyle(color: Colors.white70),
-                              ),
-                            ] else ...[
-                              TextSpan(
-                                text: inviterName,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white,
-                                ),
-                              ),
-                              TextSpan(
-                                text: () {
-                                  if (type == 'plan_invite') {
-                                    return " invited you to join ";
-                                  } else {
-                                    final fields = widget.notification['changed_fields'];
-                                    if (fields is List && fields.isNotEmpty) {
-                                      final labelsMap = {
-                                        'starts_at': 'time',
-                                        'location': 'location',
-                                        'title': 'title',
-                                        'description': 'description',
-                                        'category': 'category',
-                                        'plan_type': 'type',
-                                        'is_online': 'online status',
-                                        'meeting_link': 'meeting link',
-                                      };
-                                      final labels = fields.map((f) => labelsMap[f] ?? f).toList();
-                                      return " updated the plan (changed: ${labels.join(', ')}) ";
-                                    }
-                                    return " updated the plan ";
-                                  }
-                                }(),
-                                style: const TextStyle(color: Colors.white70),
-                              ),
-                              TextSpan(
-                                text: '${categoryEmoji(category)} $title',
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white,
-                                ),
-                              ),
-                            ],
-                            if (timeStr.isNotEmpty)
-                              TextSpan(
-                                text: " • $timeStr",
-                                style: const TextStyle(
-                                  color: Color(0xFF5C5E78),
-                                  fontWeight: FontWeight.normal,
-                                ),
-                              ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      // Time / location of the plan
-                      Text(
-                        '$startsAtText${location != null && location.isNotEmpty ? ' · $location' : (isOnline ? ' · Online' : '')}',
-                        style: AppTypography.bodyText.copyWith(
-                          color: AppColors.textSecondary,
-                          fontSize: 12,
-                        ),
-                      ),
-                      
-                      // Accept/Decline action buttons (only for plan_invite type & pending status)
-                      if (type == 'plan_invite' && myStatus == 'pending') ...[
-                        const SizedBox(height: 10),
-                        if (!_showDeclineReason)
-                          Row(
-                            children: [
-                              // Accept
-                              GestureDetector(
-                                onTap: _submitting ? null : () => _respond('accepted'),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                                  decoration: BoxDecoration(
-                                    color: AppColors.accentPrimary,
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: Text(
-                                    'Accept',
-                                    style: AppTypography.captionText.copyWith(
-                                      color: Colors.white,
-                                      fontSize: 11,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              // Decline
-                              GestureDetector(
-                                onTap: _submitting ? null : () => setState(() => _showDeclineReason = true),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withValues(alpha: 0.05),
-                                    border: Border.all(color: AppColors.borderMuted),
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: Text(
-                                    'Decline',
-                                    style: AppTypography.captionText.copyWith(
-                                      color: AppColors.textSecondary,
-                                      fontSize: 11,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          )
-                        else ...[
-                          // Decline reason input
-                          const SizedBox(height: 6),
-                          Text(
-                            "Why can't you make it?",
-                            style: AppTypography.captionText.copyWith(
-                              color: AppColors.textSecondary,
-                              fontSize: 11,
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          Container(
-                            decoration: BoxDecoration(
-                              color: AppColors.surfaceSecondary,
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: AppColors.borderMuted),
-                            ),
-                            child: TextField(
-                              controller: _reasonController,
-                              style: AppTypography.bodyText.copyWith(fontSize: 12),
-                              decoration: InputDecoration(
-                                hintText: 'e.g. Family dinner (optional)',
-                                hintStyle: AppTypography.bodyText.copyWith(
-                                  color: AppColors.textMuted,
-                                  fontSize: 12,
-                                ),
-                                border: InputBorder.none,
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Row(
-                            children: [
-                              GestureDetector(
-                                onTap: _submitting
-                                    ? null
-                                    : () => _respond('declined', reason: _reasonController.text.trim()),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFFEF4444),
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: Text(
-                                    'Submit',
-                                    style: AppTypography.captionText.copyWith(
-                                      color: Colors.white,
-                                      fontSize: 11,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              GestureDetector(
-                                onTap: () => setState(() => _showDeclineReason = false),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                                  decoration: BoxDecoration(
-                                    color: Colors.transparent,
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: Text(
-                                    'Cancel',
-                                    style: AppTypography.captionText.copyWith(
-                                      color: AppColors.textSecondary,
-                                      fontSize: 11,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ] else if (type == 'plan_invite') ...[
-                        // Status badge (Accepted/Declined)
-                        const SizedBox(height: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                          decoration: BoxDecoration(
-                            color: myStatus == 'accepted'
-                                ? const Color(0xFF22C55E).withValues(alpha: 0.12)
-                                : const Color(0xFFEF4444).withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Text(
-                            myStatus == 'accepted' ? 'Accepted' : 'Declined',
-                            style: AppTypography.captionText.copyWith(
-                              color: myStatus == 'accepted'
-                                  ? const Color(0xFF22C55E)
-                                  : const Color(0xFFEF4444),
-                              fontSize: 10,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  String _getInitials(String name) {
-    if (name.isEmpty) return '?';
-    final parts = name.trim().split(' ');
-    if (parts.length > 1) {
-      return (parts[0][0] + parts[1][0]).toUpperCase();
-    }
-    return name[0].toUpperCase();
-  }
-
-  String _getRelativeTime(String? createdAtStr) {
-    if (createdAtStr == null) return '';
-    try {
-      final dateTime = DateTime.parse(createdAtStr).toLocal();
-      final diff = DateTime.now().difference(dateTime);
-      if (diff.inSeconds < 60) return 'Just now';
-      if (diff.inMinutes < 60) return '${diff.inMinutes}m';
-      if (diff.inHours < 24) return '${diff.inHours}h';
-      if (diff.inDays < 7) return '${diff.inDays}d';
-      return '${dateTime.day}/${dateTime.month}';
-    } catch (e) {
-      return '';
-    }
-  }
-
-  String _formatDateTime(DateTime dt) {
-    final hour = dt.hour;
-    final minute = dt.minute.toString().padLeft(2, '0');
-    final period = hour >= 12 ? 'PM' : 'AM';
-    final displayHour = hour % 12 == 0 ? 12 : hour % 12;
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    return '${months[dt.month - 1]} ${dt.day}, $displayHour:$minute $period';
   }
 }

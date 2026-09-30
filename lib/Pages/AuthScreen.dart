@@ -262,6 +262,30 @@ class _AuthScreenState extends State<AuthScreen> {
       );
       debugPrint(
           '[Google Sign-In] Supabase sign-in response received. User email: ${authResponse.user?.email}');
+
+      // Sync Google photo and name into Supabase user metadata if available
+      if (authResponse.user != null) {
+        final Map<String, dynamic> extraData = {};
+        if (googleUser.photoUrl != null && googleUser.photoUrl!.isNotEmpty) {
+          extraData['avatar_url'] = googleUser.photoUrl;
+          extraData['picture'] = googleUser.photoUrl;
+        }
+        if (googleUser.displayName != null && googleUser.displayName!.isNotEmpty) {
+          extraData['full_name'] = googleUser.displayName;
+          extraData['name'] = googleUser.displayName;
+        }
+        if (extraData.isNotEmpty) {
+          try {
+            await Supabase.instance.client.auth.updateUser(
+              UserAttributes(data: extraData),
+            );
+            debugPrint('[Google Sign-In] Synced Google profile photo/name to user metadata.');
+          } catch (e) {
+            debugPrint('[Google Sign-In] Could not sync user metadata: $e');
+          }
+        }
+      }
+
       AnalyticsService.logEvent(
         name: 'login_completed',
         parameters: {'method': 'google'},
@@ -380,10 +404,22 @@ class _AuthScreenState extends State<AuthScreen> {
         }
 
         // Pass identity token to Supabase using signInWithIdToken
-        await Supabase.instance.client.auth.signInWithIdToken(
+        final authResponse = await Supabase.instance.client.auth.signInWithIdToken(
           provider: OAuthProvider.apple,
           idToken: idToken,
         );
+
+        final givenName = credential.givenName ?? '';
+        final familyName = credential.familyName ?? '';
+        final fullName = '$givenName $familyName'.trim();
+        if (fullName.isNotEmpty && authResponse.user != null) {
+          try {
+            await Supabase.instance.client.auth.updateUser(
+              UserAttributes(data: {'full_name': fullName, 'name': fullName}),
+            );
+          } catch (_) {}
+        }
+
         AnalyticsService.logEvent(
           name: 'login_completed',
           parameters: {'method': 'apple'},
@@ -407,7 +443,6 @@ class _AuthScreenState extends State<AuthScreen> {
       debugPrint('[Apple Sign-In] Error: $e');
       if (mounted) {
         setState(() => _isLoading = false);
-        final errorStr = e.toString();
         if (e is SignInWithAppleAuthorizationException &&
             e.code == AuthorizationErrorCode.canceled) {
           ScaffoldMessenger.of(context).showSnackBar(

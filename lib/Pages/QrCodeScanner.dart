@@ -4,12 +4,10 @@ import 'dart:io';
 
 import 'package:connect/Providers/profile_provider.dart';
 import 'package:connect/Providers/connection_provider.dart';
-import 'package:connect/Providers/tribe_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:qr_code_scanner_plus/qr_code_scanner_plus.dart';
-import 'package:connect/Utils/profile_field_filter.dart';
 import 'package:connect/Config/app_theme.dart';
 import 'package:connect/services/analytics_service.dart';
 
@@ -225,47 +223,13 @@ class _QRScannerPageState extends State<QRScannerPage> {
 
           if (!mounted) return;
           // Read providers before async operations to avoid BuildContext async gap warnings
-          final tribeProvider =
-              Provider.of<TribeProvider>(context, listen: false);
           final profileProvider =
               Provider.of<ProfileProvider>(context, listen: false);
 
           // Pause the camera to prevent additional scans
           controller.pauseCamera();
 
-          if (decodedData.containsKey('tribeCode')) {
-            final String tribeCode = decodedData['tribeCode'].toString();
-            setState(() {
-              _isLoading = true;
-            });
-            try {
-              await tribeProvider.joinTribeWithInviteCode(tribeCode);
-              setState(() {
-                _isLoading = false;
-              });
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                      content: Text("Joined tribe successfully!"),
-                      backgroundColor: Colors.green),
-                );
-                Navigator.pop(context);
-              }
-            } catch (e) {
-              setState(() {
-                _isLoading = false;
-                _processingScan = false;
-              });
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                      content: Text("The Mafia key is invalid or does not exist."),
-                      backgroundColor: Colors.redAccent),
-                );
-              }
-              controller.resumeCamera();
-            }
-          } else if (decodedData.containsKey('userId')) {
+          if (decodedData.containsKey('userId')) {
             final userIdVal = decodedData['userId'];
             final int idToFetch =
                 userIdVal is int ? userIdVal : int.parse(userIdVal.toString());
@@ -278,7 +242,7 @@ class _QRScannerPageState extends State<QRScannerPage> {
             final fetchedData =
                 await profileProvider.fetchProfileDataOnly(idToFetch);
             if (fetchedData.isNotEmpty) {
-              fetchedData['sharedCard'] = decodedData['sharedCard'] ?? 'casual';
+              fetchedData['sharedCard'] = 'both';
             }
 
             setState(() {
@@ -312,7 +276,7 @@ class _QRScannerPageState extends State<QRScannerPage> {
               }
             }
           } else {
-            decodedData['sharedCard'] = decodedData['sharedCard'] ?? 'casual';
+            decodedData['sharedCard'] = 'both';
             if (mounted) {
               Navigator.push(
                 context,
@@ -372,8 +336,6 @@ class ProfileCard extends StatefulWidget {
 class _ProfileCardState extends State<ProfileCard> {
   late final ProfileProvider profileProvider;
   late final ConnectionProvider connectionProvider;
-  String _shareBackType = 'casual';
-
   bool _isAlreadyConnected = false;
 
   @override
@@ -390,16 +352,6 @@ class _ProfileCardState extends State<ProfileCard> {
           : int.parse(otherUserIdVal.toString());
       _isAlreadyConnected =
           connectionProvider.connections.any((c) => c['id'] == scannedUserId);
-      if (_isAlreadyConnected) {
-        final existingConnection = connectionProvider.connections
-            .firstWhere((c) => c['id'] == scannedUserId);
-        final myShared = existingConnection['my_shared_card'] ?? 'casual';
-        if (myShared == 'professional') {
-          _shareBackType = 'professional';
-        } else {
-          _shareBackType = 'casual';
-        }
-      }
     }
   }
 
@@ -429,9 +381,6 @@ class _ProfileCardState extends State<ProfileCard> {
     final int scannedUserId = otherUserIdVal is int
         ? otherUserIdVal
         : int.parse(otherUserIdVal.toString());
-
-    final String presenterSharedCard =
-        widget.profileData['sharedCard'] ?? 'casual';
 
     final messenger = ScaffoldMessenger.of(context);
     final navigator = Navigator.of(context);
@@ -474,8 +423,8 @@ class _ProfileCardState extends State<ProfileCard> {
       await connectionProvider.connectUsers(
         profileProvider.userId!,
         scannedUserId,
-        sharedCardByPresenter: presenterSharedCard,
-        sharedCardByScanner: _shareBackType,
+        sharedCardByPresenter: 'both',
+        sharedCardByScanner: 'both',
       );
       navigator.pop(); // Dismiss progress dialog
 
@@ -517,22 +466,10 @@ class _ProfileCardState extends State<ProfileCard> {
 
   Widget _buildProfileHeaderCard() {
     final String name = widget.profileData['name'] ?? 'Unknown';
-    final String sharedCard =
-        (widget.profileData['sharedCard'] ?? 'casual').toString();
-    final bool isCasual = sharedCard == 'casual';
-    final Color accentColor =
-        isCasual ? context.accentSecondary : context.accentPrimary;
+    final Color accentColor = context.accentPrimary;
 
-    final String profession = ProfileFieldFilter.getVisibleValue(
-        'profession',
-        widget.profileData['profession'] ?? '',
-        sharedCard,
-        widget.profileData['field_assignments']);
-    final String company = ProfileFieldFilter.getVisibleValue(
-        'company',
-        widget.profileData['company'] ?? '',
-        sharedCard,
-        widget.profileData['field_assignments']);
+    final String profession = widget.profileData['profession'] ?? '';
+    final String company = widget.profileData['company'] ?? '';
     final String avatar = _getAvatarUrl(name, widget.profileData['avatarUrl']);
 
     return Padding(
@@ -541,19 +478,13 @@ class _ProfileCardState extends State<ProfileCard> {
         width: double.infinity,
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: isCasual
-                ? [const Color(0xFF2C1E4D), const Color(0xFF0F0922)]
-                : [const Color(0xFF132A33), const Color(0xFF091316)],
-          ),
+          color: context.surfacePrimary,
           borderRadius: BorderRadius.circular(AppDimensions.radiusPremiumCard),
           border: Border.all(
-              color: accentColor.withValues(alpha: 0.35), width: 1.5),
+              color: Colors.white.withValues(alpha: 0.1), width: 1.5),
           boxShadow: [
             BoxShadow(
-              color: accentColor.withValues(alpha: 0.08),
+              color: Colors.black.withValues(alpha: 0.3),
               blurRadius: 20,
               spreadRadius: 2,
             ),
@@ -567,15 +498,10 @@ class _ProfileCardState extends State<ProfileCard> {
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 gradient: LinearGradient(
-                  colors: isCasual
-                      ? [
-                          context.accentSecondary,
-                          context.accentSecondary.withValues(alpha: 0.5)
-                        ]
-                      : [
-                          context.accentPrimary,
-                          context.accentPrimary.withValues(alpha: 0.5)
-                        ],
+                  colors: [
+                    context.accentPrimary,
+                    context.accentPrimary.withValues(alpha: 0.5)
+                  ],
                 ),
               ),
               padding: const EdgeInsets.all(1.5),
@@ -658,44 +584,16 @@ class _ProfileCardState extends State<ProfileCard> {
   }
 
   Widget _buildProfileDetailsSection() {
-    final String sharedCard =
-        (widget.profileData['sharedCard'] ?? 'casual').toString();
-    final bool isCasual = sharedCard == 'casual';
-    final Color accentColor =
-        isCasual ? context.accentSecondary : context.accentPrimary;
+    final Color accentColor = context.accentPrimary;
 
-    final String email = ProfileFieldFilter.getVisibleValue(
-        'email',
-        widget.profileData['email'] ?? '',
-        sharedCard,
-        widget.profileData['field_assignments']);
-    final String phone = ProfileFieldFilter.getVisibleValue(
-        'phoneNumber',
-        widget.profileData['phoneNumber'] ??
-            widget.profileData['phone_number'] ??
-            '',
-        sharedCard,
-        widget.profileData['field_assignments']);
-    final String bio = ProfileFieldFilter.getVisibleValue(
-        'bio',
-        widget.profileData['bio'] ?? '',
-        sharedCard,
-        widget.profileData['field_assignments']);
-    final String instagram = ProfileFieldFilter.getVisibleValue(
-        'instagram',
-        widget.profileData['instagram'] ?? '',
-        sharedCard,
-        widget.profileData['field_assignments']);
-    final String linkedin = ProfileFieldFilter.getVisibleValue(
-        'linkedin',
-        widget.profileData['linkedin'] ?? '',
-        sharedCard,
-        widget.profileData['field_assignments']);
-    final String twitter = ProfileFieldFilter.getVisibleValue(
-        'twitter',
-        widget.profileData['twitter'] ?? '',
-        sharedCard,
-        widget.profileData['field_assignments']);
+    final String email = widget.profileData['email'] ?? '';
+    final String phone = widget.profileData['phoneNumber'] ??
+        widget.profileData['phone_number'] ??
+        '';
+    final String bio = widget.profileData['bio'] ?? '';
+    final String instagram = widget.profileData['instagram'] ?? '';
+    final String linkedin = widget.profileData['linkedin'] ?? '';
+    final String twitter = widget.profileData['twitter'] ?? '';
 
     if (email.isEmpty &&
         phone.isEmpty &&
@@ -835,115 +733,6 @@ class _ProfileCardState extends State<ProfileCard> {
     );
   }
 
-  Widget _buildShareBackSelector() {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: context.surfacePrimary,
-        borderRadius: BorderRadius.circular(AppDimensions.radiusPremiumCard),
-        border: Border.all(color: context.surfaceSecondary, width: 1.5),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            "HOW DO YOU KNOW THEM?",
-            style: context.captionText.copyWith(
-              color: context.textSecondary,
-              fontWeight: FontWeight.bold,
-              letterSpacing: 1.5,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            _shareBackType == 'casual'
-                ? "You'll share your Casual card with them."
-                : "You'll share your Professional card with them.",
-            style: context.captionText.copyWith(
-              color: context.textSecondary,
-              height: 1.3,
-            ),
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(
-                child: _buildShareBackOption(
-                  type: 'casual',
-                  label: "Casual",
-                  color: context.accentSecondary,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _buildShareBackOption(
-                  type: 'professional',
-                  label: "Professional",
-                  color: context.accentPrimary,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildShareBackOption({
-    required String type,
-    required String label,
-    required Color color,
-  }) {
-    final bool isSelected = _shareBackType == type;
-
-    return GestureDetector(
-      onTap: () {
-        HapticFeedback.lightImpact();
-        setState(() {
-          _shareBackType = type;
-        });
-      },
-      behavior: HitTestBehavior.opaque,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 250),
-        height: 52,
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? color.withValues(alpha: 0.08)
-              : context.canvasBackground,
-          borderRadius: BorderRadius.circular(AppDimensions.radiusComponent),
-          border: Border.all(
-            color: isSelected ? color : context.surfaceSecondary,
-            width: isSelected ? 1.8 : 1.2,
-          ),
-          boxShadow: isSelected
-              ? [
-                  BoxShadow(
-                    color: color.withValues(alpha: 0.12),
-                    blurRadius: 8,
-                    spreadRadius: 0,
-                  )
-                ]
-              : null,
-        ),
-        child: Center(
-          child: Text(
-            label,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: isSelected ? Colors.white : context.textSecondary,
-              fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-              fontSize: 12,
-              fontFamily: 'Inter',
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
   Widget _buildAlreadyConnectedBadge() {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
@@ -1029,9 +818,7 @@ class _ProfileCardState extends State<ProfileCard> {
               _buildProfileHeaderCard(),
               _buildProfileDetailsSection(),
               if (_isAlreadyConnected)
-                _buildAlreadyConnectedBadge()
-              else
-                _buildShareBackSelector(),
+                _buildAlreadyConnectedBadge(),
               Padding(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
@@ -1065,9 +852,7 @@ class _ProfileCardState extends State<ProfileCard> {
                     child: Text(
                       _isAlreadyConnected
                           ? "Already Connected"
-                          : (_shareBackType == 'casual'
-                              ? "Add to My Casual Network"
-                              : "Add to My Professional Network"),
+                          : "Connect",
                       style: TextStyle(
                         color: _isAlreadyConnected
                             ? context.textMuted

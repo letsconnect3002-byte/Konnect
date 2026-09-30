@@ -26,19 +26,20 @@ class ProfileFieldFilter {
     return key;
   }
 
-  /// Returns true if a field is visible based on shared card type ('casual' or 'professional') and field assignments.
+  /// In the unified model, fields are visible unless explicitly marked private ('pr' == true).
+  /// sharedCard parameter is kept for signature compatibility but ignored.
   static bool isFieldVisible(
-    String fieldKey,
-    String sharedCard, // Strictly 'casual' or 'professional'
+    String fieldKey, [
+    dynamic sharedCardOrAssignments,
     dynamic fieldAssignments,
-  ) {
+  ]) {
     // Name and avatarUrl are always visible
     if (fieldKey == 'name' || fieldKey == 'avatarUrl') return true;
 
-    final bool isCasualCard = sharedCard.toLowerCase() != 'professional';
-    final assignments = parseFieldAssignments(fieldAssignments);
+    final dynamic assignmentsRaw = fieldAssignments ??
+        (sharedCardOrAssignments is! String ? sharedCardOrAssignments : null);
+    final assignments = parseFieldAssignments(assignmentsRaw);
 
-    // Look up assignment: try exact fieldKey first, then fallback
     dynamic assignmentRaw;
     if (assignments != null) {
       assignmentRaw = assignments[fieldKey];
@@ -50,58 +51,22 @@ class ProfileFieldFilter {
       }
     }
 
-    Map<String, dynamic>? assignment;
-    if (assignmentRaw != null && assignmentRaw is Map) {
-      assignment = Map<String, dynamic>.from(assignmentRaw);
+    if (assignmentRaw is Map) {
+      if (assignmentRaw['pr'] == true) return false;
     }
 
-    final bool isPrivate = assignment?['pr'] == true;
-    if (isPrivate) return false;
-
-    // Casual Email rule:
-    // There are two types of email; the email for casual should show by default.
-    if (fieldKey == 'email') {
-      if (isCasualCard) {
-        // Casual email shows by default on casual card unless marked private
-        return true;
-      } else {
-        // On professional card, show if enabled on professional
-        if (assignment != null && assignment.containsKey('p')) {
-          return assignment['p'] == true;
-        }
-        return true;
-      }
-    }
-
-    // Professional Email rule:
-    if (fieldKey == 'professionalEmail') {
-      if (isCasualCard) {
-        // Professional email does NOT show on casual card
-        return false;
-      }
-      // On professional card, show by default unless private
-      if (assignment != null && assignment.containsKey('p')) {
-        return assignment['p'] == true;
-      }
-      return true;
-    }
-
-    if (assignment == null) return true;
-
-    final bool isCasual = assignment['c'] == true;
-    final bool isProfessional = assignment['p'] == true;
-
-    return isCasualCard ? isCasual : isProfessional;
+    return true;
   }
 
   /// Returns the filtered value (the raw value if visible, or an empty string if not).
   static String getVisibleValue(
     String fieldKey,
-    String rawValue,
-    String sharedCard,
+    String rawValue, [
+    dynamic sharedCardOrAssignments,
     dynamic fieldAssignments,
-  ) {
-    final bool visible = isFieldVisible(fieldKey, sharedCard, fieldAssignments);
+  ]) {
+    final bool visible =
+        isFieldVisible(fieldKey, sharedCardOrAssignments, fieldAssignments);
     return visible ? rawValue : '';
   }
 }

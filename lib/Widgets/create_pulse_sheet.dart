@@ -330,32 +330,7 @@ class _CreatePulsePageState extends State<CreatePulsePage> with SingleTickerProv
                       const SizedBox(height: 24),
                     ],
 
-                    // Visibility Selector
-                    Text(
-                      "VISIBILITY",
-                      style: context.captionText.copyWith(
-                        color: context.textSecondary,
-                        letterSpacing: 1.5,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Container(
-                      height: 42,
-                      decoration: BoxDecoration(
-                        color: context.surfaceSecondary,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      padding: const EdgeInsets.all(3),
-                      child: Row(
-                        children: [
-                          _buildVisibilityTab('casual', 'Casual'),
-                          _buildVisibilityTab('professional', 'Professional'),
-                          _buildVisibilityTab('both', 'Both'),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 24),
+
 
                     // Hide From picker
                     Text(
@@ -702,36 +677,6 @@ class _CreatePulsePageState extends State<CreatePulsePage> with SingleTickerProv
     }
   }
 
-  Widget _buildVisibilityTab(String value, String title) {
-    final isSelected = _visibility == value;
-    return Expanded(
-      child: GestureDetector(
-        onTap: () {
-          HapticFeedback.lightImpact();
-          setState(() {
-            _visibility = value;
-          });
-        },
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          curve: Curves.easeOutCubic,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(9),
-            color: isSelected ? Colors.white : Colors.transparent,
-          ),
-          alignment: Alignment.center,
-          child: Text(
-            title,
-            style: TextStyle(
-              color: isSelected ? Colors.black : context.textSecondary,
-              fontWeight: FontWeight.bold,
-              fontSize: 13,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
 
   Widget _buildTagIcon(String iconName, bool isSelected) {
     IconData iconData;

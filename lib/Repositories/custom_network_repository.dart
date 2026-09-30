@@ -98,7 +98,7 @@ class SupabaseCustomNetworkRepository implements CustomNetworkRepository {
         }
       ];
 
-      // 3. Add any initial members directly (Mafia-style direct add)
+      // 3. Add any initial members directly
       for (final memberId in initialMemberIds) {
         if (memberId != creatorId) {
           membersToAdd.add({
@@ -112,7 +112,7 @@ class SupabaseCustomNetworkRepository implements CustomNetworkRepository {
 
       await _client.from('custom_network_members').upsert(membersToAdd);
 
-      // Send push notifications to initially added members (just like mafia direct-add)
+      // Send push notifications to initially added members
       final initialAddedUserIds =
           initialMemberIds.where((id) => id != creatorId).toList();
       if (initialAddedUserIds.isNotEmpty) {
@@ -252,7 +252,7 @@ class SupabaseCustomNetworkRepository implements CustomNetworkRepository {
         'role': role,
       });
 
-      // Send push notification to the added user (just like mafia)
+      // Send push notification to the added user
       if (userId != addedBy) {
         String resolvedNetworkName = networkName ?? '';
         if (resolvedNetworkName.isEmpty) {

@@ -30,20 +30,7 @@ class PulseProvider with ChangeNotifier {
         (c) => c['id'] == pulse.userId,
         orElse: () => <String, dynamic>{},
       );
-      if (conn.isEmpty) return false;
-
-      final sharedCard =
-          (conn['shared_card'] ?? 'both').toString().toLowerCase();
-      final visibility = pulse.visibility.toLowerCase();
-
-      if (visibility == 'both') return true;
-      if (visibility == 'casual') {
-        return sharedCard == 'casual' || sharedCard == 'both';
-      }
-      if (visibility == 'professional') {
-        return sharedCard == 'professional' || sharedCard == 'both';
-      }
-      return false;
+      return conn.isNotEmpty;
     }).toList();
   }
 

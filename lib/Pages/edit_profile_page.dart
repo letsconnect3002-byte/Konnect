@@ -1,5 +1,4 @@
 import 'package:connect/Config/app_theme.dart';
-import 'package:connect/Models/profile_card_type.dart';
 import 'package:connect/Models/custom_link.dart';
 import 'package:connect/Providers/profile_provider.dart';
 import 'package:flutter/material.dart';
@@ -26,19 +25,12 @@ class _EditProfilePageState extends State<EditProfilePage> {
   late TextEditingController _professionController;
   late TextEditingController _companyController;
   late TextEditingController _emailController;
-  late TextEditingController _professionalEmailController;
   late TextEditingController _phoneController;
-  late TextEditingController _professionalPhoneController;
   late TextEditingController _bioController;
-  late TextEditingController _professionalBioController;
   late FocusNode _bioFocusNode;
-  late FocusNode _professionalBioFocusNode;
   late FocusNode _emailFocusNode;
-  late FocusNode _professionalEmailFocusNode;
   late FocusNode _phoneFocusNode;
-  late FocusNode _professionalPhoneFocusNode;
-  String _casualCountryCode = '+91';
-  String _professionalCountryCode = '+91';
+  String _countryCode = '+91';
 
   @override
   void initState() {
@@ -48,41 +40,29 @@ class _EditProfilePageState extends State<EditProfilePage> {
     _nameController = TextEditingController(text: provider.name);
     _professionController = TextEditingController(text: provider.profession);
     _companyController = TextEditingController(text: provider.company);
-    _emailController = TextEditingController(text: provider.email);
-    _professionalEmailController =
-        TextEditingController(text: provider.professionalEmail);
+    final initialEmail = provider.email.isNotEmpty ? provider.email : provider.professionalEmail;
+    _emailController = TextEditingController(text: initialEmail);
 
-    final casualPhoneParsed = _parsePhone(provider.phoneNumber);
-    _casualCountryCode = casualPhoneParsed['code']!;
+    final initialPhone = provider.phoneNumber.isNotEmpty ? provider.phoneNumber : provider.professionalPhoneNumber;
+    final phoneParsed = _parsePhone(initialPhone);
+    _countryCode = phoneParsed['code']!;
     _phoneController =
-        TextEditingController(text: casualPhoneParsed['number']!);
+        TextEditingController(text: phoneParsed['number']!);
 
-    final profPhoneParsed = _parsePhone(provider.professionalPhoneNumber);
-    _professionalCountryCode = profPhoneParsed['code']!;
-    _professionalPhoneController =
-        TextEditingController(text: profPhoneParsed['number']!);
-
-    _bioController = TextEditingController(text: provider.bio);
-    _professionalBioController =
-        TextEditingController(text: provider.professionalBio);
+    final initialBio = provider.bio.isNotEmpty ? provider.bio : provider.professionalBio;
+    _bioController = TextEditingController(text: initialBio);
     _avatarUrl = provider.avatarUrl.isNotEmpty ? provider.avatarUrl : _defaultAvatarUrl;
 
     _bioFocusNode = FocusNode();
-    _professionalBioFocusNode = FocusNode();
     _emailFocusNode = FocusNode();
-    _professionalEmailFocusNode = FocusNode();
     _phoneFocusNode = FocusNode();
-    _professionalPhoneFocusNode = FocusNode();
 
     _nameController.addListener(_onFieldChanged);
     _professionController.addListener(_onFieldChanged);
     _companyController.addListener(_onFieldChanged);
     _emailController.addListener(_onFieldChanged);
-    _professionalEmailController.addListener(_onFieldChanged);
     _phoneController.addListener(_onFieldChanged);
-    _professionalPhoneController.addListener(_onFieldChanged);
     _bioController.addListener(_onFieldChanged);
-    _professionalBioController.addListener(_onFieldChanged);
   }
 
   @override
@@ -91,27 +71,18 @@ class _EditProfilePageState extends State<EditProfilePage> {
     _professionController.removeListener(_onFieldChanged);
     _companyController.removeListener(_onFieldChanged);
     _emailController.removeListener(_onFieldChanged);
-    _professionalEmailController.removeListener(_onFieldChanged);
     _phoneController.removeListener(_onFieldChanged);
-    _professionalPhoneController.removeListener(_onFieldChanged);
     _bioController.removeListener(_onFieldChanged);
-    _professionalBioController.removeListener(_onFieldChanged);
 
     _nameController.dispose();
     _professionController.dispose();
     _companyController.dispose();
     _emailController.dispose();
-    _professionalEmailController.dispose();
     _phoneController.dispose();
-    _professionalPhoneController.dispose();
     _bioController.dispose();
-    _professionalBioController.dispose();
     _bioFocusNode.dispose();
-    _professionalBioFocusNode.dispose();
     _emailFocusNode.dispose();
-    _professionalEmailFocusNode.dispose();
     _phoneFocusNode.dispose();
-    _professionalPhoneFocusNode.dispose();
     super.dispose();
   }
 
@@ -142,25 +113,16 @@ class _EditProfilePageState extends State<EditProfilePage> {
     if (!mounted) return false;
     final provider = Provider.of<ProfileProvider>(context, listen: false);
 
-    final String casualPhoneText = _phoneController.text.trim();
-    final String casualPhoneToCompare = casualPhoneText.isNotEmpty
-        ? '$_casualCountryCode $casualPhoneText'
-        : '';
-
-    final String profPhoneText = _professionalPhoneController.text.trim();
-    final String profPhoneToCompare = profPhoneText.isNotEmpty
-        ? '$_professionalCountryCode $profPhoneText'
+    final String phoneText = _phoneController.text.trim();
+    final String phoneToCompare = phoneText.isNotEmpty
+        ? '$_countryCode $phoneText'
         : '';
 
     return _nameController.text.trim() != provider.name ||
         _professionController.text.trim() != provider.profession ||
-        _companyController.text.trim() != provider.company ||
         _emailController.text.trim() != provider.email ||
-        _professionalEmailController.text.trim() != provider.professionalEmail ||
-        casualPhoneToCompare != provider.phoneNumber ||
-        profPhoneToCompare != provider.professionalPhoneNumber ||
+        phoneToCompare != provider.phoneNumber ||
         _bioController.text.trim() != provider.bio ||
-        _professionalBioController.text.trim() != provider.professionalBio ||
         _avatarUrl != provider.avatarUrl;
   }
 
@@ -170,28 +132,25 @@ class _EditProfilePageState extends State<EditProfilePage> {
 
     final provider = Provider.of<ProfileProvider>(context, listen: false);
     try {
+      final emailToSave = _emailController.text.trim();
+      final bioToSave = _bioController.text.trim();
+
+      final String phoneText = _phoneController.text.trim();
+      final String phoneToSave = phoneText.isNotEmpty
+          ? '$_countryCode $phoneText'
+          : '';
+
       provider.setValue('name', _nameController.text.trim());
       provider.setValue('profession', _professionController.text.trim());
-      provider.setValue('company', _companyController.text.trim());
-      provider.setValue('email', _emailController.text.trim());
-      provider.setValue(
-          'professionalEmail', _professionalEmailController.text.trim());
-
-      final String casualPhoneText = _phoneController.text.trim();
-      final String casualPhoneToSave = casualPhoneText.isNotEmpty
-          ? '$_casualCountryCode $casualPhoneText'
-          : '';
-      provider.setValue('phoneNumber', casualPhoneToSave);
-
-      final String profPhoneText = _professionalPhoneController.text.trim();
-      final String profPhoneToSave = profPhoneText.isNotEmpty
-          ? '$_professionalCountryCode $profPhoneText'
-          : '';
-      provider.setValue('professionalPhoneNumber', profPhoneToSave);
-
-      provider.setValue('bio', _bioController.text.trim());
-      provider.setValue(
-          'professionalBio', _professionalBioController.text.trim());
+      if (provider.currentCompany.isNotEmpty) {
+        provider.setValue('company', provider.currentCompany);
+      }
+      provider.setValue('email', emailToSave);
+      provider.setValue('professionalEmail', emailToSave);
+      provider.setValue('phoneNumber', phoneToSave);
+      provider.setValue('professionalPhoneNumber', phoneToSave);
+      provider.setValue('bio', bioToSave);
+      provider.setValue('professionalBio', bioToSave);
       provider.setValue('avatarUrl', _avatarUrl);
 
       await provider.saveOrUpdateProfile();
@@ -658,9 +617,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
     required Widget logo,
     required VoidCallback onEdit,
   }) {
-    final provider = context.watch<ProfileProvider>();
-    final assignment = provider.fieldAssignments[fieldKey] ??
-        FieldCardAssignment(casual: false, professional: true);
     final hasHandle = handle.isNotEmpty;
 
     return Container(
@@ -686,25 +642,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-              ),
-              const Text("Casual", style: TextStyle(color: Colors.white54, fontSize: 10)),
-              const SizedBox(width: 4),
-              _buildLocalCardToggle(
-                icon: Icons.person_outline_rounded,
-                isActive: assignment.casual,
-                activeColor: context.accentSecondary,
-                onTap: () => provider.toggleFieldOnCard(
-                    fieldKey, ProfileCardType.casual),
-              ),
-              const SizedBox(width: 12),
-              const Text("Pro", style: TextStyle(color: Colors.white54, fontSize: 10)),
-              const SizedBox(width: 4),
-              _buildLocalCardToggle(
-                icon: Icons.work_outline_rounded,
-                isActive: assignment.professional,
-                activeColor: context.accentSecondary,
-                onTap: () => provider.toggleFieldOnCard(
-                    fieldKey, ProfileCardType.professional),
               ),
             ],
           ),
@@ -745,35 +682,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildLocalCardToggle({
-    required IconData icon,
-    required bool isActive,
-    required Color activeColor,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 28,
-        height: 28,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: isActive ? activeColor : context.surfacePrimary,
-          border: Border.all(
-            color: isActive
-                ? activeColor
-                : context.textMuted.withValues(alpha: 0.15),
-          ),
-        ),
-        child: Icon(
-          icon,
-          size: 14,
-          color: isActive ? Colors.white : context.textMuted,
-        ),
       ),
     );
   }
@@ -1136,90 +1044,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
     );
   }
 
-  Widget _buildAdvancedCardSettingsPanel() {
-    final provider = context.watch<ProfileProvider>();
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(AppDimensions.radiusComponent),
-        border: Border.all(color: context.textMuted.withValues(alpha: 0.2)),
-      ),
-      child: Material(
-        color: context.surfaceSecondary,
-        borderRadius: BorderRadius.circular(AppDimensions.radiusComponent),
-        clipBehavior: Clip.antiAlias,
-        child: Theme(
-          data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-          child: ExpansionTile(
-            title: Text(
-              "Advanced Card Visibility Settings",
-              style: context.bodyText.copyWith(
-                color: context.textPrimary,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            subtitle: Text(
-              "Configure which details show on Casual vs. Work cards",
-              style: context.captionText.copyWith(color: context.textSecondary, fontSize: 11),
-            ),
-            leading: Icon(Icons.settings_suggest_rounded, color: context.accentSecondary),
-            childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-            children: [
-              _buildAdvancedToggleRow(provider, 'name', 'Full Name'),
-              _buildAdvancedToggleRow(provider, 'avatarUrl', 'Photo'),
-              _buildAdvancedToggleRow(provider, 'profession', 'Profession'),
-              _buildAdvancedToggleRow(provider, 'company', 'Company'),
-              _buildAdvancedToggleRow(provider, 'email', 'Casual Email'),
-              _buildAdvancedToggleRow(provider, 'professionalEmail', 'Work Email'),
-              _buildAdvancedToggleRow(provider, 'phoneNumber', 'Casual Phone'),
-              _buildAdvancedToggleRow(provider, 'professionalPhoneNumber', 'Work Phone'),
-              _buildAdvancedToggleRow(provider, 'bio', 'Casual Bio'),
-              _buildAdvancedToggleRow(provider, 'professionalBio', 'Work Bio'),
-              _buildAdvancedToggleRow(provider, 'linkedin', 'LinkedIn Link'),
-              _buildAdvancedToggleRow(provider, 'twitter', 'Twitter Link'),
-              _buildAdvancedToggleRow(provider, 'instagram', 'Instagram Link'),
-              _buildAdvancedToggleRow(provider, 'spotify', 'Spotify Link'),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildAdvancedToggleRow(ProfileProvider provider, String fieldKey, String label) {
-    final assignment = provider.fieldAssignments[fieldKey] ??
-        FieldCardAssignment(casual: fieldKey == 'name' || fieldKey == 'avatarUrl', professional: true);
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6.0),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              label,
-              style: context.bodyText.copyWith(color: context.textPrimary, fontSize: 13),
-            ),
-          ),
-          const Text("Casual", style: TextStyle(color: Colors.white54, fontSize: 10)),
-          const SizedBox(width: 4),
-          _buildLocalCardToggle(
-            icon: Icons.person_outline_rounded,
-            isActive: assignment.casual,
-            activeColor: context.accentSecondary,
-            onTap: () => provider.toggleFieldOnCard(fieldKey, ProfileCardType.casual),
-          ),
-          const SizedBox(width: 12),
-          const Text("Pro", style: TextStyle(color: Colors.white54, fontSize: 10)),
-          const SizedBox(width: 4),
-          _buildLocalCardToggle(
-            icon: Icons.work_outline_rounded,
-            isActive: assignment.professional,
-            activeColor: context.accentSecondary,
-            onTap: () => provider.toggleFieldOnCard(fieldKey, ProfileCardType.professional),
-          ),
-        ],
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final hasChanges = _isDataChanged();
@@ -1361,7 +1185,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
                     ),
                   ),
 
-                  _buildSectionHeader("CASUAL CARD DETAILS (PERSONAL)"),
+                  _buildSectionHeader("PROFILE DETAILS"),
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
@@ -1372,7 +1196,14 @@ class _EditProfilePageState extends State<EditProfilePage> {
                     child: Column(
                       children: [
                         _buildCompactField(
-                          label: 'Casual Bio',
+                          label: 'Profession',
+                          hint: 'Product Designer',
+                          controller: _professionController,
+                          icon: Icons.work_outline_rounded,
+                        ),
+                        const SizedBox(height: 12),
+                        _buildCompactField(
+                          label: 'Bio',
                           hint: 'Tell us about yourself...',
                           controller: _bioController,
                           icon: Icons.description_outlined,
@@ -1380,7 +1211,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
                         ),
                         const SizedBox(height: 12),
                         _buildCompactField(
-                          label: 'Casual Email',
+                          label: 'Email Address',
                           hint: 'jordan@design.com',
                           controller: _emailController,
                           keyboardType: TextInputType.emailAddress,
@@ -1388,7 +1219,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
                         ),
                         const SizedBox(height: 12),
                         _buildCompactField(
-                          label: 'Casual Phone',
+                          label: 'Phone Number',
                           hint: '555-0199',
                           controller: _phoneController,
                           keyboardType: TextInputType.phone,
@@ -1396,7 +1227,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
                           prefix: GestureDetector(
                             onTap: () => _showCountryPicker(context, (val) {
                               if (val != null) {
-                                setState(() => _casualCountryCode = val);
+                                setState(() => _countryCode = val);
                               }
                             }),
                             child: Container(
@@ -1413,103 +1244,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   Text(
-                                    '${_getFlagForCode(_casualCountryCode)} $_casualCountryCode',
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 2),
-                                  Icon(
-                                    Icons.keyboard_arrow_down_rounded,
-                                    color: context.textSecondary,
-                                    size: 14,
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  _buildSectionHeader("WORK CARD DETAILS (PROFESSIONAL)"),
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: context.surfacePrimary,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: context.borderMuted),
-                    ),
-                    child: Column(
-                      children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: _buildCompactField(
-                                label: 'Profession',
-                                hint: 'Product Designer',
-                                controller: _professionController,
-                                icon: Icons.work_outline_rounded,
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: _buildCompactField(
-                                label: 'Company',
-                                hint: 'Design Studio Inc.',
-                                controller: _companyController,
-                                icon: Icons.apartment_rounded,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        _buildCompactField(
-                          label: 'Work Bio',
-                          hint: 'Tell clients about your work...',
-                          controller: _professionalBioController,
-                          icon: Icons.description_outlined,
-                          maxLines: 3,
-                        ),
-                        const SizedBox(height: 12),
-                        _buildCompactField(
-                          label: 'Work Email',
-                          hint: 'work@design.com',
-                          controller: _professionalEmailController,
-                          keyboardType: TextInputType.emailAddress,
-                          icon: Icons.email_outlined,
-                        ),
-                        const SizedBox(height: 12),
-                        _buildCompactField(
-                          label: 'Work Phone',
-                          hint: '555-0200',
-                          controller: _professionalPhoneController,
-                          keyboardType: TextInputType.phone,
-                          icon: Icons.phone_android_outlined,
-                          prefix: GestureDetector(
-                            onTap: () => _showCountryPicker(context, (val) {
-                              if (val != null) {
-                                setState(() => _professionalCountryCode = val);
-                              }
-                            }),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                              margin: const EdgeInsets.only(right: 4),
-                              decoration: BoxDecoration(
-                                border: Border(
-                                  right: BorderSide(
-                                    color: context.textMuted.withValues(alpha: 0.15),
-                                  ),
-                                ),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text(
-                                    '${_getFlagForCode(_professionalCountryCode)} $_professionalCountryCode',
+                                    '${_getFlagForCode(_countryCode)} $_countryCode',
                                     style: const TextStyle(
                                       color: Colors.white,
                                       fontSize: 12,
@@ -1536,16 +1271,13 @@ class _EditProfilePageState extends State<EditProfilePage> {
 
                   _buildSectionHeader("CUSTOM LINKS"),
                   _buildCustomLinksSection(),
-
-                  const SizedBox(height: 24),
-                  _buildAdvancedCardSettingsPanel(),
                   const SizedBox(height: 48),
                 ],
               ),
             ),
             if (_isSaving)
               Container(
-                color: Colors.black.withOpacity(0.5),
+                color: Colors.black.withValues(alpha: 0.5),
                 child: Center(
                   child: CircularProgressIndicator(
                     valueColor: AlwaysStoppedAnimation<Color>(

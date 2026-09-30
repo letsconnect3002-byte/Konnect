@@ -18,6 +18,7 @@ class FeedPost {
   final bool isAnonymous;
   final String? networkId;
   final String? feedScope; // 'global', 'network', 'inner_circle'
+  final String? authorProfession;
 
   FeedPost({
     required this.id,
@@ -37,6 +38,7 @@ class FeedPost {
     this.isAnonymous = false,
     this.networkId,
     this.feedScope,
+    this.authorProfession,
   }) : activeReplyCount = activeReplyCount ?? replyCount;
 
 
@@ -111,6 +113,7 @@ class FeedPost {
       isAnonymous: json['is_anonymous'] == true,
       networkId: json['network_id']?.toString(),
       feedScope: json['feed_scope']?.toString(),
+      authorProfession: json['author_profession']?.toString(),
     );
   }
 
@@ -156,6 +159,7 @@ class FeedPost {
       isAnonymous: json['is_anonymous'] == true,
       networkId: json['network_id']?.toString(),
       feedScope: json['feed_scope']?.toString(),
+      authorProfession: json['author_profession']?.toString(),
     );
   }
 
@@ -178,6 +182,7 @@ class FeedPost {
     bool? isAnonymous,
     String? networkId,
     String? feedScope,
+    String? authorProfession,
   }) {
     final int newReplyCount = replyCount ?? this.replyCount;
     final int newActiveReplyCount = activeReplyCount ??
@@ -200,6 +205,7 @@ class FeedPost {
       isAnonymous: isAnonymous ?? this.isAnonymous,
       networkId: networkId ?? this.networkId,
       feedScope: feedScope ?? this.feedScope,
+      authorProfession: authorProfession ?? this.authorProfession,
     );
   }
 
@@ -221,6 +227,7 @@ class FeedPost {
         other.userReaction == userReaction &&
         other.visibility == visibility &&
         other.isAnonymous == isAnonymous &&
+        other.authorProfession == authorProfession &&
         mapEquals(other.reactionCounts, reactionCounts);
   }
 
@@ -233,6 +240,7 @@ class FeedPost {
         activeReplyCount,
         visibility,
         isAnonymous,
+        authorProfession,
         Object.hashAll(reactionCounts.entries.map((e) => Object.hash(e.key, e.value))),
       );
 }

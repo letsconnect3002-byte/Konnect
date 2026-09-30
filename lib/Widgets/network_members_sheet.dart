@@ -481,7 +481,7 @@ class _NetworkMembersSheetState extends State<NetworkMembersSheet> {
             ),
             const SizedBox(height: 10),
 
-            // Mafia Direct Add Note banner (when on tab 0)
+            // Direct Add Note banner (when on tab 0)
             if (_selectedTab == 0)
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),

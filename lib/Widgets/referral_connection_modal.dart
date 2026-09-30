@@ -461,7 +461,7 @@ class _ReferralConnectionModalState extends State<ReferralConnectionModal> {
                                   // Pipeline: Redeem Private Key directly
                                   await connectionProvider.redeemInviteCode(
                                     codeToRedeem,
-                                    'casual',
+                                    'both',
                                   );
                                   await connectionProvider.fetchConnections();
                                   debugPrint('[ReferralConnectionModal] Connected via Private Key pipeline ($codeToRedeem)');

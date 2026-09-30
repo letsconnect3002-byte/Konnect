@@ -64,7 +64,10 @@ class _VouchesListWidgetState extends State<VouchesListWidget> {
   @override
   Widget build(BuildContext context) {
     final vouchProvider = Provider.of<VouchProvider>(context);
-    final List<UserVouch> vouches = vouchProvider.getVouchesFor(widget.userId);
+    final allVouches = vouchProvider.getVouchesFor(widget.userId);
+    final List<UserVouch> vouches = allVouches.where((v) =>
+        (v.relationshipType != null && v.relationshipType!.trim().isNotEmpty) ||
+        (v.optionalNote != null && v.optionalNote!.trim().isNotEmpty)).toList();
     final bool isLoading = vouchProvider.isLoading(widget.userId);
 
     if (isLoading && vouches.isEmpty) {
@@ -232,7 +235,7 @@ class _VouchesListWidgetState extends State<VouchesListWidget> {
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     border: Border.all(
-                      color: const Color(0xFFF59E0B).withValues(alpha: 0.4),
+                      color: Colors.white.withValues(alpha: 0.15),
                       width: 1.2,
                     ),
                   ),
@@ -294,30 +297,110 @@ class _VouchesListWidgetState extends State<VouchesListWidget> {
 
           const SizedBox(height: 10),
 
-          // Statement Body
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.03),
-              borderRadius: BorderRadius.circular(10),
-              border: Border(
-                left: BorderSide(
-                  color: Colors.white.withValues(alpha: 0.25),
-                  width: 2.0,
+          // Structured or Legacy Statement Body
+          if (vouch.relationshipType != null && vouch.relationshipType!.isNotEmpty) ...[
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.04),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.10),
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.12),
+                            width: 0.8,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Icons.verified_rounded,
+                              size: 11,
+                              color: Colors.white,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              vouch.relationshipType!,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (vouch.contextTag != null && vouch.contextTag!.isNotEmpty) ...[
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            vouch.contextTag!,
+                            style: TextStyle(
+                              color: context.textPrimary,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                  if (vouch.optionalNote != null && vouch.optionalNote!.trim().isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      "“${vouch.optionalNote!.trim()}”",
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.88),
+                        fontSize: 12.5,
+                        fontStyle: FontStyle.italic,
+                        height: 1.35,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ] else ...[
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.03),
+                borderRadius: BorderRadius.circular(10),
+                border: Border(
+                  left: BorderSide(
+                    color: Colors.white.withValues(alpha: 0.25),
+                    width: 2.0,
+                  ),
+                ),
+              ),
+              child: Text(
+                "“${vouch.statement}”",
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.88),
+                  fontSize: 13,
+                  fontStyle: FontStyle.italic,
+                  height: 1.4,
                 ),
               ),
             ),
-            child: Text(
-              "“${vouch.statement}”",
-              style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.88),
-                fontSize: 13,
-                fontStyle: FontStyle.italic,
-                height: 1.4,
-              ),
-            ),
-          ),
+          ],
         ],
       ),
     );

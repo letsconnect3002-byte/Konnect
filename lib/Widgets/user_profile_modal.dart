@@ -68,6 +68,7 @@ class _UserProfileModalState extends State<UserProfileModal> {
   String _company = '';
   bool _isLoadingProfile = true;
   Map<String, dynamic> _rawProfile = {};
+  List<String> _mutualIntents = [];
 
   @override
   void initState() {
@@ -155,6 +156,14 @@ class _UserProfileModalState extends State<UserProfileModal> {
           voucherId: myUserId,
           voucheeId: _resolvedUserId,
         );
+        vProvider.getMutualIntents(
+          userId1: myUserId,
+          userId2: _resolvedUserId,
+        ).then((intents) {
+          if (mounted && intents.isNotEmpty) {
+            setState(() => _mutualIntents = intents);
+          }
+        });
       }
     }
   }
@@ -370,22 +379,22 @@ class _UserProfileModalState extends State<UserProfileModal> {
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
         decoration: BoxDecoration(
-          color: const Color(0xFF10B981).withValues(alpha: 0.12),
+          color: Colors.white.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: const Color(0xFF10B981).withValues(alpha: 0.3),
+            color: Colors.white.withValues(alpha: 0.20),
             width: 1.0,
           ),
         ),
         child: const Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.verified_rounded, color: Color(0xFF10B981), size: 11),
+            Icon(Icons.verified_rounded, color: Colors.white70, size: 11),
             SizedBox(width: 4),
             Text(
               "Vouched",
               style: TextStyle(
-                color: Color(0xFF10B981),
+                color: Colors.white70,
                 fontSize: 10,
                 fontWeight: FontWeight.bold,
                 fontFamily: 'Inter',
@@ -411,6 +420,12 @@ class _UserProfileModalState extends State<UserProfileModal> {
               voucherId: myUserId,
               voucheeId: _resolvedUserId,
             );
+            vouchProvider.getMutualIntents(
+              userId1: myUserId,
+              userId2: _resolvedUserId,
+            ).then((intents) {
+              if (mounted) setState(() => _mutualIntents = intents);
+            });
             if (mounted) setState(() {});
           },
         );
@@ -418,22 +433,22 @@ class _UserProfileModalState extends State<UserProfileModal> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
         decoration: BoxDecoration(
-          color: const Color(0xFFF59E0B).withValues(alpha: 0.15),
+          color: Colors.white.withValues(alpha: 0.10),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: const Color(0xFFF59E0B).withValues(alpha: 0.4),
+            color: Colors.white.withValues(alpha: 0.25),
             width: 1.0,
           ),
         ),
         child: const Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.shield_rounded, color: Color(0xFFF59E0B), size: 11),
+            Icon(Icons.shield_rounded, color: Colors.white, size: 11),
             SizedBox(width: 4),
             Text(
               "Vouch",
               style: TextStyle(
-                color: Color(0xFFF59E0B),
+                color: Colors.white,
                 fontSize: 10,
                 fontWeight: FontWeight.bold,
                 fontFamily: 'Inter',
@@ -612,6 +627,59 @@ class _UserProfileModalState extends State<UserProfileModal> {
               ],
             ),
           ),
+
+          // Confidential Mutual Match Banner (revealed only upon mutual match)
+          if (_mutualIntents.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.06),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.20),
+                    width: 1.0,
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.lock_open_rounded,
+                      color: Colors.white,
+                      size: 16,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            "MUTUAL INTENT MATCH",
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 0.8,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            "You and $_name mutually signaled: ${_mutualIntents.join(' • ')}",
+                            style: TextStyle(
+                              color: context.textSecondary,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
 
           const SizedBox(height: 14),
 
@@ -875,16 +943,80 @@ class _UserProfileModalState extends State<UserProfileModal> {
 
                             const SizedBox(height: 8),
 
-                            // Statement
-                            Text(
-                              "\"${vouch.statement}\"",
-                              style: TextStyle(
-                                color: context.textPrimary,
-                                fontSize: 13,
-                                height: 1.4,
-                                fontStyle: FontStyle.italic,
+                            // Statement / Structured Relationship
+                            if (vouch.relationshipType != null && vouch.relationshipType!.isNotEmpty) ...[
+                              Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white.withValues(alpha: 0.08),
+                                      border: Border.all(
+                                        color: Colors.white.withValues(alpha: 0.12),
+                                        width: 0.6,
+                                      ),
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        const Icon(
+                                          Icons.verified_rounded,
+                                          size: 10,
+                                          color: Colors.white,
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          vouch.relationshipType!,
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 10.5,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  if (vouch.contextTag != null && vouch.contextTag!.isNotEmpty) ...[
+                                    const SizedBox(width: 6),
+                                    Expanded(
+                                      child: Text(
+                                        vouch.contextTag!,
+                                        style: TextStyle(
+                                          color: context.textPrimary,
+                                          fontSize: 11.5,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  ],
+                                ],
                               ),
-                            ),
+                              if (vouch.optionalNote != null && vouch.optionalNote!.trim().isNotEmpty) ...[
+                                const SizedBox(height: 6),
+                                Text(
+                                  "“${vouch.optionalNote!.trim()}”",
+                                  style: TextStyle(
+                                    color: context.textPrimary.withValues(alpha: 0.9),
+                                    fontSize: 12,
+                                    height: 1.35,
+                                    fontStyle: FontStyle.italic,
+                                  ),
+                                ),
+                              ],
+                            ] else ...[
+                              Text(
+                                "\"${vouch.statement}\"",
+                                style: TextStyle(
+                                  color: context.textPrimary,
+                                  fontSize: 13,
+                                  height: 1.4,
+                                  fontStyle: FontStyle.italic,
+                                ),
+                              ),
+                            ],
                           ],
                         ),
                       );

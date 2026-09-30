@@ -66,6 +66,9 @@ class VouchProvider with ChangeNotifier {
     required String statement,
     required String feedScope,
     String? announcementPostId,
+    String? relationshipType,
+    List<String>? privateIntents,
+    String? optionalNote,
   }) async {
     final vouch = await _vouchRepository.createVouch(
       voucherId: voucherId,
@@ -73,6 +76,9 @@ class VouchProvider with ChangeNotifier {
       statement: statement,
       feedScope: feedScope,
       announcementPostId: announcementPostId,
+      relationshipType: relationshipType,
+      privateIntents: privateIntents,
+      optionalNote: optionalNote,
     );
 
     // Update local caches
@@ -94,5 +100,15 @@ class VouchProvider with ChangeNotifier {
 
     notifyListeners();
     return vouch;
+  }
+
+  Future<List<String>> getMutualIntents({
+    required int userId1,
+    required int userId2,
+  }) async {
+    return _vouchRepository.getMutualIntents(
+      userId1: userId1,
+      userId2: userId2,
+    );
   }
 }

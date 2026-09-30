@@ -57,7 +57,6 @@ class DirectConnectionSheet extends StatefulWidget {
 
 class _DirectConnectionSheetState extends State<DirectConnectionSheet> {
   final TextEditingController _noteController = TextEditingController();
-  String _selectedCard = 'casual'; // 'casual' or 'professional'
   bool _isSending = false;
 
   @override
@@ -87,7 +86,7 @@ class _DirectConnectionSheetState extends State<DirectConnectionSheet> {
     try {
       await notifProvider.sendDirectConnectionRequest(
         toUserId: widget.targetUserId,
-        sharedCard: _selectedCard,
+        sharedCard: 'both',
         note: _noteController.text.trim(),
       );
 
@@ -95,7 +94,6 @@ class _DirectConnectionSheetState extends State<DirectConnectionSheet> {
         name: 'direct_connection_request_sent',
         parameters: {
           'target_user_id': widget.targetUserId,
-          'shared_card': _selectedCard,
           'has_note': _noteController.text.trim().isNotEmpty,
         },
       );
@@ -326,32 +324,7 @@ class _DirectConnectionSheetState extends State<DirectConnectionSheet> {
                 ),
               ),
 
-              const SizedBox(height: 20),
-              Text(
-                "CHOOSE CARD TO SHARE",
-                style: context.captionText.copyWith(
-                  color: context.textSecondary,
-                  letterSpacing: 1.5,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(height: 10),
 
-              // Card Selector: Casual vs Professional
-              _buildCardOption(
-                title: "Casual Card",
-                description: "Share bio, socials & casual contact details",
-                icon: Icons.person_outline_rounded,
-                value: 'casual',
-              ),
-              const SizedBox(height: 8),
-              _buildCardOption(
-                title: "Professional Card",
-                description: "Share company, job title, work email & LinkedIn",
-                icon: Icons.business_center_outlined,
-                value: 'professional',
-              ),
 
               const SizedBox(height: 20),
               Text(
@@ -432,123 +405,6 @@ class _DirectConnectionSheetState extends State<DirectConnectionSheet> {
               ),
             ],
           ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCardOption({
-    required String title,
-    required String description,
-    required IconData icon,
-    required String value,
-  }) {
-    final bool isSelected = _selectedCard == value;
-
-    return GestureDetector(
-      onTap: () {
-        HapticFeedback.selectionClick();
-        setState(() {
-          _selectedCard = value;
-        });
-      },
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? Colors.white.withValues(alpha: 0.06)
-              : context.surfaceSecondary,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: isSelected
-                ? Colors.white
-                : context.surfaceSecondary,
-            width: 1.5,
-          ),
-          boxShadow: isSelected
-              ? [
-                  BoxShadow(
-                    color: Colors.white.withValues(alpha: 0.08),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ]
-              : null,
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: isSelected
-                    ? Colors.white.withValues(alpha: 0.15)
-                    : context.surfacePrimary,
-              ),
-              child: Icon(
-                icon,
-                size: 18,
-                color: isSelected
-                    ? Colors.white
-                    : context.textSecondary,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: TextStyle(
-                      color: isSelected
-                          ? Colors.white
-                          : context.textPrimary,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    description,
-                    style: TextStyle(
-                      color: isSelected
-                          ? context.textPrimary.withValues(alpha: 0.8)
-                          : context.textSecondary,
-                      fontSize: 11.5,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Container(
-              width: 20,
-              height: 20,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: isSelected
-                      ? Colors.white
-                      : context.textMuted.withValues(alpha: 0.4),
-                  width: 2,
-                ),
-              ),
-              child: isSelected
-                  ? Center(
-                      child: Container(
-                        width: 10,
-                        height: 10,
-                        decoration: const BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: Colors.white,
-                        ),
-                      ),
-                    )
-                  : null,
-            ),
-          ],
         ),
       ),
     );

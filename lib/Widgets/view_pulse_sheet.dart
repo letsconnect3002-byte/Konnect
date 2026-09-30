@@ -6,7 +6,6 @@ import 'package:connect/Models/pulse.dart';
 import 'package:connect/Providers/pulse_provider.dart';
 import 'package:connect/Providers/connection_provider.dart';
 import 'package:connect/Pages/IndividualChatPage.dart';
-import 'package:connect/Widgets/create_plan_sheet.dart';
 import 'package:connect/services/analytics_service.dart';
 import 'package:connect/Utils/error_handler.dart';
 
@@ -486,8 +485,6 @@ class _ViewPulseSheetState extends State<ViewPulseSheet> {
         return "Message";
       case 'refer':
         return "Refer Someone";
-      case 'propose_plan':
-        return "Propose Plan";
       default:
         return "Interact";
     }
@@ -514,14 +511,6 @@ class _ViewPulseSheetState extends State<ViewPulseSheet> {
           ),
         );
       }
-    } else if (actionType == 'propose_plan') {
-      Navigator.pop(context);
-      showModalBottomSheet(
-        context: context,
-        isScrollControlled: true,
-        backgroundColor: Colors.transparent,
-        builder: (ctx) => const CreatePlanSheet(),
-      );
     } else {
       // refer
       ScaffoldMessenger.of(context).showSnackBar(

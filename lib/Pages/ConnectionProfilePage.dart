@@ -28,10 +28,6 @@ class ConnectionProfilePage extends StatefulWidget {
 }
 
 class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
-  static const _cardAnimDuration = Duration(milliseconds: 400);
-  static const _cardAnimCurve = Curves.easeInOut;
-
-  bool _showFront = true;
   bool _isLoading = false;
   Map<String, dynamic>? _fieldAssignments;
 
@@ -45,7 +41,6 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
   late String _bio;
   late String _professionalBio;
   late String _avatarUrl;
-  late String _vibeTag;
   late String _instagram;
   late String _linkedin;
   late String _twitter;
@@ -57,19 +52,30 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
   Map<String, String> _casualFields = {};
   Map<String, String> _professionalFields = {};
 
-  String _selectedPreviewCardType = 'professional';
-
   Map<String, String> get _activeFields {
-    if (_sharedCardPermission == 'casual') return _casualFields;
-    return _professionalFields;
+    final merged = Map<String, String>.from(_casualFields);
+    for (final entry in _professionalFields.entries) {
+      if (entry.value.trim().isNotEmpty) {
+        merged[entry.key] = entry.value;
+      }
+    }
+    if ((merged['email'] ?? '').isEmpty && _email.isNotEmpty) {
+      merged['email'] = _email;
+    }
+    if ((merged['phoneNumber'] ?? '').isEmpty && _phoneNumber.isNotEmpty) {
+      merged['phoneNumber'] = _phoneNumber;
+    }
+    if ((merged['bio'] ?? '').isEmpty && _bio.isNotEmpty) {
+      merged['bio'] = _bio;
+    }
+    return merged;
   }
 
   Map<String, String> get _previewFields => _activeFields;
 
   late final ProfileProvider profileProvider;
   late final ConnectionProvider connectionProvider;
-  String _sharedCardPermission = 'casual'; // what they share with me
-  String _mySharedCardToThem = 'casual'; // what I share with them
+  String _sharedCardPermission = 'both'; // permission context
 
   int get _targetUserId {
     final idVal = widget.profileData['id'] ??
@@ -78,6 +84,8 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
     if (idVal is int) return idVal;
     return int.tryParse(idVal?.toString() ?? '0') ?? 0;
   }
+
+  List<String> _mutualIntents = [];
 
   @override
   void initState() {
@@ -91,10 +99,19 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
       if (mounted) {
         final myUserId = profileProvider.userId;
         if (myUserId != null && _targetUserId != 0) {
-          Provider.of<VouchProvider>(context, listen: false).checkHasVouched(
+          final vProvider = Provider.of<VouchProvider>(context, listen: false);
+          vProvider.checkHasVouched(
             voucherId: myUserId,
             voucheeId: _targetUserId,
           );
+          vProvider.getMutualIntents(
+            userId1: myUserId,
+            userId2: _targetUserId,
+          ).then((intents) {
+            if (mounted && intents.isNotEmpty) {
+              setState(() => _mutualIntents = intents);
+            }
+          });
         }
       }
     });
@@ -109,11 +126,6 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
             'casual')
         .toString();
     _sharedCardPermission = permission;
-    if (permission == 'casual') {
-      _selectedPreviewCardType = 'casual';
-    } else {
-      _selectedPreviewCardType = 'professional';
-    }
 
     AnalyticsService.logEvent(
       name: 'profile_viewed',
@@ -144,7 +156,6 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
     _professionalBio =
         data['professionalBio'] ?? data['professional_bio'] ?? '';
     _avatarUrl = data['avatarUrl'] ?? data['avatar_url'] ?? '';
-    _vibeTag = data['vibe_tag'] ?? data['vibeTag'] ?? '';
     _instagram = data['instagram'] ?? '';
     _linkedin = data['linkedin'] ?? '';
     _twitter = data['twitter'] ?? '';
@@ -161,6 +172,16 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
         _experience = expData
             .map((e) => ExperienceItem.fromJson(e as Map<String, dynamic>))
             .toList();
+        for (final exp in _experience) {
+          if (exp.isCurrent ||
+              exp.endDate.trim().toLowerCase() == 'present' ||
+              exp.endDate.toLowerCase().contains('present')) {
+            if (exp.company.trim().isNotEmpty) {
+              _company = exp.company.trim();
+              break;
+            }
+          }
+        }
       }
     } else {
       _experience = [];
@@ -243,13 +264,7 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
             : int.parse(connectionProfileId.toString());
         final details = await profileProvider.fetchConnectionDetails(idToFetch);
         final response = details['profile'] as Map<String, dynamic>?;
-        _sharedCardPermission = details['sharedCardPermission'] as String;
-        if (_sharedCardPermission == 'casual') {
-          _selectedPreviewCardType = 'casual';
-        } else if (_sharedCardPermission == 'professional') {
-          _selectedPreviewCardType = 'professional';
-        }
-        _mySharedCardToThem = details['mySharedCardToThem'] as String;
+        _sharedCardPermission = details['sharedCardPermission'] as String? ?? 'both';
 
         if (response != null && mounted) {
           final Map<String, dynamic>? fieldAssignments =
@@ -264,7 +279,6 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
             _fieldAssignments = fieldAssignments;
             _name = response['name'] ?? '';
             _avatarUrl = response['avatar_url'] ?? '';
-            _vibeTag = response['vibe_tag'] ?? response['vibeTag'] ?? '';
             _profession = response['profession'] ?? '';
             _company = response['company'] ?? '';
             _email = ProfileFieldFilter.getVisibleValue(
@@ -325,6 +339,16 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
                     .map((e) =>
                         ExperienceItem.fromJson(e as Map<String, dynamic>))
                     .toList();
+                for (final exp in _experience) {
+                  if (exp.isCurrent ||
+                      exp.endDate.trim().toLowerCase() == 'present' ||
+                      exp.endDate.toLowerCase().contains('present')) {
+                    if (exp.company.trim().isNotEmpty) {
+                      _company = exp.company.trim();
+                      break;
+                    }
+                  }
+                }
               }
             } else {
               _experience = [];
@@ -436,829 +460,11 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
     }
   }
 
-  // Return the actual avatar URL from the database, or empty if none
-  String _getAvatarUrl(String name, String url) {
-    if (url.isNotEmpty) {
-      return url;
-    }
-    return '';
-  }
 
-  String _getCompany(String name, String comp) {
-    return comp;
-  }
 
-  String _getBio(String name, String bioText) {
-    return bioText;
-  }
 
-  Widget _buildFallbackAvatar() {
-    final monogram =
-        _name.isNotEmpty ? _name.substring(0, 1).toUpperCase() : "?";
-    return Center(
-      child: Text(
-        monogram,
-        style: const TextStyle(
-          color: Colors.white,
-          fontSize: 32,
-          fontWeight: FontWeight.bold,
-          fontFamily: 'Inter',
-        ),
-      ),
-    );
-  }
 
-  // ignore: unused_element
-  Widget _buildTag(String text) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 5.0),
-      decoration: BoxDecoration(
-        color: context.surfaceSecondary,
-        borderRadius: BorderRadius.circular(15.0),
-        border: Border.all(
-          color: context.surfaceSecondary.withValues(alpha: 0.8),
-          width: 1.0,
-        ),
-      ),
-      child: Text(
-        text,
-        style: context.captionText.copyWith(
-          color: context.accentPrimary,
-          fontWeight: FontWeight.bold,
-        ),
-      ),
-    );
-  }
 
-  // ignore: unused_element
-  Widget _buildHeroSection(BuildContext context) {
-    return SizedBox(
-      height: 220,
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          // 1. Banner Cover Background
-          Positioned(
-            left: 0,
-            right: 0,
-            top: 0,
-            height: 180,
-            child: Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    context.surfacePrimary,
-                    context.surfaceSecondary,
-                  ],
-                ),
-              ),
-              child: Stack(
-                children: [
-                  Positioned.fill(
-                    child: CustomPaint(
-                      painter: CardPatternPainter(
-                        color: context.accentPrimary.withValues(alpha: 0.04),
-                      ),
-                    ),
-                  ),
-                  Container(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          Colors.transparent,
-                          context.canvasBackground,
-                        ],
-                        stops: const [0.35, 1.0],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          // 2. Back Button Overlay
-          Positioned(
-            left: AppDimensions.marginStandard,
-            top: 48,
-            child: GestureDetector(
-              onTap: () {
-                if (Navigator.canPop(context)) {
-                  Navigator.pop(context);
-                }
-              },
-              child: Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: context.surfacePrimary.withValues(alpha: 0.8),
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: context.surfaceSecondary,
-                    width: 1.0,
-                  ),
-                ),
-                child: const Icon(
-                  Icons.arrow_back_ios_new_rounded,
-                  color: Colors.white,
-                  size: 16,
-                ),
-              ),
-            ),
-          ),
-
-          // 3. Avatar Placement
-          Positioned(
-            left: AppDimensions.marginStandard,
-            top: 110,
-            child: Container(
-              width: 90,
-              height: 90,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: context.accentPrimary.withValues(alpha: 0.35),
-                  width: 1.5,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.4),
-                    blurRadius: 8,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              padding: const EdgeInsets.all(1.5),
-              child: Container(
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: context.surfaceSecondary,
-                ),
-                clipBehavior: Clip.antiAlias,
-                child: (_avatarUrl.isNotEmpty && _avatarUrl.startsWith('http'))
-                    ? Image.network(
-                        _avatarUrl,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => _buildFallbackAvatar(),
-                      )
-                    : _buildFallbackAvatar(),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildFrontBackToggle() {
-    return Container(
-      height: 32,
-      decoration: BoxDecoration(
-        color: context.surfaceSecondary,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: context.surfaceSecondary),
-      ),
-      padding: const EdgeInsets.all(2),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          GestureDetector(
-            onTap: () => setState(() => _showFront = true),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              decoration: BoxDecoration(
-                color:
-                    _showFront ? context.accentSecondary : Colors.transparent,
-                borderRadius: BorderRadius.circular(6),
-              ),
-              alignment: Alignment.center,
-              child: Text(
-                'FRONT',
-                style: TextStyle(
-                  color: _showFront ? Colors.white : context.textSecondary,
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                  fontFamily: 'Inter',
-                ),
-              ),
-            ),
-          ),
-          GestureDetector(
-            onTap: () => setState(() => _showFront = false),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              decoration: BoxDecoration(
-                color:
-                    !_showFront ? context.accentSecondary : Colors.transparent,
-                borderRadius: BorderRadius.circular(6),
-              ),
-              alignment: Alignment.center,
-              child: Text(
-                'BACK',
-                style: TextStyle(
-                  color: !_showFront ? Colors.white : context.textSecondary,
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                  fontFamily: 'Inter',
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDigitalCard() {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final cardWidth = constraints.maxWidth;
-        final cardHeight = cardWidth / 1.58;
-
-        return GestureDetector(
-          onDoubleTap: () {
-            HapticFeedback.mediumImpact();
-            setState(() {
-              _showFront = !_showFront;
-            });
-          },
-          behavior: HitTestBehavior.opaque,
-          child: AnimatedContainer(
-            duration: _cardAnimDuration,
-            curve: _cardAnimCurve,
-            width: cardWidth,
-            height: cardHeight,
-            decoration: BoxDecoration(
-              borderRadius:
-                  BorderRadius.circular(AppDimensions.radiusPremiumCard),
-              gradient: LinearGradient(
-                colors: [
-                  const Color(0xFF00F2FE),
-                  context.accentSecondary,
-                  const Color(0xFFEC4899),
-                ],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: const Color(0xFF00F2FE).withValues(alpha: 0.1),
-                  blurRadius: 14,
-                  spreadRadius: 0,
-                ),
-              ],
-            ),
-            padding: const EdgeInsets.all(1.5),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(22.5),
-              child: AnimatedContainer(
-                duration: _cardAnimDuration,
-                curve: _cardAnimCurve,
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [Color(0xFF1B1B3A), Color(0xFF0C0C18)],
-                  ),
-                  borderRadius: BorderRadius.circular(22.5),
-                ),
-                child: Stack(
-                  children: [
-                    Positioned.fill(
-                      child: CustomPaint(
-                        painter: CardPatternPainter(
-                          color:
-                              const Color(0xFF00F2FE).withValues(alpha: 0.06),
-                        ),
-                      ),
-                    ),
-                    AnimatedSwitcher(
-                      duration: _cardAnimDuration,
-                      switchInCurve: _cardAnimCurve,
-                      switchOutCurve: _cardAnimCurve,
-                      transitionBuilder: (child, animation) {
-                        return FadeTransition(
-                          opacity: animation,
-                          child: ScaleTransition(
-                            scale: ScaleTransition(
-                              scale: Tween<double>(begin: 0.96, end: 1.0)
-                                  .animate(animation),
-                              child: child,
-                            ).scale,
-                            child: child,
-                          ),
-                        );
-                      },
-                      child: _buildActiveCardFace(cardWidth),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildActiveCardFace(double cardWidth) {
-    final isFront = _showFront;
-    if (isFront) {
-      return _wrapCardFace(
-        _buildUnifiedFrontCard(cardWidth),
-        1.58,
-        cardWidth,
-        const ValueKey('FrontCard'),
-      );
-    } else {
-      return _wrapCardFace(
-        _buildUnifiedBackCard(cardWidth),
-        1.58,
-        cardWidth,
-        const ValueKey('BackCard'),
-      );
-    }
-  }
-
-  Widget _wrapCardFace(
-      Widget child, double targetAspectRatio, double cardWidth, Key key) {
-    final targetHeight = cardWidth / targetAspectRatio;
-    return ClipRect(
-      key: key,
-      child: OverflowBox(
-        minWidth: cardWidth,
-        maxWidth: cardWidth,
-        minHeight: cardWidth / 1.58,
-        maxHeight: cardWidth / 0.82,
-        alignment: Alignment.topCenter,
-        child: AnimatedContainer(
-          duration: _cardAnimDuration,
-          curve: _cardAnimCurve,
-          width: cardWidth,
-          height: targetHeight,
-          child: child,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildUnifiedFrontCard(double cardWidth) {
-    final W = cardWidth;
-    final comp = _getCompany(_name, _company);
-    final nameText = _name.isEmpty ? 'Jordan Miller' : _name;
-    final professionText = _profession;
-
-    return Stack(
-      children: [
-        // 1. Top Section: Logo, Company Name, Card Type
-        AnimatedPositioned(
-          duration: _cardAnimDuration,
-          curve: _cardAnimCurve,
-          left: 0,
-          right: 0,
-          top: 20,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              AnimatedContainer(
-                duration: _cardAnimDuration,
-                curve: _cardAnimCurve,
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: const Color(0xFF151628),
-                  border: Border.all(
-                    color: context.accentSecondary.withValues(alpha: 0.3),
-                    width: 1.5,
-                  ),
-                ),
-                child: Center(
-                  child: Image.asset(
-                    'assets/icons/Group 5.png',
-                    width: 22,
-                    height: 22,
-                    color: const Color(0xFF00F2FE),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-              AnimatedDefaultTextStyle(
-                duration: _cardAnimDuration,
-                curve: _cardAnimCurve,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 2.5,
-                  fontFamily: 'Inter',
-                ),
-                child: Text(
-                  comp.isEmpty ? 'CONNECT' : comp.toUpperCase(),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'DIGITAL CARD',
-                style: TextStyle(
-                  color: const Color(0xFF00F2FE).withValues(alpha: 0.8),
-                  fontSize: 11,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 1.0,
-                  fontFamily: 'Inter',
-                ),
-              ),
-            ],
-          ),
-        ),
-
-        // 2. Name & Profession
-        AnimatedPositioned(
-          duration: _cardAnimDuration,
-          curve: _cardAnimCurve,
-          left: 18,
-          right: W * 0.4,
-          bottom: 14,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              AnimatedDefaultTextStyle(
-                duration: _cardAnimDuration,
-                curve: _cardAnimCurve,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                  fontFamily: 'Inter',
-                ),
-                child: Text(
-                  nameText,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              if (professionText.isNotEmpty) ...[
-                const SizedBox(height: 2),
-                AnimatedDefaultTextStyle(
-                  duration: _cardAnimDuration,
-                  curve: _cardAnimCurve,
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.65),
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                    fontFamily: 'Inter',
-                  ),
-                  child: Text(
-                    professionText,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ],
-            ],
-          ),
-        ),
-
-        // 3. Scan Badge
-        AnimatedPositioned(
-          duration: _cardAnimDuration,
-          curve: _cardAnimCurve,
-          left: W - 113,
-          bottom: 14,
-          width: 95,
-          child: Container(
-            padding: const EdgeInsets.symmetric(
-              horizontal: 8,
-              vertical: 4,
-            ),
-            decoration: BoxDecoration(
-              color: const Color(0xFF1E1F32),
-              borderRadius: BorderRadius.circular(6),
-              border: Border.all(
-                color: Colors.white.withValues(alpha: 0.08),
-              ),
-            ),
-            child: const Center(
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    Icons.qr_code_2_rounded,
-                    color: Color(0xFF00F2FE),
-                    size: 13,
-                  ),
-                  SizedBox(width: 4),
-                  Text(
-                    'SCAN',
-                    style: TextStyle(
-                      color: Colors.white70,
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 0.5,
-                      fontFamily: 'Inter',
-                    ),
-                    maxLines: 1,
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildUnifiedBackCard(double cardWidth) {
-    final W = cardWidth;
-    final avatar = _getAvatarUrl(_name, _avatarUrl);
-    final comp = _getCompany(_name, _company);
-    final bioVal = _getBio(_name, _previewFields['bio'] ?? '');
-    final emailVal = _previewFields['email'] ?? '';
-    final phoneVal = _previewFields['phoneNumber'] ?? '';
-    final professionText = _profession;
-
-    return Stack(
-      children: [
-        // 1. Row 1: Avatar, Name, Profession, Link Button
-        AnimatedPositioned(
-          duration: _cardAnimDuration,
-          curve: _cardAnimCurve,
-          left: 16,
-          right: 16,
-          top: 12,
-          height: 40,
-          child: Row(
-            children: [
-              AnimatedContainer(
-                duration: _cardAnimDuration,
-                curve: _cardAnimCurve,
-                width: 36,
-                height: 36,
-                padding: const EdgeInsets.all(1.0),
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: LinearGradient(
-                    colors: [const Color(0xFF00F2FE), context.accentSecondary],
-                  ),
-                ),
-                child: ClipOval(
-                  child: (avatar.isNotEmpty && avatar.startsWith('http'))
-                      ? Image.network(
-                          avatar,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => Container(
-                            color: const Color(0xFF1E1F32),
-                            alignment: Alignment.center,
-                            child: Text(
-                              _name.isNotEmpty
-                                  ? _name.substring(0, 1).toUpperCase()
-                                  : "?",
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 14,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                        )
-                      : Container(
-                          color: const Color(0xFF1E1F32),
-                          alignment: Alignment.center,
-                          child: Text(
-                            _name.isNotEmpty
-                                ? _name.substring(0, 1).toUpperCase()
-                                : "?",
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                ),
-              ),
-              AnimatedContainer(
-                duration: _cardAnimDuration,
-                curve: _cardAnimCurve,
-                width: 10,
-              ),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    AnimatedDefaultTextStyle(
-                      duration: _cardAnimDuration,
-                      curve: _cardAnimCurve,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        fontFamily: 'Inter',
-                      ),
-                      child: Text(
-                        _name.isEmpty ? 'Unknown' : _name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    if (professionText.isNotEmpty) ...[
-                      const SizedBox(height: 2),
-                      AnimatedDefaultTextStyle(
-                        duration: _cardAnimDuration,
-                        curve: _cardAnimCurve,
-                        style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.65),
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
-                          fontFamily: 'Inter',
-                        ),
-                        child: Text(
-                          professionText,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF1E1F32),
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.06),
-                  ),
-                ),
-                child: const Icon(
-                  Icons.link_rounded,
-                  color: Color(0xFF00F2FE),
-                  size: 14,
-                ),
-              ),
-            ],
-          ),
-        ),
-
-        // 2. Divider Line
-        AnimatedPositioned(
-          duration: _cardAnimDuration,
-          curve: _cardAnimCurve,
-          left: 16,
-          right: 16,
-          top: 60,
-          height: 1,
-          child: Container(
-            color: Colors.white.withValues(alpha: 0.08),
-          ),
-        ),
-
-        // 3. Contact Details Group (Company, Email, Phone)
-        AnimatedPositioned(
-          duration: _cardAnimDuration,
-          curve: _cardAnimCurve,
-          left: (W * 0.5) + 6,
-          right: 16,
-          top: 74,
-          height: 80,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.start,
-            children: [
-              _buildUnifiedCardRow(
-                Icons.apartment_rounded,
-                comp.isNotEmpty ? comp : 'Data Unavailable',
-                false,
-                isUnavailable: comp.isEmpty,
-              ),
-              const SizedBox(height: 5),
-              _buildUnifiedCardRow(
-                Icons.email_outlined,
-                emailVal.isNotEmpty ? emailVal : 'Data Unavailable',
-                false,
-                isUnavailable: emailVal.isEmpty,
-              ),
-              const SizedBox(height: 5),
-              _buildUnifiedCardRow(
-                Icons.phone_rounded,
-                phoneVal.isNotEmpty ? phoneVal : 'Data Unavailable',
-                false,
-                isUnavailable: phoneVal.isEmpty,
-              ),
-            ],
-          ),
-        ),
-
-        // 4. Bio Section
-        AnimatedPositioned(
-          duration: _cardAnimDuration,
-          curve: _cardAnimCurve,
-          left: 16,
-          right: (W * 0.5) + 6,
-          top: 74,
-          height: 60,
-          child: bioVal.isNotEmpty
-              ? Text(
-                  bioVal,
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.55),
-                    fontSize: 12,
-                    height: 1.25,
-                    fontFamily: 'Inter',
-                  ),
-                  maxLines: 3,
-                  overflow: TextOverflow.ellipsis,
-                )
-              : const SizedBox.shrink(),
-        ),
-
-        // 5. Bottom Accent Line
-        AnimatedPositioned(
-          duration: _cardAnimDuration,
-          curve: _cardAnimCurve,
-          left: 16,
-          right: W - 76,
-          top: 140,
-          height: 2,
-          child: Container(
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(1.5),
-              gradient: LinearGradient(
-                colors: [context.accentSecondary, const Color(0xFF00F2FE)],
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildUnifiedCardRow(IconData icon, String text, bool isCasual,
-      {bool isUnavailable = false}) {
-    return Row(
-      children: [
-        AnimatedContainer(
-          duration: _cardAnimDuration,
-          curve: _cardAnimCurve,
-          width: 22,
-          height: 22,
-          decoration: const BoxDecoration(
-            color: Color(0xFF171825),
-            shape: BoxShape.circle,
-          ),
-          child: Center(
-            child: Icon(
-              icon,
-              color: isUnavailable
-                  ? const Color(0xFF3A3B50)
-                  : (isCasual ? const Color(0xFF8B8C9E) : Colors.white54),
-              size: 12,
-            ),
-          ),
-        ),
-        AnimatedContainer(
-          duration: _cardAnimDuration,
-          curve: _cardAnimCurve,
-          width: 8,
-        ),
-        Expanded(
-          child: FittedBox(
-            fit: BoxFit.scaleDown,
-            alignment: Alignment.centerLeft,
-            child: AnimatedDefaultTextStyle(
-              duration: _cardAnimDuration,
-              curve: _cardAnimCurve,
-              style: TextStyle(
-                color: isUnavailable
-                    ? const Color(0xFF3A3B50)
-                    : (isCasual ? const Color(0xFF8B8C9E) : Colors.white70),
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-                fontStyle: isUnavailable ? FontStyle.italic : FontStyle.normal,
-                fontFamily: 'Inter',
-              ),
-              child: Text(
-                text,
-                maxLines: 1,
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
 
   Widget _buildReadOnlyField({
     required String label,
@@ -1702,11 +908,7 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  _sharedCardPermission == 'casual'
-                      ? 'Personal Profile'
-                      : (_sharedCardPermission == 'professional'
-                          ? 'Professional Profile'
-                          : 'Digital Profile'),
+                  'Digital Profile',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     color: context.textSecondary,
@@ -1751,23 +953,13 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
                   height: 24,
                 ),
 
-                // 3. Digital Cards Preview and Permissions Details
+                // Profile Details
                 Padding(
                   padding: const EdgeInsets.symmetric(
                       horizontal: AppDimensions.marginStandard),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      if (_sharedCardPermission != 'casual') ...[
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: _buildFrontBackToggle(),
-                        ),
-                        const SizedBox(height: 16),
-                        // Business card graphic
-                        _buildDigitalCard(),
-                        const SizedBox(height: 32),
-                      ],
                       // Section: Identity (Photo, Name, Vibe)
                       Container(
                         padding: const EdgeInsets.fromLTRB(0, 0, 0, 0),
@@ -1853,41 +1045,6 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
                                   const SizedBox(height: 8),
                                   Row(
                                     children: [
-                                      if (_vibeTag.isNotEmpty) ...[
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(
-                                              horizontal: 10, vertical: 4),
-                                          decoration: BoxDecoration(
-                                            color: const Color(0xFF00F2FE)
-                                                .withValues(alpha: 0.1),
-                                            borderRadius: BorderRadius.circular(16),
-                                            border: Border.all(
-                                              color: const Color(0xFF00F2FE)
-                                                  .withValues(alpha: 0.25),
-                                              width: 1.0,
-                                            ),
-                                          ),
-                                          child: Row(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              const Icon(Icons.flash_on_rounded,
-                                                  color: Color(0xFF00F2FE),
-                                                  size: 10),
-                                              const SizedBox(width: 4),
-                                              Text(
-                                                _vibeTag,
-                                                style: const TextStyle(
-                                                  color: Color(0xFF00F2FE),
-                                                  fontSize: 10,
-                                                  fontWeight: FontWeight.bold,
-                                                  fontFamily: 'Inter',
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                        const SizedBox(width: 8),
-                                      ],
                                       // Vouch Button / Badge
                                       Consumer2<ProfileProvider, VouchProvider>(
                                         builder: (context, pProvider, vProvider, _) {
@@ -1901,12 +1058,12 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
                                               padding: const EdgeInsets.symmetric(
                                                   horizontal: 10, vertical: 4),
                                               decoration: BoxDecoration(
-                                                color: const Color(0xFF10B981)
-                                                    .withValues(alpha: 0.12),
+                                                color: Colors.white
+                                                    .withValues(alpha: 0.08),
                                                 borderRadius: BorderRadius.circular(16),
                                                 border: Border.all(
-                                                  color: const Color(0xFF10B981)
-                                                      .withValues(alpha: 0.3),
+                                                  color: Colors.white
+                                                      .withValues(alpha: 0.20),
                                                   width: 1.0,
                                                 ),
                                               ),
@@ -1914,13 +1071,13 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
                                                 mainAxisSize: MainAxisSize.min,
                                                 children: [
                                                   Icon(Icons.verified_rounded,
-                                                      color: Color(0xFF10B981),
+                                                      color: Colors.white70,
                                                       size: 11),
                                                   SizedBox(width: 4),
                                                   Text(
                                                     "Vouched",
                                                     style: TextStyle(
-                                                      color: Color(0xFF10B981),
+                                                      color: Colors.white70,
                                                       fontSize: 10,
                                                       fontWeight: FontWeight.bold,
                                                       fontFamily: 'Inter',
@@ -1941,6 +1098,19 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
                                                 targetUserAvatar: _avatarUrl,
                                                 targetUserProfession: _profession,
                                                 onVouched: () {
+                                                  final myId = profileProvider.userId;
+                                                  if (myId != null && _targetUserId != 0) {
+                                                    Provider.of<VouchProvider>(context, listen: false)
+                                                        .getMutualIntents(
+                                                      userId1: myId,
+                                                      userId2: _targetUserId,
+                                                    )
+                                                        .then((intents) {
+                                                      if (mounted) {
+                                                        setState(() => _mutualIntents = intents);
+                                                      }
+                                                    });
+                                                  }
                                                   setState(() {});
                                                 },
                                               );
@@ -1950,12 +1120,12 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
                                               padding: const EdgeInsets.symmetric(
                                                   horizontal: 10, vertical: 4),
                                               decoration: BoxDecoration(
-                                                color: const Color(0xFFF59E0B)
-                                                    .withValues(alpha: 0.15),
+                                                color: Colors.white
+                                                    .withValues(alpha: 0.10),
                                                 borderRadius: BorderRadius.circular(16),
                                                 border: Border.all(
-                                                  color: const Color(0xFFF59E0B)
-                                                      .withValues(alpha: 0.4),
+                                                  color: Colors.white
+                                                      .withValues(alpha: 0.25),
                                                   width: 1.0,
                                                 ),
                                               ),
@@ -1963,13 +1133,13 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
                                                 mainAxisSize: MainAxisSize.min,
                                                 children: [
                                                   Icon(Icons.shield_rounded,
-                                                      color: Color(0xFFF59E0B),
+                                                      color: Colors.white,
                                                       size: 11),
                                                   SizedBox(width: 4),
                                                   Text(
                                                     "Vouch",
                                                     style: TextStyle(
-                                                      color: Color(0xFFF59E0B),
+                                                      color: Colors.white,
                                                       fontSize: 10,
                                                       fontWeight: FontWeight.bold,
                                                       fontFamily: 'Inter',
@@ -1989,8 +1159,55 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
                           ],
                         ),
                       ),
-                      const SizedBox(height: 24),
-                      _buildAccessControlSection(),
+                      if (_mutualIntents.isNotEmpty) ...[
+                        const SizedBox(height: 16),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 12),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.06),
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.20),
+                              width: 1.0,
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(
+                                Icons.lock_open_rounded,
+                                color: Colors.white,
+                                size: 18,
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text(
+                                      "MUTUAL INTENT MATCH",
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                        letterSpacing: 0.8,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 3),
+                                    Text(
+                                      "You and $_name mutually signaled: ${_mutualIntents.join(' • ')}",
+                                      style: const TextStyle(
+                                        color: Colors.white70,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                       const SizedBox(height: 24),
 
                       // VOUCHES SECTION
@@ -2037,34 +1254,26 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
                       ),
                       const SizedBox(height: 12),
 
-                      if (_sharedCardPermission == 'professional') ...[
+                      if (_profession.isNotEmpty)
                         _buildReadOnlyField(
                           label: 'Profession',
                           value: _profession,
                           icon: Icons.work_outline_rounded,
                         ),
+
+                      if ((_previewFields['email'] ?? '').isNotEmpty)
                         _buildReadOnlyField(
-                          label: 'Company',
-                          value: _company,
-                          icon: Icons.apartment_rounded,
+                          label: 'Email Address',
+                          value: _previewFields['email'] ?? '',
+                          icon: Icons.email_outlined,
                         ),
-                      ],
 
-                      _buildReadOnlyField(
-                        label: _sharedCardPermission == 'casual'
-                            ? 'Email Address'
-                            : 'Professional Email',
-                        value: _previewFields['email'] ?? '',
-                        icon: Icons.email_outlined,
-                      ),
-
-                      _buildReadOnlyField(
-                        label: _sharedCardPermission == 'casual'
-                            ? 'Phone Number'
-                            : 'Professional Phone',
-                        value: _previewFields['phoneNumber'] ?? '',
-                        icon: Icons.phone_android_outlined,
-                      ),
+                      if ((_previewFields['phoneNumber'] ?? '').isNotEmpty)
+                        _buildReadOnlyField(
+                          label: 'Phone Number',
+                          value: _previewFields['phoneNumber'] ?? '',
+                          icon: Icons.phone_android_outlined,
+                        ),
 
                       // SOCIAL SECTIONS
                       _buildSocialGridSection(_previewFields),
@@ -2072,17 +1281,21 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
                       // CUSTOM LINKS
                       ..._buildCustomLinksList(_fieldAssignments),
 
-                      if (_sharedCardPermission == 'professional') ...[
+                      if (_experience.isNotEmpty) ...[
                         const SizedBox(height: 28),
                         ExperienceTimelineSection(
                           experience: _experience,
                           isOwner: false,
                         ),
+                      ],
+                      if (_education.isNotEmpty) ...[
                         const SizedBox(height: 28),
                         EducationSection(
                           education: _education,
                           isOwner: false,
                         ),
+                      ],
+                      if (_skills.isNotEmpty) ...[
                         const SizedBox(height: 28),
                         SkillsSection(
                           skills: _skills,
@@ -2235,14 +1448,11 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
   List<Widget> _buildCustomLinksList(dynamic fieldAssignments) {
     final widgets = <Widget>[];
 
-    final isCasual = _selectedPreviewCardType == 'casual';
-    final currentTypeStr = isCasual ? 'casual' : 'professional';
-
-    // Filter links based on visibility on the CURRENT active card preview
+    // Filter links based on visibility (visible unless explicitly private)
     final visibleLinks = _customLinks.where((link) {
       final String linkId = link['id'] ?? '';
       return ProfileFieldFilter.isFieldVisible(
-          linkId, currentTypeStr, fieldAssignments);
+          linkId, 'both', fieldAssignments);
     }).toList();
 
     if (visibleLinks.isEmpty) return widgets;
@@ -2270,124 +1480,6 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
     }
 
     return widgets;
-  }
-
-  Widget _buildAccessControlSection() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: context.surfacePrimary,
-        borderRadius: BorderRadius.circular(AppDimensions.radiusPremiumCard),
-        border:
-            Border.all(color: context.surfaceSecondary.withValues(alpha: 0.5)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.security_rounded,
-                  color: context.accentPrimary, size: 18),
-              const SizedBox(width: 8),
-              Text(
-                "ACCESS PERMISSIONS",
-                style: context.captionText.copyWith(
-                  color: context.textPrimary,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 1.0,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Text(
-            "Configure which digital card of yours this contact can see:",
-            style: context.bodyText.copyWith(
-              color: context.textSecondary,
-              fontSize: 12,
-            ),
-          ),
-          const SizedBox(height: 16),
-          _buildAccessPills(),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildAccessPills() {
-    return Container(
-      height: 38,
-      decoration: BoxDecoration(
-        color: context.canvasBackground,
-        borderRadius: BorderRadius.circular(AppDimensions.radiusComponent),
-        border: Border.all(color: context.surfaceSecondary),
-      ),
-      padding: const EdgeInsets.all(3),
-      child: Row(
-        children: [
-          _buildPillItem('casual', 'Casual'),
-          _buildPillItem('professional', 'Professional'),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPillItem(String value, String label) {
-    final bool isSelected = _mySharedCardToThem == value;
-    return Expanded(
-      child: GestureDetector(
-        onTap: () => _updateSharingAccess(value),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          decoration: BoxDecoration(
-            color: isSelected ? context.accentPrimary : Colors.transparent,
-            borderRadius: BorderRadius.circular(8),
-          ),
-          alignment: Alignment.center,
-          child: Text(
-            label,
-            style: TextStyle(
-              color: isSelected ? Colors.black : context.textSecondary,
-              fontWeight: FontWeight.bold,
-              fontSize: 11,
-              fontFamily: 'Inter',
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Future<void> _updateSharingAccess(String accessType) async {
-    final connectionProfileId =
-        widget.profileData['connection_profile_id'] ?? widget.profileData['id'];
-    if (connectionProfileId == null) return;
-
-    final int otherUserId = connectionProfileId is int
-        ? connectionProfileId
-        : int.parse(connectionProfileId.toString());
-
-    setState(() {
-      _mySharedCardToThem = accessType;
-    });
-
-    await connectionProvider.updateConnectionAccess(otherUserId, accessType);
-
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            "Sharing settings updated to ${accessType.toUpperCase()}",
-            style: const TextStyle(
-              color: Colors.black,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          backgroundColor: Colors.white,
-          duration: const Duration(milliseconds: 1500),
-        ),
-      );
-    }
   }
 
   Future<void> _deleteProfileLocally(
@@ -2753,31 +1845,4 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
       },
     );
   }
-}
-
-class CardPatternPainter extends CustomPainter {
-  final Color color;
-  CardPatternPainter({required this.color});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = color
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.0;
-
-    final centerTR = Offset(size.width, 0);
-    for (double r = 40.0; r <= 220.0; r += 16.0) {
-      canvas.drawCircle(centerTR, r, paint);
-    }
-
-    final centerBL = Offset(0, size.height);
-    for (double r = 40.0; r <= 220.0; r += 16.0) {
-      canvas.drawCircle(centerBL, r, paint);
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CardPatternPainter oldDelegate) =>
-      oldDelegate.color != color;
 }

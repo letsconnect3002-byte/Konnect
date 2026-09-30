@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:connect/Models/feed_post.dart';
 import 'package:connect/Models/custom_network.dart';
 import 'package:connect/Models/app_error.dart';
@@ -14,12 +15,62 @@ enum FeedFilter {
   innerCircle,
 }
 
+enum NetworkViewMode {
+  messages, // Discord-style linear chat messaging UI
+  threads, // Card-based posts and threads UI
+}
+
 class FeedProvider with ChangeNotifier {
   final FeedRepository _repository;
 
   FeedProvider({FeedRepository? repository})
       : _repository = repository ?? SupabaseFeedRepository() {
     _startSeenFlushTimer();
+    _clearLocalSavedViewMode();
+  }
+
+  void _clearLocalSavedViewMode() {
+    SharedPreferences.getInstance().then((prefs) {
+      prefs.remove('network_view_mode');
+    }).catchError((_) {});
+  }
+
+  NetworkViewMode _networkViewMode = NetworkViewMode.threads;
+  NetworkViewMode get networkViewMode => _networkViewMode;
+
+  void setNetworkViewMode(NetworkViewMode mode) {
+    if (_networkViewMode == mode) return;
+    _networkViewMode = mode;
+    notifyListeners();
+
+    final uid = _viewerId;
+    if (uid != null) {
+      final bool isChat = mode == NetworkViewMode.messages;
+      Supabase.instance.client
+          .from('profiles')
+          .update({'is_chat_view': isChat})
+          .eq('id', uid)
+          .catchError((_) {});
+    }
+  }
+
+  Future<void> _fetchUserViewModeFromBackend(int userId) async {
+    try {
+      final res = await Supabase.instance.client
+          .from('profiles')
+          .select('is_chat_view')
+          .eq('id', userId)
+          .maybeSingle();
+      if (res != null && res['is_chat_view'] != null) {
+        final bool isChat = res['is_chat_view'] == true;
+        final newMode =
+            isChat ? NetworkViewMode.messages : NetworkViewMode.threads;
+        if (_networkViewMode != newMode) {
+          _networkViewMode = newMode;
+          notifyListeners();
+        }
+      }
+    } catch (_) {}
   }
 
   FeedFilter _feedFilter = FeedFilter.fullNetwork;
@@ -66,9 +117,8 @@ class FeedProvider with ChangeNotifier {
 
   List<FeedPost> get displayedPosts {
     if (_activeCustomNetwork != null) {
-      final list = _posts
-          .where((p) => p.networkId == _activeCustomNetwork!.id)
-          .toList();
+      final list =
+          _posts.where((p) => p.networkId == _activeCustomNetwork!.id).toList();
       list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
       final pinnedId = _activeCustomNetwork!.pinnedPostId;
       if (pinnedId != null && pinnedId.isNotEmpty) {
@@ -93,7 +143,8 @@ class FeedProvider with ChangeNotifier {
       return _posts
           .where((p) =>
               (p.networkId == null || p.networkId!.isEmpty) &&
-              (p.feedScope == 'network' || (p.feedScope == null && !p.isAnonymous)) &&
+              (p.feedScope == 'network' ||
+                  (p.feedScope == null && !p.isAnonymous)) &&
               !p.isAnonymous)
           .toList();
     }
@@ -153,7 +204,8 @@ class FeedProvider with ChangeNotifier {
       case FeedFilter.global:
         return _savedGlobalPosts != null && _savedGlobalPosts!.isNotEmpty;
       case FeedFilter.innerCircle:
-        return _savedInnerCirclePosts != null && _savedInnerCirclePosts!.isNotEmpty;
+        return _savedInnerCirclePosts != null &&
+            _savedInnerCirclePosts!.isNotEmpty;
       case FeedFilter.fullNetwork:
         return _savedNetworkPosts != null && _savedNetworkPosts!.isNotEmpty;
     }
@@ -275,7 +327,8 @@ class FeedProvider with ChangeNotifier {
 
   void registerPost(FeedPost post) {
     final existing = _postRegistry[post.id];
-    final String? netId = post.networkId ?? existing?.networkId ?? _activeCustomNetwork?.id;
+    final String? netId =
+        post.networkId ?? existing?.networkId ?? _activeCustomNetwork?.id;
     _postRegistry[post.id] = (netId != null && post.networkId != netId)
         ? post.copyWith(networkId: netId)
         : post;
@@ -332,8 +385,18 @@ class FeedProvider with ChangeNotifier {
     int? id,
     int connectionCount, {
     required bool isConnectionsLoaded,
+    bool? isChatView,
   }) {
     _lastKnownConnectionCount = connectionCount;
+
+    if (isChatView != null) {
+      final targetMode =
+          isChatView ? NetworkViewMode.messages : NetworkViewMode.threads;
+      if (_networkViewMode != targetMode) {
+        _networkViewMode = targetMode;
+        notifyListeners();
+      }
+    }
 
     if (id == null) {
       if (_viewerId != null) {
@@ -356,6 +419,9 @@ class FeedProvider with ChangeNotifier {
 
     if (_viewerId != id) {
       _viewerId = id;
+      if (isChatView == null) {
+        _fetchUserViewModeFromBackend(id);
+      }
       _hasUserExplicitlySelectedFilter = false;
       _hasDeterminedDefaultFilter = false;
       _initialLoadFallbackTimer?.cancel();
@@ -534,7 +600,8 @@ class FeedProvider with ChangeNotifier {
             _activeCustomNetwork = freshNet.copyWith(
               memberCount: _activeCustomNetwork!.memberCount,
               isMember: _activeCustomNetwork!.isMember,
-              isCreator: _activeCustomNetwork!.isCreator || freshNet.creatorId == vId,
+              isCreator:
+                  _activeCustomNetwork!.isCreator || freshNet.creatorId == vId,
             );
           }
         } catch (_) {}
@@ -608,7 +675,8 @@ class FeedProvider with ChangeNotifier {
       final List<FeedPost> mergedPosts = [];
       for (final fetchedPost in updatedPosts) {
         final existing = existingPostsMap[fetchedPost.id];
-        if (existing != null && _pendingReactionPostIds.contains(fetchedPost.id)) {
+        if (existing != null &&
+            _pendingReactionPostIds.contains(fetchedPost.id)) {
           // ONLY preserve local reaction state if the viewer is actively mid-flight toggling a reaction on this post
           mergedPosts.add(fetchedPost.copyWith(
             reactionCounts: existing.reactionCounts,
@@ -645,7 +713,9 @@ class FeedProvider with ChangeNotifier {
           .map((p) => p.id)
           .toList();
       if (postIdsToMark.isNotEmpty) {
-        _repository.markPostsSeen(viewerId: vId, postIds: postIdsToMark).then((_) {
+        _repository
+            .markPostsSeen(viewerId: vId, postIds: postIdsToMark)
+            .then((_) {
           fetchUnseenCount();
         }).catchError((e) {
           debugPrint("[FeedProvider] Error marking posts seen: $e");
@@ -682,7 +752,8 @@ class FeedProvider with ChangeNotifier {
       String? cursorPostId;
 
       if (_posts.isNotEmpty) {
-        final lastPost = _posts.lastWhere((p) => !p.id.startsWith('temp_'), orElse: () => _posts.last);
+        final lastPost = _posts.lastWhere((p) => !p.id.startsWith('temp_'),
+            orElse: () => _posts.last);
         cursorCreatedAt = lastPost.createdAt;
         cursorPostId = lastPost.id;
       }
@@ -803,13 +874,13 @@ class FeedProvider with ChangeNotifier {
       }
     }
 
-    final bool effectiveAnonymous = (_activeCustomNetwork != null && !_activeCustomNetwork!.allowAnonymous)
-        ? false
-        : isAnonymous;
+    final bool effectiveAnonymous =
+        (_activeCustomNetwork != null && !_activeCustomNetwork!.allowAnonymous)
+            ? false
+            : isAnonymous;
 
-    final String? effectiveScope = effectiveNetworkId != null
-        ? null
-        : (feedScope ?? currentScope);
+    final String? effectiveScope =
+        effectiveNetworkId != null ? null : (feedScope ?? currentScope);
 
     final String tempId = 'temp_${DateTime.now().millisecondsSinceEpoch}';
     final tempPost = FeedPost(
@@ -860,7 +931,8 @@ class FeedProvider with ChangeNotifier {
           // Update snapshot so we don't flag our own post as "new"
           _latestKnownPostId = realPost.id;
           notifyListeners();
-        } else if (matchesCurrentView && !_posts.any((p) => p.id == realPost.id)) {
+        } else if (matchesCurrentView &&
+            !_posts.any((p) => p.id == realPost.id)) {
           _posts.insert(0, realPost);
           _latestKnownPostId = realPost.id;
           notifyListeners();
@@ -1018,14 +1090,16 @@ class FeedProvider with ChangeNotifier {
               .toSet();
           mentionedUserIds.removeWhere((id) => !validMemberIds.contains(id));
         } catch (e) {
-          debugPrint("[FeedProvider] Error checking custom network member mentions: $e");
+          debugPrint(
+              "[FeedProvider] Error checking custom network member mentions: $e");
         }
       }
 
       // 3. Send Reply / Mention notifications
       if (parentAuthorId != null && parentAuthorId != authorId) {
         final isMentioned = mentionedUserIds.contains(parentAuthorId);
-        final String notifType = isMentioned ? 'feed_reply_mention' : 'feed_reply';
+        final String notifType =
+            isMentioned ? 'feed_reply_mention' : 'feed_reply';
 
         await notifRepo.sendFeedNotification(
           recipientUserId: parentAuthorId,
@@ -1063,7 +1137,8 @@ class FeedProvider with ChangeNotifier {
         final Set<int> notifiedUserIds = {authorId, ...mentionedUserIds};
         if (parentAuthorId != null) notifiedUserIds.add(parentAuthorId);
 
-        if (createdPost.networkId != null && createdPost.networkId!.isNotEmpty) {
+        if (createdPost.networkId != null &&
+            createdPost.networkId!.isNotEmpty) {
           // Custom Network: Send push and in-app notifications ONLY to members of this network
           try {
             final membersRes = await Supabase.instance.client
@@ -1093,7 +1168,8 @@ class FeedProvider with ChangeNotifier {
               }
             }
           } catch (e) {
-            debugPrint("[FeedProvider] Error notifying custom network members: $e");
+            debugPrint(
+                "[FeedProvider] Error notifying custom network members: $e");
           }
         } else {
           // Built-in Networks: Send New Post notification to connected users who have matching visibility reach
@@ -1105,7 +1181,9 @@ class FeedProvider with ChangeNotifier {
                 : int.tryParse(conn['id']?.toString() ?? '');
 
             if (cId != null && !notifiedUserIds.contains(cId)) {
-              final cardType = (conn['my_shared_card'] ?? conn['shared_card'] ?? 'both').toString();
+              final cardType =
+                  (conn['my_shared_card'] ?? conn['shared_card'] ?? 'both')
+                      .toString();
               final bool isReachable = postVis == 'both' ||
                   cardType == 'both' ||
                   cardType == postVis;
@@ -1169,7 +1247,8 @@ class FeedProvider with ChangeNotifier {
   Future<void> setPinnedPost(String networkId, String? postId) async {
     try {
       await _repository.updatePinnedPost(networkId: networkId, postId: postId);
-      if (_activeCustomNetwork != null && _activeCustomNetwork!.id == networkId) {
+      if (_activeCustomNetwork != null &&
+          _activeCustomNetwork!.id == networkId) {
         _activeCustomNetwork = _activeCustomNetwork!.copyWith(
           pinnedPostId: postId,
           nullifyPinnedPostId: postId == null,
@@ -1231,20 +1310,23 @@ class FeedProvider with ChangeNotifier {
   //  Reactions
   // -------------------------------------------------------
 
-  Future<Map<String, dynamic>?> toggleReaction(String postId, {String reactionType = 'like'}) async {
+  Future<Map<String, dynamic>?> toggleReaction(String postId,
+      {String reactionType = 'like'}) async {
     final vId = _viewerId;
     if (vId == null) return null;
 
     _pendingReactionPostIds.add(postId);
 
     final index = _posts.indexWhere((p) => p.id == postId);
-    FeedPost? oldPost = (index != -1 ? _posts[index] : null) ?? _postRegistry[postId];
+    FeedPost? oldPost =
+        (index != -1 ? _posts[index] : null) ?? _postRegistry[postId];
     if (oldPost != null) {
       final String? effectiveNetworkId = oldPost.networkId ??
           (index != -1 ? _posts[index].networkId : null) ??
           _activeCustomNetwork?.id;
       final String? oldUserReaction = oldPost.userReaction;
-      final Map<String, int> newCounts = Map<String, int>.from(oldPost.reactionCounts);
+      final Map<String, int> newCounts =
+          Map<String, int>.from(oldPost.reactionCounts);
 
       String? newUserReaction;
       if (oldUserReaction == reactionType) {
@@ -1301,7 +1383,8 @@ class FeedProvider with ChangeNotifier {
         });
       }
 
-      final existing = (index != -1 ? _posts[index] : null) ?? _postRegistry[postId];
+      final existing =
+          (index != -1 ? _posts[index] : null) ?? _postRegistry[postId];
       if (existing != null) {
         final String? effectiveNetworkId = existing.networkId ??
             (index != -1 ? _posts[index].networkId : null) ??
@@ -1343,15 +1426,18 @@ class FeedProvider with ChangeNotifier {
   // -------------------------------------------------------
 
   Future<List<FeedPost>> fetchThread(String rootPostId) async {
-    final threadPosts = await _repository.getThread(rootPostId: rootPostId, viewerId: _viewerId);
+    final threadPosts = await _repository.getThread(
+        rootPostId: rootPostId, viewerId: _viewerId);
     registerPosts(threadPosts);
     return threadPosts;
   }
 
-  Future<List<Map<String, dynamic>>> fetchMutualConnections(int targetId) async {
+  Future<List<Map<String, dynamic>>> fetchMutualConnections(
+      int targetId) async {
     final vId = _viewerId;
     if (vId == null) return [];
-    return await _repository.getMutualConnections(viewerId: vId, targetId: targetId);
+    return await _repository.getMutualConnections(
+        viewerId: vId, targetId: targetId);
   }
 
   // -------------------------------------------------------
@@ -1360,7 +1446,8 @@ class FeedProvider with ChangeNotifier {
 
   void _subscribeToRealtime() {
     if (_realtimeChannel != null) {
-      debugPrint("[REALTIME_SIGNAL: PROVIDER] Channel already exists, skipping duplicate subscription");
+      debugPrint(
+          "[REALTIME_SIGNAL: PROVIDER] Channel already exists, skipping duplicate subscription");
       return;
     }
     final vId = _viewerId;
@@ -1369,7 +1456,8 @@ class FeedProvider with ChangeNotifier {
     _realtimeChannel = _repository.subscribeToPosts(
       onChange: (payload) => _handleRealtimeEvent(payload),
       onStatusChange: (status, error) {
-        debugPrint("[REALTIME_SIGNAL: PROVIDER] Channel status: $status, error: $error");
+        debugPrint(
+            "[REALTIME_SIGNAL: PROVIDER] Channel status: $status, error: $error");
         if (status == RealtimeSubscribeStatus.subscribed) {
           _reconcileReactions();
         } else if (status == RealtimeSubscribeStatus.closed ||
@@ -1378,7 +1466,8 @@ class FeedProvider with ChangeNotifier {
         }
       },
     );
-    debugPrint("[REALTIME_SIGNAL: PROVIDER] Realtime channel subscribe requested");
+    debugPrint(
+        "[REALTIME_SIGNAL: PROVIDER] Realtime channel subscribe requested");
   }
 
   Future<void> _reconcileReactions() async {
@@ -1410,7 +1499,8 @@ class FeedProvider with ChangeNotifier {
             final Map<String, int> reactionCounts = {};
             if (summary['reaction_counts'] is Map) {
               (summary['reaction_counts'] as Map).forEach((k, v) {
-                final c = v is int ? v : (int.tryParse(v?.toString() ?? '') ?? 0);
+                final c =
+                    v is int ? v : (int.tryParse(v?.toString() ?? '') ?? 0);
                 if (c > 0) reactionCounts[k.toString()] = c;
               });
             }
@@ -1431,7 +1521,8 @@ class FeedProvider with ChangeNotifier {
 
       if (hasChanges) {
         notifyListeners();
-        debugPrint("[FeedProvider] Reconciled reactions for ${_posts.length} posts");
+        debugPrint(
+            "[FeedProvider] Reconciled reactions for ${_posts.length} posts");
       }
     } catch (e) {
       debugPrint("[FeedProvider] Error reconciling reactions: $e");
@@ -1492,7 +1583,9 @@ class FeedProvider with ChangeNotifier {
         if (pinnedPostId != null && vId != null) {
           final exists = _posts.any((p) => p.id == pinnedPostId);
           if (!exists) {
-            _repository.getPostById(postId: pinnedPostId, viewerId: vId).then((p) {
+            _repository
+                .getPostById(postId: pinnedPostId, viewerId: vId)
+                .then((p) {
               if (p != null && !p.isDeleted) {
                 _posts.insert(0, p);
                 registerPost(p);
@@ -1582,7 +1675,8 @@ class FeedProvider with ChangeNotifier {
         }
 
         // Update direct parent reply in registry
-        if (replyToPostId != rootPostId && _postRegistry.containsKey(replyToPostId)) {
+        if (replyToPostId != rootPostId &&
+            _postRegistry.containsKey(replyToPostId)) {
           final old = _postRegistry[replyToPostId]!;
           _postRegistry[replyToPostId] = old.copyWith(
             replyCount: old.replyCount + 1,
@@ -1628,15 +1722,20 @@ class FeedProvider with ChangeNotifier {
       _posts.removeAt(index);
       notifyListeners();
     } else {
-      final String? rootPostId = (oldRecord['root_post_id'] ?? newRecord['root_post_id'])?.toString();
-      final String? replyToPostId = (oldRecord['reply_to_post_id'] ?? newRecord['reply_to_post_id'])?.toString();
+      final String? rootPostId =
+          (oldRecord['root_post_id'] ?? newRecord['root_post_id'])?.toString();
+      final String? replyToPostId =
+          (oldRecord['reply_to_post_id'] ?? newRecord['reply_to_post_id'])
+              ?.toString();
 
       if (rootPostId != null && rootPostId != postId) {
         final rootIndex = _posts.indexWhere((p) => p.id == rootPostId);
         if (rootIndex != -1) {
           final currentActive = _posts[rootIndex].activeReplyCount;
           _posts[rootIndex] = _posts[rootIndex].copyWith(
-            replyCount: _posts[rootIndex].replyCount > 0 ? _posts[rootIndex].replyCount - 1 : 0,
+            replyCount: _posts[rootIndex].replyCount > 0
+                ? _posts[rootIndex].replyCount - 1
+                : 0,
             activeReplyCount: currentActive > 0 ? currentActive - 1 : 0,
           );
         }
@@ -1644,16 +1743,20 @@ class FeedProvider with ChangeNotifier {
           final old = _postRegistry[rootPostId]!;
           _postRegistry[rootPostId] = old.copyWith(
             replyCount: old.replyCount > 0 ? old.replyCount - 1 : 0,
-            activeReplyCount: old.activeReplyCount > 0 ? old.activeReplyCount - 1 : 0,
+            activeReplyCount:
+                old.activeReplyCount > 0 ? old.activeReplyCount - 1 : 0,
           );
         }
       }
 
-      if (replyToPostId != null && replyToPostId != rootPostId && _postRegistry.containsKey(replyToPostId)) {
+      if (replyToPostId != null &&
+          replyToPostId != rootPostId &&
+          _postRegistry.containsKey(replyToPostId)) {
         final old = _postRegistry[replyToPostId]!;
         _postRegistry[replyToPostId] = old.copyWith(
           replyCount: old.replyCount > 0 ? old.replyCount - 1 : 0,
-          activeReplyCount: old.activeReplyCount > 0 ? old.activeReplyCount - 1 : 0,
+          activeReplyCount:
+              old.activeReplyCount > 0 ? old.activeReplyCount - 1 : 0,
         );
       }
 
@@ -1672,7 +1775,8 @@ class FeedProvider with ChangeNotifier {
 
     // Skip updating local state if this device is mid-flight with an optimistic tap
     if (_pendingReactionPostIds.contains(postId)) {
-      debugPrint('[REALTIME_SIGNAL: PROVIDER] Skipping realtime update for in-flight pending post $postId');
+      debugPrint(
+          '[REALTIME_SIGNAL: PROVIDER] Skipping realtime update for in-flight pending post $postId');
       return;
     }
 
@@ -1697,14 +1801,18 @@ class FeedProvider with ChangeNotifier {
           if (_postRegistry.containsKey(rootPostId)) {
             final old = _postRegistry[rootPostId]!;
             _postRegistry[rootPostId] = old.copyWith(
-              activeReplyCount: old.activeReplyCount > 0 ? old.activeReplyCount - 1 : 0,
+              activeReplyCount:
+                  old.activeReplyCount > 0 ? old.activeReplyCount - 1 : 0,
             );
           }
         }
-        if (replyToPostId != null && replyToPostId != rootPostId && _postRegistry.containsKey(replyToPostId)) {
+        if (replyToPostId != null &&
+            replyToPostId != rootPostId &&
+            _postRegistry.containsKey(replyToPostId)) {
           final old = _postRegistry[replyToPostId]!;
           _postRegistry[replyToPostId] = old.copyWith(
-            activeReplyCount: old.activeReplyCount > 0 ? old.activeReplyCount - 1 : 0,
+            activeReplyCount:
+                old.activeReplyCount > 0 ? old.activeReplyCount - 1 : 0,
           );
         }
         notifyListeners();
@@ -1716,7 +1824,9 @@ class FeedProvider with ChangeNotifier {
     final Map<String, int> updatedCounts = {};
     if (rawCounts is Map) {
       rawCounts.forEach((key, val) {
-        final c = (val is num) ? val.toInt() : (int.tryParse(val?.toString() ?? '') ?? 0);
+        final c = (val is num)
+            ? val.toInt()
+            : (int.tryParse(val?.toString() ?? '') ?? 0);
         if (c > 0) updatedCounts[key.toString()] = c;
       });
     }
@@ -1736,13 +1846,15 @@ class FeedProvider with ChangeNotifier {
           newRecord['network_id']?.toString() ??
           _activeCustomNetwork?.id;
       _postRegistry[postId] = old.copyWith(
-        reactionCounts: updatedCounts.isNotEmpty ? updatedCounts : old.reactionCounts,
+        reactionCounts:
+            updatedCounts.isNotEmpty ? updatedCounts : old.reactionCounts,
         replyCount: replyCount ?? old.replyCount,
         activeReplyCount: replyCount ?? old.activeReplyCount,
         networkId: postNetworkId,
       );
       changed = true;
-      debugPrint('[REALTIME_SIGNAL: PROVIDER] Updated _postRegistry[$postId] with reactionCounts: $updatedCounts, replyCount: $replyCount');
+      debugPrint(
+          '[REALTIME_SIGNAL: PROVIDER] Updated _postRegistry[$postId] with reactionCounts: $updatedCounts, replyCount: $replyCount');
     }
 
     // 2. Update _posts list
@@ -1751,20 +1863,25 @@ class FeedProvider with ChangeNotifier {
           newRecord['network_id']?.toString() ??
           _activeCustomNetwork?.id;
       _posts[index] = _posts[index].copyWith(
-        reactionCounts: updatedCounts.isNotEmpty ? updatedCounts : _posts[index].reactionCounts,
+        reactionCounts: updatedCounts.isNotEmpty
+            ? updatedCounts
+            : _posts[index].reactionCounts,
         replyCount: replyCount ?? _posts[index].replyCount,
         activeReplyCount: replyCount ?? _posts[index].activeReplyCount,
         networkId: postNetworkId,
       );
       changed = true;
-      debugPrint('[REALTIME_SIGNAL: PROVIDER] Updated _posts[$index] for post $postId with reactionCounts: $updatedCounts, replyCount: $replyCount');
+      debugPrint(
+          '[REALTIME_SIGNAL: PROVIDER] Updated _posts[$index] for post $postId with reactionCounts: $updatedCounts, replyCount: $replyCount');
     }
 
     if (changed) {
       notifyListeners();
-      debugPrint('[REALTIME_SIGNAL: PROVIDER] ✅ Successfully applied posts UPDATE to post $postId (counts: $updatedCounts) -> notifyListeners() called');
+      debugPrint(
+          '[REALTIME_SIGNAL: PROVIDER] ✅ Successfully applied posts UPDATE to post $postId (counts: $updatedCounts) -> notifyListeners() called');
     } else {
-      debugPrint('[REALTIME_SIGNAL: PROVIDER] ⚠️ Received posts UPDATE for $postId, but post was not in registry or feed list');
+      debugPrint(
+          '[REALTIME_SIGNAL: PROVIDER] ⚠️ Received posts UPDATE for $postId, but post was not in registry or feed list');
     }
   }
 
@@ -1774,21 +1891,23 @@ class FeedProvider with ChangeNotifier {
     required Map<String, dynamic> oldRecord,
     int? viewerId,
   }) {
-    final String postId =
-        newRecord['post_id']?.toString() ?? oldRecord['post_id']?.toString() ?? '';
+    final String postId = newRecord['post_id']?.toString() ??
+        oldRecord['post_id']?.toString() ??
+        '';
     final int? eventUserId = newRecord['user_id'] is int
         ? newRecord['user_id'] as int
         : int.tryParse(newRecord['user_id']?.toString() ??
             oldRecord['user_id']?.toString() ??
             '');
-    final String? reactionType =
-        newRecord['reaction_type']?.toString() ?? oldRecord['reaction_type']?.toString();
+    final String? reactionType = newRecord['reaction_type']?.toString() ??
+        oldRecord['reaction_type']?.toString();
 
     debugPrint(
         '[REALTIME_SIGNAL: PROVIDER] Processing post_reactions delta: postId=$postId, eventUserId=$eventUserId, type=$reactionType, event=$eventType');
 
     if (postId.isEmpty) {
-      debugPrint('[REALTIME_SIGNAL: PROVIDER] ⚠️ Reaction event dropped: postId is empty');
+      debugPrint(
+          '[REALTIME_SIGNAL: PROVIDER] ⚠️ Reaction event dropped: postId is empty');
       return;
     }
 
@@ -1801,7 +1920,8 @@ class FeedProvider with ChangeNotifier {
 
     // 1. Update Registry (handles root posts + nested replies)
     final postIndex = _posts.indexWhere((p) => p.id == postId);
-    final existingPost = (postIndex != -1 ? _posts[postIndex] : null) ?? _postRegistry[postId];
+    final existingPost =
+        (postIndex != -1 ? _posts[postIndex] : null) ?? _postRegistry[postId];
     if (existingPost != null) {
       final updatedPost = applyReactionDelta(
         existingPost,
@@ -1838,7 +1958,8 @@ class FeedProvider with ChangeNotifier {
     required int viewerId,
   }) {
     final event = eventType.toLowerCase();
-    debugPrint("[FeedProvider] Realtime blocked_users event: $event, new: $newRecord, old: $oldRecord");
+    debugPrint(
+        "[FeedProvider] Realtime blocked_users event: $event, new: $newRecord, old: $oldRecord");
 
     if (event == 'insert') {
       final blockerId = newRecord['blocker_id'] is int
@@ -1862,7 +1983,8 @@ class FeedProvider with ChangeNotifier {
           : int.tryParse(oldRecord['blocked_id']?.toString() ?? '');
 
       if (blockerId == null || blockerId == viewerId || blockedId == viewerId) {
-        debugPrint("[FeedProvider] User unblocked in realtime. Silently refreshing feed...");
+        debugPrint(
+            "[FeedProvider] User unblocked in realtime. Silently refreshing feed...");
         fetchInitialFeed(silent: true);
       }
     }
@@ -1875,17 +1997,23 @@ class FeedProvider with ChangeNotifier {
     required int viewerId,
   }) {
     final event = eventType.toLowerCase();
-    debugPrint("[FeedProvider] Realtime user_connections event: $event, new: $newRecord, old: $oldRecord");
+    debugPrint(
+        "[FeedProvider] Realtime user_connections event: $event, new: $newRecord, old: $oldRecord");
 
     final int? u1 = (newRecord['user_id_1'] ?? oldRecord['user_id_1']) is int
         ? (newRecord['user_id_1'] ?? oldRecord['user_id_1']) as int
-        : int.tryParse((newRecord['user_id_1'] ?? oldRecord['user_id_1'])?.toString() ?? '');
+        : int.tryParse(
+            (newRecord['user_id_1'] ?? oldRecord['user_id_1'])?.toString() ??
+                '');
     final int? u2 = (newRecord['user_id_2'] ?? oldRecord['user_id_2']) is int
         ? (newRecord['user_id_2'] ?? oldRecord['user_id_2']) as int
-        : int.tryParse((newRecord['user_id_2'] ?? oldRecord['user_id_2'])?.toString() ?? '');
+        : int.tryParse(
+            (newRecord['user_id_2'] ?? oldRecord['user_id_2'])?.toString() ??
+                '');
 
     // If connection involves the current user or their extended network, silently refresh the feed
-    debugPrint("[FeedProvider] Connection changed ($event: u1=$u1, u2=$u2, viewer=$viewerId). Refreshing feed...");
+    debugPrint(
+        "[FeedProvider] Connection changed ($event: u1=$u1, u2=$u2, viewer=$viewerId). Refreshing feed...");
     fetchInitialFeed(silent: true);
   }
 
@@ -1918,10 +2046,13 @@ class FeedProvider with ChangeNotifier {
         );
         if (topPosts.isNotEmpty) {
           final newestId = topPosts.first.id;
-          if (_posts.isNotEmpty && _posts.first.id != newestId && !_posts.any((p) => p.id == newestId)) {
+          if (_posts.isNotEmpty &&
+              _posts.first.id != newestId &&
+              !_posts.any((p) => p.id == newestId)) {
             _hasNewPosts = true;
             notifyListeners();
-            debugPrint("[FeedProvider] Poll detected new post in custom network: $newestId");
+            debugPrint(
+                "[FeedProvider] Poll detected new post in custom network: $newestId");
           }
         }
         return;

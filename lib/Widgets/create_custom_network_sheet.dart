@@ -349,7 +349,7 @@ class _CreateCustomNetworkSheetState extends State<CreateCustomNetworkSheet> {
                     ),
                     const SizedBox(height: 22),
 
-                    // Section: Mafia-style Direct Member Addition (No enclosing background container)
+                    // Section: Direct Member Addition (No enclosing background container)
                     if (myConnections.isNotEmpty) ...[
                       _buildSectionHeader(
                         'ADD CONNECTIONS (${_selectedMemberIds.length})',

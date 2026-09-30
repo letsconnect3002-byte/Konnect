@@ -175,8 +175,6 @@ class ChatProvider with ChangeNotifier {
   final Map<String, RealtimeChannel> _roomSubscriptions = {};
 
   int totalUnreadCount = 0;
-  int casualUnreadCount = 0;
-  int professionalUnreadCount = 0;
 
   Map<int, String> _lastKnownRooms = {};
 
@@ -1066,38 +1064,6 @@ class ChatProvider with ChangeNotifier {
 
       totalUnreadCount = await _repository.getTotalUnreadCountLocally(myUserId);
 
-      final roomResults =
-          await _repository.getRoomUnreadCountsLocally(myUserId);
-
-      final Map<String, int> roomUnreadMap = {
-        for (final row in roomResults)
-          row['room_id'] as String: int.tryParse(row['count'].toString()) ?? 0
-      };
-
-      int casualCount = 0;
-      int professionalCount = 0;
-
-      for (final connection in _externalConnections) {
-        final int connId = connection['id'] as int;
-        final String? rId = connectionRooms[connId];
-        if (rId != null && roomUnreadMap.containsKey(rId)) {
-          final int count = roomUnreadMap[rId]!;
-          final sharedCard =
-              (connection['my_shared_card'] ?? 'both').toString().toLowerCase();
-
-          if (sharedCard == 'casual') {
-            casualCount += count;
-          } else if (sharedCard == 'professional') {
-            professionalCount += count;
-          } else {
-            casualCount += count;
-            professionalCount += count;
-          }
-        }
-      }
-
-      casualUnreadCount = casualCount;
-      professionalUnreadCount = professionalCount;
 
       notifyListeners();
     } catch (e) {
@@ -1132,46 +1098,10 @@ class ChatProvider with ChangeNotifier {
     final myUserId = _userId;
     if (myUserId == null) {
       totalUnreadCount = 0;
-      casualUnreadCount = 0;
-      professionalUnreadCount = 0;
       return;
     }
     try {
       totalUnreadCount = await _repository.getTotalUnreadCountLocally(myUserId);
-
-      final roomResults =
-          await _repository.getRoomUnreadCountsLocally(myUserId);
-
-      final Map<String, int> roomUnreadMap = {
-        for (final row in roomResults)
-          row['room_id'] as String: int.tryParse(row['count'].toString()) ?? 0
-      };
-
-      int casualCount = 0;
-      int professionalCount = 0;
-
-      for (final connection in _externalConnections) {
-        final int connId = connection['id'] as int;
-        final String? rId = connectionRooms[connId];
-        if (rId != null && roomUnreadMap.containsKey(rId)) {
-          final int count = roomUnreadMap[rId]!;
-
-          final sharedCard =
-              (connection['my_shared_card'] ?? 'both').toString().toLowerCase();
-
-          if (sharedCard == 'casual') {
-            casualCount += count;
-          } else if (sharedCard == 'professional') {
-            professionalCount += count;
-          } else {
-            casualCount += count;
-            professionalCount += count;
-          }
-        }
-      }
-
-      casualUnreadCount = casualCount;
-      professionalUnreadCount = professionalCount;
 
       notifyListeners();
     } catch (e) {

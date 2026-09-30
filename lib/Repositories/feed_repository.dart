@@ -155,7 +155,7 @@ class SupabaseFeedRepository implements FeedRepository {
         if (mainTargetPost != null) {
           final rawReplies = await _client
               .from('posts')
-              .select('*, profiles!author_id(name, avatar_url)')
+              .select('*, profiles!author_id(name, avatar_url, profession)')
               .or('root_post_id.eq.$rootPostId,reply_to_post_id.eq.$rootPostId')
               .order('created_at', ascending: true);
 
@@ -182,6 +182,7 @@ class SupabaseFeedRepository implements FeedRepository {
                 isDeleted: row['is_deleted'] == true,
                 replyToPostId: row['reply_to_post_id']?.toString(),
                 networkId: row['network_id']?.toString(),
+                authorProfession: profile?['profession']?.toString(),
               ));
             }
           }
@@ -311,7 +312,7 @@ class SupabaseFeedRepository implements FeedRepository {
     // Fetch author profile details
     final profileRes = await _client
         .from('profiles')
-        .select('name, avatar_url, anon_name')
+        .select('name, avatar_url, anon_name, profession')
         .eq('id', authorId)
         .maybeSingle();
 
@@ -321,6 +322,8 @@ class SupabaseFeedRepository implements FeedRepository {
         : (profileRes?['name']?.toString() ?? 'User');
     final String authorAvatarUrl =
         anon ? '' : (profileRes?['avatar_url']?.toString() ?? '');
+    final String? authorProfession =
+        anon ? null : profileRes?['profession']?.toString();
 
     return FeedPost(
       id: row['id'].toString(),
@@ -339,6 +342,7 @@ class SupabaseFeedRepository implements FeedRepository {
       isAnonymous: anon,
       networkId: row['network_id']?.toString() ?? networkId,
       feedScope: row['feed_scope']?.toString() ?? feedScope,
+      authorProfession: authorProfession,
     );
   }
 
@@ -353,7 +357,7 @@ class SupabaseFeedRepository implements FeedRepository {
     try {
       var query = _client
           .from('posts')
-          .select('*, profiles:author_id(name, avatar_url, anon_name)')
+          .select('*, profiles:author_id(name, avatar_url, anon_name, profession)')
           .eq('network_id', networkId)
           .isFilter('reply_to_post_id', null)
           .eq('is_deleted', false);
@@ -374,6 +378,7 @@ class SupabaseFeedRepository implements FeedRepository {
             ? (profile?['anon_name']?.toString() ?? 'Anonymous')
             : (profile?['name']?.toString() ?? 'User');
         final String authorAvatarUrl = anon ? '' : (profile?['avatar_url']?.toString() ?? '');
+        final String? authorProfession = anon ? null : profile?['profession']?.toString();
 
         // Fetch user reaction if exists
         final userReactionRes = await _client
@@ -403,6 +408,7 @@ class SupabaseFeedRepository implements FeedRepository {
           visibility: row['visibility']?.toString() ?? 'both',
           isAnonymous: anon,
           networkId: row['network_id']?.toString() ?? networkId,
+          authorProfession: authorProfession,
         ));
       }
       return posts;
@@ -714,7 +720,7 @@ class SupabaseFeedRepository implements FeedRepository {
     try {
       final response = await _client
           .from('posts')
-          .select('*, profiles!author_id(name, avatar_url, anon_name)')
+          .select('*, profiles!author_id(name, avatar_url, anon_name, profession)')
           .eq('id', postId)
           .maybeSingle();
 
@@ -786,6 +792,7 @@ class SupabaseFeedRepository implements FeedRepository {
         isAnonymous: isAnon,
         networkId: response['network_id']?.toString(),
         feedScope: response['feed_scope']?.toString(),
+        authorProfession: isAnon ? null : profile?['profession']?.toString(),
       );
     } catch (e) {
       return null;

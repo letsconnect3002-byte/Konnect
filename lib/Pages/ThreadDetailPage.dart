@@ -12,6 +12,12 @@ import 'package:connect/Widgets/post_card.dart';
 import 'package:connect/Widgets/threaded_comment_tree.dart';
 import 'package:connect/services/analytics_service.dart';
 import 'package:connect/Widgets/anonymous_avatar.dart';
+import 'package:connect/Widgets/discord_network_view_toggle.dart';
+import 'package:connect/Widgets/user_profile_modal.dart';
+import 'package:connect/Widgets/link_preview_card.dart';
+import 'package:connect/Providers/notification_provider.dart';
+import 'package:connect/Widgets/referral_intro_sheet.dart';
+import 'package:connect/Widgets/direct_connection_sheet.dart';
 
 class _MentionTextEditingController extends TextEditingController {
   Color accentColor;
@@ -92,12 +98,16 @@ class ThreadDetailPage extends StatefulWidget {
   /// If provided, isolates this post as the head of an independent sub-thread.
   final String? independentPostId;
 
+  /// True if pushed from another ThreadDetailPage
+  final bool openedFromThread;
+
   const ThreadDetailPage({
     super.key,
     required this.rootPostId,
     this.highlightPostId,
     this.focusReplyToPostId,
     this.independentPostId,
+    this.openedFromThread = false,
   });
 
   @override
@@ -138,7 +148,7 @@ class _ThreadDetailPageState extends State<ThreadDetailPage> {
     _replyController.addListener(() {
       if (mounted) setState(() {});
     });
-    _highlightedPostId = widget.highlightPostId;
+    _highlightedPostId = null;
     _loadThread();
     _subscribeToThreadRealtime();
     AnalyticsService.logEvent(
@@ -488,27 +498,20 @@ class _ThreadDetailPageState extends State<ThreadDetailPage> {
           }
         });
 
-        // If a target post highlight is requested, scroll to it & fade highlight after 3.0s
-        final targetId = _highlightedPostId;
+        // If a target post highlight is requested, scroll to it & subtly fade highlight
+        final targetId = widget.highlightPostId;
         if (targetId != null && targetId.isNotEmpty) {
-          _highlightTimer?.cancel();
-          _highlightTimer = Timer(const Duration(milliseconds: 3000), () {
-            if (mounted) {
-              setState(() {
-                _highlightedPostId = null;
-              });
-            }
-          });
-
-          if (targetId != _threadPosts.first.id) {
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              _scrollToHighlightedPost(targetId);
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            Future.delayed(const Duration(milliseconds: 150), () {
+              if (mounted) {
+                _scrollToHighlightedPost(targetId);
+              }
             });
-          }
+          });
         }
 
         // Align focused reply post at the top so parent posts are revealed when pulling down / scrolling up
-        if (!_hasScrolledToFocusedPost && _parentPosts.isNotEmpty && (_highlightedPostId == null || _highlightedPostId == _threadPosts.first.id)) {
+        if (!_hasScrolledToFocusedPost && _parentPosts.isNotEmpty && widget.highlightPostId == null) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             _scrollToFocusedPost();
           });
@@ -547,16 +550,34 @@ class _ThreadDetailPageState extends State<ThreadDetailPage> {
   }
 
   void _scrollToHighlightedPost(String targetId, {int retryCount = 0}) {
+    if (retryCount == 0) {
+      HapticFeedback.lightImpact();
+      if (mounted) {
+        setState(() {
+          _highlightedPostId = targetId;
+        });
+
+        _highlightTimer?.cancel();
+        _highlightTimer = Timer(const Duration(milliseconds: 1800), () {
+          if (mounted && _highlightedPostId == targetId) {
+            setState(() {
+              _highlightedPostId = null;
+            });
+          }
+        });
+      }
+    }
+
     final targetKey = _itemKeys[targetId];
     if (targetKey != null && targetKey.currentContext != null) {
       Scrollable.ensureVisible(
         targetKey.currentContext!,
-        duration: const Duration(milliseconds: 600),
+        duration: const Duration(milliseconds: 450),
         curve: Curves.easeOutCubic,
-        alignment: 0.3,
+        alignment: 0.2,
       );
-    } else if (retryCount < 8) {
-      Future.delayed(const Duration(milliseconds: 120), () {
+    } else if (retryCount < 12) {
+      Future.delayed(const Duration(milliseconds: 100), () {
         if (mounted) {
           _scrollToHighlightedPost(targetId, retryCount: retryCount + 1);
         }
@@ -879,502 +900,2117 @@ class _ThreadDetailPageState extends State<ThreadDetailPage> {
       setState(() {});
     }
 
+    final feedProvider = Provider.of<FeedProvider>(context);
+    final viewMode = feedProvider.networkViewMode;
+
     return Scaffold(
       backgroundColor: context.canvasBackground,
       appBar: AppBar(
         backgroundColor: context.canvasBackground,
         elevation: 0,
-        title: Text("Thread", style: TextStyle(color: context.textPrimary, fontWeight: FontWeight.bold, fontSize: 18)),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              "Thread",
+              style: TextStyle(
+                color: context.textPrimary,
+                fontWeight: FontWeight.bold,
+                fontSize: 17,
+              ),
+            ),
+            if (_threadPosts.isNotEmpty)
+              Text(
+                "Started by @${_threadPosts.first.isAnonymous ? 'Anonymous' : _threadPosts.first.authorName}",
+                style: TextStyle(
+                  color: context.textSecondary,
+                  fontSize: 11,
+                  fontWeight: FontWeight.normal,
+                ),
+              ),
+          ],
+        ),
         leading: IconButton(
-          icon: Icon(Icons.arrow_back_ios_new_rounded, color: context.textPrimary, size: 20),
+          icon: Icon(Icons.arrow_back_ios_new_rounded,
+              color: context.textPrimary, size: 20),
           onPressed: () => Navigator.pop(context),
         ),
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 12.0),
+            child: Center(
+              child: DiscordNetworkViewToggle(
+                mode: viewMode,
+                onChanged: (newMode) {
+                  feedProvider.setNetworkViewMode(newMode);
+                  Provider.of<ProfileProvider>(context, listen: false)
+                      .setIsChatView(newMode == NetworkViewMode.messages);
+                  AnalyticsService.logEvent(
+                    name: 'thread_view_mode_changed',
+                    parameters: {'mode': newMode.name},
+                  );
+                },
+              ),
+            ),
+          ),
+        ],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : Column(
-              children: [
-                Expanded(
-                  child: SingleChildScrollView(
-                    controller: _scrollController,
-                    physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // 1. Ancestor Parent Posts connected with thread lines (Twitter/X style)
-                        if (_parentPosts.isNotEmpty) ...[
-                          ..._parentPosts.asMap().entries.map((entry) {
-                            final int idx = entry.key;
-                            final FeedPost parent = entry.value;
-                            final bool showTop = (idx > 0);
-                            final String? repName = _resolveParentAuthorName(parent.replyToPostId);
-
-                            return Container(
-                              key: _itemKeys.putIfAbsent(parent.id, () => GlobalKey()),
-                              child: PostCard(
-                                post: parent,
-                                isThreadView: true,
-                                showTopConnector: showTop,
-                                showBottomConnector: true,
-                                replyToName: repName,
-                                onReactionToggle: _handleReactionToggle,
-                                onTap: () {
-                                  if (parent.id == widget.rootPostId && widget.independentPostId != null) {
-                                    Navigator.pop(context);
-                                  } else {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) => ThreadDetailPage(
-                                          rootPostId: widget.rootPostId,
-                                          independentPostId: parent.id == widget.rootPostId ? null : parent.id,
-                                          focusReplyToPostId: parent.id,
-                                        ),
-                                      ),
-                                    );
-                                  }
-                                },
-                                onCommentTap: () {
-                                  setState(() {
-                                    _replyingToTarget = parent;
-                                  });
-                                  _replyFocusNode.requestFocus();
-                                },
-                              ),
-                            );
-                          }),
-                        ],
-
-                        // 2. Focused Main Post
-                        if (_threadPosts.isNotEmpty) ...[
-                          Builder(builder: (context) {
-                            final rootPost = _threadPosts.first;
-                            final bool isSelected = (_replyingToTarget?.id == rootPost.id);
-                            final bool isHighlighted = (rootPost.id == _highlightedPostId);
-
-                            final rootPostWithActiveCount = FeedPost(
-                              id: rootPost.id,
-                              authorId: rootPost.authorId,
-                              authorName: rootPost.authorName,
-                              authorAvatarUrl: rootPost.authorAvatarUrl,
-                              content: rootPost.content,
-                              createdAt: rootPost.createdAt,
-                              replyCount: activeRepliesCount,
-                              degree: rootPost.degree,
-                              isDeleted: rootPost.isDeleted,
-                              replyToPostId: rootPost.replyToPostId,
-                              userReaction: rootPost.userReaction,
-                              reactionCounts: rootPost.reactionCounts,
-                            );
-
-                            final bool hasParents = _parentPosts.isNotEmpty;
-                            _itemKeys[rootPost.id] = _focusedPostKey;
-
-                            return Container(
-                              key: _focusedPostKey,
-                              child: PostCard(
-                                post: rootPostWithActiveCount,
-                                isThreadView: hasParents,
-                                showTopConnector: hasParents,
-                                showBottomConnector: false,
-                                isSelectedTarget: isSelected,
-                                isHighlighted: isHighlighted,
-                                replyToName: null,
-                                onReactionToggle: _handleReactionToggle,
-                                onTap: () {
-                                  setState(() {
-                                    _replyingToTarget = rootPost;
-                                  });
-                                },
-                                onCommentTap: () {
-                                  setState(() {
-                                    _replyingToTarget = rootPost;
-                                  });
-                                  _replyFocusNode.requestFocus();
-                                },
-                              ),
-                            );
-                          }),
-
-                          Divider(color: Colors.white.withValues(alpha: 0.08), height: 1),
-
-                          // 2. Separate Replies Header
-                          if (activeRepliesCount > 0)
-                            Padding(
-                              padding: const EdgeInsets.only(left: 16, top: 16, bottom: 12),
-                              child: Text(
-                                "Replies ($activeRepliesCount)",
-                                style: TextStyle(
-                                  color: context.textSecondary,
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                        ],
-
-                        // 3. Separate Replies List (ThreadedCommentTree for top-level replies and their children)
-                        if (commentTrees.isNotEmpty)
-                          Column(
-                            children: commentTrees.map((treeNode) {
-                              return Container(
-                                margin: const EdgeInsets.only(bottom: 12.0),
-                                child: ThreadedCommentTree(
-                                  comment: treeNode,
-                                  parentAvatarRadius: 18.0,
-                                  childAvatarRadius: 14.0,
-                                  indentationWidth: 32.0,
-                                  parentLeftPadding: 16.0,
-                                  lineColor: const Color(0xFF3E414D),
-                                  strokeWidth: 1.8,
-                                  curveRadius: 12.0,
-                                  initialExpandPostId: _highlightedPostId,
-                                  itemKeys: _itemKeys,
-                                  allowNestedExpansion: false,
-                                  onReactionToggle: _handleReactionToggle,
-                                  onReplyTap: (node) {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) => ThreadDetailPage(
-                                          rootPostId: widget.rootPostId,
-                                          independentPostId: node.id,
-                                          focusReplyToPostId: node.id,
-                                        ),
-                                      ),
-                                    );
-                                  },
-                                  onCommentTap: (node) {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) => ThreadDetailPage(
-                                          rootPostId: widget.rootPostId,
-                                          independentPostId: node.id,
-                                          focusReplyToPostId: node.id,
-                                        ),
-                                      ),
-                                    );
-                                  },
-                                ),
-                              );
-                            }).toList(),
-                          ),
-                      ],
+          : AnimatedSwitcher(
+              duration: const Duration(milliseconds: 220),
+              switchInCurve: Curves.easeOutCubic,
+              switchOutCurve: Curves.easeInCubic,
+              child: viewMode == NetworkViewMode.messages
+                  ? KeyedSubtree(
+                      key: const ValueKey('thread_chat_view'),
+                      child: _buildThreadChatView(
+                        context,
+                        feedProvider,
+                        mentionSuggestions,
+                        insertMention,
+                      ),
+                    )
+                  : KeyedSubtree(
+                      key: const ValueKey('thread_tree_view'),
+                      child: _buildThreadTreeView(
+                        context,
+                        feedProvider,
+                        commentTrees,
+                        activeRepliesCount,
+                        mentionSuggestions,
+                        insertMention,
+                      ),
                     ),
-                  ),
-                ),
+            ),
+    );
+  }
 
-                // Inline Reply Bar
-                Container(
-                  padding: EdgeInsets.only(
-                    left: 16,
-                    right: 16,
-                    top: 10,
-                    bottom: 10 + MediaQuery.of(context).padding.bottom,
-                  ),
-                  decoration: BoxDecoration(
-                    color: context.surfacePrimary,
-                    border: Border(top: BorderSide(color: Colors.white.withValues(alpha: 0.08))),
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (mentionSuggestions.isNotEmpty) ...[
-                        Container(
-                          constraints: const BoxConstraints(maxHeight: 150),
-                          margin: const EdgeInsets.only(bottom: 8),
-                          child: Material(
-                            color: context.surfaceSecondary,
-                            clipBehavior: Clip.antiAlias,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(14),
-                              side: BorderSide(
-                                  color: context.accentPrimary.withValues(alpha: 0.4)),
-                            ),
-                            child: ListView.separated(
-                              shrinkWrap: true,
-                              padding: const EdgeInsets.symmetric(vertical: 4),
-                              itemCount: mentionSuggestions.length,
-                              separatorBuilder: (_, __) => Divider(
-                                  height: 1,
-                                  color: Colors.white.withValues(alpha: 0.06)),
-                              itemBuilder: (context, idx) {
-                                final conn = mentionSuggestions[idx];
-                                final name = conn['name']?.toString() ?? 'User';
-                                final avatarUrl = conn['avatarUrl']?.toString() ??
-                                    conn['avatar_url']?.toString() ??
-                                    '';
-                                final profession =
-                                    conn['profession']?.toString() ?? '';
+  // ─────────────────────────────────────────────────────────
+  // CHAT UI VIEW (Discord-style linear thread conversation)
+  // ─────────────────────────────────────────────────────────
 
-                                return ListTile(
-                                  dense: true,
-                                  visualDensity: VisualDensity.compact,
-                                  leading: CircleAvatar(
-                                    radius: 14,
-                                    backgroundColor: context.accentPrimary,
-                                    backgroundImage: avatarUrl.isNotEmpty
-                                        ? NetworkImage(avatarUrl)
-                                        : null,
-                                    child: avatarUrl.isEmpty
-                                        ? Text(
-                                            name.isNotEmpty
-                                                ? name[0].toUpperCase()
-                                                : '?',
-                                            style: const TextStyle(
-                                                fontSize: 12, color: Colors.white))
-                                        : null,
-                                  ),
-                                  title: Text(
-                                    name,
-                                    style: TextStyle(
-                                      color: context.textPrimary,
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.bold,
+  Widget _buildThreadChatView(
+    BuildContext context,
+    FeedProvider feedProvider,
+    List<Map<String, dynamic>> mentionSuggestions,
+    void Function(Map<String, dynamic>) insertMention,
+  ) {
+    if (_threadPosts.isEmpty) {
+      return Center(
+        child: Text(
+          "Thread not found",
+          style: TextStyle(color: context.textSecondary),
+        ),
+      );
+    }
+
+    final rootPost = _threadPosts.first;
+    final activeReplies = _threadPosts
+        .sublist(1)
+        .where((p) => !p.isDeleted)
+        .toList();
+    // Sort replies chronologically: oldest to newest
+    activeReplies.sort((a, b) => a.createdAt.compareTo(b.createdAt));
+
+    final bool isAnonAllowed = !(feedProvider.isCustomNetworkActive &&
+        !feedProvider.activeCustomNetwork!.allowAnonymous);
+
+    return Column(
+      children: [
+        // Scrollable Message Timeline
+        Expanded(
+          child: SingleChildScrollView(
+            controller: _scrollController,
+            physics: const AlwaysScrollableScrollPhysics(
+                parent: BouncingScrollPhysics()),
+            padding: const EdgeInsets.fromLTRB(14, 8, 14, 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // 1. Ancestor Parent Strip if this is a sub-thread
+                if (_parentPosts.isNotEmpty) ...[
+                  Builder(
+                    builder: (context) {
+                      final parent = _parentPosts.last;
+                      final urlRegex =
+                          RegExp(r'https?://[^\s]+', caseSensitive: false);
+                      final cleanParentContent =
+                          parent.content.replaceAll(urlRegex, '').trim();
+                      final displayContent = cleanParentContent.isNotEmpty
+                          ? cleanParentContent
+                          : parent.content.trim();
+
+                      return BounceTap(
+                        onTap: () {
+                          HapticFeedback.lightImpact();
+                          if (parent.id == widget.rootPostId &&
+                              widget.independentPostId != null &&
+                              widget.openedFromThread &&
+                              Navigator.canPop(context)) {
+                            Navigator.pop(context, parent.id);
+                          } else {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => ThreadDetailPage(
+                                  rootPostId: widget.rootPostId,
+                                  independentPostId:
+                                      parent.id == widget.rootPostId
+                                          ? null
+                                          : parent.id,
+                                  focusReplyToPostId: parent.id,
+                                  highlightPostId: parent.id,
+                                  openedFromThread: true,
+                                ),
+                              ),
+                            ).then((result) {
+                              if (result is String && mounted) {
+                                Future.delayed(const Duration(milliseconds: 120), () {
+                                  if (mounted) {
+                                    _scrollToHighlightedPost(result);
+                                  }
+                                });
+                              }
+                            });
+                          }
+                        },
+                        child: Container(
+                          margin: const EdgeInsets.only(bottom: 12),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.03),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Icon(Icons.turn_left_rounded,
+                                      size: 15, color: context.accentSecondary),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      "Sub-thread of ${parent.isAnonymous ? 'Anonymous' : (parent.authorName.isNotEmpty ? parent.authorName : 'User')}",
+                                      style: TextStyle(
+                                        color: context.textMuted,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                        fontFamily: 'Inter',
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
                                     ),
                                   ),
-                                  subtitle: profession.isNotEmpty
-                                      ? Text(
-                                          profession,
-                                          style: TextStyle(
-                                              color: context.textMuted,
-                                              fontSize: 11),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                        )
-                                      : null,
-                                  onTap: () => insertMention(conn),
-                                );
-                              },
-                            ),
-                          ),
-                        ),
-                      ],
-                      if (_replyingToTarget != null)
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 6),
-                          child: Row(
-                            children: [
-                              Flexible(
-                                child: Text(
-                                  "Replying to @${_replyingToTarget!.authorName} for \"${_truncateContent(_replyingToTarget!.content, 30)}\"",
-                                  style: TextStyle(color: context.accentSecondary, fontSize: 12, fontWeight: FontWeight.w600),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
+                                ],
+                              ),
+                              if (displayContent.isNotEmpty) ...[
+                                const SizedBox(height: 4),
+                                Padding(
+                                  padding: const EdgeInsets.only(left: 23),
+                                  child: Text(
+                                    displayContent,
+                                    style: TextStyle(
+                                      color: context.textMuted,
+                                      fontSize: 12,
+                                      height: 1.35,
+                                      fontFamily: 'Inter',
+                                    ),
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
                                 ),
-                              ),
-                              const SizedBox(width: 8),
-                              GestureDetector(
-                                onTap: () {
-                                  setState(() {
-                                    _replyingToTarget = _threadPosts.isNotEmpty ? _threadPosts.first : null;
-                                  });
-                                },
-                                child: Icon(Icons.close_rounded, size: 14, color: context.textMuted),
-                              ),
+                              ],
                             ],
                           ),
                         ),
-                      Consumer2<ProfileProvider, FeedProvider>(
-                        builder: (context, profileProvider, feedProvider, _) {
-                          final bool isAnonAllowed = !(feedProvider.isCustomNetworkActive &&
-                              !feedProvider.activeCustomNetwork!.allowAnonymous);
-                          final effectiveAnon = isAnonAllowed && _isAnonymousReply;
-                          final currentName = effectiveAnon
-                              ? (profileProvider.anonName.isNotEmpty
-                                  ? profileProvider.anonName
-                                  : "Anonymous")
-                              : (profileProvider.name.isNotEmpty
-                                  ? profileProvider.name
-                                  : "You");
+                      );
+                    },
+                  ),
+                ],
 
-                          return Container(
-                            margin: const EdgeInsets.only(bottom: 8),
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 10, vertical: 6),
-                            decoration: BoxDecoration(
-                              color: effectiveAnon
-                                  ? context.accentPrimary
-                                      .withValues(alpha: 0.12)
-                                  : context.surfaceSecondary,
-                              borderRadius: BorderRadius.circular(10),
-                              border: Border.all(
-                                color: effectiveAnon
-                                    ? context.accentPrimary
-                                        .withValues(alpha: 0.4)
-                                    : Colors.white.withValues(alpha: 0.06),
-                                width: 0.8,
-                              ),
-                            ),
-                            child: Row(
-                              children: [
-                                effectiveAnon
-                                    ? AnonymousAvatar(
-                                        seed: (profileProvider.userId ?? 0)
-                                            .toString(),
-                                        radius: 12,
-                                      )
-                                    : CircleAvatar(
-                                        radius: 12,
-                                        backgroundColor:
-                                            context.surfaceSecondary,
-                                        backgroundImage: profileProvider
-                                                .avatarUrl.isNotEmpty
-                                            ? NetworkImage(
-                                                profileProvider.avatarUrl)
-                                            : null,
-                                        child: profileProvider.avatarUrl.isEmpty
-                                            ? Text(
-                                                profileProvider.name.isNotEmpty
-                                                    ? profileProvider.name[0]
-                                                        .toUpperCase()
-                                                    : '?',
-                                                style: const TextStyle(
-                                                    fontSize: 10,
-                                                    fontWeight: FontWeight.bold,
-                                                    color: Colors.white),
-                                              )
-                                            : null,
-                                      ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: RichText(
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    text: TextSpan(
-                                      style: TextStyle(
-                                          color: context.textMuted,
-                                          fontSize: 12),
-                                      children: [
-                                        const TextSpan(text: "Replying as "),
-                                        TextSpan(
-                                          text: currentName,
-                                          style: TextStyle(
-                                            color: effectiveAnon
-                                                ? context.accentSecondary
-                                                : context.textPrimary,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                        TextSpan(
-                                          text: effectiveAnon
-                                              ? " • Anonymous"
-                                              : (isAnonAllowed ? " • Real Profile" : " • Real Identity Only"),
-                                          style: TextStyle(
-                                            color: effectiveAnon
-                                                ? context.accentSecondary
-                                                    .withValues(alpha: 0.8)
-                                                : context.textMuted,
-                                            fontSize: 11,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                                if (isAnonAllowed)
-                                  InkWell(
-                                    onTap: () {
-                                      HapticFeedback.selectionClick();
-                                      setState(() {
-                                        _isAnonymousReply = !_isAnonymousReply;
-                                      });
-                                    },
-                                    borderRadius: BorderRadius.circular(8),
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 8, vertical: 4),
-                                      decoration: BoxDecoration(
-                                        color: effectiveAnon
-                                            ? context.accentPrimary
-                                                .withValues(alpha: 0.25)
-                                            : Colors.white.withValues(alpha: 0.08),
-                                        borderRadius: BorderRadius.circular(8),
-                                        border: Border.all(
-                                          color: effectiveAnon
-                                              ? context.accentPrimary
-                                                  .withValues(alpha: 0.4)
-                                              : Colors.white
-                                                  .withValues(alpha: 0.1),
-                                          width: 0.6,
-                                        ),
-                                      ),
-                                      child: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Icon(
-                                            effectiveAnon
-                                                ? Icons.visibility_off_rounded
-                                                : Icons.person_rounded,
-                                            size: 13,
-                                            color: effectiveAnon
-                                                ? context.accentSecondary
-                                                : context.textPrimary,
-                                          ),
-                                          const SizedBox(width: 4),
-                                          Text(
-                                            effectiveAnon
-                                                ? "Go Real Profile"
-                                                : "Go Anonymous",
-                                            style: TextStyle(
-                                              color: effectiveAnon
-                                                  ? context.accentSecondary
-                                                  : context.textPrimary,
-                                              fontSize: 11,
-                                              fontWeight: FontWeight.w600,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                              ],
-                            ),
-                          );
-                        },
+                // 2. Thread Topic Card (Original Post Starter)
+                _buildThreadTopicCard(context, rootPost),
+
+                // 3. Conversation Divider
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Container(
+                          height: 1,
+                          color: Colors.white.withValues(alpha: 0.08),
+                        ),
                       ),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: TextField(
-                              controller: _replyController,
-                              focusNode: _replyFocusNode,
-                              maxLines: null,
-                              maxLength: 500,
-                              style: TextStyle(color: context.textPrimary, fontSize: 14),
-                              decoration: InputDecoration(
-                                hintText: _isAnonymousReply
-                                    ? "Post anonymous reply..."
-                                    : "Post your reply... Use @ to mention",
-                                hintStyle: TextStyle(color: context.textMuted, fontSize: 13),
-                                counterText: "",
-                                border: InputBorder.none,
-                              ),
-                            ),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        child: Text(
+                          activeReplies.isEmpty
+                              ? "NO REPLIES YET"
+                              : "${activeReplies.length} ${activeReplies.length == 1 ? 'REPLY' : 'REPLIES'}",
+                          style: TextStyle(
+                            color: context.textSecondary.withValues(alpha: 0.7),
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 0.8,
+                            fontFamily: 'Inter',
                           ),
-                          const SizedBox(width: 8),
-                          ValueListenableBuilder<TextEditingValue>(
-                            valueListenable: _replyController,
-                            builder: (context, value, child) {
-                              final textLength = value.text.trim().length;
-                              final isValid = textLength > 0 && textLength <= 500 && !_isSubmitting;
-
-                              return IconButton(
-                                icon: _isSubmitting
-                                     ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                                     : Icon(Icons.send_rounded, color: isValid ? Colors.white : context.textMuted),
-                                onPressed: isValid ? _submitReply : null,
-                              );
-                            },
-                          ),
-                        ],
+                        ),
+                      ),
+                      Expanded(
+                        child: Container(
+                          height: 1,
+                          color: Colors.white.withValues(alpha: 0.08),
+                        ),
                       ),
                     ],
                   ),
                 ),
+
+                // 4. Thread Replies List or Empty State
+                if (activeReplies.isEmpty) ...[
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 24, vertical: 32),
+                    child: Column(
+                      children: [
+                        Container(
+                          width: 56,
+                          height: 56,
+                          decoration: BoxDecoration(
+                            color: context.accentPrimary.withValues(alpha: 0.12),
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: context.accentPrimary.withValues(alpha: 0.25),
+                              width: 1,
+                            ),
+                          ),
+                          child: Icon(
+                            Icons.chat_bubble_outline_rounded,
+                            size: 26,
+                            color: context.accentPrimary,
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+                        Text(
+                          "Start the conversation!",
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            fontFamily: 'Inter',
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          "Send a message below to join the discussion.",
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: context.textSecondary,
+                            fontSize: 13,
+                            height: 1.35,
+                            fontFamily: 'Inter',
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ] else ...[
+                  ...activeReplies.map((reply) {
+                    return _buildThreadChatMessageTile(context, reply, rootPost);
+                  }),
+                ],
               ],
             ),
+          ),
+        ),
+
+        // 5. Pinned Bottom Chat Composer
+        _buildThreadChatBottomComposer(
+          context,
+          rootPost,
+          isAnonAllowed,
+          mentionSuggestions,
+          insertMention,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildThreadTopicCard(BuildContext context, FeedPost rootPost) {
+    final urlRegex = RegExp(r'https?://[^\s]+', caseSensitive: false);
+    final match = urlRegex.firstMatch(rootPost.content);
+    final String? attachedUrl = match?.group(0);
+    final String cleanContent = attachedUrl != null
+        ? rootPost.content.replaceAll(urlRegex, '').trim()
+        : rootPost.content.trim();
+    final bool isHighlighted = _highlightedPostId == rootPost.id;
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 350),
+      curve: Curves.easeOutCubic,
+      key: _itemKeys.putIfAbsent(rootPost.id, () => GlobalKey()),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+      decoration: BoxDecoration(
+        color: isHighlighted
+            ? Colors.white.withValues(alpha: 0.09)
+            : Colors.transparent,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isHighlighted
+              ? Colors.white.withValues(alpha: 0.22)
+              : Colors.transparent,
+          width: 1.0,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Author Info & Time
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              GestureDetector(
+                onTap: () => _openUserProfile(context, rootPost),
+                child: rootPost.isAnonymous
+                    ? AnonymousAvatar(
+                        seed: rootPost.authorId.toString(),
+                        radius: 19,
+                      )
+                    : Container(
+                        width: 38,
+                        height: 38,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: context.surfaceSecondary,
+                          border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.1),
+                            width: 1,
+                          ),
+                        ),
+                        clipBehavior: Clip.antiAlias,
+                        child: (rootPost.authorAvatarUrl.isNotEmpty &&
+                                rootPost.authorAvatarUrl.startsWith('http'))
+                            ? Image.network(
+                                rootPost.authorAvatarUrl,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) =>
+                                    _buildAvatarFallback(rootPost.authorName),
+                              )
+                            : _buildAvatarFallback(rootPost.authorName),
+                      ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Flexible(
+                          child: GestureDetector(
+                            onTap: () => _openUserProfile(context, rootPost),
+                            child: Text(
+                              rootPost.isAnonymous
+                                  ? 'Anonymous'
+                                  : (rootPost.authorName.isNotEmpty
+                                      ? rootPost.authorName
+                                      : 'User'),
+                              style: TextStyle(
+                                color: rootPost.degree == 0
+                                    ? context.accentPrimary
+                                    : Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14.5,
+                                fontFamily: 'Inter',
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        _buildDegreeBadge(context, rootPost),
+                        const SizedBox(width: 8),
+                        Text(
+                          _formatTimeAgo(rootPost.createdAt),
+                          style: TextStyle(
+                            color: context.textMuted.withValues(alpha: 0.7),
+                            fontSize: 11.5,
+                            fontFamily: 'Inter',
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (rootPost.authorProfession != null &&
+                        rootPost.authorProfession!.trim().isNotEmpty &&
+                        !rootPost.isAnonymous &&
+                        !rootPost.isDeleted) ...[
+                      const SizedBox(height: 2),
+                      GestureDetector(
+                        onTap: () => _openUserProfile(context, rootPost),
+                        child: Text(
+                          rootPost.authorProfession!.trim(),
+                          style: TextStyle(
+                            color: context.textSecondary,
+                            fontSize: 11.5,
+                            fontFamily: 'Inter',
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          // Post Content (raw URL stripped, only preview shown)
+          if (cleanContent.isNotEmpty)
+            SelectableText(
+              cleanContent,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 15,
+                height: 1.42,
+                fontFamily: 'Inter',
+                letterSpacing: -0.1,
+              ),
+            ),
+
+          // Attached Link Preview
+          if (attachedUrl != null && attachedUrl.isNotEmpty) ...[
+            if (cleanContent.isNotEmpty) const SizedBox(height: 10),
+            LinkPreviewCard(url: attachedUrl),
+          ],
+
+          const SizedBox(height: 12),
+
+          // Reactions (if any)
+          if (rootPost.reactionCounts.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            _buildReactionsRow(context, rootPost),
+          ],
+
+          // Actions Row (left-aligned)
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              // Reaction Button
+              GestureDetector(
+                onTap: () {
+                  HapticFeedback.lightImpact();
+                  _showReactionPicker(context, rootPost);
+                },
+                child: Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.add_reaction_outlined,
+                          size: 13, color: context.textMuted),
+                      const SizedBox(width: 3),
+                      Text(
+                        "React",
+                        style: TextStyle(
+                          color: context.textMuted,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          fontFamily: 'Inter',
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              // Reply Button
+              GestureDetector(
+                onTap: () {
+                  HapticFeedback.lightImpact();
+                  setState(() {
+                    _replyingToTarget = rootPost;
+                  });
+                  _replyFocusNode.requestFocus();
+                },
+                child: Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.reply_rounded,
+                          size: 13, color: context.textMuted),
+                      const SizedBox(width: 3),
+                      Text(
+                        "Reply",
+                        style: TextStyle(
+                          color: context.textMuted,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          fontFamily: 'Inter',
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const Spacer(),
+              _buildConnectButton(context, rootPost),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildThreadChatMessageTile(
+    BuildContext context,
+    FeedPost reply,
+    FeedPost rootPost,
+  ) {
+    final urlRegex = RegExp(r'https?://[^\s]+', caseSensitive: false);
+    final match = urlRegex.firstMatch(reply.content);
+    final String? attachedUrl = match?.group(0);
+    final String cleanReplyText = attachedUrl != null
+        ? reply.content.replaceAll(urlRegex, '').trim()
+        : reply.content.trim();
+    final bool isMe = reply.degree == 0;
+    final bool isHighlighted = _highlightedPostId == reply.id;
+
+    // Check if replying to someone specific
+    FeedPost? replyTargetPost;
+    if (reply.replyToPostId != null &&
+        reply.replyToPostId!.isNotEmpty &&
+        reply.replyToPostId != rootPost.id) {
+      replyTargetPost = _threadPosts
+          .where((p) => p.id == reply.replyToPostId)
+          .firstOrNull;
+    }
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 350),
+      curve: Curves.easeOutCubic,
+      key: _itemKeys.putIfAbsent(reply.id, () => GlobalKey()),
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+      decoration: BoxDecoration(
+        color: isHighlighted
+            ? Colors.white.withValues(alpha: 0.09)
+            : Colors.transparent,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isHighlighted
+              ? Colors.white.withValues(alpha: 0.22)
+              : Colors.transparent,
+          width: 1.0,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Discord Reply Quote Header (if replying to another comment)
+          if (replyTargetPost != null) ...[
+            GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () => _scrollToHighlightedPost(replyTargetPost!.id),
+              child: Padding(
+                padding: const EdgeInsets.only(left: 44, bottom: 4),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.reply_rounded,
+                        size: 13, color: context.accentPrimary),
+                    const SizedBox(width: 4),
+                    Text(
+                      "Replying to @${replyTargetPost.isAnonymous ? 'Anonymous' : replyTargetPost.authorName}: ",
+                      style: TextStyle(
+                        color: context.accentPrimary,
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        fontFamily: 'Inter',
+                      ),
+                    ),
+                    Flexible(
+                      child: Text(
+                        _truncateContent(replyTargetPost.content, 35),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: context.textSecondary,
+                          fontSize: 11,
+                          fontFamily: 'Inter',
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+
+          // Message Row: Avatar + Content
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Avatar
+              GestureDetector(
+                onTap: () => _openUserProfile(context, reply),
+                child: reply.isAnonymous
+                    ? AnonymousAvatar(
+                        seed: reply.authorId.toString(),
+                        radius: 17,
+                      )
+                    : Container(
+                        width: 34,
+                        height: 34,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: context.surfaceSecondary,
+                          border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.1),
+                            width: 1,
+                          ),
+                        ),
+                        clipBehavior: Clip.antiAlias,
+                        child: (reply.authorAvatarUrl.isNotEmpty &&
+                                reply.authorAvatarUrl.startsWith('http'))
+                            ? Image.network(
+                                reply.authorAvatarUrl,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) =>
+                                    _buildAvatarFallback(reply.authorName),
+                              )
+                            : _buildAvatarFallback(reply.authorName),
+                      ),
+              ),
+              const SizedBox(width: 10),
+
+              // Message Content & Actions
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Author Header Row
+                    Row(
+                      children: [
+                        Flexible(
+                          child: GestureDetector(
+                            onTap: () => _openUserProfile(context, reply),
+                            child: Text(
+                              reply.isAnonymous
+                                  ? 'Anonymous'
+                                  : (reply.authorName.isNotEmpty
+                                      ? reply.authorName
+                                      : 'User'),
+                              style: TextStyle(
+                                color:
+                                    isMe ? context.accentPrimary : Colors.white,
+                                fontSize: 13.5,
+                                fontWeight: FontWeight.bold,
+                                fontFamily: 'Inter',
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        _buildDegreeBadge(context, reply),
+                        const SizedBox(width: 8),
+                        Text(
+                          _formatTimeAgo(reply.createdAt),
+                          style: TextStyle(
+                            color: context.textMuted.withValues(alpha: 0.65),
+                            fontSize: 11,
+                            fontFamily: 'Inter',
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (reply.authorProfession != null &&
+                        reply.authorProfession!.trim().isNotEmpty &&
+                        !reply.isAnonymous &&
+                        !reply.isDeleted) ...[
+                      const SizedBox(height: 1.5),
+                      GestureDetector(
+                        onTap: () => _openUserProfile(context, reply),
+                        child: Text(
+                          reply.authorProfession!.trim(),
+                          style: TextStyle(
+                            color: context.textSecondary,
+                            fontSize: 11,
+                            fontFamily: 'Inter',
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 3),
+
+                    // Chat Message Content (no grey background, no white border, raw URL stripped)
+                    GestureDetector(
+                      onTap: () {
+                        HapticFeedback.lightImpact();
+                        setState(() {
+                          _replyingToTarget = reply;
+                        });
+                        _replyFocusNode.requestFocus();
+                      },
+                      onLongPress: () => _showReactionPicker(context, reply),
+                      behavior: HitTestBehavior.opaque,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 2),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if (cleanReplyText.isNotEmpty)
+                              SelectableText(
+                                cleanReplyText,
+                                style: TextStyle(
+                                  color: Colors.white.withValues(alpha: 0.95),
+                                  fontSize: 14.5,
+                                  height: 1.35,
+                                  fontFamily: 'Inter',
+                                  letterSpacing: -0.1,
+                                ),
+                              ),
+                            if (attachedUrl != null &&
+                                attachedUrl.isNotEmpty) ...[
+                              if (cleanReplyText.isNotEmpty)
+                                const SizedBox(height: 6),
+                              LinkPreviewCard(url: attachedUrl),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ),
+
+                    // Reactions (if any)
+                    if (reply.reactionCounts.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      _buildReactionsRow(context, reply),
+                    ],
+
+                    // Actions Row (left-aligned)
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        // Reaction Button
+                        GestureDetector(
+                          onTap: () {
+                            HapticFeedback.lightImpact();
+                            _showReactionPicker(context, reply);
+                          },
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 4, vertical: 2),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.add_reaction_outlined,
+                                    size: 13, color: context.textMuted),
+                                const SizedBox(width: 3),
+                                Text(
+                                  "React",
+                                  style: TextStyle(
+                                    color: context.textMuted,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                    fontFamily: 'Inter',
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        // Reply Button
+                        GestureDetector(
+                          onTap: () {
+                            HapticFeedback.lightImpact();
+                            setState(() {
+                              _replyingToTarget = reply;
+                            });
+                            _replyFocusNode.requestFocus();
+                          },
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 4, vertical: 2),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.reply_rounded,
+                                    size: 13, color: context.textMuted),
+                                const SizedBox(width: 3),
+                                Text(
+                                  "Reply",
+                                  style: TextStyle(
+                                    color: context.textMuted,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                    fontFamily: 'Inter',
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const Spacer(),
+                        _buildConnectButton(context, reply),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildThreadChatBottomComposer(
+    BuildContext context,
+    FeedPost rootPost,
+    bool allowAnonymous,
+    List<Map<String, dynamic>> mentionSuggestions,
+    void Function(Map<String, dynamic>) insertMention,
+  ) {
+    final target = _replyingToTarget ?? rootPost;
+    final bool isReplyingToSubMessage = target.id != rootPost.id;
+
+    return Container(
+      padding: EdgeInsets.only(
+        left: 14,
+        right: 14,
+        top: 8,
+        bottom: 8 + MediaQuery.of(context).padding.bottom,
+      ),
+      decoration: BoxDecoration(
+        color: context.surfacePrimary,
+        border: Border(
+          top: BorderSide(
+            color: Colors.white.withValues(alpha: 0.08),
+            width: 1,
+          ),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.3),
+            blurRadius: 10,
+            offset: const Offset(0, -2),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Mention suggestions list (if typing @)
+          if (mentionSuggestions.isNotEmpty) ...[
+            Container(
+              constraints: const BoxConstraints(maxHeight: 140),
+              margin: const EdgeInsets.only(bottom: 8),
+              child: Material(
+                color: context.surfaceSecondary,
+                clipBehavior: Clip.antiAlias,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  side: BorderSide(
+                    color: context.accentPrimary.withValues(alpha: 0.35),
+                  ),
+                ),
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  itemCount: mentionSuggestions.length,
+                  separatorBuilder: (_, __) => Divider(
+                    height: 1,
+                    color: Colors.white.withValues(alpha: 0.06),
+                  ),
+                  itemBuilder: (context, idx) {
+                    final conn = mentionSuggestions[idx];
+                    final name = conn['name']?.toString() ?? 'User';
+                    final avatarUrl = conn['avatarUrl']?.toString() ??
+                        conn['avatar_url']?.toString() ??
+                        '';
+                    return ListTile(
+                      dense: true,
+                      visualDensity: VisualDensity.compact,
+                      leading: CircleAvatar(
+                        radius: 13,
+                        backgroundColor: context.accentPrimary,
+                        backgroundImage: avatarUrl.isNotEmpty
+                            ? NetworkImage(avatarUrl)
+                            : null,
+                        child: avatarUrl.isEmpty
+                            ? Text(
+                                name.isNotEmpty ? name[0].toUpperCase() : '?',
+                                style: const TextStyle(
+                                    fontSize: 11, color: Colors.white),
+                              )
+                            : null,
+                      ),
+                      title: Text(
+                        name,
+                        style: TextStyle(
+                          color: context.textPrimary,
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      onTap: () => insertMention(conn),
+                    );
+                  },
+                ),
+              ),
+            ),
+          ],
+
+          // Target Reply Banner (if targeting someone specific)
+          if (isReplyingToSubMessage) ...[
+            Container(
+              margin: const EdgeInsets.only(bottom: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: context.accentPrimary.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: context.accentPrimary.withValues(alpha: 0.3),
+                  width: 0.8,
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.reply_rounded,
+                      size: 13, color: context.accentPrimary),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      "Replying to @${target.isAnonymous ? 'Anonymous' : target.authorName}: \"${_truncateContent(target.content, 28)}\"",
+                      style: TextStyle(
+                        color: context.accentPrimary,
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w600,
+                        fontFamily: 'Inter',
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        _replyingToTarget = rootPost;
+                      });
+                    },
+                    child: Icon(Icons.close_rounded,
+                        size: 15, color: context.textMuted),
+                  ),
+                ],
+              ),
+            ),
+          ],
+
+          // Bottom Input Row: (Anonymous toggle if allowed) + Input + Send Button
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              // Anonymous mode toggle
+              if (allowAnonymous) ...[
+                GestureDetector(
+                  onTap: () {
+                    HapticFeedback.selectionClick();
+                    setState(() {
+                      _isAnonymousReply = !_isAnonymousReply;
+                    });
+                  },
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 180),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: _isAnonymousReply
+                          ? const Color(0xFFF59E0B).withValues(alpha: 0.2)
+                          : context.surfaceSecondary,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: _isAnonymousReply
+                            ? const Color(0xFFF59E0B).withValues(alpha: 0.5)
+                            : Colors.white.withValues(alpha: 0.08),
+                        width: 1,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          _isAnonymousReply
+                              ? Icons.masks_rounded
+                              : Icons.person_rounded,
+                          size: 15,
+                          color: _isAnonymousReply
+                              ? const Color(0xFFF59E0B)
+                              : context.textMuted,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          _isAnonymousReply ? "Anon" : "Self",
+                          style: TextStyle(
+                            color: _isAnonymousReply
+                                ? const Color(0xFFF59E0B)
+                                : context.textMuted,
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+              ],
+
+              // Text Field
+              Expanded(
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: context.surfaceSecondary,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.08),
+                      width: 1,
+                    ),
+                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 14),
+                  child: TextField(
+                    controller: _replyController,
+                    focusNode: _replyFocusNode,
+                    maxLines: 4,
+                    minLines: 1,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
+                      fontFamily: 'Inter',
+                    ),
+                    decoration: InputDecoration(
+                      hintText: isReplyingToSubMessage
+                          ? "Reply to @${target.isAnonymous ? 'Anonymous' : target.authorName}..."
+                          : "Reply in thread...",
+                      hintStyle: TextStyle(
+                        color: context.textMuted.withValues(alpha: 0.7),
+                        fontSize: 13.5,
+                        fontFamily: 'Inter',
+                      ),
+                      border: InputBorder.none,
+                      isDense: true,
+                      contentPadding: const EdgeInsets.symmetric(vertical: 9),
+                    ),
+                    onSubmitted: (_) => _submitReply(),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+
+              // Send Button
+              ValueListenableBuilder<TextEditingValue>(
+                valueListenable: _replyController,
+                builder: (context, value, _) {
+                  final hasText = value.text.trim().isNotEmpty;
+
+                  return GestureDetector(
+                    onTap: hasText && !_isSubmitting ? _submitReply : null,
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 180),
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        color: hasText
+                            ? context.accentPrimary
+                            : context.surfaceSecondary,
+                        shape: BoxShape.circle,
+                        boxShadow: hasText
+                            ? [
+                                BoxShadow(
+                                  color: context.accentPrimary
+                                      .withValues(alpha: 0.35),
+                                  blurRadius: 8,
+                                  spreadRadius: 1,
+                                ),
+                              ]
+                            : null,
+                      ),
+                      child: Center(
+                        child: _isSubmitting
+                            ? SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color:
+                                      hasText ? Colors.black : Colors.white,
+                                ),
+                              )
+                            : Icon(
+                                Icons.arrow_upward_rounded,
+                                size: 19,
+                                color:
+                                    hasText ? Colors.black : context.textMuted,
+                              ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────
+  // THREAD TREE VIEW (Classic hierarchical comment tree view)
+  // ─────────────────────────────────────────────────────────
+
+  Widget _buildThreadTreeView(
+    BuildContext context,
+    FeedProvider feedProvider,
+    List<CommentNode> commentTrees,
+    int activeRepliesCount,
+    List<Map<String, dynamic>> mentionSuggestions,
+    void Function(Map<String, dynamic>) insertMention,
+  ) {
+    return Column(
+      children: [
+        Expanded(
+          child: SingleChildScrollView(
+            controller: _scrollController,
+            physics: const AlwaysScrollableScrollPhysics(
+                parent: BouncingScrollPhysics()),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // 1. Ancestor Parent Posts connected with thread lines (Twitter/X style)
+                if (_parentPosts.isNotEmpty) ...[
+                  ..._parentPosts.asMap().entries.map((entry) {
+                    final int idx = entry.key;
+                    final FeedPost parent = entry.value;
+                    final bool showTop = (idx > 0);
+                    final String? repName =
+                        _resolveParentAuthorName(parent.replyToPostId);
+
+                    return Container(
+                      key: _itemKeys.putIfAbsent(
+                          parent.id, () => GlobalKey()),
+                      child: PostCard(
+                        post: parent,
+                        isThreadView: true,
+                        showTopConnector: showTop,
+                        showBottomConnector: true,
+                        replyToName: repName,
+                        onReactionToggle: _handleReactionToggle,
+                        onTap: () {
+                          if (parent.id == widget.rootPostId &&
+                              widget.independentPostId != null &&
+                              widget.openedFromThread &&
+                              Navigator.canPop(context)) {
+                            Navigator.pop(context, parent.id);
+                          } else {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => ThreadDetailPage(
+                                  rootPostId: widget.rootPostId,
+                                  independentPostId:
+                                      parent.id == widget.rootPostId
+                                          ? null
+                                          : parent.id,
+                                  focusReplyToPostId: parent.id,
+                                  highlightPostId: parent.id,
+                                  openedFromThread: true,
+                                ),
+                              ),
+                            ).then((result) {
+                              if (result is String && mounted) {
+                                Future.delayed(const Duration(milliseconds: 120), () {
+                                  if (mounted) {
+                                    _scrollToHighlightedPost(result);
+                                  }
+                                });
+                              }
+                            });
+                          }
+                        },
+                        onCommentTap: () {
+                          setState(() {
+                            _replyingToTarget = parent;
+                          });
+                          _replyFocusNode.requestFocus();
+                        },
+                      ),
+                    );
+                  }),
+                ],
+
+                // 2. Focused Main Post
+                if (_threadPosts.isNotEmpty) ...[
+                  Builder(builder: (context) {
+                    final rootPost = _threadPosts.first;
+                    final bool isSelected =
+                        (_replyingToTarget?.id == rootPost.id);
+                    final bool isHighlighted =
+                        (rootPost.id == _highlightedPostId);
+
+                    final rootPostWithActiveCount = FeedPost(
+                      id: rootPost.id,
+                      authorId: rootPost.authorId,
+                      authorName: rootPost.authorName,
+                      authorAvatarUrl: rootPost.authorAvatarUrl,
+                      content: rootPost.content,
+                      createdAt: rootPost.createdAt,
+                      replyCount: activeRepliesCount,
+                      degree: rootPost.degree,
+                      isDeleted: rootPost.isDeleted,
+                      replyToPostId: rootPost.replyToPostId,
+                      userReaction: rootPost.userReaction,
+                      reactionCounts: rootPost.reactionCounts,
+                    );
+
+                    final bool hasParents = _parentPosts.isNotEmpty;
+                    _itemKeys[rootPost.id] = _focusedPostKey;
+
+                    return Container(
+                      key: _focusedPostKey,
+                      child: PostCard(
+                        post: rootPostWithActiveCount,
+                        isThreadView: hasParents,
+                        showTopConnector: hasParents,
+                        showBottomConnector: false,
+                        isSelectedTarget: isSelected,
+                        isHighlighted: isHighlighted,
+                        replyToName: null,
+                        onReactionToggle: _handleReactionToggle,
+                        onTap: () {
+                          setState(() {
+                            _replyingToTarget = rootPost;
+                          });
+                        },
+                        onCommentTap: () {
+                          setState(() {
+                            _replyingToTarget = rootPost;
+                          });
+                          _replyFocusNode.requestFocus();
+                        },
+                      ),
+                    );
+                  }),
+
+                  Divider(
+                      color: Colors.white.withValues(alpha: 0.08), height: 1),
+
+                  // 2. Separate Replies Header
+                  if (activeRepliesCount > 0)
+                    Padding(
+                      padding:
+                          const EdgeInsets.only(left: 16, top: 16, bottom: 12),
+                      child: Text(
+                        "Replies ($activeRepliesCount)",
+                        style: TextStyle(
+                          color: context.textSecondary,
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                ],
+
+                // 3. Separate Replies List (ThreadedCommentTree for top-level replies and their children)
+                if (commentTrees.isNotEmpty)
+                  Column(
+                    children: commentTrees.map((treeNode) {
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 12.0),
+                        child: ThreadedCommentTree(
+                          comment: treeNode,
+                          parentAvatarRadius: 18.0,
+                          childAvatarRadius: 14.0,
+                          indentationWidth: 32.0,
+                          parentLeftPadding: 16.0,
+                          lineColor: const Color(0xFF3E414D),
+                          strokeWidth: 1.8,
+                          curveRadius: 12.0,
+                          initialExpandPostId: _highlightedPostId,
+                          itemKeys: _itemKeys,
+                          allowNestedExpansion: false,
+                          onReactionToggle: _handleReactionToggle,
+                          onReplyTap: (node) {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => ThreadDetailPage(
+                                  rootPostId: widget.rootPostId,
+                                  independentPostId: node.id,
+                                  focusReplyToPostId: node.id,
+                                  openedFromThread: true,
+                                ),
+                              ),
+                            ).then((result) {
+                              if (result is String && mounted) {
+                                Future.delayed(const Duration(milliseconds: 120), () {
+                                  if (mounted) {
+                                    _scrollToHighlightedPost(result);
+                                  }
+                                });
+                              }
+                            });
+                          },
+                          onCommentTap: (node) {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => ThreadDetailPage(
+                                  rootPostId: widget.rootPostId,
+                                  independentPostId: node.id,
+                                  focusReplyToPostId: node.id,
+                                  openedFromThread: true,
+                                ),
+                              ),
+                            ).then((result) {
+                              if (result is String && mounted) {
+                                Future.delayed(const Duration(milliseconds: 120), () {
+                                  if (mounted) {
+                                    _scrollToHighlightedPost(result);
+                                  }
+                                });
+                              }
+                            });
+                          },
+                        ),
+                      );
+                    }).toList(),
+                  ),
+              ],
+            ),
+          ),
+        ),
+
+        // Inline Reply Bar
+        Container(
+          padding: EdgeInsets.only(
+            left: 16,
+            right: 16,
+            top: 10,
+            bottom: 10 + MediaQuery.of(context).padding.bottom,
+          ),
+          decoration: BoxDecoration(
+            color: context.surfacePrimary,
+            border: Border(
+                top: BorderSide(
+                    color: Colors.white.withValues(alpha: 0.08))),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (mentionSuggestions.isNotEmpty) ...[
+                Container(
+                  constraints: const BoxConstraints(maxHeight: 150),
+                  margin: const EdgeInsets.only(bottom: 8),
+                  child: Material(
+                    color: context.surfaceSecondary,
+                    clipBehavior: Clip.antiAlias,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      side: BorderSide(
+                          color: context.accentPrimary
+                              .withValues(alpha: 0.4)),
+                    ),
+                    child: ListView.separated(
+                      shrinkWrap: true,
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      itemCount: mentionSuggestions.length,
+                      separatorBuilder: (_, __) => Divider(
+                          height: 1,
+                          color: Colors.white.withValues(alpha: 0.06)),
+                      itemBuilder: (context, idx) {
+                        final conn = mentionSuggestions[idx];
+                        final name = conn['name']?.toString() ?? 'User';
+                        final avatarUrl = conn['avatarUrl']?.toString() ??
+                            conn['avatar_url']?.toString() ??
+                            '';
+                        final profession =
+                            conn['profession']?.toString() ?? '';
+
+                        return ListTile(
+                          dense: true,
+                          visualDensity: VisualDensity.compact,
+                          leading: CircleAvatar(
+                            radius: 14,
+                            backgroundColor: context.accentPrimary,
+                            backgroundImage: avatarUrl.isNotEmpty
+                                ? NetworkImage(avatarUrl)
+                                : null,
+                            child: avatarUrl.isEmpty
+                                ? Text(
+                                    name.isNotEmpty
+                                        ? name[0].toUpperCase()
+                                        : '?',
+                                    style: const TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.white))
+                                : null,
+                          ),
+                          title: Text(
+                            name,
+                            style: TextStyle(
+                              color: context.textPrimary,
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          subtitle: profession.isNotEmpty
+                              ? Text(
+                                  profession,
+                                  style: TextStyle(
+                                      color: context.textMuted,
+                                      fontSize: 11),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                )
+                              : null,
+                          onTap: () => insertMention(conn),
+                        );
+                      },
+                    ),
+                  ),
+                ),
+              ],
+              if (_replyingToTarget != null)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
+                  child: Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          "Replying to @${_replyingToTarget!.authorName} for \"${_truncateContent(_replyingToTarget!.content, 30)}\"",
+                          style: TextStyle(
+                              color: context.accentSecondary,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      GestureDetector(
+                        onTap: () {
+                          setState(() {
+                            _replyingToTarget = _threadPosts.isNotEmpty
+                                ? _threadPosts.first
+                                : null;
+                          });
+                        },
+                        child: Icon(Icons.close_rounded,
+                            size: 14, color: context.textMuted),
+                      ),
+                    ],
+                  ),
+                ),
+              Consumer2<ProfileProvider, FeedProvider>(
+                builder: (context, profileProvider, feedProvider, _) {
+                  final bool isAnonAllowed =
+                      !(feedProvider.isCustomNetworkActive &&
+                          !feedProvider.activeCustomNetwork!.allowAnonymous);
+                  final effectiveAnon =
+                      isAnonAllowed && _isAnonymousReply;
+                  final currentName = effectiveAnon
+                      ? (profileProvider.anonName.isNotEmpty
+                          ? profileProvider.anonName
+                          : "Anonymous")
+                      : (profileProvider.name.isNotEmpty
+                          ? profileProvider.name
+                          : "You");
+
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: effectiveAnon
+                          ? context.accentPrimary
+                              .withValues(alpha: 0.12)
+                          : context.surfaceSecondary,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: effectiveAnon
+                            ? context.accentPrimary
+                                .withValues(alpha: 0.4)
+                            : Colors.white.withValues(alpha: 0.06),
+                        width: 0.8,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        effectiveAnon
+                            ? AnonymousAvatar(
+                                seed: (profileProvider.userId ?? 0)
+                                    .toString(),
+                                radius: 12,
+                              )
+                            : CircleAvatar(
+                                radius: 12,
+                                backgroundColor:
+                                    context.surfaceSecondary,
+                                backgroundImage: profileProvider
+                                        .avatarUrl.isNotEmpty
+                                    ? NetworkImage(
+                                        profileProvider.avatarUrl)
+                                    : null,
+                                child: profileProvider.avatarUrl.isEmpty
+                                    ? Text(
+                                        profileProvider.name.isNotEmpty
+                                            ? profileProvider.name[0]
+                                                .toUpperCase()
+                                            : '?',
+                                        style: const TextStyle(
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.white),
+                                      )
+                                    : null,
+                              ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: RichText(
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            text: TextSpan(
+                              style: TextStyle(
+                                  color: context.textMuted,
+                                  fontSize: 12),
+                              children: [
+                                const TextSpan(text: "Replying as "),
+                                TextSpan(
+                                  text: currentName,
+                                  style: TextStyle(
+                                    color: effectiveAnon
+                                        ? context.accentSecondary
+                                        : context.textPrimary,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                TextSpan(
+                                  text: effectiveAnon
+                                      ? " • Anonymous"
+                                      : (isAnonAllowed
+                                          ? " • Real Profile"
+                                          : " • Real Identity Only"),
+                                  style: TextStyle(
+                                    color: effectiveAnon
+                                        ? context.accentSecondary
+                                            .withValues(alpha: 0.8)
+                                        : context.textMuted,
+                                    fontSize: 11,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        if (isAnonAllowed)
+                          InkWell(
+                            onTap: () {
+                              HapticFeedback.selectionClick();
+                              setState(() {
+                                _isAnonymousReply = !_isAnonymousReply;
+                              });
+                            },
+                            borderRadius: BorderRadius.circular(8),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: effectiveAnon
+                                    ? context.accentPrimary
+                                        .withValues(alpha: 0.25)
+                                    : Colors.white
+                                        .withValues(alpha: 0.08),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: effectiveAnon
+                                      ? context.accentPrimary
+                                          .withValues(alpha: 0.4)
+                                      : Colors.white
+                                          .withValues(alpha: 0.1),
+                                  width: 0.6,
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    effectiveAnon
+                                        ? Icons.visibility_off_rounded
+                                        : Icons.person_rounded,
+                                    size: 13,
+                                    color: effectiveAnon
+                                        ? context.accentSecondary
+                                        : context.textPrimary,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    effectiveAnon
+                                        ? "Go Real Profile"
+                                        : "Go Anonymous",
+                                    style: TextStyle(
+                                      color: effectiveAnon
+                                          ? context.accentSecondary
+                                          : context.textPrimary,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _replyController,
+                      focusNode: _replyFocusNode,
+                      maxLines: null,
+                      maxLength: 500,
+                      style: TextStyle(
+                          color: context.textPrimary, fontSize: 14),
+                      decoration: InputDecoration(
+                        hintText: _isAnonymousReply
+                            ? "Post anonymous reply..."
+                            : "Post your reply... Use @ to mention",
+                        hintStyle: TextStyle(
+                            color: context.textMuted, fontSize: 13),
+                        counterText: "",
+                        border: InputBorder.none,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  ValueListenableBuilder<TextEditingValue>(
+                    valueListenable: _replyController,
+                    builder: (context, value, child) {
+                      final textLength = value.text.trim().length;
+                      final isValid = textLength > 0 &&
+                          textLength <= 500 &&
+                          !_isSubmitting;
+
+                      return IconButton(
+                        icon: _isSubmitting
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                    strokeWidth: 2))
+                            : Icon(Icons.send_rounded,
+                                color: isValid
+                                    ? Colors.white
+                                    : context.textMuted),
+                        onPressed: isValid ? _submitReply : null,
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────
+  // SHARED CHAT HELPERS
+  // ─────────────────────────────────────────────────────────
+
+  void _showReactionPicker(BuildContext context, FeedPost post) {
+    HapticFeedback.lightImpact();
+    final emojis = FeedPost.reactionEmojiMap.entries.toList();
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        decoration: BoxDecoration(
+          color: context.surfacePrimary,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+        ),
+        child: SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.white24,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: emojis.map((e) {
+                  final isSelected = post.userReaction == e.key;
+                  return GestureDetector(
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      _handleReactionToggle(post.id, e.key);
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: isSelected
+                            ? context.accentPrimary.withValues(alpha: 0.2)
+                            : context.surfaceSecondary,
+                        shape: BoxShape.circle,
+                        border: isSelected
+                            ? Border.all(
+                                color: context.accentPrimary,
+                                width: 1.5,
+                              )
+                            : null,
+                      ),
+                      child: Text(
+                        e.value,
+                        style: const TextStyle(fontSize: 24),
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: 16),
+              ListTile(
+                leading: const Icon(Icons.reply_rounded,
+                    color: Colors.white, size: 22),
+                title: const Text(
+                  "Reply to Message",
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontFamily: 'Inter',
+                  ),
+                ),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  setState(() {
+                    _replyingToTarget = post;
+                  });
+                  _replyFocusNode.requestFocus();
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.copy_rounded,
+                    color: Colors.white70, size: 20),
+                title: const Text(
+                  "Copy Text",
+                  style: TextStyle(
+                    color: Colors.white70,
+                    fontFamily: 'Inter',
+                  ),
+                ),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  Clipboard.setData(ClipboardData(text: post.content));
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text("Message copied to clipboard"),
+                      duration: Duration(seconds: 1),
+                    ),
+                  );
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildReactionsRow(BuildContext context, FeedPost post) {
+    if (post.reactionCounts.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Wrap(
+      spacing: 6,
+      runSpacing: 4,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        ...post.reactionCounts.entries.map((entry) {
+          final emojiKey = entry.key;
+          final count = entry.value;
+          if (count <= 0) return const SizedBox.shrink();
+
+          final emoji = FeedPost.reactionEmojiMap[emojiKey] ?? '❤️';
+          final isSelected = post.userReaction == emojiKey;
+
+          return GestureDetector(
+            onTap: () {
+              HapticFeedback.lightImpact();
+              _handleReactionToggle(post.id, emojiKey);
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? context.accentPrimary.withValues(alpha: 0.18)
+                    : context.surfacePrimary,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: isSelected
+                      ? context.accentPrimary.withValues(alpha: 0.4)
+                      : Colors.white.withValues(alpha: 0.08),
+                  width: 1,
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(emoji, style: const TextStyle(fontSize: 12)),
+                  const SizedBox(width: 4),
+                  Text(
+                    count.toString(),
+                    style: TextStyle(
+                      color: isSelected ? context.accentPrimary : Colors.white70,
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      fontFamily: 'Inter',
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }),
+      ],
+    );
+  }
+
+  Widget _buildConnectButton(BuildContext context, FeedPost post) {
+    if (post.isDeleted) return const SizedBox.shrink();
+
+    final int? myUserId =
+        Provider.of<ProfileProvider>(context, listen: false).userId;
+    if (post.degree == 0 || (myUserId != null && post.authorId == myUserId)) {
+      return const SizedBox.shrink();
+    }
+
+    final connectionProvider =
+        Provider.of<ConnectionProvider>(context, listen: false);
+    if (connectionProvider.connections.any((c) => c['id'] == post.authorId)) {
+      return const SizedBox.shrink();
+    }
+
+    if (post.degree != -1 && post.degree < 2) {
+      return const SizedBox.shrink();
+    }
+
+    final notifProvider = Provider.of<NotificationProvider>(context);
+    final bool isDirectRequest = post.degree == -1;
+    final bool isRequestSent =
+        isDirectRequest && notifProvider.hasSentDirectRequest(post.authorId);
+
+    void handleConnectTap() {
+      if (isRequestSent) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Direct request already sent to ${post.authorName}'),
+            duration: const Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        return;
+      }
+
+      if (isDirectRequest) {
+        DirectConnectionSheet.show(
+          context: context,
+          targetUserId: post.authorId,
+          targetUserName: post.authorName,
+          targetUserAvatar: post.isAnonymous ? '' : post.authorAvatarUrl,
+          isAnonymous: post.isAnonymous,
+        );
+      } else {
+        ReferralIntroSheet.show(
+          context: context,
+          targetUserId: post.authorId,
+          targetUserName: post.authorName,
+          degree: post.degree,
+        );
+      }
+    }
+
+    return BounceTap(
+      onTap: handleConnectTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3.5),
+        decoration: BoxDecoration(
+          color: isRequestSent ? Colors.white.withValues(alpha: 0.05) : null,
+          borderRadius: BorderRadius.circular(99),
+          border: Border.all(
+            color: isRequestSent
+                ? Colors.white.withValues(alpha: 0.25)
+                : context.accentPrimary.withValues(alpha: 0.6),
+            width: 0.8,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              isRequestSent
+                  ? Icons.done_rounded
+                  : (isDirectRequest
+                      ? Icons.send_rounded
+                      : Icons.person_add_outlined),
+              size: 12,
+              color: isRequestSent ? Colors.white70 : context.accentPrimary,
+            ),
+            const SizedBox(width: 4),
+            Text(
+              isRequestSent
+                  ? "Request Sent"
+                  : (isDirectRequest ? "Direct Request" : "Connect"),
+              style: TextStyle(
+                color: isRequestSent ? Colors.white70 : context.accentPrimary,
+                fontSize: 10.5,
+                fontWeight: FontWeight.bold,
+                fontFamily: 'Inter',
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDegreeBadge(BuildContext context, FeedPost post) {
+    if (post.isAnonymous) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF59E0B).withValues(alpha: 0.15),
+          borderRadius: BorderRadius.circular(4),
+          border: Border.all(
+            color: const Color(0xFFF59E0B).withValues(alpha: 0.3),
+            width: 0.5,
+          ),
+        ),
+        child: const Text(
+          "Anon",
+          style: TextStyle(
+            color: Color(0xFFF59E0B),
+            fontSize: 9.5,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      );
+    }
+
+    final Color greyColor = context.textMuted.withValues(alpha: 0.7);
+
+    if (post.degree == 0) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.05),
+          borderRadius: BorderRadius.circular(4),
+          border: Border.all(
+            color: Colors.white.withValues(alpha: 0.08),
+            width: 0.5,
+          ),
+        ),
+        child: Text(
+          "YOU",
+          style: TextStyle(
+            color: greyColor,
+            fontSize: 9.5,
+            fontWeight: FontWeight.w600,
+            fontFamily: 'Inter',
+          ),
+        ),
+      );
+    }
+
+    String label = "${post.degree}°";
+    if (post.degree == 1) {
+      label = "1st";
+    } else if (post.degree == 2) {
+      label = "2nd";
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.08),
+          width: 0.5,
+        ),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: greyColor,
+          fontSize: 9.5,
+          fontWeight: FontWeight.w600,
+          fontFamily: 'Inter',
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAvatarFallback(String name) {
+    final letter = name.isNotEmpty ? name.substring(0, 1).toUpperCase() : '?';
+    return Center(
+      child: Text(
+        letter,
+        style: const TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.bold,
+          fontSize: 13,
+        ),
+      ),
+    );
+  }
+
+  void _openUserProfile(BuildContext context, FeedPost post) {
+    if (post.isDeleted || post.isAnonymous) return;
+    UserProfileModal.show(
+      context,
+      userId: post.authorId,
+      userName: post.authorName,
+      avatarUrl: post.authorAvatarUrl,
+      degree: post.degree,
+      scope: post.feedScope,
     );
   }
 }

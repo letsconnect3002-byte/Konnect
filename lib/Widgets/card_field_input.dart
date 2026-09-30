@@ -1,8 +1,5 @@
 import 'package:connect/Config/app_theme.dart';
-import 'package:connect/Models/profile_card_type.dart';
-import 'package:connect/Providers/profile_provider.dart';
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 
 /// Edit field styled like the reference mockup with Casual / Professional toggles.
 class CardFieldInput extends StatefulWidget {
@@ -73,10 +70,6 @@ class _CardFieldInputState extends State<CardFieldInput> {
 
   @override
   Widget build(BuildContext context) {
-    final provider = context.watch<ProfileProvider>();
-    final assignment = provider.fieldAssignments[widget.fieldKey] ??
-        FieldCardAssignment(casual: false, professional: true);
-
     final isEditing = widget.isEditing;
     final isFilled = (widget.controller?.text ?? '').isNotEmpty;
     final readOnly = isFilled && !isEditing;
@@ -113,23 +106,6 @@ class _CardFieldInputState extends State<CardFieldInput> {
                   ),
                 ),
               ),
-              if (widget.showToggles) ...[
-                _CardToggle(
-                  icon: Icons.person_outline_rounded,
-                  isActive: assignment.casual,
-                  activeColor: context.accentSecondary,
-                  onTap: () => provider.toggleFieldOnCard(
-                      widget.fieldKey, ProfileCardType.casual),
-                ),
-                const SizedBox(width: 8),
-                _CardToggle(
-                  icon: Icons.work_outline_rounded,
-                  isActive: assignment.professional,
-                  activeColor: context.accentSecondary,
-                  onTap: () => provider.toggleFieldOnCard(
-                      widget.fieldKey, ProfileCardType.professional),
-                ),
-              ],
             ],
           ),
           const SizedBox(height: 12),
@@ -246,45 +222,6 @@ class _InputShell extends StatelessWidget {
         border: Border.all(color: context.textMuted.withValues(alpha: 0.2)),
       ),
       child: child,
-    );
-  }
-}
-
-class _CardToggle extends StatelessWidget {
-  final IconData icon;
-  final bool isActive;
-  final Color activeColor;
-  final VoidCallback onTap;
-
-  const _CardToggle({
-    required this.icon,
-    required this.isActive,
-    required this.activeColor,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 32,
-        height: 32,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: isActive ? activeColor : context.surfaceSecondary,
-          border: Border.all(
-            color: isActive
-                ? activeColor
-                : context.textMuted.withValues(alpha: 0.2),
-          ),
-        ),
-        child: Icon(
-          icon,
-          size: 16,
-          color: isActive ? Colors.white : context.textMuted,
-        ),
-      ),
     );
   }
 }

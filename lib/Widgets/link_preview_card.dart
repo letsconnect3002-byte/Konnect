@@ -34,10 +34,6 @@ class LinkPreviewCard extends StatelessWidget {
           decoration: BoxDecoration(
             color: context.surfaceSecondary,
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(
-              color: context.accentPrimary.withValues(alpha: 0.25),
-              width: 1.0,
-            ),
           ),
           child: AnyLinkPreview(
             link: url,

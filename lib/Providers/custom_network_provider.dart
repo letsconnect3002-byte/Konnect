@@ -174,7 +174,7 @@ class CustomNetworkProvider with ChangeNotifier {
     }
   }
 
-  /// Mafia-style direct add: immediately adds a connection without needing an invite or approval.
+  /// Direct add: immediately adds a connection without needing an invite or approval.
   Future<void> addMemberDirectly(int memberUserId) async {
     final net = _activeCustomNetwork;
     final uid = _userId;

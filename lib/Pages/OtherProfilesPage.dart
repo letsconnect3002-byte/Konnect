@@ -20,7 +20,7 @@ class OtherProfilesPage extends StatefulWidget {
 
 class _OtherProfilesPageState extends State<OtherProfilesPage> {
   bool _isGridView =
-      false; // true = Card View, false = List View (List is default)
+      true; // true = Grid View (default), false = List View
   late ConnectionProvider connectionProvider;
 
   @override
@@ -476,64 +476,6 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
     return existingCompany ?? '';
   }
 
-  List<String> _getCardTypesForProfile(Map<String, dynamic> profile) {
-    if (profile.containsKey('cardTypes')) {
-      return List<String>.from(profile['cardTypes']);
-    }
-
-    final allTypes = <String>[];
-
-    final hasInstagram = (profile['instagram'] ?? '').toString().isNotEmpty;
-    final hasTwitter = (profile['twitter'] ?? '').toString().isNotEmpty;
-    final hasCasualBio = (profile['bio'] ?? '').toString().isNotEmpty;
-
-    final hasLinkedin = (profile['linkedin'] ?? '').toString().isNotEmpty;
-    final hasCompany = (profile['company'] ?? '').toString().isNotEmpty;
-    final hasEmail = (profile['email'] ?? '').toString().isNotEmpty;
-
-    if (hasInstagram ||
-        hasTwitter ||
-        hasCasualBio ||
-        (!hasLinkedin && !hasCompany)) {
-      allTypes.add('casual');
-    }
-    if (hasLinkedin || hasCompany || hasEmail) {
-      allTypes.add('professional');
-    }
-
-    if (allTypes.isEmpty) {
-      allTypes.addAll(['casual', 'professional']);
-    }
-
-    return allTypes;
-  }
-
-  Widget _buildCardTypeBadges(Map<String, dynamic> profile) {
-    final types = _getCardTypesForProfile(profile);
-
-    return Wrap(
-      spacing: 8.0,
-      runSpacing: 8.0,
-      children: [
-        for (final type in types)
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-            decoration: BoxDecoration(
-              color: context.surfaceSecondary,
-              borderRadius: BorderRadius.circular(AppDimensions.radiusPill),
-            ),
-            child: Text(
-              type.toUpperCase(),
-              style: context.captionText.copyWith(
-                color: context.textSecondary,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-      ],
-    );
-  }
-
   Widget _buildCircularActionButton({
     required IconData icon,
     required VoidCallback onPressed,
@@ -560,7 +502,7 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(
-            "ALL CARDS",
+            "ALL PROFILES",
             style: context.captionText.copyWith(
               color: context.textSecondary,
               fontWeight: FontWeight.bold,
@@ -647,18 +589,10 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
       Map<String, dynamic> profileData, ConnectionProvider provider) {
     final name = profileData["name"] ?? "Unknown";
     final profession = profileData["profession"] ?? "";
-    final String sharedCard =
-        (profileData['sharedCard'] ?? profileData['shared_card'] ?? 'casual')
-            .toString();
+    const String sharedCard = 'both';
     final String email = ProfileFieldFilter.getVisibleValue(
       'email',
       profileData["email"] ?? '',
-      sharedCard,
-      profileData['field_assignments'],
-    );
-    final String company = ProfileFieldFilter.getVisibleValue(
-      'company',
-      _getCompany(name, profileData["company"]),
       sharedCard,
       profileData['field_assignments'],
     );
@@ -782,8 +716,6 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
                           overflow: TextOverflow.ellipsis,
                         ),
                       ],
-                      const SizedBox(height: 6),
-                      _buildCardTypeBadges(profileData),
                     ],
                   ),
                 ),
@@ -809,40 +741,21 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
               height: 1,
               color: context.surfaceSecondary.withValues(alpha: 0.5),
             ),
-            const SizedBox(height: 12),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (company.isNotEmpty) ...[
-                  Row(
-                    children: [
-                      Icon(Icons.business_center_rounded,
-                          color: context.textSecondary, size: 14),
-                      const SizedBox(width: 8),
-                      Text(
-                        company,
-                        style: context.bodyText
-                            .copyWith(color: context.textSecondary),
-                      ),
-                    ],
+            if (email.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Icon(Icons.alternate_email_rounded,
+                      color: context.textSecondary, size: 14),
+                  const SizedBox(width: 8),
+                  Text(
+                    email,
+                    style: context.bodyText
+                        .copyWith(color: context.textSecondary),
                   ),
-                  const SizedBox(height: 6),
                 ],
-                if (email.isNotEmpty)
-                  Row(
-                    children: [
-                      Icon(Icons.alternate_email_rounded,
-                          color: context.textSecondary, size: 14),
-                      const SizedBox(width: 8),
-                      Text(
-                        email,
-                        style: context.bodyText
-                            .copyWith(color: context.textSecondary),
-                      ),
-                    ],
-                  ),
-              ],
-            ),
+              ),
+            ],
             const SizedBox(height: 16),
             Row(
               children: [
@@ -904,9 +817,7 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
       Map<String, dynamic> profileData, ConnectionProvider provider) {
     final name = profileData["name"] ?? "Unknown";
     final profession = profileData["profession"] ?? "";
-    final String sharedCard =
-        (profileData['sharedCard'] ?? profileData['shared_card'] ?? 'casual')
-            .toString();
+    const String sharedCard = 'both';
     final String company = ProfileFieldFilter.getVisibleValue(
       'company',
       _getCompany(name, profileData["company"]),

@@ -53,14 +53,85 @@ class VouchBottomSheet extends StatefulWidget {
   State<VouchBottomSheet> createState() => _VouchBottomSheetState();
 }
 
+class _RelationshipTypeOption {
+  final String title;
+  final String description;
+  final IconData icon;
+
+  const _RelationshipTypeOption({
+    required this.title,
+    required this.description,
+    required this.icon,
+  });
+}
+
+class _IntentTagOption {
+  final String label;
+  final String hint;
+  final IconData icon;
+
+  const _IntentTagOption({
+    required this.label,
+    required this.hint,
+    required this.icon,
+  });
+}
+
 class _VouchBottomSheetState extends State<VouchBottomSheet> {
-  final TextEditingController _statementController = TextEditingController();
+  // 1. Relationship Context Tags (Structural labels)
+  static const List<_RelationshipTypeOption> _relationshipOptions = [
+    _RelationshipTypeOption(
+      title: "Fought in the trenches with",
+      description: "Close teammates, co-founders, or engineers who shipped code together.",
+      icon: Icons.offline_bolt_rounded,
+    ),
+    _RelationshipTypeOption(
+      title: "Managed / Was managed by",
+      description: "Explicitly clarify reporting lines and executive leadership relations.",
+      icon: Icons.account_tree_rounded,
+    ),
+    _RelationshipTypeOption(
+      title: "Backed / Funded",
+      description: "Reserved for investor-to-founder relationship tracking.",
+      icon: Icons.monetization_on_rounded,
+    ),
+    _RelationshipTypeOption(
+      title: "Rising Star",
+      description: "Flag junior talent or high-potential individuals early in their trajectory.",
+      icon: Icons.auto_awesome_rounded,
+    ),
+  ];
+
+  // 2. Private Intent Tags (Matching Mechanics)
+  static const List<_IntentTagOption> _intentOptions = [
+    _IntentTagOption(
+      label: "Would Hire",
+      hint: "Signal hiring interest confidentially",
+      icon: Icons.work_outline_rounded,
+    ),
+    _IntentTagOption(
+      label: "Would Fund",
+      hint: "Signal investment interest confidentially",
+      icon: Icons.payments_outlined,
+    ),
+    _IntentTagOption(
+      label: "Would Work With",
+      hint: "Signal collaboration & co-founding interest",
+      icon: Icons.groups_outlined,
+    ),
+  ];
+
+  String? _selectedRelationship;
+  final Set<String> _selectedIntents = {};
+
+  final TextEditingController _optionalNoteController = TextEditingController();
+
   String _selectedScope = 'network'; // 'network', 'global', 'profile_only'
   bool _isSubmitting = false;
 
   @override
   void dispose() {
-    _statementController.dispose();
+    _optionalNoteController.dispose();
     super.dispose();
   }
 
@@ -74,17 +145,6 @@ class _VouchBottomSheetState extends State<VouchBottomSheet> {
   }
 
   Future<void> _submitVouch() async {
-    final statement = _statementController.text.trim();
-    if (statement.length < 5) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Please write a short statement (at least 5 characters)."),
-          backgroundColor: Colors.redAccent,
-        ),
-      );
-      return;
-    }
-
     if (_isSubmitting) return;
     setState(() => _isSubmitting = true);
 
@@ -99,17 +159,51 @@ class _VouchBottomSheetState extends State<VouchBottomSheet> {
       return;
     }
 
+    final hasRel = _selectedRelationship != null && _selectedRelationship!.isNotEmpty;
+    final hasIntents = _selectedIntents.isNotEmpty;
+
+    if (!hasRel && !hasIntents) {
+      setState(() => _isSubmitting = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Please select a relationship context or at least one private intent tag."),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    final optionalNote = _optionalNoteController.text.trim();
+
+    // Pack into formatted statement backward compatible with raw string columns
+    final statementBuffer = StringBuffer();
+    if (hasRel) {
+      statementBuffer.write("REL:[$_selectedRelationship]");
+    }
+    if (hasIntents) {
+      if (statementBuffer.isNotEmpty) statementBuffer.write(" ");
+      statementBuffer.write("INTENTS:[${_selectedIntents.join(', ')}]");
+    }
+    if (optionalNote.isNotEmpty) {
+      if (statementBuffer.isNotEmpty) statementBuffer.write(" ");
+      statementBuffer.write("NOTE:[$optionalNote]");
+    }
+    final formattedStatement = statementBuffer.isEmpty ? "VOUCH" : statementBuffer.toString();
+
     try {
       String? announcementPostId;
 
-      // If user chose to broadcast to network or global feed
-      if (_selectedScope != 'profile_only') {
-        final postContent =
-            "Vouched for @${widget.targetUserName}\n\n\"$statement\"";
-
+      // Only publish public feed announcement if a public relationship context is chosen
+      if (hasRel && _selectedScope != 'profile_only') {
         try {
+          final announcementDisplay = StringBuffer();
+          announcementDisplay.write("Vouched for @${widget.targetUserName} as \"$_selectedRelationship\"");
+          if (optionalNote.isNotEmpty) {
+            announcementDisplay.write("\n\n\"$optionalNote\"");
+          }
+
           final post = await feedProvider.createPost(
-            postContent,
+            announcementDisplay.toString(),
             authorName: profileProvider.name,
             authorAvatarUrl: profileProvider.avatarUrl,
             connections: connectionProvider.connections,
@@ -126,17 +220,22 @@ class _VouchBottomSheetState extends State<VouchBottomSheet> {
       await vouchProvider.submitVouch(
         voucherId: myUserId,
         voucheeId: widget.targetUserId,
-        statement: statement,
-        feedScope: _selectedScope,
+        statement: formattedStatement,
+        feedScope: hasRel ? _selectedScope : 'profile_only',
         announcementPostId: announcementPostId,
+        relationshipType: _selectedRelationship,
+        privateIntents: _selectedIntents.toList(),
+        optionalNote: optionalNote.isNotEmpty ? optionalNote : null,
       );
 
       AnalyticsService.logEvent(
         name: 'vouch_submitted',
         parameters: {
           'target_user_id': widget.targetUserId,
-          'feed_scope': _selectedScope,
-          'char_count': statement.length,
+          'feed_scope': hasRel ? _selectedScope : 'profile_only',
+          'relationship_type': _selectedRelationship ?? 'none',
+          'private_intents_count': _selectedIntents.length,
+          'has_note': optionalNote.isNotEmpty,
         },
       );
 
@@ -145,16 +244,28 @@ class _VouchBottomSheetState extends State<VouchBottomSheet> {
         widget.onVouched?.call();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            backgroundColor: const Color(0xFF10B981),
+            backgroundColor: const Color(0xFF18191D),
             behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: BorderSide(
+                color: Colors.white.withValues(alpha: 0.15),
+                width: 1,
+              ),
+            ),
             content: Row(
               children: [
-                const Icon(Icons.verified_rounded, color: Colors.white, size: 20),
+                Icon(
+                  hasRel ? Icons.verified_rounded : Icons.lock_outline_rounded,
+                  color: Colors.white,
+                  size: 20,
+                ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    "You have officially vouched for ${widget.targetUserName}!",
+                    hasRel
+                        ? "You have officially vouched for ${widget.targetUserName}!"
+                        : "Confidential intent signaled for ${widget.targetUserName}!",
                     style: const TextStyle(
                       fontWeight: FontWeight.w600,
                       color: Colors.white,
@@ -215,8 +326,8 @@ class _VouchBottomSheetState extends State<VouchBottomSheet> {
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       border: Border.all(
-                        color: const Color(0xFFF59E0B),
-                        width: 2.0,
+                        color: Colors.white.withValues(alpha: 0.25),
+                        width: 1.5,
                       ),
                     ),
                     child: ClipOval(
@@ -262,11 +373,257 @@ class _VouchBottomSheetState extends State<VouchBottomSheet> {
                 ],
               ),
 
-              const SizedBox(height: 20),
+              const SizedBox(height: 22),
 
-              // Statement Input Label
+              // Section 1: Relationship Type (High Stakes Structured Options)
+              Row(
+                children: [
+                  Text(
+                    "RELATIONSHIP CONTEXT",
+                    style: context.captionText.copyWith(
+                      color: context.textSecondary,
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 1.2,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.12),
+                        width: 0.6,
+                      ),
+                    ),
+                    child: Text(
+                      _selectedRelationship != null ? "SELECTED" : "OPTIONAL",
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+
+              // Relationship cards
+              ..._relationshipOptions.map((opt) {
+                final isSelected = _selectedRelationship == opt.title;
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 8.0),
+                  child: InkWell(
+                    onTap: () {
+                      HapticFeedback.selectionClick();
+                      setState(() {
+                        if (_selectedRelationship == opt.title) {
+                          _selectedRelationship = null;
+                        } else {
+                          _selectedRelationship = opt.title;
+                        }
+                      });
+                    },
+                    borderRadius: BorderRadius.circular(12),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 150),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: isSelected
+                            ? Colors.white.withValues(alpha: 0.08)
+                            : context.surfaceSecondary,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: isSelected
+                              ? Colors.white
+                              : Colors.white.withValues(alpha: 0.08),
+                          width: isSelected ? 1.2 : 1.0,
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: isSelected
+                                  ? Colors.white.withValues(alpha: 0.15)
+                                  : Colors.white.withValues(alpha: 0.05),
+                            ),
+                            child: Icon(
+                              opt.icon,
+                              size: 18,
+                              color: isSelected
+                                  ? Colors.white
+                                  : context.textSecondary,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  opt.title,
+                                  style: TextStyle(
+                                    color: isSelected
+                                        ? Colors.white
+                                        : context.textPrimary,
+                                    fontSize: 13.5,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  opt.description,
+                                  style: TextStyle(
+                                    color: context.textMuted,
+                                    fontSize: 11.5,
+                                    height: 1.3,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          if (isSelected)
+                            const Icon(
+                              Icons.check_circle_rounded,
+                              color: Colors.white,
+                              size: 18,
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              }),
+
+              const SizedBox(height: 16),
+
+              // Section 2: Private Intent Tags (Matching Mechanics)
+              Row(
+                children: [
+                  Text(
+                    "PRIVATE INTENT TAGS",
+                    style: context.captionText.copyWith(
+                      color: context.textSecondary,
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 1.2,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.12),
+                        width: 0.6,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: const [
+                        Icon(
+                          Icons.lock_outline_rounded,
+                          size: 10,
+                          color: Colors.white70,
+                        ),
+                        SizedBox(width: 3),
+                        Text(
+                          "CONFIDENTIAL",
+                          style: TextStyle(
+                            color: Colors.white70,
+                            fontSize: 9.5,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
               Text(
-                "WHY DO YOU VOUCH FOR THEM?",
+                "Remains entirely hidden until a mutual match occurs.",
+                style: TextStyle(
+                  color: context.textMuted,
+                  fontSize: 11.5,
+                ),
+              ),
+              const SizedBox(height: 10),
+
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: _intentOptions.map((opt) {
+                  final isSelected = _selectedIntents.contains(opt.label);
+                  return Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: () {
+                        HapticFeedback.lightImpact();
+                        setState(() {
+                          if (isSelected) {
+                            _selectedIntents.remove(opt.label);
+                          } else {
+                            _selectedIntents.add(opt.label);
+                          }
+                        });
+                      },
+                      borderRadius: BorderRadius.circular(12),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 180),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: isSelected
+                              ? Colors.white.withValues(alpha: 0.12)
+                              : context.surfaceSecondary,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: isSelected
+                                ? Colors.white
+                                : Colors.white.withValues(alpha: 0.08),
+                            width: isSelected ? 1.2 : 1.0,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              isSelected ? Icons.check_circle_rounded : opt.icon,
+                              size: 15,
+                              color: isSelected ? Colors.white : context.textSecondary,
+                            ),
+                            const SizedBox(width: 7),
+                            Text(
+                              opt.label,
+                              style: TextStyle(
+                                color: isSelected ? Colors.white : context.textPrimary,
+                                fontSize: 12.5,
+                                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+
+              const SizedBox(height: 16),
+
+              // Section 3: Optional Endorsement Note
+              Text(
+                "NOTE / SPECIFIC HIGHLIGHT (OPTIONAL)",
                 style: context.captionText.copyWith(
                   color: context.textSecondary,
                   fontSize: 11,
@@ -276,120 +633,174 @@ class _VouchBottomSheetState extends State<VouchBottomSheet> {
               ),
               const SizedBox(height: 8),
 
-              // Statement TextField
               Container(
                 decoration: BoxDecoration(
                   color: context.surfaceSecondary,
-                  borderRadius: BorderRadius.circular(14),
+                  borderRadius: BorderRadius.circular(12),
                   border: Border.all(
                     color: Colors.white.withValues(alpha: 0.08),
                   ),
                 ),
                 child: TextField(
-                  controller: _statementController,
-                  maxLines: 3,
-                  maxLength: 300,
-                  style: TextStyle(color: context.textPrimary, fontSize: 14),
+                  controller: _optionalNoteController,
+                  maxLines: 2,
+                  maxLength: 250,
+                  style: TextStyle(color: context.textPrimary, fontSize: 13.5),
                   decoration: InputDecoration(
-                    hintText:
-                        "e.g. Exceptional builder, brilliant work ethic, one of the sharpest founders I've worked with...",
+                    hintText: "Add specific achievements or evidence if desired...",
                     hintStyle: TextStyle(
                       color: context.textMuted,
-                      fontSize: 13,
+                      fontSize: 12.5,
                     ),
-                    contentPadding: const EdgeInsets.all(14),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 12,
+                    ),
                     border: InputBorder.none,
                     counterStyle: TextStyle(
                       color: context.textMuted,
-                      fontSize: 11,
+                      fontSize: 10,
                     ),
                   ),
                 ),
               ),
 
-              const SizedBox(height: 18),
+              const SizedBox(height: 16),
 
-              // Broadcast Scope Selector
-              Text(
-                "ANNOUNCE TO",
-                style: context.captionText.copyWith(
-                  color: context.textSecondary,
-                  fontSize: 11,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 1.2,
+              if (_selectedRelationship != null && _selectedRelationship!.isNotEmpty) ...[
+                // Broadcast Scope Selector
+                Text(
+                  "ANNOUNCE TO",
+                  style: context.captionText.copyWith(
+                    color: context.textSecondary,
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 1.2,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 8),
+                const SizedBox(height: 8),
 
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildScopeOption(
-                      id: 'network',
-                      title: 'Private Network',
-                      subtitle: '1st & 2nd degree',
-                      icon: Icons.hub_rounded,
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildScopeOption(
+                        id: 'network',
+                        title: 'Private Network',
+                        subtitle: '1st & 2nd degree',
+                        icon: Icons.hub_rounded,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _buildScopeOption(
+                        id: 'global',
+                        title: 'Global Feed',
+                        subtitle: 'Everyone on Jana',
+                        icon: Icons.public_rounded,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _buildScopeOption(
+                        id: 'profile_only',
+                        title: 'Profile Only',
+                        subtitle: 'No feed post',
+                        icon: Icons.badge_rounded,
+                      ),
+                    ),
+                  ],
+                ),
+              ] else if (_selectedIntents.isNotEmpty) ...[
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.05),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.10),
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: _buildScopeOption(
-                      id: 'global',
-                      title: 'Global Feed',
-                      subtitle: 'Everyone on Jana',
-                      icon: Icons.public_rounded,
-                    ),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.lock_rounded,
+                        color: Colors.white70,
+                        size: 16,
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          "Private intent signals are 100% confidential. No public feed post will be created until mutual intent matches.",
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.70),
+                            fontSize: 11.5,
+                            height: 1.3,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: _buildScopeOption(
-                      id: 'profile_only',
-                      title: 'Profile Only',
-                      subtitle: 'No feed post',
-                      icon: Icons.badge_rounded,
-                    ),
-                  ),
-                ],
-              ),
+                ),
+              ],
 
               const SizedBox(height: 24),
 
               // Submit Button
-              ElevatedButton(
-                onPressed: _isSubmitting ? null : _submitVouch,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFF59E0B),
-                  foregroundColor: Colors.black,
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                ),
-                child: _isSubmitting
-                    ? const SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.black,
-                        ),
-                      )
-                    : Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Icon(Icons.verified_rounded, size: 20),
-                          const SizedBox(width: 8),
-                          Text(
-                            "Confirm & Vouch",
-                            style: context.bodyText.copyWith(
-                              color: Colors.black,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 15,
-                            ),
-                          ),
-                        ],
+              Builder(
+                builder: (context) {
+                  final hasRel = _selectedRelationship != null && _selectedRelationship!.isNotEmpty;
+                  final hasIntents = _selectedIntents.isNotEmpty;
+                  final canSubmit = !_isSubmitting && (hasRel || hasIntents);
+
+                  String buttonLabel = "Confirm & Vouch";
+                  if (!hasRel && hasIntents) {
+                    buttonLabel = "Signal Private Intent";
+                  }
+
+                  return ElevatedButton(
+                    onPressed: canSubmit ? _submitVouch : null,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: canSubmit ? Colors.white : Colors.white.withValues(alpha: 0.10),
+                      foregroundColor: canSubmit ? Colors.black : Colors.white38,
+                      disabledBackgroundColor: Colors.white.withValues(alpha: 0.10),
+                      disabledForegroundColor: Colors.white38,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
                       ),
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                    ),
+                    child: _isSubmitting
+                        ? const SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.black,
+                            ),
+                          )
+                        : Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                hasIntents && !hasRel
+                                    ? Icons.lock_outline_rounded
+                                    : Icons.verified_rounded,
+                                size: 20,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                buttonLabel,
+                                style: context.bodyText.copyWith(
+                                  color: canSubmit ? Colors.black : Colors.white38,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 15,
+                                ),
+                              ),
+                            ],
+                          ),
+                  );
+                },
               ),
             ],
           ),
@@ -416,14 +827,14 @@ class _VouchBottomSheetState extends State<VouchBottomSheet> {
         padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
         decoration: BoxDecoration(
           color: isSelected
-              ? const Color(0xFFF59E0B).withValues(alpha: 0.15)
+              ? Colors.white.withValues(alpha: 0.08)
               : context.surfaceSecondary,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: isSelected
-                ? const Color(0xFFF59E0B)
+                ? Colors.white
                 : Colors.white.withValues(alpha: 0.08),
-            width: isSelected ? 1.5 : 1.0,
+            width: isSelected ? 1.2 : 1.0,
           ),
         ),
         child: Column(
@@ -431,7 +842,7 @@ class _VouchBottomSheetState extends State<VouchBottomSheet> {
             Icon(
               icon,
               size: 20,
-              color: isSelected ? const Color(0xFFF59E0B) : context.textSecondary,
+              color: isSelected ? Colors.white : context.textSecondary,
             ),
             const SizedBox(height: 4),
             Text(

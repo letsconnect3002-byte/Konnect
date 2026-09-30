@@ -24,7 +24,7 @@ class ProfilePage extends StatefulWidget {
 class _ProfilePageState extends State<ProfilePage> {
   bool _isLoading = false; // set properly in initState based on data presence
   bool _qrGenerated = false;
-  String _selectedShareType = 'casual';
+  String _selectedShareType = 'both';
   String _selectedKeyType = 'single_use';
 
   @override
@@ -248,75 +248,6 @@ class _ProfilePageState extends State<ProfilePage> {
                         child: _buildQRFrame(context, qrImage, profileProvider),
                       ),
 
-                      // Active sharing type chip/card below QR code
-                      if (hasBasicDetails && _qrGenerated) ...[
-                        const SizedBox(height: 20),
-                        Center(
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 16, vertical: 12),
-                            decoration: BoxDecoration(
-                              color: context.surfacePrimary,
-                              borderRadius: BorderRadius.circular(
-                                  AppDimensions.radiusPremiumCard),
-                              border: Border.all(
-                                color: Colors.white.withValues(alpha: 0.04),
-                              ),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                // Glowing/active dot indicator
-                                Container(
-                                  width: 8,
-                                  height: 8,
-                                  decoration: BoxDecoration(
-                                    color: context.accentPrimary,
-                                    shape: BoxShape.circle,
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: context.accentPrimary
-                                            .withValues(alpha: 0.4),
-                                        blurRadius: 6,
-                                        spreadRadius: 2,
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  "Sharing: ${_selectedShareType.toUpperCase()}",
-                                  style: context.bodyText
-                                      .copyWith(fontWeight: FontWeight.w600),
-                                ),
-                                const SizedBox(width: 12),
-                                // Vertical divider
-                                Container(
-                                  width: 1,
-                                  height: 14,
-                                  color: Colors.white.withValues(alpha: 0.12),
-                                ),
-                                const SizedBox(width: 12),
-                                // Change action
-                                GestureDetector(
-                                  onTap: () =>
-                                      _showQrOptionsBottomSheet(context),
-                                  child: Text(
-                                    "Change",
-                                    style: TextStyle(
-                                      color: context.accentPrimary,
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.bold,
-                                      fontFamily: 'Inter',
-                                      decoration: TextDecoration.underline,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
                       const SizedBox(height: 28),
 
                       // Premium Asymmetric Dashboard Grid
@@ -630,7 +561,7 @@ class _ProfilePageState extends State<ProfilePage> {
                             ),
                             const SizedBox(height: 6),
                             Text(
-                              "Choose what you want to share before scanning",
+                              "Tap below to display your QR code",
                               style: TextStyle(
                                 color: context.textSecondary,
                                 fontSize: 12,
@@ -640,7 +571,9 @@ class _ProfilePageState extends State<ProfilePage> {
                             const SizedBox(height: 16),
                             ElevatedButton(
                               onPressed: () {
-                                _showQrOptionsBottomSheet(context);
+                                setState(() {
+                                  _qrGenerated = true;
+                                });
                               },
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: context.accentPrimary,
@@ -668,128 +601,8 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-  void _showQrOptionsBottomSheet(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setModalState) {
-            return GlassmorphicContainer(
-              borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(AppDimensions.radiusPremiumCard)),
-              border: Border(
-                top: BorderSide(
-                    color: Colors.white.withValues(alpha: 0.04), width: 1),
-              ),
-              padding: EdgeInsets.only(
-                left: 24,
-                right: 24,
-                top: 24,
-                bottom: 24 + MediaQuery.of(context).viewInsets.bottom,
-              ),
-              child: SafeArea(
-                child: SingleChildScrollView(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Center(
-                        child: Container(
-                          width: 40,
-                          height: 4,
-                          decoration: BoxDecoration(
-                            color: context.surfaceSecondary,
-                            borderRadius: BorderRadius.circular(2),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      Text(
-                        "Share Identity Options",
-                        style: TextStyle(
-                          color: context.textPrimary,
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          fontFamily: 'Inter',
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        "Select which digital card you want to share with this QR Code scan:",
-                        style: TextStyle(
-                          color: context.textSecondary,
-                          fontSize: 13,
-                          fontFamily: 'Inter',
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      _buildOptionTile(
-                        title: "Casual Card Only",
-                        subtitle: "Share bio, socials, name & basic details.",
-                        value: "casual",
-                        groupValue: _selectedShareType,
-                        onChanged: (val) {
-                          setModalState(() {
-                            _selectedShareType = val!;
-                          });
-                        },
-                      ),
-                      const SizedBox(height: 12),
-                      _buildOptionTile(
-                        title: "Professional Card Only",
-                        subtitle:
-                            "Share company, email, phone & professional bio.",
-                        value: "professional",
-                        groupValue: _selectedShareType,
-                        onChanged: (val) {
-                          setModalState(() {
-                            _selectedShareType = val!;
-                          });
-                        },
-                      ),
-                      const SizedBox(height: 24),
-                      ElevatedButton(
-                        onPressed: () {
-                          setState(() {
-                            _qrGenerated = true;
-                          });
-                          Navigator.pop(context);
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: context.accentPrimary,
-                          foregroundColor: Colors.black,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(
-                                AppDimensions.radiusComponent),
-                          ),
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                        ),
-                        child: const Text(
-                          "Generate QR Code",
-                          style: TextStyle(
-                            color: Colors.black,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 14,
-                            fontFamily: 'Inter',
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-
   void _showShareOptionsBottomSheet(
       BuildContext context, ProfileProvider profileProvider) {
-    String tempShareType = _selectedShareType;
     String tempKeyType = _selectedKeyType;
 
     showModalBottomSheet(
@@ -840,7 +653,7 @@ class _ProfilePageState extends State<ProfilePage> {
                       ),
                       const SizedBox(height: 6),
                       Text(
-                        "Select key duration and which digital card to share:",
+                        "Select key duration:",
                         style: TextStyle(
                           color: context.textSecondary,
                           fontSize: 13,
@@ -883,48 +696,10 @@ class _ProfilePageState extends State<ProfilePage> {
                           });
                         },
                       ),
-
-                      const SizedBox(height: 20),
-
-                      // 2. Card to Share Section
-                      Text(
-                        "DIGITAL CARD TO SHARE",
-                        style: TextStyle(
-                          color: context.textMuted,
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 0.8,
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      _buildOptionTile(
-                        title: "Casual Card Only",
-                        subtitle: "Share bio, socials, name & basic details.",
-                        value: "casual",
-                        groupValue: tempShareType,
-                        onChanged: (val) {
-                          setModalState(() {
-                            tempShareType = val!;
-                          });
-                        },
-                      ),
-                      const SizedBox(height: 10),
-                      _buildOptionTile(
-                        title: "Professional Card Only",
-                        subtitle:
-                            "Share company, email, phone & professional bio.",
-                        value: "professional",
-                        groupValue: tempShareType,
-                        onChanged: (val) {
-                          setModalState(() {
-                            tempShareType = val!;
-                          });
-                        },
-                      ),
                       const SizedBox(height: 24),
                       ElevatedButton(
                         onPressed: () {
-                          _selectedShareType = tempShareType;
+                          _selectedShareType = 'both';
                           _selectedKeyType = tempKeyType;
                           Navigator.pop(context);
                           _shareProfile(profileProvider);

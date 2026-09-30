@@ -644,14 +644,14 @@ class PostCard extends StatelessWidget {
           curve: Curves.easeInOut,
           decoration: BoxDecoration(
             color: isHighlighted
-                ? context.accentPrimary.withValues(alpha: 0.08)
+                ? context.accentPrimary.withValues(alpha: 0.09)
                 : (isSelectedTarget
                     ? context.accentPrimary.withValues(alpha: 0.05)
                     : Colors.transparent),
             borderRadius: BorderRadius.circular(isHighlighted ? 16 : 0),
             border: isHighlighted
                 ? Border.all(
-                    color: context.accentPrimary.withValues(alpha: 0.28),
+                    color: context.accentPrimary.withValues(alpha: 0.22),
                     width: 1.0)
                 : null,
           ),
@@ -736,37 +736,63 @@ class PostCard extends StatelessWidget {
                           const SizedBox(height: 4),
                         ],
                         Row(
-                          crossAxisAlignment: CrossAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Expanded(
-                              child: Wrap(
-                                spacing: 6,
-                                runSpacing: 2,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  GestureDetector(
-                                    onTap: () => _openUserProfile(context),
-                                    child: Text(
-                                      post.isDeleted
-                                          ? "Deleted User"
-                                          : post.authorName,
-                                      style: TextStyle(
-                                        color: post.isDeleted
-                                            ? context.textMuted
-                                            : context.textPrimary,
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.bold,
+                                  Wrap(
+                                    spacing: 6,
+                                    runSpacing: 2,
+                                    crossAxisAlignment: WrapCrossAlignment.center,
+                                    children: [
+                                      GestureDetector(
+                                        onTap: () => _openUserProfile(context),
+                                        child: Text(
+                                          post.isDeleted
+                                              ? "Deleted User"
+                                              : post.authorName,
+                                          style: TextStyle(
+                                            color: post.isDeleted
+                                                ? context.textMuted
+                                                : context.textPrimary,
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ),
+                                      if (!post.isDeleted)
+                                        _buildDegreeBadge(context, isMe: isMe),
+                                      Text(
+                                        "• ${_formatTimeAgo(post.createdAt)}",
+                                        style: TextStyle(
+                                          color: context.textMuted,
+                                          fontSize: 11,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  if (post.authorProfession != null &&
+                                      post.authorProfession!.trim().isNotEmpty &&
+                                      !post.isAnonymous &&
+                                      !post.isDeleted) ...[
+                                    const SizedBox(height: 2),
+                                    GestureDetector(
+                                      onTap: () => _openUserProfile(context),
+                                      child: Text(
+                                        post.authorProfession!.trim(),
+                                        style: TextStyle(
+                                          color: context.textSecondary,
+                                          fontSize: 11.5,
+                                          fontWeight: FontWeight.w400,
+                                          fontFamily: 'Inter',
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
                                       ),
                                     ),
-                                  ),
-                                  if (!post.isDeleted)
-                                    _buildDegreeBadge(context, isMe: isMe),
-                                  Text(
-                                    "• ${_formatTimeAgo(post.createdAt)}",
-                                    style: TextStyle(
-                                      color: context.textMuted,
-                                      fontSize: 11,
-                                    ),
-                                  ),
+                                  ],
                                 ],
                               ),
                             ),
@@ -843,15 +869,15 @@ class PostCard extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             decoration: BoxDecoration(
               color: isHighlighted
-                  ? context.accentPrimary.withValues(alpha: 0.08)
+                  ? context.accentPrimary.withValues(alpha: 0.09)
                   : Colors.transparent,
               borderRadius: BorderRadius.circular(isHighlighted ? 16 : 0),
-              border: Border.all(
-                color: isHighlighted
-                    ? context.accentPrimary.withValues(alpha: 0.28)
-                    : Colors.transparent,
-                width: 1.0,
-              ),
+              border: isHighlighted
+                  ? Border.all(
+                      color: context.accentPrimary.withValues(alpha: 0.22),
+                      width: 1.0,
+                    )
+                  : null,
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -931,35 +957,61 @@ class PostCard extends StatelessWidget {
                     const SizedBox(height: 4),
                   ],
                   Row(
-                    crossAxisAlignment: CrossAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Expanded(
-                        child: Wrap(
-                          spacing: 6,
-                          runSpacing: 2,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            GestureDetector(
-                              onTap: () => _openUserProfile(context),
-                              child: Text(
-                                post.isDeleted ? "Deleted User" : post.authorName,
-                                style: TextStyle(
-                                  color: post.isDeleted
-                                      ? context.textMuted
-                                      : context.textPrimary,
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.bold,
+                            Wrap(
+                              spacing: 6,
+                              runSpacing: 2,
+                              crossAxisAlignment: WrapCrossAlignment.center,
+                              children: [
+                                GestureDetector(
+                                  onTap: () => _openUserProfile(context),
+                                  child: Text(
+                                    post.isDeleted ? "Deleted User" : post.authorName,
+                                    style: TextStyle(
+                                      color: post.isDeleted
+                                          ? context.textMuted
+                                          : context.textPrimary,
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                                if (!post.isDeleted)
+                                  _buildDegreeBadge(context, isMe: isMe),
+                                Text(
+                                  "• ${_formatTimeAgo(post.createdAt)}",
+                                  style: TextStyle(
+                                    color: context.textMuted,
+                                    fontSize: 11,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            if (post.authorProfession != null &&
+                                post.authorProfession!.trim().isNotEmpty &&
+                                !post.isAnonymous &&
+                                !post.isDeleted) ...[
+                              const SizedBox(height: 2),
+                              GestureDetector(
+                                onTap: () => _openUserProfile(context),
+                                child: Text(
+                                  post.authorProfession!.trim(),
+                                  style: TextStyle(
+                                    color: context.textSecondary,
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.w400,
+                                    fontFamily: 'Inter',
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                               ),
-                            ),
-                            if (!post.isDeleted)
-                              _buildDegreeBadge(context, isMe: isMe),
-                            Text(
-                              "• ${_formatTimeAgo(post.createdAt)}",
-                              style: TextStyle(
-                                color: context.textMuted,
-                                fontSize: 11,
-                              ),
-                            ),
+                            ],
                           ],
                         ),
                       ),
