@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:connect/Config/app_theme.dart';
 import 'package:connect/Models/vouch_model.dart';
 import 'package:connect/Providers/vouch_provider.dart';
 import 'package:connect/Pages/ConnectionProfilePage.dart';
 import 'package:connect/Providers/profile_provider.dart';
+import 'package:connect/Widgets/vouch_bottom_sheet.dart';
 
 class VouchesListWidget extends StatefulWidget {
   final int userId;
@@ -32,6 +34,24 @@ class _VouchesListWidgetState extends State<VouchesListWidget> {
             .loadVouches(widget.userId);
       }
     });
+  }
+
+  void _openVouchSheet(BuildContext context) {
+    final pProvider = Provider.of<ProfileProvider>(context, listen: false);
+    final myId = pProvider.userId;
+    if (myId == null || widget.userId == 0 || myId == widget.userId) return;
+
+    VouchBottomSheet.show(
+      context: context,
+      targetUserId: widget.userId,
+      targetUserName: widget.userName,
+      onVouched: () {
+        if (mounted) {
+          Provider.of<VouchProvider>(context, listen: false)
+              .loadVouches(widget.userId);
+        }
+      },
+    );
   }
 
   String _formatTimeAgo(DateTime date) {
@@ -69,6 +89,7 @@ class _VouchesListWidgetState extends State<VouchesListWidget> {
         (v.relationshipType != null && v.relationshipType!.trim().isNotEmpty) ||
         (v.optionalNote != null && v.optionalNote!.trim().isNotEmpty)).toList();
     final bool isLoading = vouchProvider.isLoading(widget.userId);
+    final String firstName = widget.userName.trim().split(RegExp(r'\s+')).first;
 
     if (isLoading && vouches.isEmpty) {
       return const Padding(
@@ -84,60 +105,150 @@ class _VouchesListWidgetState extends State<VouchesListWidget> {
     }
 
     if (vouches.isEmpty) {
-      if (widget.isOwnProfile) {
-        return Container(
-          margin: const EdgeInsets.only(top: 8, bottom: 20),
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: context.surfacePrimary,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: Colors.white.withValues(alpha: 0.05),
-            ),
-          ),
-          child: Row(
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Colors.white.withValues(alpha: 0.06),
-                ),
-                child: Icon(
-                  Icons.shield_outlined,
-                  color: context.textSecondary,
-                  size: 20,
+              const Text(
+                'VOUCHES (0)',
+                style: TextStyle(
+                  color: Color(0xFFA1A4B0),
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 1.5,
+                  fontFamily: 'Inter',
                 ),
               ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      "No vouches yet",
-                      style: context.bodyText.copyWith(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
+              if (!widget.isOwnProfile)
+                Consumer<ProfileProvider>(
+                  builder: (context, pProvider, _) {
+                    final myId = pProvider.userId;
+                    final hasVouched = (myId != null && widget.userId != 0)
+                        ? vouchProvider.hasVouchedFor(myId, widget.userId)
+                        : false;
+                    if (hasVouched) return const SizedBox.shrink();
+
+                    return GestureDetector(
+                      onTap: () {
+                        HapticFeedback.lightImpact();
+                        _openVouchSheet(context);
+                      },
+                      child: const Text(
+                        '+ Vouch',
+                        style: TextStyle(
+                          color: Color(0xFF00F2FE),
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          fontFamily: 'Inter',
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      "When trusted connections back you, their endorsements will appear here.",
-                      style: context.captionText.copyWith(
-                        color: context.textMuted,
-                        fontSize: 12,
-                        height: 1.3,
-                      ),
-                    ),
-                  ],
+                    );
+                  },
                 ),
-              ),
             ],
           ),
-        );
-      }
-      return const SizedBox.shrink();
+          const SizedBox(height: 10),
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 20),
+            decoration: BoxDecoration(
+              color: const Color(0xFF0F1013),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.08),
+                width: 1,
+              ),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: const Color(0xFF00F2FE).withValues(alpha: 0.10),
+                    border: Border.all(
+                      color: const Color(0xFF00F2FE).withValues(alpha: 0.20),
+                      width: 1,
+                    ),
+                  ),
+                  child: const Center(
+                    child: Icon(
+                      Icons.shield_outlined,
+                      color: Color(0xFF00F2FE),
+                      size: 18,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                const Text(
+                  "No vouches yet",
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                    fontFamily: 'Inter',
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  widget.isOwnProfile
+                      ? "When trusted connections back you, their endorsements will appear here."
+                      : "Be the first to endorse $firstName's work, skills, and character on Jana.",
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: Color(0xFFA1A4B0),
+                    fontSize: 11.5,
+                    height: 1.4,
+                    fontFamily: 'Inter',
+                  ),
+                ),
+                if (!widget.isOwnProfile) ...[
+                  const SizedBox(height: 16),
+                  Consumer<ProfileProvider>(
+                    builder: (context, pProvider, _) {
+                      final myId = pProvider.userId;
+                      final hasVouched = (myId != null && widget.userId != 0)
+                          ? vouchProvider.hasVouchedFor(myId, widget.userId)
+                          : false;
+                      if (hasVouched) return const SizedBox.shrink();
+
+                      return ElevatedButton.icon(
+                        onPressed: () {
+                          HapticFeedback.lightImpact();
+                          _openVouchSheet(context);
+                        },
+                        icon: const Icon(Icons.add_rounded,
+                            color: Colors.black, size: 16),
+                        label: Text(
+                          "Vouch for $firstName",
+                          style: const TextStyle(
+                            color: Colors.black,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            fontFamily: 'Inter',
+                          ),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.white,
+                          foregroundColor: Colors.black,
+                          elevation: 0,
+                          shape: const StadiumBorder(),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 20, vertical: 10),
+                        ),
+                      );
+                    },
+                  ),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+        ],
+      );
     }
 
     return Column(
@@ -147,28 +258,45 @@ class _VouchesListWidgetState extends State<VouchesListWidget> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Row(
-              children: [
-                Icon(
-                  Icons.verified_outlined,
-                  color: context.textSecondary,
-                  size: 15,
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  'VOUCHES (${vouches.length})',
-                  style: context.captionText.copyWith(
-                    color: context.textSecondary,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: 1.2,
-                    fontSize: 12,
-                  ),
-                ),
-              ],
+            Text(
+              'VOUCHES (${vouches.length})',
+              style: const TextStyle(
+                color: Color(0xFFA1A4B0),
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 1.5,
+                fontFamily: 'Inter',
+              ),
             ),
+            if (!widget.isOwnProfile)
+              Consumer<ProfileProvider>(
+                builder: (context, pProvider, _) {
+                  final myId = pProvider.userId;
+                  final hasVouched = (myId != null && widget.userId != 0)
+                      ? vouchProvider.hasVouchedFor(myId, widget.userId)
+                      : false;
+                  if (hasVouched) return const SizedBox.shrink();
+
+                  return GestureDetector(
+                    onTap: () {
+                      HapticFeedback.lightImpact();
+                      _openVouchSheet(context);
+                    },
+                    child: const Text(
+                      '+ Vouch',
+                      style: TextStyle(
+                        color: Color(0xFF00F2FE),
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        fontFamily: 'Inter',
+                      ),
+                    ),
+                  );
+                },
+              ),
           ],
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 10),
 
         // List of Vouchers
         ListView.separated(
@@ -391,7 +519,7 @@ class _VouchesListWidgetState extends State<VouchesListWidget> {
                 ),
               ),
               child: Text(
-                "“${vouch.statement}”",
+                "“${vouch.displayStatement}”",
                 style: TextStyle(
                   color: Colors.white.withValues(alpha: 0.88),
                   fontSize: 13,

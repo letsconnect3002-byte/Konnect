@@ -3,6 +3,9 @@ import 'package:connect/Pages/IndividualChatPage.dart';
 import 'package:connect/Providers/connection_provider.dart';
 import 'package:connect/Providers/chat_provider.dart';
 import 'package:connect/Providers/notification_provider.dart';
+import 'package:connect/Providers/profile_provider.dart';
+import 'package:connect/Providers/vouch_provider.dart';
+import 'package:connect/Providers/feed_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -77,10 +80,27 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
       String id, ConnectionProvider provider) async {
     try {
       final intId = int.tryParse(id) ?? 0;
+      final myUserId =
+          Provider.of<ProfileProvider>(context, listen: false).userId;
+      final chatProvider = Provider.of<ChatProvider>(context, listen: false);
+      final vouchProvider = Provider.of<VouchProvider>(context, listen: false);
+      final feedProvider = Provider.of<FeedProvider>(context, listen: false);
+
       await provider.deleteProfile(intId,
           onRoomCleanup: (profileId, roomId) async {
-        await Provider.of<ChatProvider>(context, listen: false)
-            .handleRoomCleanup(profileId, roomId);
+        await chatProvider.handleRoomCleanup(profileId, roomId);
+      }, onVouchCleanup: () async {
+        if (myUserId != null && intId != 0) {
+          try {
+            await vouchProvider.deleteVouchesBetween(
+                userId1: myUserId, userId2: intId);
+          } catch (e) {
+            debugPrint("Error deleting vouches in cleanup: $e");
+          }
+          try {
+            feedProvider.fetchInitialFeed(silent: true);
+          } catch (_) {}
+        }
       });
     } catch (e) {
       print("Error deleting profile locally: $e");

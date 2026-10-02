@@ -34,6 +34,7 @@
 			<key>CFBundleURLSchemes</key>
 			<array>
 				<string>connectapp</string>
+				<string>jana</string>
 			</array>
 		</dict>
 		<dict>

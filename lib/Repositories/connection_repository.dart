@@ -138,8 +138,7 @@ class SupabaseConnectionRepository implements ConnectionRepository {
     await _client
         .from('user_connections')
         .delete()
-        .eq('user_id_1', id1)
-        .eq('user_id_2', id2);
+        .or('and(user_id_1.eq.$id1,user_id_2.eq.$id2),and(user_id_1.eq.$id2,user_id_2.eq.$id1)');
   }
 
   @override

@@ -1,6 +1,7 @@
 import 'package:connect/Models/app_error.dart';
 import 'package:connect/Repositories/connection_repository.dart';
 import 'package:connect/Repositories/notification_repository.dart';
+import 'package:connect/Repositories/vouch_repository.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -24,13 +25,16 @@ class UserConnectionError extends UserConnectionState {
 class ConnectionProvider with ChangeNotifier {
   final ConnectionRepository _repository;
   final NotificationRepository _notificationRepository;
+  final VouchRepository _vouchRepository;
 
   ConnectionProvider({
     ConnectionRepository? connectionRepository,
     NotificationRepository? notificationRepository,
+    VouchRepository? vouchRepository,
   })  : _repository = connectionRepository ?? SupabaseConnectionRepository(),
         _notificationRepository =
-            notificationRepository ?? SupabaseNotificationRepository();
+            notificationRepository ?? SupabaseNotificationRepository(),
+        _vouchRepository = vouchRepository ?? SupabaseVouchRepository();
 
   int? _userId;
   int? get userId => _userId;
@@ -352,6 +356,14 @@ class ConnectionProvider with ChangeNotifier {
         print("Non-fatal error deleting connection notifications: $notifErr");
       }
 
+      // Delete vouches between the users
+      try {
+        await _vouchRepository.deleteVouchesBetween(userId1: idA, userId2: idB);
+        print("Deleted vouches between $idA and $idB");
+      } catch (vouchErr) {
+        print("Non-fatal error deleting vouches: $vouchErr");
+      }
+
       await fetchConnections(silent: true);
       notifyListeners();
     } catch (e) {
@@ -425,8 +437,8 @@ class ConnectionProvider with ChangeNotifier {
   }
 
   Future<void> deleteProfile(int id,
-      {Future<void> Function(int profileId, String? roomId)?
-          onRoomCleanup}) async {
+      {Future<void> Function(int profileId, String? roomId)? onRoomCleanup,
+      Future<void> Function()? onVouchCleanup}) async {
     final myUserId = _userId;
     if (myUserId == null) return;
 
@@ -457,6 +469,9 @@ class ConnectionProvider with ChangeNotifier {
         await disconnectUsers(myUserId, id);
         if (onRoomCleanup != null) {
           await onRoomCleanup(id, roomId);
+        }
+        if (onVouchCleanup != null) {
+          await onVouchCleanup();
         }
         await fetchConnections(silent: true);
       } catch (e) {

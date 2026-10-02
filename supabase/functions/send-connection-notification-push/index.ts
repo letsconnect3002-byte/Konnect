@@ -160,6 +160,15 @@ serve(async (req) => {
         msg = note
       }
       bodyText = msg.trim() ? `${actorName}: ${msg.trim()}` : `${actorName} sent you a direct connection request`
+    } else if (type === "vouch_request") {
+      title = "New Vouch Request"
+      bodyText = `${actorName} wants to connect & vouched for you`
+    } else if (type === "vouch_received") {
+      title = "New Endorsement"
+      bodyText = `${actorName} vouched for you on your profile`
+    } else if (type === "vouch_accepted") {
+      title = "Vouch Accepted"
+      bodyText = `${actorName} accepted your vouch and connected with you!`
     } else {
       // Fallback for other potential types
       title = "New Connection"

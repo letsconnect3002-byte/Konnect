@@ -13,6 +13,7 @@ class VouchBottomSheet extends StatefulWidget {
   final String targetUserName;
   final String targetUserAvatar;
   final String targetUserProfession;
+  final String? initialScope;
   final VoidCallback? onVouched;
 
   const VouchBottomSheet({
@@ -21,6 +22,7 @@ class VouchBottomSheet extends StatefulWidget {
     required this.targetUserName,
     this.targetUserAvatar = '',
     this.targetUserProfession = '',
+    this.initialScope,
     this.onVouched,
   });
 
@@ -30,6 +32,7 @@ class VouchBottomSheet extends StatefulWidget {
     required String targetUserName,
     String targetUserAvatar = '',
     String targetUserProfession = '',
+    String? initialScope,
     VoidCallback? onVouched,
   }) {
     return showModalBottomSheet(
@@ -44,6 +47,7 @@ class VouchBottomSheet extends StatefulWidget {
         targetUserName: targetUserName,
         targetUserAvatar: targetUserAvatar,
         targetUserProfession: targetUserProfession,
+        initialScope: initialScope,
         onVouched: onVouched,
       ),
     );
@@ -126,8 +130,19 @@ class _VouchBottomSheetState extends State<VouchBottomSheet> {
 
   final TextEditingController _optionalNoteController = TextEditingController();
 
-  String _selectedScope = 'network'; // 'network', 'global', 'profile_only'
+  late String _selectedScope; // 'inner_circle', 'network', 'global', 'profile_only'
   bool _isSubmitting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final init = widget.initialScope?.trim().toLowerCase();
+    if (init == 'inner_circle' || init == 'network' || init == 'global' || init == 'profile_only') {
+      _selectedScope = init!;
+    } else {
+      _selectedScope = 'inner_circle';
+    }
+  }
 
   @override
   void dispose() {
@@ -192,9 +207,10 @@ class _VouchBottomSheetState extends State<VouchBottomSheet> {
 
     try {
       String? announcementPostId;
+      final isConnected = connectionProvider.isConnected(widget.targetUserId);
 
-      // Only publish public feed announcement if a public relationship context is chosen
-      if (hasRel && _selectedScope != 'profile_only') {
+      // Only publish public feed announcement if already connected and a public relationship context is chosen
+      if (isConnected && hasRel && _selectedScope != 'profile_only') {
         try {
           final announcementDisplay = StringBuffer();
           announcementDisplay.write("Vouched for @${widget.targetUserName} as \"$_selectedRelationship\"");
@@ -236,12 +252,19 @@ class _VouchBottomSheetState extends State<VouchBottomSheet> {
           'relationship_type': _selectedRelationship ?? 'none',
           'private_intents_count': _selectedIntents.length,
           'has_note': optionalNote.isNotEmpty,
+          'is_connected': isConnected,
         },
       );
 
       if (mounted) {
         Navigator.pop(context);
         widget.onVouched?.call();
+        final successMessage = isConnected
+            ? (hasRel
+                ? "You have officially vouched for ${widget.targetUserName}!"
+                : "Confidential intent signaled for ${widget.targetUserName}!")
+            : "Vouch & connection request sent to ${widget.targetUserName}!";
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             backgroundColor: const Color(0xFF18191D),
@@ -256,16 +279,16 @@ class _VouchBottomSheetState extends State<VouchBottomSheet> {
             content: Row(
               children: [
                 Icon(
-                  hasRel ? Icons.verified_rounded : Icons.lock_outline_rounded,
+                  isConnected
+                      ? (hasRel ? Icons.verified_rounded : Icons.lock_outline_rounded)
+                      : Icons.send_rounded,
                   color: Colors.white,
                   size: 20,
                 ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    hasRel
-                        ? "You have officially vouched for ${widget.targetUserName}!"
-                        : "Confidential intent signaled for ${widget.targetUserName}!",
+                    successMessage,
                     style: const TextStyle(
                       fontWeight: FontWeight.w600,
                       color: Colors.white,
@@ -684,18 +707,31 @@ class _VouchBottomSheetState extends State<VouchBottomSheet> {
                   children: [
                     Expanded(
                       child: _buildScopeOption(
-                        id: 'network',
-                        title: 'Private Network',
-                        subtitle: '1st & 2nd degree',
-                        icon: Icons.hub_rounded,
+                        id: 'inner_circle',
+                        title: 'Inner Circle',
+                        subtitle: 'Direct 1° only',
+                        icon: Icons.people_alt_rounded,
                       ),
                     ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: _buildScopeOption(
+                        id: 'network',
+                        title: 'Network',
+                        subtitle: '1° & 2° degree',
+                        icon: Icons.hub_rounded,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildScopeOption(
                         id: 'global',
                         title: 'Global Feed',
-                        subtitle: 'Everyone on Jana',
+                        subtitle: 'Everyone on Mandala',
                         icon: Icons.public_rounded,
                       ),
                     ),
@@ -823,11 +859,12 @@ class _VouchBottomSheetState extends State<VouchBottomSheet> {
         setState(() => _selectedScope = id);
       },
       borderRadius: BorderRadius.circular(12),
-      child: Container(
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
         padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
         decoration: BoxDecoration(
           color: isSelected
-              ? Colors.white.withValues(alpha: 0.08)
+              ? Colors.white.withValues(alpha: 0.12)
               : context.surfaceSecondary,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
@@ -858,7 +895,7 @@ class _VouchBottomSheetState extends State<VouchBottomSheet> {
             Text(
               subtitle,
               style: TextStyle(
-                color: context.textMuted,
+                color: isSelected ? Colors.white70 : context.textMuted,
                 fontSize: 9.5,
               ),
               textAlign: TextAlign.center,

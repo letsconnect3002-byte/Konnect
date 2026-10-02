@@ -14,6 +14,7 @@ class UserVouch {
   final String? contextTag;
   final String? optionalNote;
   final List<String> privateIntents;
+  final String status;
 
   const UserVouch({
     required this.id,
@@ -31,6 +32,7 @@ class UserVouch {
     this.contextTag,
     this.optionalNote,
     this.privateIntents = const [],
+    this.status = 'accepted',
   });
 
   factory UserVouch.fromJson(Map<String, dynamic> json) {
@@ -133,6 +135,7 @@ class UserVouch {
       contextTag: ctxTag,
       optionalNote: optNote,
       privateIntents: parsedIntents,
+      status: json['status']?.toString() ?? 'accepted',
     );
   }
 
@@ -149,7 +152,12 @@ class UserVouch {
       }
       return buffer.toString();
     }
-    return statement;
+    final clean = statement
+        .replaceAll(RegExp(r'INTENTS:\[.*?\]'), '')
+        .replaceAll(RegExp(r'REL:\[.*?\]'), '')
+        .replaceAll(RegExp(r'TAG:\[.*?\]'), '')
+        .trim();
+    return clean.isNotEmpty ? clean : (relationshipType ?? 'Vouched');
   }
 
   Map<String, dynamic> toJson() {
@@ -164,6 +172,7 @@ class UserVouch {
       'relationship_type': relationshipType,
       'private_intents': privateIntents,
       'optional_note': optionalNote,
+      'status': status,
     };
   }
 }

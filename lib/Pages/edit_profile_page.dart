@@ -22,6 +22,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
   String _avatarUrl = _defaultAvatarUrl;
 
   late TextEditingController _nameController;
+  late TextEditingController _handleController;
   late TextEditingController _professionController;
   late TextEditingController _companyController;
   late TextEditingController _emailController;
@@ -38,6 +39,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
     final provider = Provider.of<ProfileProvider>(context, listen: false);
 
     _nameController = TextEditingController(text: provider.name);
+    _handleController = TextEditingController(text: provider.handle);
     _professionController = TextEditingController(text: provider.profession);
     _companyController = TextEditingController(text: provider.company);
     final initialEmail = provider.email.isNotEmpty ? provider.email : provider.professionalEmail;
@@ -58,6 +60,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
     _phoneFocusNode = FocusNode();
 
     _nameController.addListener(_onFieldChanged);
+    _handleController.addListener(_onFieldChanged);
     _professionController.addListener(_onFieldChanged);
     _companyController.addListener(_onFieldChanged);
     _emailController.addListener(_onFieldChanged);
@@ -68,6 +71,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
   @override
   void dispose() {
     _nameController.removeListener(_onFieldChanged);
+    _handleController.removeListener(_onFieldChanged);
     _professionController.removeListener(_onFieldChanged);
     _companyController.removeListener(_onFieldChanged);
     _emailController.removeListener(_onFieldChanged);
@@ -75,6 +79,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
     _bioController.removeListener(_onFieldChanged);
 
     _nameController.dispose();
+    _handleController.dispose();
     _professionController.dispose();
     _companyController.dispose();
     _emailController.dispose();
@@ -119,6 +124,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
         : '';
 
     return _nameController.text.trim() != provider.name ||
+        _handleController.text.trim().replaceAll('@', '') != provider.handle ||
         _professionController.text.trim() != provider.profession ||
         _emailController.text.trim() != provider.email ||
         phoneToCompare != provider.phoneNumber ||
@@ -141,6 +147,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
           : '';
 
       provider.setValue('name', _nameController.text.trim());
+      provider.setValue('handle', _handleController.text.trim().replaceAll('@', ''));
       provider.setValue('profession', _professionController.text.trim());
       if (provider.currentCompany.isNotEmpty) {
         provider.setValue('company', provider.currentCompany);
@@ -1078,15 +1085,45 @@ class _EditProfilePageState extends State<EditProfilePage> {
           centerTitle: true,
           actions: [
             Padding(
-              padding: const EdgeInsets.only(right: 8),
-              child: TextButton(
-                onPressed: (hasChanges && !_isSaving) ? _saveProfile : null,
-                child: Text(
-                  "Done",
-                  style: TextStyle(
-                    color: hasChanges ? context.accentSecondary : context.textMuted,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
+              padding: const EdgeInsets.only(right: 12),
+              child: Center(
+                child: SizedBox(
+                  height: 32,
+                  child: ElevatedButton(
+                    onPressed: (hasChanges && !_isSaving) ? _saveProfile : null,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.white,
+                      foregroundColor: Colors.black,
+                      disabledBackgroundColor:
+                          Colors.white.withValues(alpha: 0.15),
+                      disabledForegroundColor: Colors.white38,
+                      elevation: 0,
+                      shadowColor: Colors.transparent,
+                      padding: const EdgeInsets.symmetric(horizontal: 14),
+                      minimumSize: const Size(0, 32),
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    child: _isSaving
+                        ? const SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor:
+                                  AlwaysStoppedAnimation<Color>(Colors.black),
+                            ),
+                          )
+                        : const Text(
+                            "Save",
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                              fontFamily: 'Inter',
+                            ),
+                          ),
                   ),
                 ),
               ),
@@ -1177,11 +1214,22 @@ class _EditProfilePageState extends State<EditProfilePage> {
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(color: context.borderMuted),
                     ),
-                    child: _buildCompactField(
-                      label: 'Full Name',
-                      hint: 'Jordan Miller',
-                      controller: _nameController,
-                      icon: Icons.person_outline_rounded,
+                    child: Column(
+                      children: [
+                        _buildCompactField(
+                          label: 'Full Name',
+                          hint: 'Jordan Miller',
+                          controller: _nameController,
+                          icon: Icons.person_outline_rounded,
+                        ),
+                        const SizedBox(height: 12),
+                        _buildCompactField(
+                          label: 'Handle',
+                          hint: 'username',
+                          controller: _handleController,
+                          icon: Icons.alternate_email_rounded,
+                        ),
+                      ],
                     ),
                   ),
 

@@ -111,6 +111,7 @@ class ProfileProvider with ChangeNotifier {
   String anonName = '';
   String gender = '';
   String spotify = '';
+  String handle = '';
   List<CustomLink> customLinks = [];
   List<ExperienceItem> experience = [];
   List<EducationItem> education = [];
@@ -252,6 +253,7 @@ class ProfileProvider with ChangeNotifier {
     avatarUrl = '';
     anonName = '';
     gender = '';
+    handle = '';
     customLinks = [];
     vibeTag = '';
     interestTags = [];
@@ -392,9 +394,49 @@ class ProfileProvider with ChangeNotifier {
         return instagram;
       case 'spotify':
         return spotify;
+      case 'handle':
+        return handle;
       default:
         return null;
     }
+  }
+
+  // Helper to generate a URL-safe handle slug
+  static String generateHandleSlug(String input) {
+    var s = input.toLowerCase().trim().replaceAll('@', '');
+    s = s.replaceAll(RegExp(r'[^a-z0-9_.-]+'), '');
+    return s.isEmpty ? 'user' : s;
+  }
+
+  // Generates a smart handle with "name<4 digits>" combining date/time and unique user ID
+  static String generateSmartHandle({
+    required String baseName,
+    required String ownerId,
+    DateTime? dateTime,
+  }) {
+    var clean = baseName.toLowerCase().trim().replaceAll('@', '');
+    clean = clean.replaceAll(RegExp(r'[^a-z0-9]+'), '');
+    if (clean.isEmpty || clean == 'user') {
+      clean = 'user';
+    }
+
+    final ts = (dateTime ?? DateTime.now()).toUtc();
+    // 2 digits smartly derived from date and time (range: 10 - 99)
+    final int timeNum = ((ts.day * 60 + ts.minute) % 90) + 10;
+
+    // 2 digits smartly derived from unique ID (range: 10 - 99)
+    final cleanId = ownerId.replaceAll(RegExp(r'[^0-9a-fA-F]'), '');
+    int idValue = 0;
+    if (cleanId.length >= 4) {
+      idValue = int.tryParse(cleanId.substring(cleanId.length - 4), radix: 16) ?? 0;
+    } else {
+      idValue = ownerId.hashCode.abs();
+    }
+    final int idNum = (idValue % 90) + 10;
+
+    // Deterministic 4-digit number: 1010 - 9999
+    final int fourDigitNumber = (timeNum * 100) + idNum;
+    return '$clean$fourDigitNumber';
   }
 
   // Helper to get or create a unique owner_id for this device
@@ -442,10 +484,18 @@ class ProfileProvider with ChangeNotifier {
             : '';
         profession = 'Professional';
         gender = metadata['gender'] as String? ?? '';
-        
+
+        final rawBase = (name.isNotEmpty && name.toLowerCase() != 'user')
+            ? name
+            : (email.isNotEmpty ? email.split('@')[0] : 'user');
+        handle = generateSmartHandle(
+          baseName: rawBase,
+          ownerId: ownerId,
+        );
+
         _setLoadedState(0, false);
         await saveProfileData(isMyProfile: true);
-        print("Default profile created for owner ID: $ownerId with avatar: $avatarUrl");
+        print("Default profile created for owner ID: $ownerId with avatar: $avatarUrl, handle: $handle");
       } else {
         final existingId = list.first['id'] as int;
         _setLoadedState(existingId, true);
@@ -503,6 +553,9 @@ class ProfileProvider with ChangeNotifier {
         break;
       case 'spotify':
         spotify = value;
+        break;
+      case 'handle':
+        handle = generateHandleSlug(value);
         break;
       case 'vibeTag':
       case 'vibe_tag':
@@ -774,8 +827,10 @@ class ProfileProvider with ChangeNotifier {
         bio = response['bio'] ?? '';
         professionalBio = response['professional_bio'] ?? '';
         avatarUrl = response['avatar_url'] ?? '';
+        handle = response['handle']?.toString() ?? '';
+        profileData['handle'] = handle;
 
-        // Auto-backfill avatar and name from Google/OAuth metadata if not yet set
+        // Auto-backfill avatar, name, and handle from Google/OAuth metadata if not yet set
         final session = Supabase.instance.client.auth.currentSession;
         if (session != null && session.user.id == _ownerId) {
           final metadata = session.user.userMetadata ?? {};
@@ -797,6 +852,19 @@ class ProfileProvider with ChangeNotifier {
             profileData['name'] = name;
             _repository.updateProfileField(id, 'name', name).catchError((e) {
               debugPrint("Error auto-updating name from OAuth metadata: $e");
+            });
+          }
+          if (handle.trim().isEmpty) {
+            final rawBase = (name.isNotEmpty && name.toLowerCase() != 'user')
+                ? name
+                : (email.isNotEmpty ? email.split('@')[0] : 'user');
+            handle = generateSmartHandle(
+              baseName: rawBase,
+              ownerId: _ownerId ?? '',
+            );
+            profileData['handle'] = handle;
+            _repository.updateProfileField(id, 'handle', handle).catchError((e) {
+              debugPrint("Error auto-updating handle: $e");
             });
           }
         }
@@ -970,6 +1038,7 @@ class ProfileProvider with ChangeNotifier {
           'professional_bio': professionalBio,
           'avatar_url': avatarUrl,
           'gender': gender,
+          if (handle.isNotEmpty) 'handle': handle,
           'show_profile_to_connections': showProfileToConnections,
           'field_assignments': assignmentsMap,
           'custom_links': customLinks.map((l) => l.toJson()).toList(),
@@ -1012,6 +1081,7 @@ class ProfileProvider with ChangeNotifier {
       'bio': bio,
       'professional_bio': professionalBio,
       'avatar_url': avatarUrl,
+      if (handle.isNotEmpty) 'handle': handle,
       'show_profile_to_connections': showProfileToConnections,
       'field_assignments': assignmentsMap,
       'custom_links': customLinks.map((l) => l.toJson()).toList(),

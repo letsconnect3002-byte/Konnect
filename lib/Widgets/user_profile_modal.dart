@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:connect/Config/app_theme.dart';
 import 'package:connect/Models/vouch_model.dart';
 import 'package:connect/Pages/ConnectionProfilePage.dart';
+import 'package:connect/Pages/yet_to_be_built_profile_page.dart';
 import 'package:connect/Providers/profile_provider.dart';
 import 'package:connect/Providers/connection_provider.dart';
 import 'package:connect/Providers/feed_provider.dart';
@@ -172,13 +173,14 @@ class _UserProfileModalState extends State<UserProfileModal> {
     final s = scope.trim().toLowerCase();
     return allVouches.where((v) {
       final vScope = v.feedScope.trim().toLowerCase();
+      final effectiveScope = vScope.isEmpty ? 'network' : vScope;
       if (s == 'global') {
-        return vScope == 'global';
+        return effectiveScope == 'global';
       } else if (s == 'inner_circle') {
-        return vScope == 'inner_circle' || vScope == 'network' || vScope == 'global';
+        return effectiveScope == 'inner_circle';
       } else {
         // network scope
-        return vScope == 'network' || vScope == 'global';
+        return effectiveScope == 'network';
       }
     }).toList();
   }
@@ -376,25 +378,34 @@ class _UserProfileModalState extends State<UserProfileModal> {
     final hasVouched = vouchProvider.hasVouchedFor(myUserId, _resolvedUserId);
 
     if (hasVouched) {
+      final isPending = vouchProvider.getCachedVouchStatus(myUserId, _resolvedUserId) == 'pending';
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.08),
+          color: isPending
+              ? const Color(0xFFF59E0B).withValues(alpha: 0.12)
+              : Colors.white.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: Colors.white.withValues(alpha: 0.20),
+            color: isPending
+                ? const Color(0xFFF59E0B).withValues(alpha: 0.35)
+                : Colors.white.withValues(alpha: 0.20),
             width: 1.0,
           ),
         ),
-        child: const Row(
+        child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.verified_rounded, color: Colors.white70, size: 11),
-            SizedBox(width: 4),
+            Icon(
+              isPending ? Icons.hourglass_top_rounded : Icons.verified_rounded,
+              color: isPending ? const Color(0xFFF59E0B) : Colors.white70,
+              size: 11,
+            ),
+            const SizedBox(width: 4),
             Text(
-              "Vouched",
+              isPending ? "Vouch Requested" : "Vouched",
               style: TextStyle(
-                color: Colors.white70,
+                color: isPending ? const Color(0xFFF59E0B) : Colors.white70,
                 fontSize: 10,
                 fontWeight: FontWeight.bold,
                 fontFamily: 'Inter',
@@ -405,6 +416,8 @@ class _UserProfileModalState extends State<UserProfileModal> {
       );
     }
 
+    final activeScope = widget.scope ?? Provider.of<FeedProvider>(context, listen: false).currentScope;
+
     return BounceTap(
       onTap: () {
         HapticFeedback.lightImpact();
@@ -414,6 +427,7 @@ class _UserProfileModalState extends State<UserProfileModal> {
           targetUserName: _name,
           targetUserAvatar: _avatarUrl,
           targetUserProfession: _profession,
+          initialScope: activeScope,
           onVouched: () {
             vouchProvider.loadVouches(_resolvedUserId);
             vouchProvider.checkHasVouched(
@@ -461,19 +475,35 @@ class _UserProfileModalState extends State<UserProfileModal> {
   }
 
   void _navigateToFullProfile() {
+    final profileProvider = Provider.of<ProfileProvider>(context, listen: false);
+    final myUserId = profileProvider.userId ?? 0;
+    final isMe = (myUserId == _resolvedUserId);
+
+    Navigator.pop(context);
+
+    if (isMe) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => const YetToBeBuiltProfilePage(),
+        ),
+      );
+      return;
+    }
+
     final connProvider = Provider.of<ConnectionProvider>(context, listen: false);
     final matchingConn = connProvider.connections.where((c) {
       final cId = c['id'] ?? c['connection_profile_id'] ?? c['user_id'];
       return cId == _resolvedUserId;
     }).firstOrNull;
 
-    Navigator.pop(context);
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => ConnectionProfilePage(
           profileData: matchingConn ?? {
             'id': _resolvedUserId,
+            'connection_profile_id': _resolvedUserId,
             'name': _name,
             'avatar_url': _avatarUrl,
             'profession': _profession,
@@ -910,27 +940,7 @@ class _UserProfileModalState extends State<UserProfileModal> {
                                     ],
                                   ),
                                 ),
-                                const SizedBox(width: 6),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                  decoration: BoxDecoration(
-                                    color: vouch.feedScope == 'global'
-                                        ? const Color(0xFF3B82F6).withValues(alpha: 0.15)
-                                        : context.accentPrimary.withValues(alpha: 0.12),
-                                    borderRadius: BorderRadius.circular(6),
-                                  ),
-                                  child: Text(
-                                    vouch.feedScope == 'global' ? 'Global' : 'Network',
-                                    style: TextStyle(
-                                      color: vouch.feedScope == 'global'
-                                          ? const Color(0xFF60A5FA)
-                                          : context.accentSecondary,
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 6),
+                                const SizedBox(width: 8),
                                 Text(
                                   _formatTimeAgo(vouch.createdAt),
                                   style: TextStyle(

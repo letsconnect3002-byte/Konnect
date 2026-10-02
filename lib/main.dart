@@ -94,6 +94,43 @@ void showInAppMessageBanner({
   }
 }
 
+void showInAppConnectionBanner({
+  required String notificationId,
+  required String title,
+  required String body,
+  required String avatarUrl,
+  int? actorId,
+  VoidCallback? onTap,
+}) {
+  if (notificationId.isNotEmpty) {
+    if (_recentlyShownBanners.contains(notificationId)) return;
+    _recentlyShownBanners.add(notificationId);
+    Timer(const Duration(seconds: 10),
+        () => _recentlyShownBanners.remove(notificationId));
+  }
+
+  final overlayState = navigatorKey.currentState?.overlay;
+  if (overlayState != null) {
+    InAppNotificationBanner.show(
+      overlayState: overlayState,
+      senderId: actorId ?? 0,
+      senderName: title,
+      avatarUrl: avatarUrl,
+      message: body,
+      onTap: onTap ??
+          () {
+            navigatorKey.currentState?.push(
+              MaterialPageRoute(
+                builder: (routeContext) => const NotificationPage(),
+              ),
+            );
+          },
+    );
+    print(
+        "InAppBanner: Connection banner displayed for notificationId: $notificationId");
+  }
+}
+
 final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
     FlutterLocalNotificationsPlugin();
 
@@ -1841,23 +1878,97 @@ class MyApp extends StatelessWidget {
               );
             }
 
-            // Route referral / invite deep links to AuthGate.
+            // Route profile deep links (jana://x/[handle] or /x/[handle] or web URLs).
+            // Save the target and push a transparent self-popping placeholder
+            // instead of AuthGate — the home AuthGate is already mounted, and
+            // pushing a second one causes a Duplicate GlobalKey (appShellKey).
+            final profileTarget = LinkrunnerService.extractProfileTarget(name);
+            if (profileTarget != null) {
+              LinkrunnerService.savePendingProfileTarget(profileTarget);
+              return MaterialPageRoute(
+                builder: (_) => const _DeepLinkPlaceholder(),
+                settings: settings,
+              );
+            } else if (name.startsWith('/x/') ||
+                name.contains('/x/') ||
+                name.startsWith('jana://') ||
+                name.startsWith('connectapp://')) {
+              return MaterialPageRoute(
+                builder: (_) => const _DeepLinkPlaceholder(),
+                settings: settings,
+              );
+            }
+
+            // Route referral / invite deep links.
             // The link params are already handled by LinkrunnerService & ShareReceiverService.
             // AuthGate handles auth → AppShellGate → referral modal flow over the fully rendered UI.
             if (name.contains('referrer=') ||
                 name.contains('MNDL-') ||
                 name.contains('invite_code=')) {
               return MaterialPageRoute(
-                builder: (_) => const AuthGate(),
+                builder: (_) => const _DeepLinkPlaceholder(),
                 settings: settings,
               );
             }
           }
-          return null;
+          // Fallback: save any possible profile target and show a self-popping placeholder.
+          final fallbackTarget = settings.name != null
+              ? LinkrunnerService.extractProfileTarget(settings.name!)
+              : null;
+          if (fallbackTarget != null) {
+            LinkrunnerService.savePendingProfileTarget(fallbackTarget);
+          }
+          return MaterialPageRoute(
+            builder: (_) => const _DeepLinkPlaceholder(),
+            settings: settings,
+          );
+        },
+        onUnknownRoute: (settings) {
+          final name = settings.name;
+          if (name != null) {
+            final profileTarget = LinkrunnerService.extractProfileTarget(name);
+            if (profileTarget != null) {
+              LinkrunnerService.savePendingProfileTarget(profileTarget);
+            }
+          }
+          return MaterialPageRoute(
+            builder: (_) => const _DeepLinkPlaceholder(),
+            settings: settings,
+          );
         },
         home: const AuthGate(),
       ),
     );
+  }
+}
+
+/// Transparent placeholder pushed by [onGenerateRoute] / [onUnknownRoute] for
+/// incoming deep links on warm start.  It pops itself on the next frame so the
+/// underlying home [AuthGate] (which already holds [AppShell] with the global
+/// [appShellKey]) stays the only instance in the tree — avoiding a
+/// "Duplicate GlobalKey detected" crash.
+class _DeepLinkPlaceholder extends StatefulWidget {
+  const _DeepLinkPlaceholder();
+
+  @override
+  State<_DeepLinkPlaceholder> createState() => _DeepLinkPlaceholderState();
+}
+
+class _DeepLinkPlaceholderState extends State<_DeepLinkPlaceholder> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && Navigator.of(context).canPop()) {
+        Navigator.of(context).pop();
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Fully transparent — the user sees the home AuthGate beneath.
+    return const SizedBox.shrink();
   }
 }
 
@@ -1965,9 +2076,23 @@ class _AppShellGateState extends State<AppShellGate> {
       // Chat rooms, push tokens, and unread counts load in the background.
       if (mounted) setState(() => _initialized = true);
 
-      // App has fully booted and UI is rendered! Now run referral invite check safely.
+      // App has fully booted and UI is rendered!
       if (mounted) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
+        WidgetsBinding.instance.addPostFrameCallback((_) async {
+          if (!mounted) return;
+
+          // 1. Check if there is a pending profile target from a deep link (e.g. jana://x/[handle] or /x/[handle])
+          final pendingTarget =
+              await LinkrunnerService.getAndClearPendingProfileTarget();
+          if (pendingTarget != null && mounted) {
+            final handled = await LinkrunnerService.navigateToProfileTarget(
+              context,
+              pendingTarget,
+            );
+            if (handled) return;
+          }
+
+          // 2. Otherwise run referral invite check safely.
           if (mounted) {
             final bool wasColdStart =
                 LinkrunnerService.consumeWasColdStartDeepLink();
@@ -2312,6 +2437,78 @@ class _AppShellGateState extends State<AppShellGate> {
               print(
                   "PushNotifications: Foreground feed notification banner displayed.");
             }
+          } else if (action == 'connection_notification') {
+            final notifId = data['notification_id']?.toString() ??
+                message.messageId ??
+                DateTime.now().millisecondsSinceEpoch.toString();
+            final type = data['type']?.toString() ?? '';
+            final realType = data['real_type']?.toString() ?? type;
+            final actorName = data['actor_name']?.toString() ?? 'Someone';
+            final actorAvatar = data['actor_avatar']?.toString() ?? '';
+            final actorIdStr = data['actor_id']?.toString();
+            final actorId =
+                actorIdStr != null ? int.tryParse(actorIdStr) : null;
+
+            String title = data['title']?.toString() ?? '';
+            String body = data['body']?.toString() ?? '';
+
+            if (title.isEmpty) {
+              if (type == 'vouch_request' || realType == 'vouch_request') {
+                title = 'New Vouch Request';
+              } else if (type == 'vouch_received' ||
+                  realType == 'vouch_received') {
+                title = 'New Endorsement';
+              } else if (type == 'vouch_accepted' ||
+                  realType == 'vouch_accepted') {
+                title = 'Vouch Accepted';
+              } else if (type == 'direct_connection_request' ||
+                  realType == 'direct_connection_request') {
+                title = 'Connection Request';
+              } else {
+                title = 'Connection Update';
+              }
+            }
+
+            if (body.isEmpty) {
+              if (type == 'vouch_request' || realType == 'vouch_request') {
+                body = '$actorName wants to connect & vouched for you';
+              } else if (type == 'vouch_received' ||
+                  realType == 'vouch_received') {
+                body = '$actorName vouched for you on your profile';
+              } else if (type == 'vouch_accepted' ||
+                  realType == 'vouch_accepted') {
+                body = '$actorName accepted your vouch and connected with you!';
+              } else if (type == 'direct_connection_request' ||
+                  realType == 'direct_connection_request') {
+                body = '$actorName sent you a direct connection request';
+              } else {
+                body = '$actorName sent you a connection update';
+              }
+            }
+
+            // Refresh notification provider so unread count and notification list are updated immediately
+            try {
+              final ctx = navigatorKey.currentContext;
+              if (ctx != null && ctx.mounted) {
+                final notifProvider =
+                    Provider.of<NotificationProvider>(ctx, listen: false);
+                notifProvider.fetchNotifications();
+                notifProvider.fetchSentDirectRequests();
+              }
+            } catch (e) {
+              print(
+                  "PushNotifications: Error refreshing notification provider: $e");
+            }
+
+            showInAppConnectionBanner(
+              notificationId: notifId,
+              title: title,
+              body: body,
+              avatarUrl: actorAvatar,
+              actorId: actorId,
+            );
+            print(
+                "PushNotifications: Foreground connection notification banner displayed for $type.");
           }
         } catch (e) {
           print("PushNotifications: Error in foreground message handler: $e");
@@ -2392,6 +2589,16 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
 
         final navContext = navigatorKey.currentContext;
 
+        final profileTarget =
+            LinkrunnerService.extractProfileTarget(url ?? rawText);
+        if (profileTarget != null) {
+          if (navContext != null && navContext.mounted) {
+            LinkrunnerService.navigateToProfileTarget(
+                navContext, profileTarget);
+          }
+          return;
+        }
+
         if (isInvite) {
           final String linkStr = url ?? rawText;
           final uri = Uri.tryParse(linkStr);
@@ -2456,6 +2663,7 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
+
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {

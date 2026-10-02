@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:connect/Models/app_error.dart';
 import 'package:connect/Repositories/notification_repository.dart';
 import 'package:flutter/material.dart';
@@ -118,9 +119,26 @@ class NotificationProvider with ChangeNotifier {
               print("PushNotifications: Dismissed notification $notifId from OS tray due to deletion.");
             }
           }
+          await fetchNotifications();
+        } else if (payload.eventType == PostgresChangeEvent.insert) {
+          final newRecord = payload.newRecord;
+          final notificationId = newRecord?['id']?.toString() ?? '';
+
+          await fetchNotifications();
+
+          if (notificationId.isNotEmpty) {
+            final notif = notifications.firstWhere(
+              (n) => n['id']?.toString() == notificationId,
+              orElse: () => <String, dynamic>{},
+            );
+
+            if (notif.isNotEmpty) {
+              _triggerInAppBannerForNotification(notif);
+            }
+          }
+        } else {
+          await fetchNotifications();
         }
-        
-        await fetchNotifications();
       },
     );
 
@@ -129,6 +147,79 @@ class NotificationProvider with ChangeNotifier {
     notifyListeners();
     fetchNotifications();
     fetchSentDirectRequests();
+  }
+
+  void _triggerInAppBannerForNotification(Map<String, dynamic> notif) {
+    try {
+      final notifId = notif['id']?.toString() ?? '';
+      if (notifId.isEmpty) return;
+
+      final type = notif['type']?.toString() ?? '';
+      final otherUser = notif['other_user'] as Map<String, dynamic>? ?? {};
+      final actorName = otherUser['name']?.toString() ?? 'Someone';
+      final actorAvatar = otherUser['avatar_url']?.toString() ??
+          otherUser['avatarUrl']?.toString() ??
+          '';
+      final actorId = otherUser['id'] as int?;
+      final rawNote = notif['note']?.toString();
+
+      String title = 'Connection Update';
+      String body = '$actorName sent you a connection update';
+
+      if (type == 'vouch_request') {
+        title = 'New Vouch Request';
+        body = '$actorName wants to connect & vouched for you';
+      } else if (type == 'vouch_received') {
+        title = 'New Endorsement';
+        body = '$actorName vouched for you on your profile';
+      } else if (type == 'vouch_accepted') {
+        title = 'Vouch Accepted';
+        body = '$actorName accepted your vouch and connected with you!';
+      } else if (type == 'direct_connection_request') {
+        title = 'Connection Request';
+        String msg = '';
+        if (rawNote != null && rawNote.startsWith('{')) {
+          try {
+            final parsed = jsonDecode(rawNote);
+            if (parsed is Map && parsed['message'] != null) {
+              msg = parsed['message'].toString().trim();
+            }
+          } catch (_) {}
+        } else if (rawNote != null) {
+          msg = rawNote.trim();
+        }
+        body = msg.isNotEmpty
+            ? '$actorName: $msg'
+            : '$actorName sent you a direct connection request';
+      } else if (type == 'referral') {
+        final isRequest = rawNote != null &&
+            (rawNote.startsWith('[REFERRAL_REQUEST]') ||
+                rawNote.startsWith('[REFERRAL_REQUEST_ACTIONED]'));
+        final referredUser =
+            notif['referred_user'] as Map<String, dynamic>? ?? {};
+        final referredName = referredUser['name']?.toString() ?? 'Someone';
+        title = isRequest ? 'Introduction Request' : 'New Referral';
+        body = isRequest
+            ? '$actorName asked to be introduced to $referredName'
+            : '$actorName referred $referredName to you';
+      } else if (type == 'tribe_invite') {
+        title = 'Mafia Invitation';
+        body = '$actorName invited you to join a Mafia';
+      } else if (type == 'custom_network_added') {
+        title = 'Added to Network';
+        body = '$actorName added you to a network';
+      }
+
+      showInAppConnectionBanner(
+        notificationId: notifId,
+        title: title,
+        body: body,
+        avatarUrl: actorAvatar,
+        actorId: actorId,
+      );
+    } catch (e) {
+      print("NotificationProvider: Error triggering in-app banner: $e");
+    }
   }
 
   void unsubscribeFromNotifications() {

@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:connect/Pages/IndividualChatPage.dart';
+import 'package:connect/Pages/yet_to_be_built_profile_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:connect/Providers/profile_provider.dart';
@@ -18,6 +19,7 @@ import 'package:connect/Widgets/vouch_bottom_sheet.dart';
 import 'package:connect/Widgets/vouches_list_widget.dart';
 import 'package:connect/Widgets/direct_connection_sheet.dart';
 import 'package:connect/Providers/notification_provider.dart';
+import 'package:connect/Providers/feed_provider.dart';
 
 class ConnectionProfilePage extends StatefulWidget {
   final Map<String, dynamic> profileData;
@@ -45,6 +47,7 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
   late String _linkedin;
   late String _twitter;
   late String _spotify;
+  String _handle = '';
   List<dynamic> _customLinks = [];
   List<ExperienceItem> _experience = [];
   List<EducationItem> _education = [];
@@ -104,10 +107,12 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
             voucherId: myUserId,
             voucheeId: _targetUserId,
           );
-          vProvider.getMutualIntents(
+          vProvider
+              .getMutualIntents(
             userId1: myUserId,
             userId2: _targetUserId,
-          ).then((intents) {
+          )
+              .then((intents) {
             if (mounted && intents.isNotEmpty) {
               setState(() => _mutualIntents = intents);
             }
@@ -160,6 +165,7 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
     _linkedin = data['linkedin'] ?? '';
     _twitter = data['twitter'] ?? '';
     _spotify = data['spotify'] ?? '';
+    _handle = (data['handle'] ?? '').toString();
     _customLinks = data['custom_links'] != null
         ? List<dynamic>.from(data['custom_links'] as List)
         : [];
@@ -211,26 +217,6 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
       _skills = [];
     }
 
-    // Fallbacks for skeleton loading shapes
-    if (_name.isEmpty) _name = "Jane Doe";
-    if (_profession.isEmpty) _profession = "Software Engineer";
-    if (_company.isEmpty) _company = "Tech Corporation";
-    if (_email.isEmpty) _email = "jane.doe@example.com";
-    if (_professionalEmail.isEmpty) _professionalEmail = "jane.doe@work.com";
-    if (_phoneNumber.isEmpty) _phoneNumber = "+91 98765 43210";
-    if (_professionalPhoneNumber.isEmpty)
-      _professionalPhoneNumber = "+91 98765 00000";
-    if (_bio.isEmpty)
-      _bio =
-          "Passionate developer building modern apps and exploring design systems.";
-    if (_professionalBio.isEmpty)
-      _professionalBio =
-          "Experienced software engineer leading web and mobile products.";
-    if (_instagram.isEmpty) _instagram = "instagram_handle";
-    if (_linkedin.isEmpty) _linkedin = "linkedin_handle";
-    if (_twitter.isEmpty) _twitter = "twitter_handle";
-    if (_spotify.isEmpty) _spotify = "";
-
     final String initialProfEmail = _professionalEmail;
     final String initialProfPhone = _professionalPhoneNumber;
 
@@ -253,18 +239,16 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
       'bio': _professionalBio,
     };
 
-    final connectionProfileId = data['connection_profile_id'];
-    if (connectionProfileId != null) {
+    final idToFetch = _targetUserId;
+    if (idToFetch != 0) {
       if (mounted) {
         setState(() => _isLoading = true);
       }
       try {
-        final idToFetch = connectionProfileId is int
-            ? connectionProfileId
-            : int.parse(connectionProfileId.toString());
         final details = await profileProvider.fetchConnectionDetails(idToFetch);
         final response = details['profile'] as Map<String, dynamic>?;
-        _sharedCardPermission = details['sharedCardPermission'] as String? ?? 'both';
+        _sharedCardPermission =
+            details['sharedCardPermission'] as String? ?? 'both';
 
         if (response != null && mounted) {
           final Map<String, dynamic>? fieldAssignments =
@@ -277,10 +261,21 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
 
           setState(() {
             _fieldAssignments = fieldAssignments;
-            _name = response['name'] ?? '';
-            _avatarUrl = response['avatar_url'] ?? '';
-            _profession = response['profession'] ?? '';
-            _company = response['company'] ?? '';
+            if ((response['name'] ?? '').toString().trim().isNotEmpty) {
+              _name = response['name'];
+            }
+            if ((response['avatar_url'] ?? '').toString().trim().isNotEmpty) {
+              _avatarUrl = response['avatar_url'];
+            }
+            if ((response['profession'] ?? '').toString().trim().isNotEmpty) {
+              _profession = response['profession'];
+            }
+            if ((response['company'] ?? '').toString().trim().isNotEmpty) {
+              _company = response['company'];
+            }
+            if ((response['handle'] ?? '').toString().trim().isNotEmpty) {
+              _handle = response['handle'];
+            }
             _email = ProfileFieldFilter.getVisibleValue(
                 'email',
                 response['email'] ?? '',
@@ -460,12 +455,6 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
     }
   }
 
-
-
-
-
-
-
   Widget _buildReadOnlyField({
     required String label,
     required String value,
@@ -473,11 +462,19 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
   }) {
     if (value.trim().isEmpty) return const SizedBox.shrink();
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.symmetric(vertical: 8),
+      margin: const EdgeInsets.only(bottom: 2),
+      padding: const EdgeInsets.symmetric(vertical: 9),
+      decoration: BoxDecoration(
+        border: Border(
+          bottom: BorderSide(
+            color: Colors.white.withValues(alpha: 0.04),
+            width: 1.0,
+          ),
+        ),
+      ),
       child: Row(
         children: [
-          Icon(icon, color: context.accentSecondary, size: 18),
+          Icon(icon, color: const Color(0xFF00F2FE), size: 17),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -485,8 +482,8 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
               children: [
                 Text(
                   label,
-                  style: TextStyle(
-                    color: context.textSecondary,
+                  style: const TextStyle(
+                    color: Color(0xFFA1A4B0),
                     fontSize: 11,
                     fontWeight: FontWeight.bold,
                     fontFamily: 'Inter',
@@ -506,8 +503,11 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
             ),
           ),
           IconButton(
-            icon: Icon(Icons.content_copy_rounded,
-                color: context.textMuted.withValues(alpha: 0.5), size: 16),
+            icon: const Icon(Icons.content_copy_rounded,
+                color: Color(0xFF5E626E), size: 15),
+            splashRadius: 18,
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
             onPressed: () {
               final scaffoldMessenger = ScaffoldMessenger.of(context);
               final surfaceSecondaryColor = context.surfaceSecondary;
@@ -860,14 +860,21 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
 
   Widget _buildSkeletonHeader() {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 12.0, horizontal: 16.0),
+      padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 14.0),
       decoration: BoxDecoration(
-        color: context.surfacePrimary,
+        color: const Color(0xFF0F1013),
         borderRadius: BorderRadius.circular(30.0),
         border: Border.all(
-          color: context.textMuted.withValues(alpha: 0.2),
+          color: Colors.white.withValues(alpha: 0.10),
           width: 1.0,
         ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.35),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -881,45 +888,49 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
             child: Container(
               width: 32,
               height: 32,
-              decoration: const BoxDecoration(
-                  shape: BoxShape.circle, color: Colors.white10),
-              child: const Icon(
-                Icons.arrow_back_ios_new_rounded,
-                color: Colors.white,
-                size: 14,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white.withValues(alpha: 0.10),
+              ),
+              child: const Center(
+                child: Icon(
+                  Icons.arrow_back_ios_new_rounded,
+                  color: Colors.white,
+                  size: 14,
+                ),
               ),
             ),
           ),
-          Expanded(
+          const Expanded(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Text(
+                Text(
                   'Profile Space',
                   textAlign: TextAlign.center,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     color: Colors.white,
-                    fontSize: 18.0,
+                    fontSize: 16.0,
                     fontWeight: FontWeight.bold,
                     fontFamily: 'Inter',
                   ),
                 ),
-                const SizedBox(height: 2),
+                SizedBox(height: 2),
                 Text(
                   'Digital Profile',
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    color: context.textSecondary,
-                    fontSize: 12.0,
+                    color: Color(0xFFA1A4B0),
+                    fontSize: 11.0,
                     fontFamily: 'Inter',
                   ),
                 ),
               ],
             ),
           ),
-          SizedBox(
+          const SizedBox(
             width: 32,
             height: 32,
           ),
@@ -1042,44 +1053,165 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
                                       letterSpacing: 0.5,
                                     ),
                                   ),
+                                  Builder(
+                                    builder: (context) {
+                                      final String subtitle =
+                                          _company.trim().isNotEmpty
+                                              ? _company.trim()
+                                              : (_profession.trim().isNotEmpty
+                                                  ? _profession.trim()
+                                                  : (_handle.trim().isNotEmpty
+                                                      ? '@${_handle.trim()}'
+                                                      : 'Jana'));
+                                      if (subtitle.isEmpty) {
+                                        return const SizedBox.shrink();
+                                      }
+                                      return Padding(
+                                        padding:
+                                            const EdgeInsets.only(top: 2.0),
+                                        child: Text(
+                                          subtitle,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(
+                                            color: Color(0xFFA1A4B0),
+                                            fontSize: 12,
+                                            fontFamily: 'Inter',
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                  ),
                                   const SizedBox(height: 8),
                                   Row(
                                     children: [
-                                      // Vouch Button / Badge
+                                      // Vouch Button / Edit Button Badge
                                       Consumer2<ProfileProvider, VouchProvider>(
-                                        builder: (context, pProvider, vProvider, _) {
+                                        builder:
+                                            (context, pProvider, vProvider, _) {
                                           final myId = pProvider.userId;
-                                          if (myId == null || _targetUserId == 0 || myId == _targetUserId) {
+                                          if (myId != null &&
+                                              _targetUserId != 0 &&
+                                              myId == _targetUserId) {
+                                            return InkWell(
+                                              onTap: () {
+                                                HapticFeedback.lightImpact();
+                                                Navigator.push(
+                                                  context,
+                                                  MaterialPageRoute(
+                                                    builder: (_) =>
+                                                        const YetToBeBuiltProfilePage(
+                                                            isEditingMode:
+                                                                true),
+                                                  ),
+                                                );
+                                              },
+                                              borderRadius:
+                                                  BorderRadius.circular(16),
+                                              child: Container(
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                        horizontal: 11,
+                                                        vertical: 4.5),
+                                                decoration: BoxDecoration(
+                                                  color: Colors.white
+                                                      .withValues(alpha: 0.10),
+                                                  borderRadius:
+                                                      BorderRadius.circular(16),
+                                                  border: Border.all(
+                                                    color: Colors.white
+                                                        .withValues(
+                                                            alpha: 0.25),
+                                                    width: 1.0,
+                                                  ),
+                                                ),
+                                                child: const Row(
+                                                  mainAxisSize:
+                                                      MainAxisSize.min,
+                                                  children: [
+                                                    Icon(Icons.edit_rounded,
+                                                        color:
+                                                            Color(0xFF00F2FE),
+                                                        size: 12),
+                                                    SizedBox(width: 4.5),
+                                                    Text(
+                                                      "Edit Profile",
+                                                      style: TextStyle(
+                                                        color: Colors.white,
+                                                        fontSize: 11,
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                        fontFamily: 'Inter',
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            );
+                                          }
+                                          if (myId == null ||
+                                              _targetUserId == 0) {
                                             return const SizedBox.shrink();
                                           }
-                                          final hasVouched = vProvider.hasVouchedFor(myId, _targetUserId);
+                                          final hasVouched =
+                                              vProvider.hasVouchedFor(
+                                                  myId, _targetUserId);
                                           if (hasVouched) {
+                                            final isPending =
+                                                vProvider.getCachedVouchStatus(
+                                                        myId, _targetUserId) ==
+                                                    'pending';
                                             return Container(
-                                              padding: const EdgeInsets.symmetric(
-                                                  horizontal: 10, vertical: 4),
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                      horizontal: 10,
+                                                      vertical: 4),
                                               decoration: BoxDecoration(
-                                                color: Colors.white
-                                                    .withValues(alpha: 0.08),
-                                                borderRadius: BorderRadius.circular(16),
+                                                color: isPending
+                                                    ? const Color(0xFFF59E0B)
+                                                        .withValues(alpha: 0.12)
+                                                    : Colors.white.withValues(
+                                                        alpha: 0.08),
+                                                borderRadius:
+                                                    BorderRadius.circular(16),
                                                 border: Border.all(
-                                                  color: Colors.white
-                                                      .withValues(alpha: 0.20),
+                                                  color: isPending
+                                                      ? const Color(0xFFF59E0B)
+                                                          .withValues(
+                                                              alpha: 0.35)
+                                                      : Colors.white.withValues(
+                                                          alpha: 0.20),
                                                   width: 1.0,
                                                 ),
                                               ),
-                                              child: const Row(
+                                              child: Row(
                                                 mainAxisSize: MainAxisSize.min,
                                                 children: [
-                                                  Icon(Icons.verified_rounded,
-                                                      color: Colors.white70,
-                                                      size: 11),
-                                                  SizedBox(width: 4),
+                                                  Icon(
+                                                    isPending
+                                                        ? Icons
+                                                            .hourglass_top_rounded
+                                                        : Icons
+                                                            .verified_rounded,
+                                                    color: isPending
+                                                        ? const Color(
+                                                            0xFFF59E0B)
+                                                        : Colors.white70,
+                                                    size: 11,
+                                                  ),
+                                                  const SizedBox(width: 4),
                                                   Text(
-                                                    "Vouched",
+                                                    isPending
+                                                        ? "Vouch Requested"
+                                                        : "Vouched",
                                                     style: TextStyle(
-                                                      color: Colors.white70,
+                                                      color: isPending
+                                                          ? const Color(
+                                                              0xFFF59E0B)
+                                                          : Colors.white70,
                                                       fontSize: 10,
-                                                      fontWeight: FontWeight.bold,
+                                                      fontWeight:
+                                                          FontWeight.bold,
                                                       fontFamily: 'Inter',
                                                     ),
                                                   ),
@@ -1096,18 +1228,25 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
                                                 targetUserId: _targetUserId,
                                                 targetUserName: _name,
                                                 targetUserAvatar: _avatarUrl,
-                                                targetUserProfession: _profession,
+                                                targetUserProfession:
+                                                    _profession,
                                                 onVouched: () {
-                                                  final myId = profileProvider.userId;
-                                                  if (myId != null && _targetUserId != 0) {
-                                                    Provider.of<VouchProvider>(context, listen: false)
+                                                  final myId =
+                                                      profileProvider.userId;
+                                                  if (myId != null &&
+                                                      _targetUserId != 0) {
+                                                    Provider.of<VouchProvider>(
+                                                            context,
+                                                            listen: false)
                                                         .getMutualIntents(
                                                       userId1: myId,
                                                       userId2: _targetUserId,
                                                     )
                                                         .then((intents) {
                                                       if (mounted) {
-                                                        setState(() => _mutualIntents = intents);
+                                                        setState(() =>
+                                                            _mutualIntents =
+                                                                intents);
                                                       }
                                                     });
                                                   }
@@ -1115,14 +1254,18 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
                                                 },
                                               );
                                             },
-                                            borderRadius: BorderRadius.circular(16),
+                                            borderRadius:
+                                                BorderRadius.circular(16),
                                             child: Container(
-                                              padding: const EdgeInsets.symmetric(
-                                                  horizontal: 10, vertical: 4),
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                      horizontal: 10,
+                                                      vertical: 4),
                                               decoration: BoxDecoration(
                                                 color: Colors.white
                                                     .withValues(alpha: 0.10),
-                                                borderRadius: BorderRadius.circular(16),
+                                                borderRadius:
+                                                    BorderRadius.circular(16),
                                                 border: Border.all(
                                                   color: Colors.white
                                                       .withValues(alpha: 0.25),
@@ -1141,7 +1284,8 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
                                                     style: TextStyle(
                                                       color: Colors.white,
                                                       fontSize: 10,
-                                                      fontWeight: FontWeight.bold,
+                                                      fontWeight:
+                                                          FontWeight.bold,
                                                       fontFamily: 'Inter',
                                                     ),
                                                   ),
@@ -1215,7 +1359,8 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
                         VouchesListWidget(
                           userId: _targetUserId,
                           userName: _name,
-                          isOwnProfile: false,
+                          isOwnProfile: (profileProvider.userId != null &&
+                              profileProvider.userId == _targetUserId),
                         ),
                       ],
 
@@ -1259,6 +1404,13 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
                           label: 'Profession',
                           value: _profession,
                           icon: Icons.work_outline_rounded,
+                        ),
+
+                      if (_company.isNotEmpty)
+                        _buildReadOnlyField(
+                          label: 'Company',
+                          value: _company,
+                          icon: Icons.business_outlined,
                         ),
 
                       if ((_previewFields['email'] ?? '').isNotEmpty)
@@ -1359,20 +1511,26 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
                                 );
                               },
                         icon: Icon(
-                          hasSent ? Icons.check_circle_outline : Icons.person_add_rounded,
+                          hasSent
+                              ? Icons.check_circle_outline
+                              : Icons.person_add_rounded,
                           color: hasSent ? context.textSecondary : Colors.black,
                           size: 20,
                         ),
                         label: Text(
                           hasSent ? "Request Sent" : "Send Connection Request",
                           style: context.bodyText.copyWith(
-                            color: hasSent ? context.textSecondary : Colors.black,
+                            color:
+                                hasSent ? context.textSecondary : Colors.black,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: hasSent ? context.surfaceSecondary : context.accentPrimary,
-                          foregroundColor: hasSent ? context.textSecondary : Colors.black,
+                          backgroundColor: hasSent
+                              ? context.surfaceSecondary
+                              : context.accentPrimary,
+                          foregroundColor:
+                              hasSent ? context.textSecondary : Colors.black,
                           shape: const StadiumBorder(),
                           padding: const EdgeInsets.symmetric(vertical: 16.0),
                           elevation: 0,
@@ -1486,10 +1644,27 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
       String id, ConnectionProvider provider) async {
     try {
       final intId = int.tryParse(id) ?? 0;
+      final myUserId =
+          Provider.of<ProfileProvider>(context, listen: false).userId;
+      final chatProvider = Provider.of<ChatProvider>(context, listen: false);
+      final vouchProvider = Provider.of<VouchProvider>(context, listen: false);
+      final feedProvider = Provider.of<FeedProvider>(context, listen: false);
+
       await provider.deleteProfile(intId,
           onRoomCleanup: (profileId, roomId) async {
-        await Provider.of<ChatProvider>(context, listen: false)
-            .handleRoomCleanup(profileId, roomId);
+        await chatProvider.handleRoomCleanup(profileId, roomId);
+      }, onVouchCleanup: () async {
+        if (myUserId != null && intId != 0) {
+          try {
+            await vouchProvider.deleteVouchesBetween(
+                userId1: myUserId, userId2: intId);
+          } catch (e) {
+            debugPrint("Error deleting vouches in cleanup: $e");
+          }
+          try {
+            feedProvider.fetchInitialFeed(silent: true);
+          } catch (_) {}
+        }
       });
     } catch (e) {
       print("Error deleting profile locally: $e");
@@ -1573,7 +1748,9 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
                       } catch (e) {
                         if (!mounted) return;
                         scaffoldMessenger.showSnackBar(
-                          const SnackBar(content: Text("Could not unblock user. Please try again.")),
+                          const SnackBar(
+                              content: Text(
+                                  "Could not unblock user. Please try again.")),
                         );
                       }
                     },
@@ -1600,7 +1777,9 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
                       } catch (e) {
                         if (!mounted) return;
                         scaffoldMessenger.showSnackBar(
-                          const SnackBar(content: Text("Could not block user. Please try again.")),
+                          const SnackBar(
+                              content: Text(
+                                  "Could not block user. Please try again.")),
                         );
                       }
                     },
@@ -1628,7 +1807,8 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
                     ),
                     content: const Row(
                       children: [
-                        Icon(Icons.check_circle_rounded, color: Colors.redAccent, size: 20),
+                        Icon(Icons.check_circle_rounded,
+                            color: Colors.redAccent, size: 20),
                         SizedBox(width: 10),
                         Expanded(
                           child: Text(
@@ -1654,9 +1834,12 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
     );
   }
 
-  void _showReportUserDialog(BuildContext context, Map<String, dynamic> connection, ConnectionProvider provider) {
+  void _showReportUserDialog(BuildContext context,
+      Map<String, dynamic> connection, ConnectionProvider provider) {
     final name = connection['name'] ?? 'this contact';
-    final profileIdStr = (connection['id'] ?? connection['connection_profile_id'] ?? '').toString();
+    final profileIdStr =
+        (connection['id'] ?? connection['connection_profile_id'] ?? '')
+            .toString();
     final intId = int.tryParse(profileIdStr) ?? 0;
 
     String selectedReason = 'Spam';
@@ -1671,7 +1854,8 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
             return GlassmorphicAlertDialog(
               title: Text(
                 "Report & Disconnect $name",
-                style: context.screenHeading.copyWith(fontWeight: FontWeight.bold),
+                style:
+                    context.screenHeading.copyWith(fontWeight: FontWeight.bold),
               ),
               content: SizedBox(
                 width: double.maxFinite,
@@ -1682,17 +1866,25 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
                     children: [
                       Text(
                         "Please select the reason for reporting this user:",
-                        style: context.bodyText.copyWith(color: context.textSecondary),
+                        style: context.bodyText
+                            .copyWith(color: context.textSecondary),
                       ),
                       const SizedBox(height: 12),
-                      ...['Spam', 'Harassment or Abuse', 'Inappropriate Behavior', 'Other'].map((reason) {
+                      ...[
+                        'Spam',
+                        'Harassment or Abuse',
+                        'Inappropriate Behavior',
+                        'Other'
+                      ].map((reason) {
                         final isSelected = selectedReason == reason;
                         return InkWell(
-                          onTap: isSubmitting ? null : () {
-                            setStateBuilder(() {
-                              selectedReason = reason;
-                            });
-                          },
+                          onTap: isSubmitting
+                              ? null
+                              : () {
+                                  setStateBuilder(() {
+                                    selectedReason = reason;
+                                  });
+                                },
                           child: Padding(
                             padding: const EdgeInsets.symmetric(vertical: 8.0),
                             child: Row(
@@ -1713,7 +1905,9 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
                                     color: isSelected
                                         ? context.textPrimary
                                         : context.textSecondary,
-                                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                    fontWeight: isSelected
+                                        ? FontWeight.bold
+                                        : FontWeight.normal,
                                   ),
                                 ),
                               ],
@@ -1724,7 +1918,8 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
                       const SizedBox(height: 16),
                       Text(
                         "Additional Details (Optional):",
-                        style: context.bodyText.copyWith(color: context.textSecondary),
+                        style: context.bodyText
+                            .copyWith(color: context.textSecondary),
                       ),
                       const SizedBox(height: 8),
                       TextField(
@@ -1733,7 +1928,8 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
                         enabled: !isSubmitting,
                         decoration: InputDecoration(
                           hintText: "Enter details here...",
-                          hintStyle: TextStyle(color: context.textMuted, fontSize: 13),
+                          hintStyle:
+                              TextStyle(color: context.textMuted, fontSize: 13),
                           fillColor: context.surfaceSecondary,
                           filled: true,
                           border: OutlineInputBorder(
@@ -1742,7 +1938,8 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
                           ),
                           focusedBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(8),
-                            borderSide: BorderSide(color: context.accentPrimary),
+                            borderSide:
+                                BorderSide(color: context.accentPrimary),
                           ),
                           contentPadding: const EdgeInsets.all(12),
                         ),
@@ -1768,24 +1965,28 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
                   : [
                       TextButton(
                         onPressed: () => Navigator.of(dialogContext).pop(),
-                        child: Text("Cancel", style: TextStyle(color: context.textSecondary)),
+                        child: Text("Cancel",
+                            style: TextStyle(color: context.textSecondary)),
                       ),
                       TextButton(
                         onPressed: () async {
                           setStateBuilder(() {
                             isSubmitting = true;
                           });
-                          
+
                           try {
                             // 1. Report User
-                            await Provider.of<ChatProvider>(context, listen: false).reportMessage(
+                            await Provider.of<ChatProvider>(context,
+                                    listen: false)
+                                .reportMessage(
                               reportedUserId: intId,
                               reason: selectedReason,
-                              additionalDetails: detailsController.text.trim().isEmpty 
-                                  ? null 
-                                  : detailsController.text.trim(),
+                              additionalDetails:
+                                  detailsController.text.trim().isEmpty
+                                      ? null
+                                      : detailsController.text.trim(),
                             );
-                            
+
                             final messenger = ScaffoldMessenger.of(context);
                             Navigator.of(dialogContext).pop();
                             if (mounted) {
@@ -1798,13 +1999,15 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(12),
                                   side: BorderSide(
-                                    color: context.borderMuted.withValues(alpha: 0.3),
+                                    color: context.borderMuted
+                                        .withValues(alpha: 0.3),
                                     width: 1,
                                   ),
                                 ),
                                 content: const Row(
                                   children: [
-                                    Icon(Icons.check_circle_rounded, color: Colors.greenAccent, size: 20),
+                                    Icon(Icons.check_circle_rounded,
+                                        color: Colors.greenAccent, size: 20),
                                     SizedBox(width: 10),
                                     Expanded(
                                       child: Text(
@@ -1828,7 +2031,8 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
                               });
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(
-                                  content: Text("Could not file report. Please check your network and try again."),
+                                  content: Text(
+                                      "Could not file report. Please check your network and try again."),
                                   backgroundColor: Colors.redAccent,
                                   behavior: SnackBarBehavior.floating,
                                 ),
@@ -1836,7 +2040,10 @@ class _ConnectionProfilePageState extends State<ConnectionProfilePage> {
                             }
                           }
                         },
-                        child: const Text("Submit & Delete", style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
+                        child: const Text("Submit & Delete",
+                            style: TextStyle(
+                                color: Colors.redAccent,
+                                fontWeight: FontWeight.bold)),
                       ),
                     ],
             );

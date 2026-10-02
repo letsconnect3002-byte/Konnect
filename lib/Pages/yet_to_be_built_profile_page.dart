@@ -6,6 +6,7 @@ import 'package:connect/Pages/edit_profile_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:connect/Widgets/connect_hub_bottom_sheet.dart';
 import 'package:connect/Utils/social_launcher.dart';
 import 'package:connect/services/analytics_service.dart';
@@ -850,7 +851,8 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
           ),
           const SizedBox(height: 60),
           ElevatedButton(
-            onPressed: _selectedInterests.where((i) => i != 'Others').length >= 3
+            onPressed: _selectedInterests.where((i) => i != 'Others').length >=
+                    3
                 ? () {
                     HapticFeedback.lightImpact();
                     final finalInterests =
@@ -911,113 +913,109 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Center(
-                    child: Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(24),
-                      decoration: BoxDecoration(
-                        color: context.surfaceSecondary.withValues(alpha: 0.8),
-                        borderRadius: BorderRadius.circular(24),
-                        border:
-                            Border.all(color: Colors.white.withValues(alpha: 0.08)),
-                      ),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Container(
-                            width: 96,
-                            height: 96,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              gradient: LinearGradient(
-                                colors: [
-                                  context.accentSecondary,
-                                  context.accentSecondary.withValues(alpha: 0.8)
-                                ],
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: context.accentSecondary
-                                      .withValues(alpha: 0.15),
-                                  blurRadius: 6,
-                                  spreadRadius: 1,
-                                ),
-                              ],
-                            ),
-                            child: Builder(builder: (context) {
-                              final provider =
-                                  Provider.of<ProfileProvider>(context,
-                                      listen: false);
-                              return (provider.avatarUrl.isNotEmpty &&
-                                      provider.avatarUrl.startsWith('http'))
-                                  ? ClipOval(
-                                      child: Image.network(
-                                        provider.avatarUrl,
-                                        fit: BoxFit.cover,
-                                        errorBuilder:
-                                            (context, error, stackTrace) =>
-                                                _buildAvatarPlaceholder(),
-                                      ),
-                                    )
-                                  : _buildAvatarPlaceholder();
-                            }),
-                          )
-                              .animate()
-                              .scale(duration: 400.ms, curve: Curves.easeOutBack),
-                          const SizedBox(height: 16),
-                          Text(
-                            _nameController.text,
-                            style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 24,
-                                fontWeight: FontWeight.bold,
-                                fontFamily: 'Inter'),
-                          ).animate().fadeIn(delay: 200.ms, duration: 300.ms),
-                          if (headline.isNotEmpty) ...[
-                            const SizedBox(height: 4),
-                            Text(
-                              headline,
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                color: Colors.white.withValues(alpha: 0.8),
-                                fontSize: 14,
-                                fontWeight: FontWeight.w500,
-                                fontFamily: 'Inter',
-                              ),
-                            ).animate().fadeIn(delay: 250.ms, duration: 300.ms),
-                          ],
-                          if (_selectedInterests.isNotEmpty) ...[
-                            const SizedBox(height: 16),
-                            Wrap(
-                              spacing: 6,
-                              runSpacing: 6,
-                              alignment: WrapAlignment.center,
-                              children: _selectedInterests
-                                  .where((i) => i != 'Others')
-                                  .take(4)
-                                  .map((i) => Container(
-                                        padding: const EdgeInsets.symmetric(
-                                            horizontal: 8, vertical: 3),
-                                        decoration: BoxDecoration(
-                                          color: Colors.white.withValues(alpha: 0.06),
-                                          borderRadius:
-                                              BorderRadius.circular(8),
-                                        ),
-                                        child: Text(
-                                          i,
-                                          style: const TextStyle(
-                                            color: Colors.white70,
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.w500,
-                                          ),
-                                        ),
-                                      ))
-                                  .toList(),
-                            ).animate().fadeIn(delay: 350.ms, duration: 300.ms),
-                          ],
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: context.surfaceSecondary.withValues(alpha: 0.8),
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 96,
+                    height: 96,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: LinearGradient(
+                        colors: [
+                          context.accentSecondary,
+                          context.accentSecondary.withValues(alpha: 0.8)
                         ],
                       ),
+                      boxShadow: [
+                        BoxShadow(
+                          color:
+                              context.accentSecondary.withValues(alpha: 0.15),
+                          blurRadius: 6,
+                          spreadRadius: 1,
+                        ),
+                      ],
                     ),
-                  ),
+                    child: Builder(builder: (context) {
+                      final provider =
+                          Provider.of<ProfileProvider>(context, listen: false);
+                      return (provider.avatarUrl.isNotEmpty &&
+                              provider.avatarUrl.startsWith('http'))
+                          ? ClipOval(
+                              child: Image.network(
+                                provider.avatarUrl,
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) =>
+                                    _buildAvatarPlaceholder(),
+                              ),
+                            )
+                          : _buildAvatarPlaceholder();
+                    }),
+                  )
+                      .animate()
+                      .scale(duration: 400.ms, curve: Curves.easeOutBack),
+                  const SizedBox(height: 16),
+                  Text(
+                    _nameController.text,
+                    style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        fontFamily: 'Inter'),
+                  ).animate().fadeIn(delay: 200.ms, duration: 300.ms),
+                  if (headline.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      headline,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.8),
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                        fontFamily: 'Inter',
+                      ),
+                    ).animate().fadeIn(delay: 250.ms, duration: 300.ms),
+                  ],
+                  if (_selectedInterests.isNotEmpty) ...[
+                    const SizedBox(height: 16),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      alignment: WrapAlignment.center,
+                      children: _selectedInterests
+                          .where((i) => i != 'Others')
+                          .take(4)
+                          .map((i) => Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.06),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  i,
+                                  style: const TextStyle(
+                                    color: Colors.white70,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ))
+                          .toList(),
+                    ).animate().fadeIn(delay: 350.ms, duration: 300.ms),
+                  ],
+                ],
+              ),
+            ),
+          ),
           const SizedBox(height: 20),
           Column(
             mainAxisSize: MainAxisSize.min,
@@ -1076,7 +1074,6 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
       });
     }
   }
-
 
   Future<void> _loadInitialData() async {
     if (!mounted) return;
@@ -1179,105 +1176,104 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                 _buildHeader(context),
                 const SizedBox(height: 28),
 
+                _buildIdentityHeader(context),
+                const SizedBox(height: 28),
 
-                  _buildIdentityHeader(context),
-                  const SizedBox(height: 28),
-
-                  // Section: My Story
-                  _buildSectionHeader('MY STORY', _showEditBioSheet),
-                  const SizedBox(height: 0),
-                  Container(
-                    padding: const EdgeInsets.fromLTRB(1, 8, 8, 8),
-                    child: Text(
-                      (provider.bio.trim().isNotEmpty
-                              ? provider.bio.trim()
-                              : provider.professionalBio.trim())
-                          .isEmpty
-                          ? 'No bio added yet. Tap edit to tell the world about yourself!'
-                          : (provider.bio.trim().isNotEmpty
-                              ? provider.bio.trim()
-                              : provider.professionalBio.trim()),
-                      style: context.bodyText.copyWith(
-                        color: (provider.bio.trim().isNotEmpty
+                // Section: My Story
+                _buildSectionHeader('MY STORY', _showEditBioSheet),
+                const SizedBox(height: 0),
+                Container(
+                  padding: const EdgeInsets.fromLTRB(1, 8, 8, 8),
+                  child: Text(
+                    (provider.bio.trim().isNotEmpty
                                 ? provider.bio.trim()
                                 : provider.professionalBio.trim())
                             .isEmpty
-                            ? context.textMuted
-                            : context.textPrimary,
-                        height: 1.4,
-                        fontSize: 14,
-                      ),
+                        ? 'No bio added yet. Tap edit to tell the world about yourself!'
+                        : (provider.bio.trim().isNotEmpty
+                            ? provider.bio.trim()
+                            : provider.professionalBio.trim()),
+                    style: context.bodyText.copyWith(
+                      color: (provider.bio.trim().isNotEmpty
+                                  ? provider.bio.trim()
+                                  : provider.professionalBio.trim())
+                              .isEmpty
+                          ? context.textMuted
+                          : context.textPrimary,
+                      height: 1.4,
+                      fontSize: 14,
                     ),
                   ),
-                  const SizedBox(height: 24),
+                ),
+                const SizedBox(height: 24),
 
-                  // Section: Interests
-                  _buildSectionHeader('INTERESTS', _showEditInterestsSheet),
-                  const SizedBox(height: 10),
-                  provider.interestTags.isEmpty
-                      ? Padding(
-                          padding: const EdgeInsets.fromLTRB(1, 4, 8, 8),
-                          child: Text(
-                            'No interests added yet. Tap edit to add your interests!',
-                            style: context.bodyText.copyWith(
-                              color: context.textMuted,
-                              fontSize: 13,
-                            ),
+                // Section: Interests
+                _buildSectionHeader('INTERESTS', _showEditInterestsSheet),
+                const SizedBox(height: 10),
+                provider.interestTags.isEmpty
+                    ? Padding(
+                        padding: const EdgeInsets.fromLTRB(1, 4, 8, 8),
+                        child: Text(
+                          'No interests added yet. Tap edit to add your interests!',
+                          style: context.bodyText.copyWith(
+                            color: context.textMuted,
+                            fontSize: 13,
                           ),
-                        )
-                      : Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: provider.interestTags.map((interest) {
-                            return Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 12, vertical: 6),
-                              decoration: BoxDecoration(
-                                color: context.surfaceSecondary,
-                                borderRadius: BorderRadius.circular(20),
-                                border: Border.all(
-                                  color: context.textMuted.withValues(alpha: 0.2),
-                                ),
-                              ),
-                              child: Text(
-                                interest,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            );
-                          }).toList(),
                         ),
-                  const SizedBox(height: 28),
+                      )
+                    : Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: provider.interestTags.map((interest) {
+                          return Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: context.surfaceSecondary,
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
+                                color: context.textMuted.withValues(alpha: 0.2),
+                              ),
+                            ),
+                            child: Text(
+                              interest,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                const SizedBox(height: 28),
 
-                  // Experience Timeline Section (LinkedIn style)
-                  ExperienceTimelineSection(
-                    experience: provider.experience,
-                    isOwner: true,
-                    onAdd: () => _showAddExperienceSheet(context),
-                    onEdit: (item) => _showEditExperienceSheet(context, item),
-                  ),
-                  const SizedBox(height: 28),
+                // Experience Timeline Section (LinkedIn style)
+                ExperienceTimelineSection(
+                  experience: provider.experience,
+                  isOwner: true,
+                  onAdd: () => _showAddExperienceSheet(context),
+                  onEdit: (item) => _showEditExperienceSheet(context, item),
+                ),
+                const SizedBox(height: 28),
 
-                  // Education Section
-                  EducationSection(
-                    education: provider.education,
-                    isOwner: true,
-                    onAdd: () => _showAddEducationSheet(context),
-                    onEdit: (item) => _showEditEducationSheet(context, item),
-                  ),
-                  const SizedBox(height: 28),
+                // Education Section
+                EducationSection(
+                  education: provider.education,
+                  isOwner: true,
+                  onAdd: () => _showAddEducationSheet(context),
+                  onEdit: (item) => _showEditEducationSheet(context, item),
+                ),
+                const SizedBox(height: 28),
 
-                  // Skills & Superpowers Section
-                  SkillsSection(
-                    skills: provider.skills,
-                    isOwner: true,
-                    onEdit: () => _showEditSkillsSheet(context),
-                  ),
-                  const SizedBox(height: 32),
-                  _buildProfileDetailsSection(),
+                // Skills & Superpowers Section
+                SkillsSection(
+                  skills: provider.skills,
+                  isOwner: true,
+                  onEdit: () => _showEditSkillsSheet(context),
+                ),
+                const SizedBox(height: 32),
+                _buildProfileDetailsSection(),
                 if (provider.userId != null) ...[
                   const SizedBox(height: 28),
                   VouchesListWidget(
@@ -1425,6 +1421,20 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                         letterSpacing: 0.3,
                       ),
                     ),
+                    if (provider.handle.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        '@${provider.handle}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: context.textSecondary.withValues(alpha: 0.6),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                          fontFamily: 'Inter',
+                        ),
+                      ),
+                    ],
                     if (subtitle.isNotEmpty) ...[
                       const SizedBox(height: 4),
                       Text(
@@ -1534,7 +1544,203 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
               ),
             ],
           ),
+          const SizedBox(height: 12),
+          _buildWebUrlShareBar(context, provider),
         ],
+      ),
+    );
+  }
+
+  Widget _buildWebUrlShareBar(BuildContext context, ProfileProvider provider) {
+    final String identifier = provider.handle.trim().isNotEmpty
+        ? provider.handle.trim()
+        : (provider.userId?.toString() ?? '');
+    if (identifier.isEmpty) return const SizedBox.shrink();
+
+    final String displayUrl = 'joinmandala.in/x/$identifier';
+    final String fullUrl = 'https://joinmandala.in/x/$identifier';
+
+    return Container(
+      decoration: BoxDecoration(
+        color: context.surfaceSecondary,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: context.textMuted.withValues(alpha: 0.18),
+          width: 1,
+        ),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(14),
+          onTap: () => _copyProfileUrl(context, fullUrl, displayUrl),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+            child: Row(
+              children: [
+                Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF00F2FE).withValues(alpha: 0.12),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.link_rounded,
+                    size: 17,
+                    color: Color(0xFF00F2FE),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'WEB PROFILE',
+                        style: TextStyle(
+                          color: context.textMuted,
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.9,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        displayUrl,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: context.textPrimary,
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w600,
+                          fontFamily: 'Inter',
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                // Copy Button
+                GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () => _copyProfileUrl(context, fullUrl, displayUrl),
+                  child: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: context.surfacePrimary,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.08),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.copy_rounded,
+                          size: 12,
+                          color: context.accentPrimary,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Copy',
+                          style: TextStyle(
+                            color: context.textPrimary,
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w600,
+                            fontFamily: 'Inter',
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                // Share Button
+                GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () => _shareProfileUrl(provider, fullUrl),
+                  child: Container(
+                    padding: const EdgeInsets.all(7),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF00F2FE).withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: const Color(0xFF00F2FE).withValues(alpha: 0.25),
+                      ),
+                    ),
+                    child: const Icon(
+                      Icons.share_outlined,
+                      size: 14,
+                      color: Color(0xFF00F2FE),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _copyProfileUrl(
+      BuildContext context, String fullUrl, String displayUrl) {
+    HapticFeedback.lightImpact();
+    Clipboard.setData(ClipboardData(text: fullUrl));
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(
+              Icons.check_circle_rounded,
+              color: Color(0xFF00F2FE),
+              size: 18,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Copied link: $displayUrl',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                  fontFamily: 'Inter',
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
+        backgroundColor: context.surfaceSecondary,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(10),
+          side: BorderSide(
+            color: context.textMuted.withValues(alpha: 0.2),
+          ),
+        ),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
+  void _shareProfileUrl(ProfileProvider provider, String fullUrl) {
+    HapticFeedback.lightImpact();
+    final name = provider.name.trim();
+    final shareText = name.isNotEmpty
+        ? 'Check out $name\'s profile on Mandala: $fullUrl'
+        : 'Check out my profile on Mandala: $fullUrl';
+    SharePlus.instance.share(
+      ShareParams(
+        text: shareText,
+        subject:
+            name.isNotEmpty ? '$name\'s Profile on Mandala' : 'Mandala Profile',
       ),
     );
   }
@@ -1556,7 +1762,11 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
           GestureDetector(
             onTap: () {
               HapticFeedback.lightImpact();
-              _showEditIdentitySheet();
+              if (Navigator.canPop(context)) {
+                Navigator.pop(context);
+              } else {
+                _showEditIdentitySheet();
+              }
             },
             behavior: HitTestBehavior.opaque,
             child: Container(
@@ -1565,8 +1775,10 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                 color: context.surfaceSecondary,
                 shape: BoxShape.circle,
               ),
-              child: const Icon(
-                Icons.person_outline_rounded,
+              child: Icon(
+                Navigator.canPop(context)
+                    ? Icons.arrow_back_ios_new_rounded
+                    : Icons.person_outline_rounded,
                 color: Colors.white,
                 size: 16,
               ),
@@ -1668,7 +1880,8 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                 onTogglePrivacy: () async {
                   final newPrivate = !isEmailPrivate;
                   await provider.setFieldPrivate('email', newPrivate);
-                  await provider.setFieldPrivate('professionalEmail', newPrivate);
+                  await provider.setFieldPrivate(
+                      'professionalEmail', newPrivate);
                   if (context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
@@ -1748,7 +1961,8 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                 onTogglePrivacy: () async {
                   final newPrivate = !isPhonePrivate;
                   await provider.setFieldPrivate('phoneNumber', newPrivate);
-                  await provider.setFieldPrivate('professionalPhoneNumber', newPrivate);
+                  await provider.setFieldPrivate(
+                      'professionalPhoneNumber', newPrivate);
                   if (context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
@@ -1837,8 +2051,7 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                 'twitter', 'X (Twitter)', 'assets/icons/twitter.png'),
             _buildSocialCard(
                 'instagram', 'Instagram', 'assets/icons/instagram.png'),
-            _buildSocialCard(
-                'spotify', 'Spotify', 'assets/icons/spotify.png'),
+            _buildSocialCard('spotify', 'Spotify', 'assets/icons/spotify.png'),
           ],
         ),
 
@@ -1952,7 +2165,7 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
     );
   }
 
-    Widget _buildDetailRow({
+  Widget _buildDetailRow({
     required IconData icon,
     required String label,
     required String value,
@@ -1963,7 +2176,8 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
   }) {
     return GestureDetector(
       onTap: onTap,
-      behavior: onTap != null ? HitTestBehavior.opaque : HitTestBehavior.deferToChild,
+      behavior:
+          onTap != null ? HitTestBehavior.opaque : HitTestBehavior.deferToChild,
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
@@ -2001,34 +2215,38 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
             ),
             const SizedBox(width: 4),
           ],
-        if (onTogglePrivacy != null && value != 'Not set' && value.isNotEmpty) ...[
-          IconButton(
-            icon: Icon(
-              isPrivate ? Icons.lock_rounded : Icons.lock_open_rounded,
-              color: isPrivate ? context.accentSecondary : context.textSecondary,
-              size: 16,
+          if (onTogglePrivacy != null &&
+              value != 'Not set' &&
+              value.isNotEmpty) ...[
+            IconButton(
+              icon: Icon(
+                isPrivate ? Icons.lock_rounded : Icons.lock_open_rounded,
+                color:
+                    isPrivate ? context.accentSecondary : context.textSecondary,
+                size: 16,
+              ),
+              onPressed: onTogglePrivacy,
+              splashRadius: 18,
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(),
+              tooltip: isPrivate ? 'Make public' : 'Make private',
             ),
-            onPressed: onTogglePrivacy,
-            splashRadius: 18,
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(),
-            tooltip: isPrivate ? 'Make public' : 'Make private',
-          ),
-          const SizedBox(width: 12),
+            const SizedBox(width: 12),
+          ],
+          if (onCopy != null && value != 'Not set' && value.isNotEmpty)
+            IconButton(
+              icon: Icon(Icons.copy_rounded,
+                  color: context.textSecondary, size: 16),
+              onPressed: onCopy,
+              splashRadius: 18,
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(),
+              tooltip: 'Copy to clipboard',
+            ),
         ],
-        if (onCopy != null && value != 'Not set' && value.isNotEmpty)
-          IconButton(
-            icon: Icon(Icons.copy_rounded, color: context.textSecondary, size: 16),
-            onPressed: onCopy,
-            splashRadius: 18,
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(),
-            tooltip: 'Copy to clipboard',
-          ),
-      ],
-    ),
-  );
-}
+      ),
+    );
+  }
 
   String _getSocialUrl(String platform, String handle) {
     return SocialLauncher.getSocialUrl(platform, handle);
@@ -2159,7 +2377,8 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                           Navigator.pop(sheetContext);
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
-                              content: Text('Copied $displayName link to clipboard!',
+                              content: Text(
+                                  'Copied $displayName link to clipboard!',
                                   style: TextStyle(color: context.textPrimary)),
                               backgroundColor: context.surfaceSecondary,
                               duration: const Duration(seconds: 2),
@@ -2172,12 +2391,12 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                       label: Text(
                         "Copy Link",
                         style: TextStyle(
-                            color: context.textSecondary, fontWeight: FontWeight.bold),
+                            color: context.textSecondary,
+                            fontWeight: FontWeight.bold),
                       ),
                       style: OutlinedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 14),
-                        side: BorderSide(
-                            color: context.borderMuted),
+                        side: BorderSide(color: context.borderMuted),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
@@ -2263,9 +2482,8 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
 
   void _showEditBioSheet() {
     final provider = Provider.of<ProfileProvider>(context, listen: false);
-    final initialBio = provider.bio.isNotEmpty
-        ? provider.bio
-        : provider.professionalBio;
+    final initialBio =
+        provider.bio.isNotEmpty ? provider.bio : provider.professionalBio;
     final controller = TextEditingController(text: initialBio);
 
     showModalBottomSheet(
@@ -3263,8 +3481,9 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                                       ? Image.network(
                                           avatarUrl,
                                           fit: BoxFit.cover,
-                                          errorBuilder: (context, error, stackTrace) =>
-                                              Container(
+                                          errorBuilder:
+                                              (context, error, stackTrace) =>
+                                                  Container(
                                             color: const Color(0xFF1E1F32),
                                             alignment: Alignment.center,
                                             child: Text(
@@ -3363,12 +3582,20 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
   void _showEditDetailsSheet() {
     final provider = Provider.of<ProfileProvider>(context, listen: false);
 
-    final initialEmail = provider.email.isNotEmpty ? provider.email : provider.professionalEmail;
-    final initialPhone = provider.phoneNumber.isNotEmpty ? provider.phoneNumber : provider.professionalPhoneNumber;
+    final initialEmail =
+        provider.email.isNotEmpty ? provider.email : provider.professionalEmail;
+    final initialPhone = provider.phoneNumber.isNotEmpty
+        ? provider.phoneNumber
+        : provider.professionalPhoneNumber;
+    final initialProfession = provider.profession;
+    final initialEmailPrivate = provider.isFieldPrivate('email') ||
+        provider.isFieldPrivate('professionalEmail');
+    final initialPhonePrivate = provider.isFieldPrivate('phoneNumber') ||
+        provider.isFieldPrivate('professionalPhoneNumber');
 
     final emailC = TextEditingController(text: initialEmail);
     final phoneC = TextEditingController(text: initialPhone);
-    final professionC = TextEditingController(text: provider.profession);
+    final professionC = TextEditingController(text: initialProfession);
 
     showModalBottomSheet(
       context: context,
@@ -3376,11 +3603,18 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
       backgroundColor: Colors.transparent,
       barrierColor: Colors.black.withValues(alpha: 0.5),
       builder: (sheetCtx) {
-        bool emailPrivate = provider.isFieldPrivate('email') || provider.isFieldPrivate('professionalEmail');
-        bool phonePrivate = provider.isFieldPrivate('phoneNumber') || provider.isFieldPrivate('professionalPhoneNumber');
+        bool emailPrivate = initialEmailPrivate;
+        bool phonePrivate = initialPhonePrivate;
 
         return StatefulBuilder(
           builder: (BuildContext context, StateSetter setModalState) {
+            final bool hasChanges =
+                professionC.text.trim() != initialProfession.trim() ||
+                    emailC.text.trim() != initialEmail.trim() ||
+                    phoneC.text.trim() != initialPhone.trim() ||
+                    emailPrivate != initialEmailPrivate ||
+                    phonePrivate != initialPhonePrivate;
+
             return Padding(
               padding: EdgeInsets.only(
                   bottom: MediaQuery.of(sheetCtx).viewInsets.bottom),
@@ -3419,20 +3653,20 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                         ),
                       ),
                       const SizedBox(height: 18),
-
                       _buildSheetField(
                         label: 'Profession',
                         controller: professionC,
                         icon: Icons.work_outline_rounded,
                         accentColor: context.accentSecondary,
+                        onChanged: (_) => setModalState(() {}),
                       ),
                       const SizedBox(height: 14),
-
                       _buildSheetField(
                         label: 'Email',
                         controller: emailC,
                         icon: Icons.email_outlined,
                         accentColor: context.accentSecondary,
+                        onChanged: (_) => setModalState(() {}),
                       ),
                       const SizedBox(height: 8),
                       Row(
@@ -3448,7 +3682,8 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                                 borderRadius: BorderRadius.circular(4),
                               ),
                               side: BorderSide(
-                                color: context.textSecondary.withValues(alpha: 0.5),
+                                color: context.textSecondary
+                                    .withValues(alpha: 0.5),
                                 width: 1.5,
                               ),
                               onChanged: (val) {
@@ -3470,12 +3705,12 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                         ],
                       ),
                       const SizedBox(height: 14),
-
                       _buildSheetField(
                         label: 'Phone Number',
                         controller: phoneC,
                         icon: Icons.phone_android_outlined,
                         accentColor: context.accentSecondary,
+                        onChanged: (_) => setModalState(() {}),
                       ),
                       const SizedBox(height: 8),
                       Row(
@@ -3491,7 +3726,8 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                                 borderRadius: BorderRadius.circular(4),
                               ),
                               side: BorderSide(
-                                color: context.textSecondary.withValues(alpha: 0.5),
+                                color: context.textSecondary
+                                    .withValues(alpha: 0.5),
                                 width: 1.5,
                               ),
                               onChanged: (val) {
@@ -3512,9 +3748,7 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                           ),
                         ],
                       ),
-
                       const SizedBox(height: 28),
-
                       _buildSheetSaveButton(() async {
                         final uid = provider.userId;
                         if (uid != null) {
@@ -3522,19 +3756,27 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
                           final phoneVal = phoneC.text.trim();
                           final professionVal = professionC.text.trim();
 
-                          await provider.updateProfileField('email', emailVal, uid);
-                          await provider.updateProfileField('professionalEmail', emailVal, uid);
-                          await provider.updateProfileField('phoneNumber', phoneVal, uid);
-                          await provider.updateProfileField('professionalPhoneNumber', phoneVal, uid);
-                          await provider.updateProfileField('profession', professionVal, uid);
+                          await provider.updateProfileField(
+                              'email', emailVal, uid);
+                          await provider.updateProfileField(
+                              'professionalEmail', emailVal, uid);
+                          await provider.updateProfileField(
+                              'phoneNumber', phoneVal, uid);
+                          await provider.updateProfileField(
+                              'professionalPhoneNumber', phoneVal, uid);
+                          await provider.updateProfileField(
+                              'profession', professionVal, uid);
 
                           await provider.setFieldPrivate('email', emailPrivate);
-                          await provider.setFieldPrivate('professionalEmail', emailPrivate);
-                          await provider.setFieldPrivate('phoneNumber', phonePrivate);
-                          await provider.setFieldPrivate('professionalPhoneNumber', phonePrivate);
+                          await provider.setFieldPrivate(
+                              'professionalEmail', emailPrivate);
+                          await provider.setFieldPrivate(
+                              'phoneNumber', phonePrivate);
+                          await provider.setFieldPrivate(
+                              'professionalPhoneNumber', phonePrivate);
                         }
                         if (sheetCtx.mounted) Navigator.pop(sheetCtx);
-                      }),
+                      }, isEnabled: hasChanges),
                       const SizedBox(height: 8),
                     ],
                   ),
@@ -3677,6 +3919,7 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
     String? assetPath,
     Color accentColor = const Color(0xFF00F2FE),
     Widget? suffixIcon,
+    ValueChanged<String>? onChanged,
   }) {
     Widget? prefix;
     if (assetPath != null) {
@@ -3694,6 +3937,7 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
 
     return TextField(
       controller: controller,
+      onChanged: onChanged,
       style: const TextStyle(color: Colors.white, fontSize: 14),
       decoration: InputDecoration(
         labelText: label,
@@ -3716,15 +3960,24 @@ class _YetToBeBuiltProfilePageState extends State<YetToBeBuiltProfilePage> {
   }
 
   Widget _buildSheetSaveButton(FutureOr<void> Function() onSave,
-      {List<Color>? customColors}) {
-    return _SheetSaveButton(onSave: onSave, customColors: customColors);
+      {List<Color>? customColors, bool isEnabled = true}) {
+    return _SheetSaveButton(
+      onSave: onSave,
+      customColors: customColors,
+      isEnabled: isEnabled,
+    );
   }
 }
 
 class _SheetSaveButton extends StatefulWidget {
   final FutureOr<void> Function() onSave;
   final List<Color>? customColors;
-  const _SheetSaveButton({required this.onSave, this.customColors});
+  final bool isEnabled;
+  const _SheetSaveButton({
+    required this.onSave,
+    this.customColors,
+    this.isEnabled = true,
+  });
 
   @override
   State<_SheetSaveButton> createState() => _SheetSaveButtonState();
@@ -3735,13 +3988,25 @@ class _SheetSaveButtonState extends State<_SheetSaveButton> {
 
   @override
   Widget build(BuildContext context) {
-    final hasCustomColors = widget.customColors != null && widget.customColors!.isNotEmpty;
-    final buttonColor = hasCustomColors ? widget.customColors!.first : context.accentSecondary;
+    final hasCustomColors =
+        widget.customColors != null && widget.customColors!.isNotEmpty;
+    final bool canPress = widget.isEnabled && !_isLoading;
+
+    final Color buttonColor;
+    if (!widget.isEnabled) {
+      buttonColor = Colors.white.withValues(alpha: 0.15);
+    } else {
+      buttonColor = hasCustomColors ? widget.customColors!.first : Colors.white;
+    }
+
     final effectiveColor =
         _isLoading ? buttonColor.withValues(alpha: 0.5) : buttonColor;
 
     final Decoration decoration;
-    if (hasCustomColors && widget.customColors!.length > 1 && !_isLoading) {
+    if (widget.isEnabled &&
+        hasCustomColors &&
+        widget.customColors!.length > 1 &&
+        !_isLoading) {
       decoration = BoxDecoration(
         gradient: LinearGradient(
           colors: widget.customColors!,
@@ -3761,10 +4026,10 @@ class _SheetSaveButtonState extends State<_SheetSaveButton> {
       width: double.infinity,
       decoration: decoration,
       child: ElevatedButton(
-        onPressed: _isLoading
-            ? null
-            : () async {
+        onPressed: canPress
+            ? () async {
                 final messenger = ScaffoldMessenger.of(context);
+                final accentColor = context.accentSecondary;
                 setState(() {
                   _isLoading = true;
                 });
@@ -3775,7 +4040,7 @@ class _SheetSaveButtonState extends State<_SheetSaveButton> {
                       content: Row(
                         children: [
                           Icon(Icons.check_circle_rounded,
-                              color: context.accentSecondary, size: 18),
+                              color: accentColor, size: 18),
                           const SizedBox(width: 8),
                           const Text(
                             'Changes saved successfully!',
@@ -3830,27 +4095,33 @@ class _SheetSaveButtonState extends State<_SheetSaveButton> {
                     });
                   }
                 }
-              },
+              }
+            : null,
         style: ElevatedButton.styleFrom(
           backgroundColor: Colors.transparent,
+          disabledBackgroundColor: Colors.transparent,
           shadowColor: Colors.transparent,
           padding: const EdgeInsets.symmetric(vertical: 14),
           shape:
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         ),
         child: _isLoading
-            ? const SizedBox(
+            ? SizedBox(
                 width: 20,
                 height: 20,
                 child: CircularProgressIndicator(
                   strokeWidth: 2.5,
-                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                  valueColor: AlwaysStoppedAnimation<Color>(
+                    hasCustomColors ? Colors.white : Colors.black,
+                  ),
                 ),
               )
-            : const Text(
+            : Text(
                 'Save',
                 style: TextStyle(
-                  color: Colors.white,
+                  color: !widget.isEnabled
+                      ? Colors.white38
+                      : (hasCustomColors ? Colors.white : Colors.black),
                   fontWeight: FontWeight.bold,
                   fontSize: 15,
                 ),

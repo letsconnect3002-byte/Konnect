@@ -7,7 +7,6 @@ import 'package:connect/Models/feed_post.dart';
 import 'package:connect/Providers/feed_provider.dart';
 import 'package:connect/Providers/profile_provider.dart';
 import 'package:connect/Providers/connection_provider.dart';
-import 'package:connect/Pages/ConnectionProfilePage.dart';
 import 'package:connect/Widgets/referral_intro_sheet.dart';
 import 'package:connect/Widgets/direct_connection_sheet.dart';
 import 'package:connect/Widgets/post_engagement_bar.dart';
@@ -1125,7 +1124,7 @@ class _FormattedPostContent extends StatelessWidget {
     } catch (_) {}
 
     final vouchMatch =
-        RegExp(r'(?:⭐\s*)?Vouched for @([^\n\r]+)').firstMatch(content);
+        RegExp(r'(?:⭐\s*)?Vouched for @([^\n\r"]+?)(?:\s+as\s+|\n|$)').firstMatch(content);
     if (vouchMatch != null) {
       final vouchedName = vouchMatch.group(1)?.trim();
       if (vouchedName != null && vouchedName.isNotEmpty) {
@@ -1158,6 +1157,15 @@ class _FormattedPostContent extends StatelessWidget {
       displayContent = displayContent.replaceFirst('⭐ ', '');
     } else if (displayContent.startsWith('⭐')) {
       displayContent = displayContent.replaceFirst(RegExp(r'^⭐\s*'), '');
+    }
+
+    // For vouch posts, keep the introductory announcement line since the rich Vouch card
+    // displays the testimonial note and endorsement details in its dedicated quote section
+    if (displayContent.startsWith('Vouched for')) {
+      final doubleNewline = displayContent.indexOf('\n\n');
+      if (doubleNewline != -1) {
+        displayContent = displayContent.substring(0, doubleNewline).trim();
+      }
     }
 
     final List<InlineSpan> spans = [];
@@ -1200,18 +1208,21 @@ class _FormattedPostContent extends StatelessWidget {
                 }).toList();
 
                 if (matches.isNotEmpty) {
+                  final target = matches.first;
+                  final targetId = target['id'] is int
+                      ? target['id'] as int
+                      : (int.tryParse(target['id']?.toString() ?? '') ?? 0);
                   AnalyticsService.logEvent(
                     name: 'profile_viewed_from_mention',
                     parameters: {
-                      'target_user_id': matches.first['id'] ?? 0,
+                      'target_user_id': targetId,
                     },
                   );
-                  Navigator.push(
+                  UserProfileModal.show(
                     context,
-                    MaterialPageRoute(
-                      builder: (context) =>
-                          ConnectionProfilePage(profileData: matches.first),
-                    ),
+                    userId: targetId,
+                    userName: target['name']?.toString() ?? rawName,
+                    avatarUrl: target['avatar_url']?.toString(),
                   );
                 } else {
                   try {
@@ -1222,12 +1233,14 @@ class _FormattedPostContent extends StatelessWidget {
                         .limit(1)
                         .maybeSingle();
                     if (profile != null && context.mounted) {
-                      Navigator.push(
+                      final targetId = profile['id'] is int
+                          ? profile['id'] as int
+                          : (int.tryParse(profile['id']?.toString() ?? '') ?? 0);
+                      UserProfileModal.show(
                         context,
-                        MaterialPageRoute(
-                          builder: (context) =>
-                              ConnectionProfilePage(profileData: profile),
-                        ),
+                        userId: targetId,
+                        userName: profile['name']?.toString() ?? rawName,
+                        avatarUrl: profile['avatar_url']?.toString(),
                       );
                     }
                   } catch (e) {

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:connect/Config/app_theme.dart';
 import 'package:connect/Pages/ConnectionProfilePage.dart';
 import 'package:connect/Pages/IndividualChatPage.dart';
@@ -8,6 +9,7 @@ import 'package:connect/Providers/custom_network_provider.dart';
 import 'package:connect/Providers/feed_provider.dart';
 import 'package:connect/Models/custom_network.dart';
 import 'package:connect/Providers/notification_provider.dart';
+import 'package:connect/Providers/vouch_provider.dart';
 import 'package:connect/main.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -564,20 +566,14 @@ class _NotificationPageState extends State<NotificationPage> {
     final bool isUnseen = notification['is_seen'] == false;
 
     final String? rawNote = notification['note'] as String?;
-    final bool isReferralRequest = type == 'referral' &&
+    final bool isReferral = type == 'referral';
+    final bool isReferralRequest = isReferral &&
         rawNote != null &&
         (rawNote.startsWith('[REFERRAL_REQUEST]') ||
             rawNote.startsWith('[REFERRAL_REQUEST_ACTIONED]'));
     final bool isRequestActioned =
         rawNote != null && rawNote.startsWith('[REFERRAL_REQUEST_ACTIONED]');
-    final bool isNormalReferral = type == 'referral' && !isReferralRequest;
-    final bool isReferral = type == 'referral';
-    final bool isQr = type == 'qr_code';
-    final bool isReferralConnect = type == 'referral_connect';
-    final bool isDirectRequest = type == 'direct_connection_request';
-    final Color accentColor = (isReferral || isReferralConnect || isDirectRequest)
-        ? context.accentSecondary
-        : (isQr ? const Color(0xFF00F2FE) : const Color(0xFF8B5CF6));
+    final bool isNormalReferral = isReferral && !isReferralRequest;
 
     final referredUser =
         notification['referred_user'] as Map<String, dynamic>? ?? {};
@@ -585,6 +581,29 @@ class _NotificationPageState extends State<NotificationPage> {
     final String referredAvatarUrl =
         referredUser['avatar_url'] ?? referredUser['avatarUrl'] ?? '';
     final String referredProfession = referredUser['profession'] ?? '';
+
+    final connectionProvider =
+        Provider.of<ConnectionProvider>(context);
+    final targetConnectionUserId =
+        isReferral ? referredUser['id'] : otherUser['id'];
+    final bool isAlreadyConnected = targetConnectionUserId != null &&
+        connectionProvider.connections
+            .any((c) => c['id'] == targetConnectionUserId);
+
+    final bool isQr = type == 'qr_code';
+    final bool isReferralConnect = type == 'referral_connect';
+    final bool isDirectRequest = type == 'direct_connection_request';
+    final bool isVouchRequest = type == 'vouch_request' && !isAlreadyConnected;
+    final bool isVouchReceived = type == 'vouch_received' ||
+        (type == 'vouch_request' && isAlreadyConnected);
+    final bool isVouchAccepted = type == 'vouch_accepted';
+    final bool isVouch = isVouchRequest || isVouchReceived || isVouchAccepted;
+
+    final Color accentColor = (isReferral || isReferralConnect || isDirectRequest)
+        ? context.accentSecondary
+        : (isVouch
+            ? const Color(0xFFF59E0B)
+            : (isQr ? const Color(0xFF00F2FE) : const Color(0xFF8B5CF6)));
 
     String? directRequestMessage;
     if (isDirectRequest && rawNote != null && rawNote.isNotEmpty) {
@@ -596,6 +615,16 @@ class _NotificationPageState extends State<NotificationPage> {
       } catch (_) {
         directRequestMessage = rawNote;
       }
+    }
+
+    String? vouchId;
+    if (isVouch && rawNote != null && rawNote.isNotEmpty) {
+      try {
+        final parsed = jsonDecode(rawNote);
+        if (parsed is Map) {
+          vouchId = parsed['vouch_id']?.toString();
+        }
+      } catch (_) {}
     }
 
     String? displayNote;
@@ -611,14 +640,6 @@ class _NotificationPageState extends State<NotificationPage> {
         displayNote = rawNote;
       }
     }
-
-    final connectionProvider =
-        Provider.of<ConnectionProvider>(context, listen: false);
-    final targetConnectionUserId =
-        isReferral ? referredUser['id'] : otherUser['id'];
-    final bool isAlreadyConnected = targetConnectionUserId != null &&
-        connectionProvider.connections
-            .any((c) => c['id'] == targetConnectionUserId);
 
     return Dismissible(
       key: Key(notification['id'].toString()),
@@ -803,11 +824,17 @@ class _NotificationPageState extends State<NotificationPage> {
                               TextSpan(
                                 text: isDirectRequest
                                     ? " sent you a direct connection request"
-                                    : (isQr
-                                        ? " connected via QR scan"
-                                        : (type == 'referral_connect'
-                                            ? " connected via Referral"
-                                            : " connected via Private Key")),
+                                    : (isVouchRequest
+                                        ? " wants to connect & vouched for you"
+                                        : (isVouchReceived
+                                            ? " vouched for you on your profile"
+                                            : (isVouchAccepted
+                                                ? " accepted your vouch and connected with you!"
+                                                : (isQr
+                                                    ? " connected via QR scan"
+                                                    : (type == 'referral_connect'
+                                                        ? " connected via Referral"
+                                                        : " connected via Private Key"))))),
                                 style: const TextStyle(color: Colors.white70),
                               ),
                               if (timeStr.isNotEmpty)
@@ -981,6 +1008,159 @@ class _NotificationPageState extends State<NotificationPage> {
                           ],
                         ),
                       ],
+                      if (isVouchRequest) ...[
+                        const SizedBox(height: 8),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.start,
+                          children: [
+                            SizedBox(
+                              height: 30,
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: ElevatedButton(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.transparent,
+                                    foregroundColor: Colors.black,
+                                    shadowColor: Colors.transparent,
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 14, vertical: 0),
+                                    minimumSize: const Size(0, 30),
+                                    tapTargetSize:
+                                        MaterialTapTargetSize.shrinkWrap,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                  ),
+                                  onPressed: () async {
+                                    HapticFeedback.lightImpact();
+                                    final messenger =
+                                        ScaffoldMessenger.of(context);
+                                    final vouchProvider =
+                                        Provider.of<VouchProvider>(context,
+                                            listen: false);
+                                    final targetId = otherUser['id'];
+
+                                    // Optimistically hide Accept/Decline and switch to accepted state
+                                    setState(() {
+                                      notification['type'] = 'vouch_received';
+                                      notification['is_seen'] = true;
+                                    });
+
+                                    try {
+                                      if (vouchId != null) {
+                                        await vouchProvider.acceptVouch(
+                                          vouchId,
+                                          voucheeId: provider.userId,
+                                        );
+                                      }
+                                      if (targetId != null &&
+                                          provider.userId != null) {
+                                        await connectionProvider.connectUsers(
+                                          provider.userId!,
+                                          targetId,
+                                          sharedCardByPresenter: 'both',
+                                          connectionType: 'direct_connect',
+                                        );
+                                      }
+                                      await Supabase.instance.client
+                                          .from('connection_notifications')
+                                          .update({
+                                        'type': 'vouch_received',
+                                        'is_seen': true,
+                                      }).eq('id', notification['id']);
+                                      await provider.fetchNotifications();
+                                      if (mounted) {
+                                        try {
+                                          final feedProv = Provider.of<FeedProvider>(context, listen: false);
+                                          feedProv.fetchInitialFeed(silent: true);
+                                        } catch (_) {}
+                                      }
+                                      messenger.showSnackBar(
+                                        SnackBar(
+                                          content: Text(
+                                              "Connected with $name and vouch accepted!"),
+                                          backgroundColor:
+                                              const Color(0xFF10B981),
+                                        ),
+                                      );
+                                    } catch (e) {
+                                      setState(() {
+                                        notification['type'] = 'vouch_request';
+                                      });
+                                      messenger.showSnackBar(
+                                        SnackBar(
+                                          content: Text(
+                                              "Could not accept vouch: $e"),
+                                          backgroundColor: Colors.redAccent,
+                                        ),
+                                      );
+                                    }
+                                  },
+                                  child: const Text(
+                                    "Accept",
+                                    style: TextStyle(
+                                      fontSize: 11.5,
+                                      fontWeight: FontWeight.bold,
+                                      fontFamily: 'Inter',
+                                      color: Colors.black,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            SizedBox(
+                              height: 30,
+                              child: OutlinedButton(
+                                style: OutlinedButton.styleFrom(
+                                  backgroundColor:
+                                      Colors.white.withValues(alpha: 0.05),
+                                  foregroundColor: Colors.white70,
+                                  side: BorderSide(
+                                    color: Colors.white
+                                        .withValues(alpha: 0.15),
+                                    width: 0.8,
+                                  ),
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 14, vertical: 0),
+                                  minimumSize: const Size(0, 30),
+                                  tapTargetSize:
+                                      MaterialTapTargetSize.shrinkWrap,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                ),
+                                onPressed: () async {
+                                  HapticFeedback.lightImpact();
+                                  final vouchProvider =
+                                      Provider.of<VouchProvider>(context,
+                                          listen: false);
+                                  try {
+                                    if (vouchId != null) {
+                                      await vouchProvider
+                                          .declineVouch(vouchId);
+                                    }
+                                    await provider
+                                        .deleteNotification(notification['id']);
+                                  } catch (_) {}
+                                },
+                                child: const Text(
+                                  "Decline",
+                                  style: TextStyle(
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.w600,
+                                    fontFamily: 'Inter',
+                                    color: Colors.white70,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                       if (isReferral &&
                           displayNote != null &&
                           displayNote.isNotEmpty) ...[
@@ -1129,7 +1309,7 @@ class _NotificationPageState extends State<NotificationPage> {
                     ],
                   ),
                 ),
-                if (!isReferralRequest && !isDirectRequest) ...[
+                if (!isReferralRequest && !isDirectRequest && !isVouchRequest) ...[
                   const SizedBox(width: 8),
                   SizedBox(
                     width: 76,

@@ -2,6 +2,8 @@ import 'package:connect/Pages/IndividualChatPage.dart';
 import 'package:connect/Providers/profile_provider.dart';
 import 'package:connect/Providers/connection_provider.dart';
 import 'package:connect/Providers/chat_provider.dart';
+import 'package:connect/Providers/vouch_provider.dart';
+import 'package:connect/Providers/feed_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -167,6 +169,14 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
                       color: Colors.redAccent, fontWeight: FontWeight.normal)),
               onPressed: () {
                 final messenger = ScaffoldMessenger.of(context);
+                final profileProvider =
+                    Provider.of<ProfileProvider>(context, listen: false);
+                final vouchProvider =
+                    Provider.of<VouchProvider>(context, listen: false);
+                final feedProvider =
+                    Provider.of<FeedProvider>(context, listen: false);
+                final myUserId = profileProvider.userId;
+
                 Navigator.pop(dialogContext);
                 messenger.showSnackBar(
                   SnackBar(
@@ -199,9 +209,24 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
                     ),
                   ),
                 );
+                final otherId = connection['id'] is int
+                    ? connection['id'] as int
+                    : (int.tryParse(connection['id'].toString()) ?? 0);
                 provider.deleteProfile(connection['id'],
                     onRoomCleanup: (profileId, roomId) async {
                   await chatProvider.handleRoomCleanup(profileId, roomId);
+                }, onVouchCleanup: () async {
+                  if (myUserId != null && otherId != 0) {
+                    try {
+                      await vouchProvider.deleteVouchesBetween(
+                          userId1: myUserId, userId2: otherId);
+                    } catch (e) {
+                      debugPrint("Error deleting vouches in cleanup: $e");
+                    }
+                    try {
+                      feedProvider.fetchInitialFeed(silent: true);
+                    } catch (_) {}
+                  }
                 });
               },
             ),
@@ -394,10 +419,34 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
                                 ),
                               ),
                             );
+                            final profileProvider =
+                                Provider.of<ProfileProvider>(context,
+                                    listen: false);
+                            final vouchProvider =
+                                Provider.of<VouchProvider>(context,
+                                    listen: false);
+                            final feedProvider =
+                                Provider.of<FeedProvider>(context,
+                                    listen: false);
+                            final myUserId = profileProvider.userId;
+
                             provider.deleteProfile(intId,
                                 onRoomCleanup: (profileId, roomId) async {
                               await chatProvider.handleRoomCleanup(
                                   profileId, roomId);
+                            }, onVouchCleanup: () async {
+                              if (myUserId != null && intId != 0) {
+                                try {
+                                  await vouchProvider.deleteVouchesBetween(
+                                      userId1: myUserId, userId2: intId);
+                                } catch (e) {
+                                  debugPrint(
+                                      "Error deleting vouches in cleanup: $e");
+                                }
+                                try {
+                                  feedProvider.fetchInitialFeed(silent: true);
+                                } catch (_) {}
+                              }
                             });
                           } catch (e) {
                             if (mounted) {
