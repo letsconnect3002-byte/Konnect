@@ -203,6 +203,7 @@ class _SettingsPageState extends State<SettingsPage> {
             navigator.popUntil((route) => route.isFirst);
           }
         } catch (e) {
+          debugPrint("deleteAccount error: $e");
           setState(() => _isDeleting = false);
           messenger.showSnackBar(
             const SnackBar(

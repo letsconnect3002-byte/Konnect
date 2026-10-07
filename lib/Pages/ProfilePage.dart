@@ -143,7 +143,7 @@ class _ProfilePageState extends State<ProfilePage> {
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    "Generating Private Key...",
+                    "Creating Invite Link...",
                     style: context.cardTitle,
                   ),
                 ],
@@ -175,7 +175,7 @@ class _ProfilePageState extends State<ProfilePage> {
             "Hey everyone! I'm inviting the group to connect with me on Jana. Click here to connect within 24 hours: $inviteLink or use group key: *$code* (Active for 24 hours).";
       } else {
         shareMessage =
-            "Hey, I'm inviting you to my private circle on Jana. Click here to download & connect: $inviteLink or use my single-use Private Key: *$code*.";
+            "Connect with me on Jana — The Private Trust Network: $inviteLink (Or use invite pass: *$code*)";
       }
 
       await SharePlus.instance.share(ShareParams(text: shareMessage));
@@ -643,7 +643,7 @@ class _ProfilePageState extends State<ProfilePage> {
                       ),
                       const SizedBox(height: 20),
                       Text(
-                        "Share Private Key Options",
+                        "Create Invite Link",
                         style: TextStyle(
                           color: context.textPrimary,
                           fontSize: 20,
@@ -653,7 +653,7 @@ class _ProfilePageState extends State<ProfilePage> {
                       ),
                       const SizedBox(height: 6),
                       Text(
-                        "Select key duration:",
+                        "Choose pass duration:",
                         style: TextStyle(
                           color: context.textSecondary,
                           fontSize: 13,
@@ -714,7 +714,7 @@ class _ProfilePageState extends State<ProfilePage> {
                           padding: const EdgeInsets.symmetric(vertical: 14),
                         ),
                         child: const Text(
-                          "Share Private Key",
+                          "Send Invite Link",
                           style: TextStyle(
                             color: Colors.black,
                             fontWeight: FontWeight.bold,
@@ -1044,7 +1044,7 @@ class _ProfilePageState extends State<ProfilePage> {
     final shareCard = compactCard(
       icon: Icons.share_rounded,
       label: 'Share Link',
-      subtitle: 'Send your Private Key',
+      subtitle: 'Send an Invite Pass',
       disabled: !hasProfile,
       onTap: () => _showShareOptionsBottomSheet(context, profileProvider),
     );

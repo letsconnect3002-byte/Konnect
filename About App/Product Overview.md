@@ -1,115 +1,249 @@
 # Jana — The Private Trust Network
 
-Jana is a premium, privacy-first personal trust network and secure messaging app. It is designed for professionals, creators, and individuals who want a distraction-free space for their most valuable connections, completely free from social media noise, public directories, and spam.
+Jana is a premium, privacy-first personal trust network and communication platform. It is crafted for founders, creators, professionals, and close-knit circles who want an authentic, distraction-free space for their most valuable relationships—completely free from social media noise, public follower counts, algorithmic rage-bait, and unsolicited spam.
 
-In Jana, a **Private Trust Network** is not confined to isolated 1-on-1 pairs. Instead, your private network naturally encompasses your **1st-degree direct connections**, **2nd-degree connections (mutual friends)**, and **3rd-degree extended connections**. Because every person across these degrees enters exclusively through verified, human-to-human trusted paths—**scanning physical QR codes**, **sharing single-use VIP Pass Keys**, or **curated introductions through mutual friends**—your entire multi-degree network remains high-trust, authentic, and completely immune to cold messages and public web scraping.
+Unlike conventional platforms where your profile and contact information are indexed for the open internet, Jana operates on **verified human trust**. You only connect with people you have physically met in person, individuals who hold a secure private invitation key, or peers introduced to you through trusted mutual friends. 
 
----
-
-## 1. The Core Vision: Multi-Degree Intimacy by Default
-
-Traditional social networks expose your contact information to the public, leading to unwanted spam and scraping. Jana reverses this dynamic by redefining privacy as a **trusted web of 1st, 2nd, and 3rd degree connections**:
-
-- **Multi-Degree Trust Graph**: Your private network spans 1st-degree (people you connected with directly), 2nd-degree (friends of your direct connections), and 3rd-degree peers. You gain access to an extended circle of trusted individuals without exposing your profile to strangers.
-- **Connections by Consent**: You can only interact directly with people you have physically met, or people introduced to you through a mutual connection in your 2nd or 3rd degree graph.
-- **Separation of Concerns**: Share your business details with professional contacts while keeping your social profile for personal friends, all under a single account.
-- **Ultimate Data Control**: You decide exactly who sees your contact details. Hide your phone number from your network with a single tap, or share it selectively when ready.
-- **Complete Sign-Out Cleanliness**: When you sign out, all local conversation history is completely cleared from the device. Your history is safely restored only when you sign back in.
+Every feature in Jana is designed to make digital connection feel as intimate, respectful, and intentional as a handshake over coffee.
 
 ---
 
-## 2. Your Dual Digital Identity
+## 1. The Core Philosophy: High-Trust & Multi-Degree Connection
 
-Jana allows you to represent yourself differently depending on the context, using two distinct cards:
-- **The Casual Card**: Designed for social and personal connections. It showcases your profile photo, a custom bio, and links to your Instagram or Spotify music handles.
-- **The Professional Card**: Designed for business and career networking. It features your current company, job role, LinkedIn link, business email, and phone number.
-- **One-Tap Privacy**: Next to your phone number on your card, a lock icon allows you to instantly toggle its visibility. When locked, your phone number displays as "Private" and is hidden from connections.
+Traditional social networks push for infinite follower counts at the expense of privacy and authenticity. Jana turns that model on its head:
 
----
-
-## 3. The Connect Hub & Interactive Network Map
-
-The **Connect Hub** and **Your Network** view provide your cockpit for expanding and visualizing your multi-degree trust graph without public exposure:
-- **Your Connection Code**: A unique, secure numeric ID associated with your profile.
-- **Secure Camera Scanner**: Scan a peer's QR code in person to connect instantly as a 1st-degree contact. A smooth, secure loading screen confirms the profile details are loading safely.
-- **VIP Pass Keys**: Generate a secure, single-use link code to send to someone via message or email. Once used, the key expires immediately, ensuring nobody else can use it to contact you.
-- **Invite Peer Link**: Share a warm, pre-written text message to invite close peers to join your trust network.
-- **Interactive Multi-Degree Network Map**: Visualize your personal trust network as an interactive 2D constellation. Inner nodes display your 1st-degree direct connections with high-resolution avatars, while outer nodes represent 2nd-degree and 3rd-degree connections linked via curved bezier paths, mutual connection indicators, atmospheric particle effects, and touch-haptic node inspection.
+- **Intimacy by Default**: There are no public directories or searchable user lists for strangers to browse. You cannot receive cold messages from people outside your trusted circle.
+- **The Multi-Degree Trust Graph**: Real-world trust travels through people you know. Jana naturally visualizes and connects your world across three circles:
+  - **1st Degree (Direct Connections)**: People you know personally, connected via in-person QR code scans or private keys.
+  - **2nd Degree (Mutual Connections)**: Friends of your direct connections. You can discover them through mutual contacts and request warm introductions.
+  - **3rd Degree (Extended Reach)**: Your broader ecosystem of verified peers, visible in network reach without opening you up to cold outreach.
+- **Mutual Consent at Every Step**: Nobody can add you or view your private contact details without your explicit consent. Even when a mutual friend introduces someone to you, you have complete control over whether to accept or decline.
+- **Your Data Stays Yours**: Your private phone number and email remain hidden until you choose to reveal them. When you sign out, your local conversation history is cleared from your phone, keeping your device completely private.
 
 ---
 
-## 4. Curated Referral Pipeline (Friend-of-a-Friend Introductions)
+## 2. Navigating Jana: The 5 Spaces
 
-To connect with someone in your 2nd or 3rd degree network, you request an introduction through a mutual friend:
-1. **Requesting an Intro**: You visit your friend’s profile, browse their connection circle (your 2nd-degree network), and request an introduction to the person you wish to connect with.
-2. **Intermediary Review**: Your mutual friend receives a notification. They can review your request, add a helpful recommendation note, and forward it.
-3. **Recipient Action**: The recipient receives a notification saying: *"Friend referred You to them"*, along with the recommendation note. They can tap **Connect** to accept or **Ignore** to decline, giving them complete control over who enters their 1st-degree circle.
+Jana is organized into five intuitive spaces accessible from a sleek floating dock at the bottom of the screen:
 
----
-
-## 5. Mafias (Private Trust Circles)
-
-Create private, custom groups called **Mafias** to communicate and collaborate within your network:
-- **Invite-Only Join System**: Mafias are completely private and do not appear in any public directory. Users join exclusively via a numeric Invite Code or secure QR code scan.
-- **Approval Queues**: Set your Mafia to require approval so that new members must be reviewed and approved by an Elder before entering.
-- **Custom Roles and Hierarchy**: Assign roles with distinct visual colors (such as Elder, Healer, Hunter, or Member), or build your own custom roles with custom emojis and badges.
-- **Visual Permissions Builder**: Elders can toggle specific access controls (such as who can invite new members, edit Mafia details, change roles, or delete the group) using a simple checkbox dashboard.
-- **Interactive Group Chats**: Share text and coordinate updates inside the private Mafia chat room, featuring an integrated activity log that records system changes (like role updates or member changes) inline.
+```
+[ 🏠 Circle Feed ]  [ 💬 Messages ]  [ 👥 Connections ]  [ 🔍 Your Network ]  [ 👤 Profile ]
+```
 
 ---
 
-## 6. Event Coordination ("Plans")
+### Space 1: The Circle Feed (Thoughts, Discussions & Pulses)
 
-Organize private gatherings and track catch-ups with your trusted circle:
-- **Unified Event Feed**: View all upcoming and past meetups in a clean chronological list with status badges and real-time countdown clocks.
-- **Custom Plans**: Schedule offline gatherings or online calls by specifying the date, time, location coordinates, meeting links, and custom category topics.
-- **Selective Invitations**: Handpick invitees from either your Casual or Professional networks across your trusted network graph.
-- **Dual Automatic Reminders**: The system automatically schedules and sends two push notification alerts—one exactly 30 minutes before the gathering starts and another at start time.
+The **Circle Feed** is your home for real-time thoughts, discussions, and updates from the people in your network. It feels like an exclusive lounge for thoughtful conversations rather than an endless algorithmic doom-scroll.
 
----
+#### Ephemeral "Pulses" (Statuses & Asks)
+At the very top of your feed sits the **Pulse Bar**. A Pulse is a lightweight, temporary beacon (lasting 8 hours by default) that lets your circle know what you’re currently up to or what you need help with:
+- **Statuses**: Let your network know your current availability or focus (e.g., *"In Tokyo this week for a conference"*, *"Deep work mode"*, *"At the design summit"*).
+- **Asks**: Tap into the collective brainpower of your circle (e.g., *"Looking for an intro to a great legal counsel"*, *"Hiring a founding engineer"*, *"Recommendations for co-working spaces in Berlin"*).
+- When connections post a Pulse, their glowing avatar appears in the top bar. Tapping on a Pulse opens a clean detail sheet where you can read their note and instantly jump into a direct message to reply or offer help.
 
-## 7. Premium Chat & Store-and-Forward Architecture
+#### Dynamic Network Feeds & Custom Spaces
+Using the dropdown title at the top of the feed or the slide-out network drawer, you can seamlessly switch what you are reading:
+- **Full Network Feed**: Thoughts and updates from your 1st and 2nd degree network.
+- **Inner Circle Feed**: Focused exclusively on your closest direct circle.
+- **Global Feed**: Broad discussions across the entire verified community.
+- **Custom Networks**: Private communities created around specific interests, teams, alumni clubs, or cohorts (with custom emoji badges, themes, and member directories).
 
-Enjoy private, secure messaging with connections built on a zero-server-footprint pipeline:
-- **Local SQLite Database**: Conversations are stored locally on your device in SQLite, giving you instantaneous loading times and offline access.
-- **Store-and-Forward Privacy**: Supabase acts solely as a temporary relay. Messages are stored transiently on the server until delivered to the recipient's device. Once received, saved to local storage, and acknowledged (`receiver_acked = true`), the message row is automatically deleted from Supabase, leaving zero server-side history.
-- **Real-Time Delivery Ticks**:
-  - **1 Grey Tick** (`sent`): Message reached the server.
-  - **2 Grey Ticks** (`delivered`): Message landed and saved in recipient's local SQLite database.
-  - **2 Blue Ticks** (`read`): Recipient opened and viewed the chat room.
-- **Dynamic Feed Ordering**: When a new message arrives, the conversation automatically jumps to the top of your chat list, highlighting itself with a clean unread badge.
-- **Voice Messages**: Record and share voice notes with native sound indicators that play when starting, sending, or receiving audio.
-- **Unsent Message Drafts**: If you type a message and navigate away or exit the app, your draft is saved locally. A draft indicator appears in the chat list, letting you pick up right where you left off.
+#### Dual Experience: Threads or Live Chat
+Depending on the community's vibe, spaces can be viewed in two distinct styles:
+- **Threads Mode**: Clean post cards with rich link previews, formatted text, @mentions, and nested comment conversations.
+- **Chat Mode**: A linear, active message stream that makes team or community hubs feel fast and lively.
 
----
+#### Smart "All Caught Up" Feed Experience
+Jana respects your attention. As you scroll, posts you have already read are marked as seen. When you have seen all new posts, a gentle divider announces: **"You're all caught up ✨"**, followed by previous posts. There are no addictive tricks to keep you scrolling forever.
 
-## 7. Network Feed (Private Multi-Degree Thought Feed)
-
-Share short-form text thoughts, announcements, and discussions exclusively with your trusted network circle:
-- **Multi-Degree Privacy**: Posts are visible strictly to you, your 1st-degree direct connections, and 2nd/3rd-degree extended network peers (`get_network_reach`). Zero public exposure or web indexing.
-- **Unseen-First Smart Bucketing**: Loads unseen posts first. When catch-up is reached, displays a "You're all caught up ✨" divider and seamless transitions into previous seen posts.
-- **Batched Dwell Seen Tracking**: Posts are marked as seen automatically when visibly rendered on screen for a dwell threshold, buffered in memory, and flushed as a single batched RPC write (`mark_posts_seen`) to eliminate network overhead.
-- **Degree Affordances**:
-  - **1st Degree**: Direct connection indicator.
-  - **2nd Degree**: Interactive "Connect" button launching mutual friend referral requests.
-  - **3rd Degree**: Soft reachability indicator without empty referral actions.
-- **Flat Threads & Client-Side Parent Resolution**: Tap any post to view the full flat thread (`get_thread`). Parent "Replying to @User" labels are resolved client-side in memory for zero extra SQL queries. Soft-deleted posts display a "This post was removed" placeholder preserving thread structure.
+#### Sharing Your Thoughts
+Tapping the floating **+** button opens a distraction-free compose window:
+- Write up to 500 characters of clean text.
+- Paste any link to instantly generate a sleek link preview card.
+- Mention connections naturally using `@name` with intelligent autocomplete.
+- Choose whether to share under your own name or post anonymously (available in select open spaces and communities where anonymous input is permitted).
 
 ---
 
-## 8. Intelligent Notifications & Profile Nudges
+### Space 2: Direct Messages (Zero-Server-Footprint Private Messaging)
 
-Jana respects your time and keeps you in your flow across iOS and Android:
-- **Foreground vs. Background Intelligence**: If you are actively using the app, loud system notifications are suppressed in favor of a silent, custom sliding in-app banner (`InAppNotificationBanner`). If the app is closed or backgrounded, standard system push notifications are delivered.
-- **Smart Profile Completion Nudges**: Incomplete profiles trigger a persistent `ProfileNudgeBanner` showing step-by-step progress (e.g. `2/4` missing fields). Dismissing the nudge with the "X" button syncs a 2-day suppression timestamp (`profile_nudge_dismissed_at`) across all your logged-in devices.
-- **Lock Screen Quick Actions**: Respond to messages or accept/decline invites directly from your device's notification drawer using quick action buttons (like **Reply**, **Mark as Read**, or **Accept**).
-- **Read-Only Alerts**: System confirmation notices (like connection approvals) are displayed cleanly as text notifications without unnecessary buttons.
+The **Messages Hub** is built for private, one-on-one communication with your verified connections. 
+
+#### Store-and-Forward Ephemeral Architecture
+Unlike mainstream messaging platforms where your entire conversation history is archived indefinitely on corporate servers, Jana uses a **privacy-first store-and-forward relay**:
+- Messages are temporarily passed through the cloud only until they reach the recipient's phone.
+- Once delivered and saved securely to the recipient's local device, the message is **permanently deleted from the server**.
+- Your conversations live securely on your personal device, ensuring maximum confidentiality.
+
+#### Rich, Frictionless Chatting
+- **Clear Delivery Receipts**: Subtle checkmarks keep you informed without clutter (One tick = Sent to relay, Two ticks = Safely delivered to recipient's phone, Two blue ticks = Read by recipient).
+- **Voice Notes**: Tap and hold to record crisp audio notes when typing isn’t convenient.
+- **Saved Drafts**: If you type a message and get interrupted, Jana automatically preserves your draft so you can return to it later.
+- **Fast Search**: Quickly find any active conversation or connection by name.
+- **Quick Pulses Row**: Friends' active statuses are visible right at the top of your chats, making it natural to initiate catch-ups.
 
 ---
 
-## 9. Safety, Moderation, & Blocking
+### Space 3: Connections (Your Direct Trust Circle)
 
-Maintain complete control over your social environment:
-- **Content Flagging**: Long-press any message to report inappropriate content (harassment, spam, etc.) with custom reporting reasons.
-- **Severing Connections**: Disconnect from anyone at any time. Choose "Delete Connection" to silently remove them, or "Delete and Report" to submit safety concerns.
-- **Complete Blocking & Isolation**: Block any contact to immediately hide their message history from your screen. Blocked users are restricted from sending you messages, requesting introductions, or connecting with you again through QR codes or VIP keys.
+The **Connections** space (Mandal) represents your personal Rolodex of trusted contacts—the individuals you have directly connected with.
+
+- **Grid & List Views**: Switch between an expansive card view showcasing profile photos and roles, or a compact list view for fast scanning.
+- **One-Tap Actions**: From each contact card, you can immediately initiate a private chat, view their full interactive profile, or refer them to another mutual friend.
+- **Complete Relationship Control**: If a relationship changes or you need to step away, you can quietly disconnect at any time. If someone behaves inappropriately, you can report and block them in a single step with designated safety categories (Spam, Harassment, Inappropriate Behavior).
+
+---
+
+### Space 4: Your Network & The Interactive Trust Map
+
+The **Your Network** space is where you explore the strength and reach of your extended trust graph.
+
+#### The Interactive Constellation Map
+Your personal trust graph comes alive as an interactive visual map:
+- **Your Node**: You are positioned at the center of the constellation.
+- **1st-Degree Orbit**: Surrounding you are your direct connections, represented by high-resolution circular portraits.
+- **2nd & 3rd-Degree Nodes**: Branching outward are extended connections linked via delicate curved lines, highlighting mutual relationships and network density.
+- **Touch & Explore**: Drag, zoom, and tap on any node to inspect their profile preview, view shared connections, and see how you are linked.
+
+#### Multi-Degree Network Reach & Stats
+At a glance, see how your circle compounds:
+- **1st Degree**: Direct relationships you hold.
+- **2nd Degree**: Trusted mutual friends you can reach through warm introductions.
+- **Extended Reach**: The broader collective presence of your extended network.
+
+#### The Warm Referral Pipeline (Introductions Through Mutual Friends)
+Cold outreach is often awkward and ignored. Jana replaces cold outreach with **curated warm introductions**:
+1. When browsing your 2nd-degree network or discovering someone in a discussion, you can view the mutual friends who connect you.
+2. Tap **Request Intro** to select a mutual friend and attach a short, polite note explaining why you'd love to connect.
+3. Your mutual friend receives a dedicated introduction request. They can review your request, add their own recommendation note, and forward it along.
+4. The recipient receives a warm notification: *"Alex referred Jordan to you"*, complete with the context note. They can tap **Connect** to accept, or gracefully dismiss it.
+
+---
+
+### Space 5: Your Digital Identity, Resume & Vouches
+
+Your **Profile** is not a static business card—it is your living digital reputation, designed with executive polish and deep personal agency.
+
+#### Quick Identity Wizard (First-Time Onboarding)
+When joining Jana, a friendly 5-step guided wizard helps you craft your initial presence in under two minutes:
+1. **Your Name & Handle**: Choose how you want to be known.
+2. **Your Primary Role & Company**: Your current profession and organization.
+3. **Your Passions & Interests**: Interactive tag bubbles covering technology, design, venture capital, arts, wellness, philosophy, and more.
+4. **My Story**: A short, personal bio in your own authentic voice.
+5. **Contact Essentials**: Your email and phone number, with built-in privacy protection.
+
+#### Interactive Professional Timeline (Experience & Education)
+- **Experience Timeline**: Chronological, beautifully formatted career milestones featuring company names, roles, dates, and accomplishments.
+- **Education & Credentials**: Academic background, degrees, and specialized training.
+- **Skills & Superpowers**: Highlight key strengths and areas of expertise that your network can discover you for.
+- **Social & Web Showcase**: Connect verified links to your personal portfolio, LinkedIn, GitHub, X (Twitter), Instagram, or Spotify.
+
+#### Granular Contact Privacy
+Next to your phone number and personal email on your profile, you maintain granular visibility toggles. You can keep contact details visible strictly to direct contacts or private by default, sharing them only when you feel comfortable.
+
+---
+
+## 3. The Vouching System: Peer-Verified Reputation & Mutual Intents
+
+In Jana, reputation isn't measured by vanity metrics or anonymous follower counts—it is forged through **Vouches**: authentic endorsements from people who have actually worked and built with you.
+
+### What is a Vouch?
+When you connect with someone on Jana, you have the option to vouch for them. A vouch is a meaningful endorsement that becomes part of their permanent reputation card on the platform.
+
+A vouch includes three powerful elements:
+
+#### 1. Relationship Context Tags
+Instead of vague recommendations, vouches specify the exact real-world dynamic between two people:
+- **"Fought in the trenches with"**: For close teammates, co-founders, or engineers who shipped difficult projects together.
+- **"Managed / Was managed by"**: Clarifies direct leadership, reporting lines, and executive mentorship.
+- **"Backed / Funded"**: For investor-founder relationships and financial backing.
+- **"Rising Star"**: Flags high-potential junior talent early in their journey.
+
+#### 2. Written Endorsement Note
+A personal, authentic testimonial describing what makes this person exceptional, their work ethic, and their unique character.
+
+#### 3. Private Intent Tags (Confidential Double-Opt-In Matching)
+When vouching for someone, you can confidentially select private intent tags:
+- **"Would Hire"**: Confidentially signals that you would hire them again in a heartbeat.
+- **"Would Fund"**: Confidentially signals investment interest.
+- **"Would Work With"**: Confidentially signals collaboration and co-founding interest.
+
+**The Confidential Double-Opt-In Magic**:
+These tags are **completely hidden from the other person**—until both of you happen to pick matching tags for each other!
+When a mutual intent is unlocked (e.g., both people marked "Would Work With"), a glowing **"Mutual Intent"** badge appears on your shared profiles, sparking immediate high-trust collaboration opportunities without any awkwardness.
+
+#### Flexible Broadcast Scope
+When submitting a vouch, you choose where it lives:
+- **Network Feed**: Celebrates the vouch publicly across your network feed.
+- **Inner Circle**: Visible only to close mutual peers.
+- **Profile Only**: Quietly pinned directly to their profile card.
+
+---
+
+## 4. The Connect Hub: Physical & Digital Handshakes
+
+Connecting on Jana happens exclusively through intentional, private channels via the **Connect Hub**:
+
+### Single-Use VIP Pass Keys
+- Generate a one-of-a-kind secure alphanumeric code (e.g., `MNDL-XXXX`).
+- Send it directly to someone via email, SMS, or messaging.
+- Once that specific person redeems the key, it **instantly self-destructs and expires**, ensuring the link can never be forwarded, shared, or leaked to third parties.
+
+### 24-Hour Group Keys
+- Hosting a private dinner, retreat, masterclass, or cohort? Generate a temporary 24-Hour Group Key.
+- Multiple attendees can use this key to connect with you during the event window.
+- When the 24 hours elapse, the key automatically expires, closing the window to new connections.
+
+### Physical QR Code Scanning
+- When meeting someone in person at an event, coffee shop, or conference, open the Connect Hub.
+- One person displays their dynamic QR code; the other taps **Scan Camera** to scan it directly.
+- The connection is established instantly—no exchange of personal phone numbers required.
+
+### Universal Deep Links
+- Share personalized profile links (`jana://x/yourhandle` or `https://joinmandala.in/x/yourhandle`).
+- When opened by someone who has the app, it directly opens the connection handshake flow smoothly without broken redirects or manual code entry.
+
+---
+
+## 5. Custom Networks: Private Hubs & Micro-Communities
+
+Beyond 1-on-1 connections, Jana empowers members to create and participate in **Custom Networks**:
+- **Private Micro-Communities**: Form invite-only spaces for startup portfolios, university alumni, masterminds, or project teams.
+- **Personalized Branding**: Each custom network has its own name, custom emoji icon, and color theme.
+- **Custom Moderation & Anonymity**: Creators can set whether the network is invite-only and whether members are allowed to post questions or feedback anonymously.
+- **Pinned Announcements**: Pin critical discussions or resources to the top of the space for all members.
+
+---
+
+## 6. Smart Notifications & Respect for Your Attention
+
+Jana is built to respect your mental space:
+- **In-App Awareness**: When you are actively using the app, loud system banners are suppressed. Instead, a smooth, unobtrusive sliding pill lets you know if a connection sent a note or requested an intro.
+- **Clear, Categorized Alerts**: Your notification inbox clearly categorizes connection requests, vouch receipts, mutual intent matches, mentions, and replies.
+- **One-Tap Clear**: Read everything or tap **Mark all read** to keep your badge counter at zero.
+- **Audio Preferences**: Turn global sound effects on or off according to your preference in Settings.
+
+---
+
+## 7. Safety, Integrity & Account Peace of Mind
+
+Jana puts your physical and digital safety first:
+- **Instant Disconnect**: Sever any connection silently. The other party receives no notification; you simply disappear from each other's spaces.
+- **Comprehensive Reporting**: Report users for spam, harassment, or bad conduct with optional context notes.
+- **Hard Blocking**: Blocked users cannot message you, view your profile, request introductions through mutual friends, or connect with you via new keys.
+- **Full Account Deletion**: If you ever decide to leave Jana, you can permanently wipe your account from the Settings page. This instantly and irreversibly purges your profile, connection ties, message history, and vouch records.
+
+---
+
+## Summary of the Jana Experience
+
+| Aspect | Conventional Social Platforms | Jana Private Trust Network |
+| :--- | :--- | :--- |
+| **Network Model** | Public directory, open following, vanity metrics | Verified 1st, 2nd, and 3rd degree trust graph |
+| **How You Connect** | Cold DMs, friend requests from strangers | In-person QR codes, single-use VIP keys, warm mutual referrals |
+| **Reputation** | Likes, follower counts, anonymous comments | Authenticated vouches, relationship tags, confidential mutual intents |
+| **Messaging** | Indefinitely logged on corporate servers | Store-and-forward relay; stored locally on device; purged from server |
+| **Feed Experience** | Algorithmic rage-bait, endless doom-scroll | Mindful network thoughts, pulses, catch-up dividers, custom spaces |
+| **Identity** | Static profile or fragmented multiple apps | Unified living identity with interactive timeline, skills, and privacy locks |
+| **Peace of Mind** | Spam, scraping, public data harvesting | Zero cold reach, complete privacy control, local cache clearing on sign-out |

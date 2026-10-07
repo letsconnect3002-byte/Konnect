@@ -9,7 +9,6 @@ import 'package:connect/Providers/custom_network_provider.dart';
 import 'package:connect/Providers/feed_provider.dart';
 import 'package:connect/Widgets/create_custom_network_sheet.dart';
 import 'package:connect/Widgets/discord_network_rail_drawer.dart';
-import 'package:connect/Widgets/network_members_sheet.dart';
 
 /// WhatsApp Communities-style Tappable Title Dropdown with Peek Animation.
 ///
@@ -299,17 +298,20 @@ class _FeedTitleDropdownState extends State<FeedTitleDropdown>
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 // 1. Built-in Feeds
-                for (final net in DiscordNetworkRailDrawer.existingNetworks) ...[
+                for (final net
+                    in DiscordNetworkRailDrawer.existingNetworks) ...[
                   _buildMenuItem(
                     iconWidget: Icon(
                       net.icon,
                       size: 18,
-                      color: (!isCustomActive && widget.currentFilter == net.filter)
+                      color: (!isCustomActive &&
+                              widget.currentFilter == net.filter)
                           ? Colors.white
                           : AppColors.textSecondary,
                     ),
                     title: net.name,
-                    isActive: !isCustomActive && widget.currentFilter == net.filter,
+                    isActive:
+                        !isCustomActive && widget.currentFilter == net.filter,
                     unseenCount: feedProvider.getUnseenCountForScope(
                       _scopeForFilter(net.filter),
                     ),
@@ -323,7 +325,8 @@ class _FeedTitleDropdownState extends State<FeedTitleDropdown>
 
                 // Subtle sleek divider
                 Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
+                  padding:
+                      const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
                   child: Container(
                     height: 1,
                     color: Colors.white.withValues(alpha: 0.08),
@@ -352,7 +355,8 @@ class _FeedTitleDropdownState extends State<FeedTitleDropdown>
                           title: customNet.name,
                           isActive: isThisActive,
                           accentColor: customNet.color,
-                          memberCount: isThisActive ? null : customNet.memberCount,
+                          memberCount:
+                              isThisActive ? null : customNet.memberCount,
                           onTap: () {
                             HapticFeedback.selectionClick();
                             widget.onSelectCustomNetwork?.call(customNet);
@@ -381,8 +385,8 @@ class _FeedTitleDropdownState extends State<FeedTitleDropdown>
                     CreateCustomNetworkSheet.show(context);
                   },
                   child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 9),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
                     decoration: BoxDecoration(
                       color: Colors.white.withValues(alpha: 0.04),
                       borderRadius: BorderRadius.circular(12),
@@ -404,7 +408,7 @@ class _FeedTitleDropdownState extends State<FeedTitleDropdown>
                         ),
                         const SizedBox(width: 10),
                         const Text(
-                          'New Network',
+                          'New Sub-Network',
                           style: TextStyle(
                             color: Colors.white70,
                             fontSize: 13,
@@ -486,8 +490,7 @@ class _FeedTitleDropdownState extends State<FeedTitleDropdown>
             // Active indicator OR unseen count badge OR member count badge
             if (isActive) ...[
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
                 decoration: BoxDecoration(
                   color: const Color(0xFF22C55E).withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(99),
@@ -538,8 +541,7 @@ class _FeedTitleDropdownState extends State<FeedTitleDropdown>
               ),
             ] else if (memberCount != null && memberCount > 0) ...[
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
                 decoration: BoxDecoration(
                   color: Colors.white.withValues(alpha: 0.06),
                   borderRadius: BorderRadius.circular(99),
@@ -603,9 +605,8 @@ class _FeedTitleDropdownState extends State<FeedTitleDropdown>
     final activeNetwork =
         DiscordNetworkRailDrawer.getNetworkData(widget.currentFilter);
 
-    final feedName = isCustomActive
-        ? (customNet?.name ?? 'Feed')
-        : activeNetwork.name;
+    final feedName =
+        isCustomActive ? (customNet?.name ?? 'Feed') : activeNetwork.name;
 
     return CompositedTransformTarget(
       link: _layerLink,
@@ -621,8 +622,7 @@ class _FeedTitleDropdownState extends State<FeedTitleDropdown>
               scaleDown: 0.94,
               onTap: _toggleDropdown,
               child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(14),
                   border: Border.all(
@@ -672,7 +672,7 @@ class _FeedTitleDropdownState extends State<FeedTitleDropdown>
 
                     // Feed Name
                     ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 160),
+                      constraints: const BoxConstraints(maxWidth: 180),
                       child: Text(
                         feedName,
                         style: TextStyle(
@@ -698,46 +698,6 @@ class _FeedTitleDropdownState extends State<FeedTitleDropdown>
                         color: Colors.white70,
                       ),
                     ),
-
-                    // Custom Network Member Count Pill
-                    if (isCustomActive && customNet != null) ...[
-                      const SizedBox(width: 8),
-                      BounceTap(
-                        scaleDown: 0.9,
-                        onTap: () {
-                          HapticFeedback.lightImpact();
-                          NetworkMembersSheet.show(context, customNet);
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 3.5),
-                          decoration: BoxDecoration(
-                            color: customNet.color.withValues(alpha: 0.15),
-                            borderRadius: BorderRadius.circular(99),
-                            border: Border.all(
-                              color: customNet.color.withValues(alpha: 0.3),
-                              width: 1,
-                            ),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.person_add_rounded,
-                                  size: 12, color: customNet.color),
-                              const SizedBox(width: 3.5),
-                              Text(
-                                '${customNet.memberCount}',
-                                style: TextStyle(
-                                  color: customNet.color,
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
 
                     // Unseen badge for current active feed
                     if (!isCustomActive && feedProvider.unseenCount > 0) ...[

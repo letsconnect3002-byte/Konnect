@@ -12,6 +12,7 @@ import 'package:connect/Widgets/network_map.dart';
 import 'package:connect/Widgets/horizontal_connection_map.dart';
 import 'package:connect/Utils/social_launcher.dart';
 import 'package:connect/services/analytics_service.dart';
+import 'package:connect/Widgets/network_guide_sheet.dart';
 import 'dart:ui';
 
 class YourNetworkPage extends StatefulWidget {
@@ -599,31 +600,72 @@ class _YourNetworkPageState extends State<YourNetworkPage> {
                   valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF7C3AED)),
                 ),
               )
-            : SingleChildScrollView(
-                controller: _scrollController,
-                physics: const BouncingScrollPhysics(),
+            : RefreshIndicator(
+                color: const Color(0xFF7C3AED),
+                backgroundColor: context.surfacePrimary,
+                onRefresh: () async {
+                  if (userId != null) {
+                    await Future.wait([
+                      networkProvider.loadStats(userId),
+                      networkProvider.loadNetwork(userId, reset: true),
+                    ]);
+                  }
+                },
+                child: SingleChildScrollView(
+                  controller: _scrollController,
+                  physics: const AlwaysScrollableScrollPhysics(
+                    parent: BouncingScrollPhysics(),
+                  ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     // Header Section
                     Padding(
                       padding: const EdgeInsets.fromLTRB(26, 20, 26, 0),
-                      child: Column(
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            "Your Network",
-                            style: context.displayHeader.copyWith(
-                              fontSize: 28,
-                              fontWeight: FontWeight.bold,
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  "Your Network",
+                                  style: context.displayHeader.copyWith(
+                                    fontSize: 28,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  "See who you can reach through your connections",
+                                  style: context.bodyText.copyWith(
+                                    color: context.textSecondary,
+                                    fontSize: 13.5,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
-                          const SizedBox(height: 4),
-                          Text(
-                            "See who you can reach through your connections",
-                            style: context.bodyText.copyWith(
-                              color: context.textSecondary,
-                              fontSize: 13.5,
+                          GestureDetector(
+                            onTap: () => NetworkGuideSheet.show(context),
+                            child: Container(
+                              width: 36,
+                              height: 36,
+                              decoration: BoxDecoration(
+                                color: context.surfacePrimary,
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: Colors.white.withValues(alpha: 0.08),
+                                  width: 1,
+                                ),
+                              ),
+                              child: const Icon(
+                                Icons.info_outline_rounded,
+                                color: Colors.white70,
+                                size: 18,
+                              ),
                             ),
                           ),
                         ],
@@ -901,6 +943,7 @@ class _YourNetworkPageState extends State<YourNetworkPage> {
                   ],
                 ),
               ),
+            ),
       ),
     );
   }

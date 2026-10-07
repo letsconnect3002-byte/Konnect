@@ -82,6 +82,9 @@ class NetworkProvider with ChangeNotifier {
   }
 
   int get secondaryCount {
+    if (_networkList.isEmpty && !_isLoading && _currentSearch.isEmpty) {
+      return 0;
+    }
     final listCount = _networkList.where((item) {
       final deg = item["degree"] is int
           ? item["degree"] as int
@@ -92,6 +95,9 @@ class NetworkProvider with ChangeNotifier {
   }
 
   int get tertiaryCount {
+    if (_networkList.isEmpty && !_isLoading && _currentSearch.isEmpty) {
+      return 0;
+    }
     final listCount = _networkList.where((item) {
       final deg = item["degree"] is int
           ? item["degree"] as int
@@ -163,6 +169,10 @@ class NetworkProvider with ChangeNotifier {
       if (reset) {
         // Replace old list with fresh results
         _networkList = List<Map<String, dynamic>>.from(results);
+        if (_currentSearch.isEmpty && results.isEmpty) {
+          _secondaryCount = 0;
+          _tertiaryCount = 0;
+        }
       } else {
         _networkList.addAll(results);
       }

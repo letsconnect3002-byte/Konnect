@@ -53,6 +53,7 @@ import 'package:uuid/uuid.dart';
 import 'package:connect/Config/app_theme.dart';
 import 'package:connect/Pages/AuthScreen.dart';
 import 'package:connect/Pages/ResetPasswordScreen.dart';
+import 'package:connect/Widgets/network_guide_sheet.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
@@ -1364,7 +1365,7 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
           if (type == "vip_pass_key") {
             title = "New Connection";
-            body = "$actorName connected via Private Key";
+            body = "$actorName connected via Invite Pass";
           } else if (type == "referral_connect") {
             title = "New Connection";
             body = "$actorName connected via Referral";
@@ -2100,6 +2101,18 @@ class _AppShellGateState extends State<AppShellGate> {
               context,
               isExplicitLinkClick: wasColdStart,
             );
+          }
+
+          // 3. First-launch onboarding: Auto-present NetworkGuideSheet if not yet seen in Supabase profile
+          if (mounted) {
+            final profile = Provider.of<ProfileProvider>(context, listen: false);
+            if (!profile.hasSeenNetworkGuide) {
+              Future.delayed(const Duration(milliseconds: 700), () {
+                if (mounted && !profile.hasSeenNetworkGuide) {
+                  NetworkGuideSheet.show(context);
+                }
+              });
+            }
           }
         });
       }
@@ -2872,6 +2885,16 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
     return BounceTap(
       onTap: () {
         setState(() => _currentIndex = index);
+        if (index == 3) {
+          final userId =
+              Provider.of<ConnectionProvider>(context, listen: false).userId;
+          if (userId != null) {
+            final networkProvider =
+                Provider.of<NetworkProvider>(context, listen: false);
+            networkProvider.loadStats(userId);
+            networkProvider.loadNetwork(userId, reset: true);
+          }
+        }
       },
       scaleDown: 0.94,
       child: Container(

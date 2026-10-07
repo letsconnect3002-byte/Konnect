@@ -11,8 +11,10 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:connect/Utils/profile_field_filter.dart';
-import 'package:skeletonizer/skeletonizer.dart';
 import 'package:connect/Config/app_theme.dart';
+import 'package:connect/Widgets/connect_hub_bottom_sheet.dart';
+import 'package:connect/Widgets/network_guide_sheet.dart';
+import 'package:skeletonizer/skeletonizer.dart';
 
 class OtherProfilesPage extends StatefulWidget {
   const OtherProfilesPage({super.key});
@@ -22,8 +24,7 @@ class OtherProfilesPage extends StatefulWidget {
 }
 
 class _OtherProfilesPageState extends State<OtherProfilesPage> {
-  bool _isGridView =
-      true; // true = Grid View (default), false = List View
+  bool _isGridView = true; // true = Grid View (default), false = List View
   late ConnectionProvider connectionProvider;
 
   @override
@@ -522,7 +523,7 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(
-            "ALL PROFILES",
+            "ALL CONNECTIONS",
             style: context.captionText.copyWith(
               color: context.textSecondary,
               fontWeight: FontWeight.bold,
@@ -770,8 +771,8 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
                   const SizedBox(width: 8),
                   Text(
                     email,
-                    style: context.bodyText
-                        .copyWith(color: context.textSecondary),
+                    style:
+                        context.bodyText.copyWith(color: context.textSecondary),
                   ),
                 ],
               ),
@@ -1010,12 +1011,38 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
                       ),
                     ],
                   ),
-                  // Back button (since this is now a pushed screen, not a tab)
-                  if (Navigator.canPop(context))
-                    _buildCircularActionButton(
-                      icon: Icons.arrow_back_ios_new_rounded,
-                      onPressed: () => Navigator.pop(context),
-                    ),
+                  Row(
+                    children: [
+                      // "How it works" Info trigger
+                      GestureDetector(
+                        onTap: () => NetworkGuideSheet.show(context),
+                        child: Container(
+                          width: 36,
+                          height: 36,
+                          decoration: BoxDecoration(
+                            color: context.surfacePrimary,
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.08),
+                              width: 1,
+                            ),
+                          ),
+                          child: const Icon(
+                            Icons.info_outline_rounded,
+                            color: Colors.white70,
+                            size: 18,
+                          ),
+                        ),
+                      ),
+                      if (Navigator.canPop(context)) ...[
+                        const SizedBox(width: 8),
+                        _buildCircularActionButton(
+                          icon: Icons.arrow_back_ios_new_rounded,
+                          onPressed: () => Navigator.pop(context),
+                        ),
+                      ],
+                    ],
+                  ),
                 ],
               ),
             ),
@@ -1034,22 +1061,85 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
                     : allProfiles.isEmpty
                         ? Center(
                             key: const ValueKey<String>('empty_state'),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  Icons.people_outline_rounded,
-                                  color: context.textMuted,
-                                  size: 48,
-                                ),
-                                const SizedBox(height: 16),
-                                Text(
-                                  "No profiles available.",
-                                  style: context.bodyText.copyWith(
-                                    color: context.textSecondary,
+                            child: Padding(
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 36),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Container(
+                                    width: 64,
+                                    height: 64,
+                                    decoration: BoxDecoration(
+                                      color: context.accentPrimary
+                                          .withValues(alpha: 0.12),
+                                      shape: BoxShape.circle,
+                                      border: Border.all(
+                                        color: context.accentPrimary
+                                            .withValues(alpha: 0.3),
+                                        width: 1.5,
+                                      ),
+                                    ),
+                                    child: Icon(
+                                      Icons.people_outline_rounded,
+                                      color: context.accentPrimary,
+                                      size: 32,
+                                    ),
                                   ),
-                                ),
-                              ],
+                                  const SizedBox(height: 18),
+                                  Text(
+                                    "Your Circle is Empty",
+                                    style: context.screenHeading.copyWith(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    "Connect with people you know in person using QR or by sending a secure invite pass.",
+                                    textAlign: TextAlign.center,
+                                    style: context.bodyText.copyWith(
+                                      color: context.textSecondary,
+                                      fontSize: 13,
+                                      height: 1.4,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 22),
+                                  ElevatedButton.icon(
+                                    onPressed: () {
+                                      HapticFeedback.lightImpact();
+                                      showModalBottomSheet(
+                                        context: context,
+                                        isScrollControlled: true,
+                                        backgroundColor: Colors.transparent,
+                                        builder: (context) =>
+                                            const ConnectHubBottomSheet(
+                                                initialTabIndex: 0),
+                                      );
+                                    },
+                                    icon: const Icon(Icons.person_add_rounded,
+                                        color: Colors.black, size: 18),
+                                    label: const Text(
+                                      "Connect with Someone",
+                                      style: TextStyle(
+                                        color: Colors.black,
+                                        fontWeight: FontWeight.bold,
+                                        fontFamily: 'Inter',
+                                      ),
+                                    ),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: context.accentPrimary,
+                                      foregroundColor: Colors.black,
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 22, vertical: 12),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(14),
+                                      ),
+                                      elevation: 0,
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                           )
                         : ListView.builder(
@@ -1067,6 +1157,32 @@ class _OtherProfilesPageState extends State<OtherProfilesPage> {
               ),
             ),
           ],
+        ),
+      ),
+      floatingActionButton: Padding(
+        padding: const EdgeInsets.only(bottom: 70.0),
+        child: FloatingActionButton(
+          heroTag: 'connections_hub_fab',
+          tooltip: 'Connect',
+          onPressed: () {
+            HapticFeedback.mediumImpact();
+            showModalBottomSheet(
+              context: context,
+              isScrollControlled: true,
+              backgroundColor: Colors.transparent,
+              builder: (context) =>
+                  const ConnectHubBottomSheet(initialTabIndex: 0),
+            );
+          },
+          backgroundColor: Colors.white,
+          elevation: 4,
+          highlightElevation: 8,
+          shape: const CircleBorder(),
+          child: const Icon(
+            Icons.person_add_rounded,
+            color: Colors.black,
+            size: 24,
+          ),
         ),
       ),
     );

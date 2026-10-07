@@ -975,6 +975,7 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
         padding: const EdgeInsets.only(bottom: 70.0),
         child: FloatingActionButton(
           heroTag: 'dm_hub_fab',
+          tooltip: 'Connect',
           onPressed: () {
             HapticFeedback.mediumImpact();
             showModalBottomSheet(
@@ -985,12 +986,13 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
             );
           },
           backgroundColor: Colors.white,
-          elevation: 8,
+          elevation: 4,
+          highlightElevation: 8,
           shape: const CircleBorder(),
           child: const Icon(
-            Icons.add_rounded,
+            Icons.person_add_rounded,
             color: Colors.black,
-            size: 28,
+            size: 24,
           ),
         ),
       ),
@@ -1065,7 +1067,7 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
                   ),
                   const SizedBox(height: 10),
                   Text(
-                    "Connect with a friend by scanning their QR code or sharing your Private Key to begin.",
+                    "Connect with a friend in person via QR code or send a secure invite link to start chatting.",
                     style: context.bodyText.copyWith(
                       color: context.textSecondary,
                       height: 1.5,
@@ -1086,8 +1088,8 @@ class _DirectMessagesHubPageState extends State<DirectMessagesHubPage> {
                           builder: (context) => const ConnectHubBottomSheet(),
                         );
                       },
-                      icon: const Icon(Icons.qr_code_scanner_rounded, size: 18, color: Colors.black),
-                      label: const Text("Open Connect Hub", style: TextStyle(color: Colors.black)),
+                      icon: const Icon(Icons.person_add_rounded, size: 18, color: Colors.black),
+                      label: const Text("Connect with Someone", style: TextStyle(color: Colors.black)),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.white,
                         foregroundColor: Colors.black,

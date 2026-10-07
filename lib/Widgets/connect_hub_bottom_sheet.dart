@@ -45,7 +45,7 @@ class _ConnectHubBottomSheetState extends State<ConnectHubBottomSheet>
   QrImage? _qrImage;
   bool _qrGenerationError = false;
   String _selectedKeyShareType = 'both';
-  bool _qrGenerated = false;
+  bool _qrGenerated = true;
   bool _dismissSteps = false;
 
   Timer? _stepTimer;
@@ -67,6 +67,7 @@ class _ConnectHubBottomSheetState extends State<ConnectHubBottomSheet>
     }
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadExistingActiveKey();
+      _initializeQrCode();
     });
     AnalyticsService.logEvent(name: 'connect_hub_opened');
   }
@@ -319,13 +320,13 @@ class _ConnectHubBottomSheetState extends State<ConnectHubBottomSheet>
     if (_generatedInviteCode != null) {
       if (_selectedKeyType == 'group_24h') {
         shareMessage =
-            "Hey everyone! Connect with me on Jana using this 24-hour group invite: $inviteLink or use group key: *$_generatedInviteCode* (Active for 24 hours).";
+            "Connect with me on Jana — The Private Trust Network: $inviteLink (Or enter group pass: *$_generatedInviteCode* — active for 24 hours)";
       } else {
         shareMessage =
-            "Hey! Connect with me on Jana! Click here to download & connect: $inviteLink or use my Private Key: *$_generatedInviteCode*";
+            "Connect with me on Jana — The Private Trust Network: $inviteLink (Or enter invite pass: *$_generatedInviteCode*)";
       }
     } else {
-      shareMessage = "Hey! Connect with me on Jana! Click here to download & connect: $inviteLink";
+      shareMessage = "Connect with me on Jana — The Private Trust Network: $inviteLink";
     }
         
     await SharePlus.instance.share(ShareParams(text: shareMessage));
@@ -534,7 +535,7 @@ class _ConnectHubBottomSheetState extends State<ConnectHubBottomSheet>
                       ),
                       const SizedBox(height: 20),
                       Text(
-                        "Generate Private Key",
+                        "Create Invite Link",
                         style: TextStyle(
                           color: context.textPrimary,
                           fontSize: 20,
@@ -544,7 +545,7 @@ class _ConnectHubBottomSheetState extends State<ConnectHubBottomSheet>
                       ),
                       const SizedBox(height: 6),
                       Text(
-                        "Select key duration:",
+                        "Choose pass duration:",
                         style: TextStyle(
                           color: context.textSecondary,
                           fontSize: 13,
@@ -555,7 +556,7 @@ class _ConnectHubBottomSheetState extends State<ConnectHubBottomSheet>
 
                       // Key Type Section
                       Text(
-                        "KEY TYPE & DURATION",
+                        "PASS TYPE & DURATION",
                         style: TextStyle(
                           color: context.textMuted,
                           fontSize: 11,
@@ -565,8 +566,8 @@ class _ConnectHubBottomSheetState extends State<ConnectHubBottomSheet>
                       ),
                       const SizedBox(height: 10),
                       _buildOptionTile(
-                        title: "Single-Use Key",
-                        subtitle: "Expires once used. Perfect for personal 1-on-1 sharing.",
+                        title: "Single-Use Pass",
+                        subtitle: "Expires once used. Perfect for personal 1-on-1 connection.",
                         value: "single_use",
                         groupValue: tempKeyType,
                         onChanged: (val) {
@@ -577,8 +578,8 @@ class _ConnectHubBottomSheetState extends State<ConnectHubBottomSheet>
                       ),
                       const SizedBox(height: 10),
                       _buildOptionTile(
-                        title: "24-Hour Group Key",
-                        subtitle: "Active for 24 hours. Multiple people can join via link or key.",
+                        title: "24-Hour Group Pass",
+                        subtitle: "Active for 24 hours. Multiple people can connect via link or code.",
                         value: "group_24h",
                         groupValue: tempKeyType,
                         onChanged: (val) {
@@ -603,7 +604,7 @@ class _ConnectHubBottomSheetState extends State<ConnectHubBottomSheet>
                           ),
                         ),
                         child: const Text(
-                          "Generate Key",
+                          "Create Link",
                           style: TextStyle(
                             color: Colors.black,
                             fontWeight: FontWeight.bold,
@@ -774,9 +775,9 @@ class _ConnectHubBottomSheetState extends State<ConnectHubBottomSheet>
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: const [
-                            Icon(Icons.qr_code_scanner_rounded, size: 16),
+                            Icon(Icons.qr_code_rounded, size: 16),
                             SizedBox(width: 8),
-                            Text("Scan QR Code"),
+                            Text("My QR & Link"),
                           ],
                         ),
                       ),
@@ -784,9 +785,9 @@ class _ConnectHubBottomSheetState extends State<ConnectHubBottomSheet>
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: const [
-                            Icon(Icons.qr_code_rounded, size: 16),
+                            Icon(Icons.qr_code_scanner_rounded, size: 16),
                             SizedBox(width: 8),
-                            Text("My QR Code"),
+                            Text("Scan / Enter Code"),
                           ],
                         ),
                       ),
@@ -799,12 +800,12 @@ class _ConnectHubBottomSheetState extends State<ConnectHubBottomSheet>
               // Tab Bar Content (Explicit view heights)
               SizedBox(
                 height:
-                    575, // Increased height to fit matching ProfilePage style
+                    610, // Generous height for Apple-style breathing room
                 child: TabBarView(
                   controller: _tabController,
                   children: [
-                    _buildScanTab(),
                     _buildMyCodeTab(),
+                    _buildScanTab(),
                   ],
                 ),
               ),
@@ -1046,117 +1047,7 @@ class _ConnectHubBottomSheetState extends State<ConnectHubBottomSheet>
   }
 
   Widget _buildAnimatedConnectionSteps(int stepIdx) {
-    if (!widget.showOnboardingSteps || _dismissSteps || (_activeStepIndex % 3) != stepIdx) {
-      return const SizedBox.shrink();
-    }
-
-    final List<Map<String, String>> steps = [
-      {
-        "title": "Step 1 of 3: Generate QR",
-        "desc": "Tap 'Generate QR' below to create an in-person code for scanning.",
-      },
-      {
-        "title": "Step 2 of 3: Private Key",
-        "desc": "Generate a one-time key or private code for remote connections.",
-      },
-      {
-        "title": "Step 3 of 3: Share Invite",
-        "desc": "Tap 'Share Invite' below to send your link directly to contacts.",
-      },
-    ];
-
-    final currentStep = steps[stepIdx];
-
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        // Minimalistic Tooltip Banner (Clean Dark Surface, No Icons/Emojis)
-        AnimatedContainer(
-          duration: const Duration(milliseconds: 300),
-          margin: const EdgeInsets.only(bottom: 2),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-          decoration: BoxDecoration(
-            color: context.surfaceSecondary,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: context.accentPrimary.withValues(alpha: 0.5),
-              width: 1.2,
-            ),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      currentStep["title"]!,
-                      style: context.bodyText.copyWith(
-                        fontSize: 12.5,
-                        fontWeight: FontWeight.bold,
-                        color: context.textPrimary,
-                      ),
-                    ),
-                  ),
-                  // Step Indicator Dots
-                  Row(
-                    children: List.generate(3, (idx) {
-                      final bool isCurrent = idx == stepIdx;
-                      return AnimatedContainer(
-                        duration: const Duration(milliseconds: 250),
-                        margin: const EdgeInsets.symmetric(horizontal: 2.5),
-                        width: isCurrent ? 14 : 6,
-                        height: 6,
-                        decoration: BoxDecoration(
-                          color: isCurrent
-                              ? context.accentPrimary
-                              : context.textMuted.withValues(alpha: 0.3),
-                          borderRadius: BorderRadius.circular(3),
-                        ),
-                      );
-                    }),
-                  ),
-                  const SizedBox(width: 12),
-                  // Dismiss Option
-                  GestureDetector(
-                    onTap: () {
-                      HapticFeedback.lightImpact();
-                      _stepTimer?.cancel();
-                      setState(() {
-                        _dismissSteps = true;
-                      });
-                    },
-                    child: Text(
-                      "Dismiss",
-                      style: context.captionText.copyWith(
-                        color: context.textMuted,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 4),
-              Text(
-                currentStep["desc"]!,
-                style: context.captionText.copyWith(
-                  color: context.textSecondary,
-                  fontSize: 11,
-                  height: 1.3,
-                ),
-              ),
-            ],
-          ),
-        ),
-        // Downward Pointer Arrow
-        CustomPaint(
-          size: const Size(14, 7),
-          painter: _TooltipArrowPainter(color: context.accentPrimary),
-        ),
-        const SizedBox(height: 6),
-      ],
-    );
+    return const SizedBox.shrink();
   }
 
   Widget _buildMyCodeTab() {
@@ -1203,18 +1094,83 @@ class _ConnectHubBottomSheetState extends State<ConnectHubBottomSheet>
       physics: const BouncingScrollPhysics(),
       padding: const EdgeInsets.symmetric(horizontal: 24),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const SizedBox(height: 10),
-          _buildAnimatedConnectionSteps(0),
 
-          // Centered QR container card with corner brackets (Exactly like ProfilePage.dart)
+          // Section 1: In-Person Connection
+          Row(
+            children: [
+              Container(
+                width: 6,
+                height: 6,
+                decoration: BoxDecoration(
+                  color: context.accentPrimary,
+                  shape: BoxShape.circle,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                "IN-PERSON CONNECTION",
+                style: TextStyle(
+                  color: context.textMuted,
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 0.8,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            "Show this code to connect instantly with someone nearby.",
+            style: TextStyle(
+              color: context.textSecondary,
+              fontSize: 12,
+              fontFamily: 'Inter',
+            ),
+          ),
+          const SizedBox(height: 14),
+
+          // Centered QR container card with corner brackets
           Center(
             child: _buildQRFrame(context, _qrImage),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 24),
 
-          const SizedBox(height: 16),
-          _buildAnimatedConnectionSteps(1),
+          // Section 2: Remote Connection
+          Row(
+            children: [
+              Container(
+                width: 6,
+                height: 6,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF60A5FA),
+                  shape: BoxShape.circle,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                "REMOTE INVITE PASS",
+                style: TextStyle(
+                  color: context.textMuted,
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 0.8,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            "Send a private link to connect remotely via WhatsApp, SMS, or Slack.",
+            style: TextStyle(
+              color: context.textSecondary,
+              fontSize: 12,
+              fontFamily: 'Inter',
+            ),
+          ),
+          const SizedBox(height: 12),
 
           // Invite Code text and share action buttons
           Container(
@@ -1246,7 +1202,7 @@ class _ConnectHubBottomSheetState extends State<ConnectHubBottomSheet>
                     child: Column(
                       children: [
                         Text(
-                          "No active Private Key generated",
+                          "No active invite link generated",
                           style: TextStyle(
                             color: context.textMuted,
                             fontSize: 13,
@@ -1254,8 +1210,10 @@ class _ConnectHubBottomSheetState extends State<ConnectHubBottomSheet>
                           ),
                         ),
                         const SizedBox(height: 12),
-                        ElevatedButton(
+                        ElevatedButton.icon(
                           onPressed: () => _showKeyOptionsBottomSheet(context),
+                          icon: const Icon(Icons.link_rounded,
+                              color: Colors.black, size: 16),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: context.accentPrimary,
                             foregroundColor: Colors.black,
@@ -1266,11 +1224,12 @@ class _ConnectHubBottomSheetState extends State<ConnectHubBottomSheet>
                                 horizontal: 18, vertical: 10),
                             elevation: 0,
                           ),
-                          child: const Text(
-                            "Generate Private Key",
+                          label: const Text(
+                            "Create Invite Link",
                             style: TextStyle(
                                 color: Colors.black,
-                                fontWeight: FontWeight.bold, fontSize: 13),
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13),
                           ),
                         ),
                       ],
@@ -1321,8 +1280,8 @@ class _ConnectHubBottomSheetState extends State<ConnectHubBottomSheet>
                               const SizedBox(width: 8),
                               Text(
                                 _selectedKeyType == 'group_24h'
-                                    ? "24H GROUP KEY"
-                                    : "SINGLE-USE KEY",
+                                    ? "24H GROUP PASS"
+                                    : "SINGLE-USE PASS",
                                 style: context.bodyText.copyWith(
                                     fontWeight: FontWeight.bold, fontSize: 12),
                               ),
@@ -1434,7 +1393,7 @@ class _ConnectHubBottomSheetState extends State<ConnectHubBottomSheet>
                             : _shareInviteLink,
                         icon: const Icon(Icons.share_rounded, size: 16),
                         label: const Text(
-                          "Share Invite",
+                          "Send Invite",
                           style: TextStyle(
                               fontSize: 13,
                               fontFamily: 'Inter',
@@ -1480,7 +1439,7 @@ class _ConnectHubBottomSheetState extends State<ConnectHubBottomSheet>
                           ),
                           const SizedBox(width: 6),
                           Text(
-                            "Create Private Key Again",
+                            "Create New Link",
                             style: TextStyle(
                               color: context.accentPrimary,
                               fontSize: 12,
@@ -1598,28 +1557,4 @@ class _ConnectHubBottomSheetState extends State<ConnectHubBottomSheet>
       ),
     );
   }
-}
-
-class _TooltipArrowPainter extends CustomPainter {
-  final Color color;
-
-  _TooltipArrowPainter({required this.color});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = color
-      ..style = PaintingStyle.fill;
-
-    final path = Path()
-      ..moveTo(0, 0)
-      ..lineTo(size.width / 2, size.height)
-      ..lineTo(size.width, 0)
-      ..close();
-
-    canvas.drawPath(path, paint);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

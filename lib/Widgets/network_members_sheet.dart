@@ -6,6 +6,7 @@ import 'package:connect/Models/custom_network.dart';
 import 'package:connect/Providers/connection_provider.dart';
 import 'package:connect/Providers/custom_network_provider.dart';
 import 'package:connect/Providers/feed_provider.dart';
+import 'package:connect/Widgets/connect_hub_bottom_sheet.dart';
 
 class NetworkMembersSheet extends StatefulWidget {
   final CustomNetwork network;
@@ -521,12 +522,104 @@ class _NetworkMembersSheetState extends State<NetworkMembersSheet> {
                   // Tab 0: Add Connections
                   ? (filteredConnections.isEmpty
                       ? Center(
-                          child: Text(
-                            query.isEmpty
-                                ? 'No 1st-degree connections found'
-                                : 'No matching connections',
-                            style: AppTypography.bodyText.copyWith(
-                              color: AppColors.textMuted,
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 32),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Container(
+                                  width: 54,
+                                  height: 54,
+                                  decoration: BoxDecoration(
+                                    color: AppColors.surfaceSecondary,
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                      color: AppColors.borderSubtle,
+                                      width: 1,
+                                    ),
+                                  ),
+                                  child: const Icon(
+                                    Icons.person_add_outlined,
+                                    size: 24,
+                                    color: AppColors.textSecondary,
+                                  ),
+                                ),
+                                const SizedBox(height: 14),
+                                Text(
+                                  query.isEmpty
+                                      ? 'No 1st-degree connections found'
+                                      : 'No matching connections',
+                                  style: AppTypography.bodyText.copyWith(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 15,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                                if (query.isEmpty) ...[
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    'Connect with people to add them directly to your sub-networks.',
+                                    style: AppTypography.captionText.copyWith(
+                                      color: AppColors.textMuted,
+                                      fontSize: 12,
+                                    ),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                  const SizedBox(height: 20),
+                                  BounceTap(
+                                    scaleDown: 0.95,
+                                    onTap: () {
+                                      HapticFeedback.mediumImpact();
+                                      showModalBottomSheet(
+                                        context: context,
+                                        isScrollControlled: true,
+                                        backgroundColor: Colors.transparent,
+                                        builder: (context) =>
+                                            const ConnectHubBottomSheet(
+                                                initialTabIndex: 0),
+                                      );
+                                    },
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 22, vertical: 10),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white,
+                                        borderRadius:
+                                            BorderRadius.circular(99),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: Colors.white
+                                                .withValues(alpha: 0.12),
+                                            blurRadius: 14,
+                                            offset: const Offset(0, 3),
+                                          ),
+                                        ],
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          const Icon(
+                                            Icons.person_add_rounded,
+                                            color: Colors.black,
+                                            size: 16,
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Text(
+                                            'Connect',
+                                            style:
+                                                AppTypography.bodyText.copyWith(
+                                              color: Colors.black,
+                                              fontWeight: FontWeight.w700,
+                                              fontSize: 13,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ],
                             ),
                           ),
                         )

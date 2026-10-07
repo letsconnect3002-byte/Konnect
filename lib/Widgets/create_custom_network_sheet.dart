@@ -6,6 +6,9 @@ import 'package:connect/Models/custom_network.dart';
 import 'package:connect/Providers/connection_provider.dart';
 import 'package:connect/Providers/custom_network_provider.dart';
 import 'package:connect/Providers/feed_provider.dart';
+import 'package:connect/Widgets/network_members_sheet.dart';
+import 'package:connect/Widgets/connect_hub_bottom_sheet.dart';
+import 'package:connect/main.dart';
 
 class CreateCustomNetworkSheet extends StatefulWidget {
   const CreateCustomNetworkSheet({super.key});
@@ -37,7 +40,18 @@ class _CreateCustomNetworkSheetState extends State<CreateCustomNetworkSheet> {
   final Set<int> _selectedMemberIds = {};
 
   static const List<String> _emojiOptions = [
-    '🌐', '🚀', '💡', '🎨', '☕', '🎮', '👥', '⚡', '🛡️', '💎', '🔥', '🧠'
+    '🌐',
+    '🚀',
+    '💡',
+    '🎨',
+    '☕',
+    '🎮',
+    '👥',
+    '⚡',
+    '🛡️',
+    '💎',
+    '🔥',
+    '🧠'
   ];
 
   @override
@@ -54,7 +68,8 @@ class _CreateCustomNetworkSheetState extends State<CreateCustomNetworkSheet> {
       HapticFeedback.heavyImpact();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Please enter a network name', style: AppTypography.bodyText),
+          content: Text('Please enter a network name',
+              style: AppTypography.bodyText),
           backgroundColor: Colors.redAccent,
           behavior: SnackBarBehavior.floating,
         ),
@@ -89,12 +104,20 @@ class _CreateCustomNetworkSheetState extends State<CreateCustomNetworkSheet> {
         Navigator.of(context).pop(newNetwork);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Network "${newNetwork.name}" created!',
+            content: Text('Circle "${newNetwork.name}" created!',
                 style: AppTypography.bodyText.copyWith(color: Colors.white)),
             backgroundColor: const Color(0xFF10B981),
             behavior: SnackBarBehavior.floating,
           ),
         );
+        if (_selectedMemberIds.isEmpty) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            final nav = navigatorKey.currentContext;
+            if (nav != null && nav.mounted) {
+              NetworkMembersSheet.show(nav, newNetwork);
+            }
+          });
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -191,7 +214,7 @@ class _CreateCustomNetworkSheetState extends State<CreateCustomNetworkSheet> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'New Network',
+                          'Create Circle',
                           style: AppTypography.screenHeading.copyWith(
                             fontSize: 19,
                             letterSpacing: -0.2,
@@ -199,7 +222,7 @@ class _CreateCustomNetworkSheetState extends State<CreateCustomNetworkSheet> {
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          'A dedicated circle with private feed & members',
+                          'A private sub-network with dedicated feed & members',
                           style: AppTypography.captionText.copyWith(
                             color: AppColors.textSecondary,
                             fontWeight: FontWeight.w400,
@@ -248,7 +271,7 @@ class _CreateCustomNetworkSheetState extends State<CreateCustomNetworkSheet> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // Section: Network Name
-                    _buildSectionHeader('NETWORK NAME'),
+                    _buildSectionHeader('SUB-NETWORK NAME'),
                     const SizedBox(height: 8),
                     _buildTextField(
                       controller: _nameController,
@@ -263,7 +286,7 @@ class _CreateCustomNetworkSheetState extends State<CreateCustomNetworkSheet> {
                     const SizedBox(height: 8),
                     _buildTextField(
                       controller: _descController,
-                      hint: 'What is this network about?',
+                      hint: 'What is this sub-network about?',
                       maxLines: 2,
                     ),
                     const SizedBox(height: 20),
@@ -321,8 +344,12 @@ class _CreateCustomNetworkSheetState extends State<CreateCustomNetworkSheet> {
                     _buildSectionHeader('ACCESS & PERMISSIONS'),
                     const SizedBox(height: 6),
                     _buildSettingRow(
-                      icon: _isPrivate ? Icons.lock_rounded : Icons.public_rounded,
-                      title: _isPrivate ? 'Private Network' : 'Public Network',
+                      icon: _isPrivate
+                          ? Icons.lock_rounded
+                          : Icons.public_rounded,
+                      title: _isPrivate
+                          ? 'Private Sub-Network'
+                          : 'Public Sub-Network',
                       subtitle: _isPrivate
                           ? 'Only invited & added members can view this feed'
                           : 'Anyone in the app can discover & view this feed',
@@ -368,7 +395,8 @@ class _CreateCustomNetworkSheetState extends State<CreateCustomNetworkSheet> {
                           ),
                           child: TextField(
                             controller: _memberSearchController,
-                            style: AppTypography.bodyText.copyWith(fontSize: 13),
+                            style:
+                                AppTypography.bodyText.copyWith(fontSize: 13),
                             onChanged: (_) => setState(() {}),
                             decoration: InputDecoration(
                               hintText: 'Search connections...',
@@ -396,12 +424,75 @@ class _CreateCustomNetworkSheetState extends State<CreateCustomNetworkSheet> {
                           ? Padding(
                               padding: const EdgeInsets.all(18),
                               child: Center(
-                                child: Text(
-                                  'No connections match your search',
-                                  style: AppTypography.captionText.copyWith(
-                                    color: AppColors.textMuted,
-                                  ),
-                                ),
+                                child: memberQuery.isNotEmpty
+                                    ? Text(
+                                        'No connections match your search',
+                                        style:
+                                            AppTypography.captionText.copyWith(
+                                          color: AppColors.textMuted,
+                                        ),
+                                      )
+                                    : Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Text(
+                                            'No 1st-degree connections found',
+                                            style: AppTypography.captionText
+                                                .copyWith(
+                                              color: AppColors.textMuted,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 12),
+                                          BounceTap(
+                                            scaleDown: 0.95,
+                                            onTap: () {
+                                              HapticFeedback.mediumImpact();
+                                              showModalBottomSheet(
+                                                context: context,
+                                                isScrollControlled: true,
+                                                backgroundColor:
+                                                    Colors.transparent,
+                                                builder: (context) =>
+                                                    const ConnectHubBottomSheet(
+                                                        initialTabIndex: 0),
+                                              );
+                                            },
+                                            child: Container(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                      horizontal: 18,
+                                                      vertical: 8),
+                                              decoration: BoxDecoration(
+                                                color: Colors.white,
+                                                borderRadius:
+                                                    BorderRadius.circular(99),
+                                              ),
+                                              child: Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  const Icon(
+                                                    Icons.person_add_rounded,
+                                                    color: Colors.black,
+                                                    size: 14,
+                                                  ),
+                                                  const SizedBox(width: 6),
+                                                  Text(
+                                                    'Connect',
+                                                    style: AppTypography
+                                                        .bodyText
+                                                        .copyWith(
+                                                      color: Colors.black,
+                                                      fontWeight:
+                                                          FontWeight.w700,
+                                                      fontSize: 12,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
                               ),
                             )
                           : Container(
@@ -410,7 +501,8 @@ class _CreateCustomNetworkSheetState extends State<CreateCustomNetworkSheet> {
                                 shrinkWrap: true,
                                 physics: const BouncingScrollPhysics(),
                                 itemCount: filteredConnections.length,
-                                separatorBuilder: (_, __) => const SizedBox(height: 6),
+                                separatorBuilder: (_, __) =>
+                                    const SizedBox(height: 6),
                                 itemBuilder: (context, idx) {
                                   final conn = filteredConnections[idx];
                                   final connId = int.tryParse(
@@ -548,7 +640,7 @@ class _CreateCustomNetworkSheetState extends State<CreateCustomNetworkSheet> {
                                   ),
                                 )
                               : Text(
-                                  'Create Network',
+                                  'Create Circle',
                                   style: AppTypography.cardTitle.copyWith(
                                     color: Colors.black,
                                     fontSize: 15,

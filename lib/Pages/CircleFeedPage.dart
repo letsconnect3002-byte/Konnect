@@ -24,6 +24,8 @@ import 'package:connect/services/analytics_service.dart';
 import 'package:connect/Providers/custom_network_provider.dart';
 import 'package:connect/Models/custom_network.dart';
 import 'package:connect/Widgets/feed_title_dropdown.dart';
+import 'package:connect/Widgets/network_members_sheet.dart';
+import 'package:connect/Widgets/network_guide_sheet.dart';
 
 class CircleFeedPage extends StatefulWidget {
   const CircleFeedPage({super.key});
@@ -983,48 +985,69 @@ class _CircleFeedPageState extends State<CircleFeedPage> {
 
   Widget _buildEmptyCustomNetworkState(
       BuildContext context, CustomNetwork? network) {
+    final bool isSolo = network == null || network.memberCount <= 1;
+
     return SingleChildScrollView(
       physics: const AlwaysScrollableScrollPhysics(),
       child: Column(
         children: [
           const PulseRowWidget(),
           Container(
-            height: MediaQuery.of(context).size.height * 0.52,
+            height: MediaQuery.of(context).size.height * 0.55,
             alignment: Alignment.center,
             padding: const EdgeInsets.symmetric(horizontal: 32),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
+                // Top Icon / Emoji Badge
                 Container(
-                  width: 64,
-                  height: 64,
+                  width: 68,
+                  height: 68,
                   decoration: BoxDecoration(
-                    color: context.accentPrimary.withValues(alpha: 0.12),
+                    color: (network?.color ?? context.accentPrimary)
+                        .withValues(alpha: 0.14),
                     shape: BoxShape.circle,
                     border: Border.all(
-                      color: context.accentPrimary.withValues(alpha: 0.3),
+                      color: (network?.color ?? context.accentPrimary)
+                          .withValues(alpha: 0.35),
                       width: 1.5,
                     ),
                   ),
-                  child: Icon(
-                    Icons.groups_rounded,
-                    size: 32,
-                    color: context.accentPrimary,
+                  child: Center(
+                    child: (network != null && network.iconEmoji.isNotEmpty)
+                        ? Text(
+                            network.iconEmoji,
+                            style: const TextStyle(fontSize: 32),
+                          )
+                        : Icon(
+                            isSolo
+                                ? Icons.group_add_rounded
+                                : Icons.dynamic_feed_rounded,
+                            size: 32,
+                            color: network?.color ?? context.accentPrimary,
+                          ),
                   ),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 18),
+                // Heading
                 Text(
-                  "No Posts in ${network?.name ?? 'Network'} Yet",
+                  isSolo
+                      ? "Add Members to ${network?.name ?? 'Sub-Network'}"
+                      : "No Posts in ${network.name} Yet",
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     color: context.textPrimary,
-                    fontSize: 18,
+                    fontSize: 19,
                     fontWeight: FontWeight.bold,
+                    letterSpacing: -0.2,
                   ),
                 ),
                 const SizedBox(height: 8),
+                // Subtitle
                 Text(
-                  "Be the first member to share something with this network!",
+                  isSolo
+                      ? "You're the only member here right now. Add connections or invite friends to start conversations and share posts in this space."
+                      : "Start the conversation! Be the first member to share a post or thought with the group.",
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     color: context.textSecondary,
@@ -1032,27 +1055,108 @@ class _CircleFeedPageState extends State<CircleFeedPage> {
                     height: 1.4,
                   ),
                 ),
-                const SizedBox(height: 20),
-                ElevatedButton.icon(
-                  onPressed: () => _openComposeSheet(context),
-                  icon: const Icon(Icons.add_rounded,
-                      color: Colors.black, size: 18),
-                  label: const Text(
-                    "Share First Post",
-                    style: TextStyle(
-                      color: Colors.black,
-                      fontWeight: FontWeight.bold,
+                const SizedBox(height: 24),
+
+                // Primary & Secondary Actions
+                if (isSolo) ...[
+                  // Primary: Add Members button (Apple style, prominent)
+                  BounceTap(
+                    scaleDown: 0.95,
+                    onTap: () {
+                      HapticFeedback.mediumImpact();
+                      if (network != null) {
+                        NetworkMembersSheet.show(context, network);
+                      }
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 24, vertical: 13),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(14),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.white.withValues(alpha: 0.15),
+                            blurRadius: 16,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.person_add_rounded,
+                              color: Colors.black, size: 18),
+                          SizedBox(width: 8),
+                          Text(
+                            "Add Members",
+                            style: TextStyle(
+                              color: Colors.black,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: context.accentPrimary,
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 24, vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                  const SizedBox(height: 12),
+                  // Secondary: Share a post anyway (text button)
+                  TextButton.icon(
+                    onPressed: () => _openComposeSheet(context),
+                    icon: const Icon(Icons.edit_outlined,
+                        size: 14, color: Colors.white60),
+                    label: const Text(
+                      "Share a post anyway",
+                      style: TextStyle(
+                        color: Colors.white70,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
                   ),
-                ),
+                ] else ...[
+                  // If members exist, primary is Share First Post
+                  ElevatedButton.icon(
+                    onPressed: () => _openComposeSheet(context),
+                    icon: const Icon(Icons.add_rounded,
+                        color: Colors.black, size: 18),
+                    label: const Text(
+                      "Share First Post",
+                      style: TextStyle(
+                        color: Colors.black,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: context.accentPrimary,
+                      foregroundColor: Colors.black,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 24, vertical: 13),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextButton.icon(
+                    onPressed: () {
+                      HapticFeedback.lightImpact();
+                      NetworkMembersSheet.show(context, network);
+                    },
+                      icon: const Icon(Icons.person_add_outlined,
+                          size: 15, color: Colors.white70),
+                      label: const Text(
+                        "Add more members",
+                        style: TextStyle(
+                          color: Colors.white70,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                ],
               ],
             ),
           ),
@@ -1140,6 +1244,56 @@ class _CircleFeedPageState extends State<CircleFeedPage> {
                     ),
                   ),
                 ),
+                // Custom Sub-Network Members Button (when in custom sub-network)
+                if (feedProvider.isCustomNetworkActive &&
+                    feedProvider.activeCustomNetwork != null) ...[
+                  const SizedBox(width: 8),
+                  BounceTap(
+                    scaleDown: 0.92,
+                    onTap: () {
+                      HapticFeedback.lightImpact();
+                      NetworkMembersSheet.show(
+                          context, feedProvider.activeCustomNetwork!);
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 5.5),
+                      decoration: BoxDecoration(
+                        color: feedProvider.activeCustomNetwork!.color
+                            .withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(99),
+                        border: Border.all(
+                          color: feedProvider.activeCustomNetwork!.color
+                              .withValues(alpha: 0.35),
+                          width: 1,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            feedProvider.activeCustomNetwork!.memberCount <= 1
+                                ? Icons.person_add_rounded
+                                : Icons.people_rounded,
+                            size: 13,
+                            color: feedProvider.activeCustomNetwork!.color,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            feedProvider.activeCustomNetwork!.memberCount <= 1
+                                ? 'Add'
+                                : '${feedProvider.activeCustomNetwork!.memberCount}',
+                            style: TextStyle(
+                              color: feedProvider.activeCustomNetwork!.color,
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
                 const SizedBox(width: 8),
                 // Right: Notification Icon Button
                 Consumer<NotificationProvider>(
@@ -1216,10 +1370,16 @@ class _CircleFeedPageState extends State<CircleFeedPage> {
         padding: const EdgeInsets.only(bottom: 70.0),
         child: FloatingActionButton(
           heroTag: 'network_feed_fab',
+          tooltip: 'Create Post',
           backgroundColor: Colors.white,
           elevation: 4,
-          onPressed: () => _openComposeSheet(context),
-          child: const Icon(Icons.add_rounded, color: Colors.black, size: 28),
+          highlightElevation: 8,
+          shape: const CircleBorder(),
+          onPressed: () {
+            HapticFeedback.lightImpact();
+            _openComposeSheet(context);
+          },
+          child: const Icon(Icons.edit_outlined, color: Colors.black, size: 24),
         ),
       ),
     );
@@ -1264,8 +1424,10 @@ class _CircleFeedPageState extends State<CircleFeedPage> {
                     ],
                   ),
                 )
-              : feedProvider.posts.isEmpty
-                  ? Builder(
+              : (feedProvider.isCustomNetworkActive && displayedPosts.isEmpty)
+                  ? _buildEmptyCustomNetworkState(context, activeCustomNet)
+                  : feedProvider.posts.isEmpty
+                      ? Builder(
                       builder: (context) {
                         final connectionProvider =
                             Provider.of<ConnectionProvider>(context);
@@ -1354,8 +1516,8 @@ class _CircleFeedPageState extends State<CircleFeedPage> {
                                                 Colors.transparent,
                                             builder: (context) =>
                                                 const ConnectHubBottomSheet(
-                                              initialTabIndex: 1,
-                                              showOnboardingSteps: true,
+                                              initialTabIndex: 0,
+                                              showOnboardingSteps: false,
                                             ),
                                           );
                                         } else {
@@ -1394,6 +1556,20 @@ class _CircleFeedPageState extends State<CircleFeedPage> {
                                         ),
                                       ),
                                     ),
+                                    const SizedBox(height: 10),
+                                    TextButton.icon(
+                                      onPressed: () => NetworkGuideSheet.show(context),
+                                      icon: const Icon(Icons.info_outline_rounded,
+                                          size: 15, color: Colors.white60),
+                                      label: const Text(
+                                        "How Jana Works",
+                                        style: TextStyle(
+                                          color: Colors.white70,
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ),
                                   ],
                                 ),
                               ),
@@ -1413,7 +1589,107 @@ class _CircleFeedPageState extends State<CircleFeedPage> {
                           itemCount: displayedPosts.length + 2,
                           itemBuilder: (context, index) {
                             if (index == 0) {
-                              return const PulseRowWidget();
+                              return Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const PulseRowWidget(),
+                                  if (feedProvider.isCustomNetworkActive &&
+                                      activeCustomNet != null &&
+                                      activeCustomNet.memberCount <= 1)
+                                    Padding(
+                                      padding: const EdgeInsets.fromLTRB(
+                                          16, 6, 16, 12),
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 14, vertical: 10),
+                                        decoration: BoxDecoration(
+                                          color: context.surfaceSecondary,
+                                          borderRadius:
+                                              BorderRadius.circular(14),
+                                          border: Border.all(
+                                            color: activeCustomNet.color
+                                                .withValues(alpha: 0.3),
+                                            width: 1,
+                                          ),
+                                        ),
+                                        child: Row(
+                                          children: [
+                                            Container(
+                                              width: 32,
+                                              height: 32,
+                                              decoration: BoxDecoration(
+                                                color: activeCustomNet.color
+                                                    .withValues(alpha: 0.15),
+                                                shape: BoxShape.circle,
+                                              ),
+                                              child: Icon(
+                                                Icons.person_add_rounded,
+                                                color: activeCustomNet.color,
+                                                size: 16,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 10),
+                                            Expanded(
+                                              child: Column(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
+                                                children: [
+                                                  Text(
+                                                    "Only 1 member here",
+                                                    style: TextStyle(
+                                                      color: context
+                                                          .textPrimary,
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                      fontSize: 12.5,
+                                                    ),
+                                                  ),
+                                                  Text(
+                                                    "Add members so others can see your posts.",
+                                                    style: TextStyle(
+                                                      color: context
+                                                          .textSecondary,
+                                                      fontSize: 11,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                            const SizedBox(width: 8),
+                                            BounceTap(
+                                              scaleDown: 0.94,
+                                              onTap: () {
+                                                HapticFeedback.lightImpact();
+                                                NetworkMembersSheet.show(
+                                                    context, activeCustomNet);
+                                              },
+                                              child: Container(
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                        horizontal: 12,
+                                                        vertical: 6),
+                                                decoration: BoxDecoration(
+                                                  color: Colors.white,
+                                                  borderRadius:
+                                                      BorderRadius.circular(99),
+                                                ),
+                                                child: const Text(
+                                                  "Add",
+                                                  style: TextStyle(
+                                                    color: Colors.black,
+                                                    fontWeight:
+                                                        FontWeight.bold,
+                                                    fontSize: 12,
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              );
                             }
 
                             if (index == displayedPosts.length + 1) {

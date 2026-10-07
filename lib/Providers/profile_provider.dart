@@ -122,6 +122,7 @@ class ProfileProvider with ChangeNotifier {
   String vibeTag = '';
   List<String> interestTags = [];
   bool quickSetupComplete = false;
+  bool hasSeenNetworkGuide = false;
   bool showSignUpNext = false;
 
   /// Returns company dynamically mapped to the Experience list item where
@@ -892,6 +893,7 @@ class ProfileProvider with ChangeNotifier {
           interestTags = [];
         }
         quickSetupComplete = response['quick_setup_complete'] == true;
+        hasSeenNetworkGuide = response['has_seen_network_guide'] == true;
 
         final dbVisibility = response['default_card_visibility']?.toString();
         if (dbVisibility != null && dbVisibility.isNotEmpty) {
@@ -1141,6 +1143,7 @@ class ProfileProvider with ChangeNotifier {
     vibeTag = '';
     interestTags = [];
     quickSetupComplete = false;
+    hasSeenNetworkGuide = false;
     _state = ProfileInitial();
     LocalDatabaseHelper.activeUserId = null;
     notifyListeners();
@@ -1278,6 +1281,19 @@ class ProfileProvider with ChangeNotifier {
     }
   }
 
+  Future<void> setHasSeenNetworkGuide(bool val) async {
+    hasSeenNetworkGuide = val;
+    notifyListeners();
+    final currentUserId = userId;
+    if (currentUserId != null) {
+      try {
+        await _repository.updateProfileField(currentUserId, 'has_seen_network_guide', val);
+      } catch (e) {
+        debugPrint("Error saving hasSeenNetworkGuide to Supabase: $e");
+      }
+    }
+  }
+
   void setVibeAndInterests(String vibe, List<String> interests) {
     vibeTag = vibe;
     interestTags = interests;
@@ -1293,36 +1309,96 @@ class ProfileProvider with ChangeNotifier {
 
     final client = Supabase.instance.client;
 
-    // Delete in order to prevent foreign key constraint violations
-    // 1. Delete network_stats
-    await client.from('network_stats').delete().eq('user_id', myUserId);
+    // 1. Clean up post views and reactions first
+    try {
+      await client.from('post_seen').delete().eq('viewer_id', myUserId);
+    } catch (e) {
+      debugPrint("deleteAccount: cleanup post_seen: $e");
+    }
+    try {
+      await client.from('post_reactions').delete().eq('user_id', myUserId);
+    } catch (e) {
+      debugPrint("deleteAccount: cleanup post_reactions: $e");
+    }
 
-    // 2. Delete referral_requests where user is requester, target, or via
-    await client.from('referral_requests').delete().eq('requester_id', myUserId);
-    await client.from('referral_requests').delete().eq('target_id', myUserId);
-    await client.from('referral_requests').delete().eq('via_user_id', myUserId);
+    // 2. Clean up posts in hierarchical order to satisfy self-referencing FK constraints:
+    // For root posts created by this user, delete all thread replies first, then the root post
+    try {
+      final rootPostsRes = await client
+          .from('posts')
+          .select('id')
+          .eq('author_id', myUserId)
+          .filter('reply_to_post_id', 'is', 'null');
+      
+      final List<dynamic> rootPosts = rootPostsRes as List<dynamic>;
+      for (final rp in rootPosts) {
+        final rootId = rp['id'];
+        if (rootId != null) {
+          try {
+            await client
+                .from('posts')
+                .delete()
+                .eq('root_post_id', rootId)
+                .neq('id', rootId);
+          } catch (e) {
+            debugPrint("deleteAccount: delete replies for root $rootId: $e");
+          }
+          try {
+            await client.from('posts').delete().eq('id', rootId);
+          } catch (e) {
+            debugPrint("deleteAccount: delete root post $rootId: $e");
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint("deleteAccount: query root posts: $e");
+    }
 
-    // 3. Delete profiles row — this cascades deletes user_connections, room_participants,
-    // messages, user_push_tokens, invite_codes, and connection_notifications!
-    await client.from('profiles').delete().eq('id', myUserId);
+    // Delete any remaining replies authored by this user
+    try {
+      await client.from('posts').delete().eq('author_id', myUserId);
+    } catch (e) {
+      debugPrint("deleteAccount: cleanup user posts: $e");
+    }
 
-    // 4. Wipe local databases
+    // 3. Clean up custom networks, members, and user-scoped stats
+    try { await client.from('custom_network_members').delete().eq('user_id', myUserId); } catch (_) {}
+    try { await client.from('custom_networks').delete().eq('creator_id', myUserId); } catch (_) {}
+    try { await client.from('user_pulses').delete().eq('user_id', myUserId); } catch (_) {}
+    try { await client.from('network_stats').delete().eq('user_id', myUserId); } catch (_) {}
+    try { await client.from('referral_requests').delete().eq('requester_id', myUserId); } catch (_) {}
+    try { await client.from('referral_requests').delete().eq('target_id', myUserId); } catch (_) {}
+    try { await client.from('referral_requests').delete().eq('via_user_id', myUserId); } catch (_) {}
+
+    // 4. Call server-side RPC to delete the profile and auth user cleanly
+    try {
+      await client.rpc('delete_user_account', params: {
+        'target_profile_id': myUserId,
+      });
+    } catch (rpcError) {
+      debugPrint("delete_user_account RPC error, attempting direct profile delete: $rpcError");
+      await client.from('profiles').delete().eq('id', myUserId);
+    }
+
+    // 2. Wipe local databases
     await LocalDatabaseHelper.instance.clearDatabaseForUser(myUserId);
 
-    // 5. Clear SharedPreferences keys
+    // 3. Clear SharedPreferences keys
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('owner_id');
     await prefs.remove('default_card_visibility');
     await prefs.remove('blur_background');
 
-    // 6. Clear fields in Provider
+    // 4. Clear fields in Provider
     clearFields();
 
     // Set redirect flag
     showSignUpNext = true;
 
-    // 7. Sign out of auth
-    await client.auth.signOut();
+    // 5. Sign out of auth
+    try {
+      await client.auth.signOut();
+    } catch (_) {}
   }
 
   Future<void> signOut() async {

@@ -834,7 +834,7 @@ class _NotificationPageState extends State<NotificationPage> {
                                                     ? " connected via QR scan"
                                                     : (type == 'referral_connect'
                                                         ? " connected via Referral"
-                                                        : " connected via Private Key"))))),
+                                                        : " connected via Invite Pass"))))),
                                 style: const TextStyle(color: Colors.white70),
                               ),
                               if (timeStr.isNotEmpty)
@@ -1769,7 +1769,7 @@ class _NotificationPageState extends State<NotificationPage> {
           const Padding(
             padding: EdgeInsets.symmetric(horizontal: 48),
             child: Text(
-              "New connections via QR code scans or Private Keys will show up here.",
+              "New connections via QR code scans or Invite Passes will show up here.",
               style: TextStyle(
                 color: Color(0xFF8B8C9E),
                 fontSize: 13,

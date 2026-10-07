@@ -56,7 +56,7 @@ class DiscordNetworkRailDrawer extends StatelessWidget {
     ),
     NetworkItemData(
       filter: FeedFilter.innerCircle,
-      name: 'Inner Circle',
+      name: 'Inner Network',
       subtitle: 'Direct 1st degree connections only',
       icon: Icons.people_alt_rounded,
     ),
@@ -347,7 +347,7 @@ class DiscordNetworkRailDrawer extends StatelessWidget {
 
   Widget _buildCreateNetworkButton(BuildContext context) {
     return Tooltip(
-      message: 'Create Network',
+      message: 'Create Sub-Network',
       preferBelow: false,
       verticalOffset: 26,
       textStyle: GoogleFonts.inter(
